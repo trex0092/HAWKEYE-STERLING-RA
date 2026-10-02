@@ -125,4 +125,4 @@ jobs:
         run: |
           node scripts/asana-alert.mjs \
             "DAILY SCREENING NOT FULLY DELIVERED BY 09:00 UAE ($GUARD_DAY)" \
-            "The deadline guard could not evidence full delivery of $GUARD_DAY's screening before 09:00 UAE (05:00 UTC): the Daily AML/CFT Screening Report with its full-results attachments, and a successful Sanctions Screen run. It re-dispatched failed runs (at most twice each); the job summary names which screen is missing or late and why. Control Retry and the Delivery Watchdog continue to recover and verify later today. $RUN_URL"
+            "The deadline guard could not evidence full delivery of $GUARD_DAY's screening before 09:00 UAE (05:00 UTC): the Daily AML/CFT Screening Report with its full-results attachments, and a Sanctions Screen run whose Asana delivery step succeeded. It re-dispatched failed runs (at most twice each); the job summary names which screen is missing or late and why. Control Retry and the Delivery Watchdog continue to recover and verify later today. $RUN_URL"

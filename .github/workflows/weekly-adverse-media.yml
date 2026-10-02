@@ -361,6 +361,9 @@ jobs:
 
       - name: Run unified daily screening (sanctions + adverse media + PEP)
         env:
+          # Personal EU FSF crawler token (optional) for the official EU XML
+          # fallback: the shared public token now redirects to EU Login.
+          EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
           # HR - Employees screening population (MLRO-directed 2026-07-29,

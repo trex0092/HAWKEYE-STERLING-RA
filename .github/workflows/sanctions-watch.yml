@@ -103,6 +103,9 @@ jobs:
           # Read-only: the TFS timeline log queries screening-run history
           # (actions:read) to record publication → ingestion → re-screen timing.
           GITHUB_TOKEN: ${{ github.token }}
+          # Personal EU FSF crawler token (optional): the shared public token now
+          # redirects to EU Login; unset = the EU list is reported blind at once.
+          EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
         run: node scripts/sanctions-watch.mjs "$MODE"
 
       - name: Trigger an immediate re-screen (TFS without-delay duty)

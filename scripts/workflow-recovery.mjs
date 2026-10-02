@@ -259,13 +259,38 @@ export function guardStep(runs, { targetDayMs, nowMs, delivered, redispatches = 
   return { action: 'redispatch', reason: why };
 }
 
-/* Final verdict: green only when every screen evidenced delivery by the deadline. */
+/* Final verdict: green only when every screen evidenced delivery by the deadline.
+   A screen that delivered but whose run failed its coverage-assurance gate is
+   delivered (the deadline control is met) and is named as DEGRADED in the
+   verdict; its coverage gap is alerted by the screen's own assurance chain. */
 export function guardVerdict(states, deadlineMs) {
   const missing = states.filter(s => !Number.isFinite(s.doneAtMs));
   const late = states.filter(s => Number.isFinite(s.doneAtMs) && s.doneAtMs > deadlineMs);
-  if (missing.length) return { ok: false, reason: `not delivered: ${missing.map(s => s.id).join(', ')}` };
-  if (late.length) return { ok: false, reason: `delivered AFTER 09:00 UAE: ${late.map(s => s.id).join(', ')}` };
-  return { ok: true, reason: 'every screen evidenced delivery before 09:00 UAE' };
+  const degraded = states.filter(s => s.degraded);
+  const note = degraded.length ? `; coverage DEGRADED (delivered, but the run failed its runtime-assurance gate): ${degraded.map(s => s.id).join(', ')}` : '';
+  if (missing.length) return { ok: false, degraded: degraded.length > 0, reason: `not delivered: ${missing.map(s => s.id).join(', ')}${note}` };
+  if (late.length) return { ok: false, degraded: degraded.length > 0, reason: `delivered AFTER 09:00 UAE: ${late.map(s => s.id).join(', ')}${note}` };
+  return { ok: true, degraded: degraded.length > 0, reason: `every screen evidenced delivery before 09:00 UAE${note}` };
+}
+
+/* Sanctions Screen delivery evidence from today's runs (newest first). A run
+   that concluded success delivered. A run that FAILED but whose Asana
+   delivery step succeeded also delivered — its red came from a later gate
+   (e.g. a required list now behind a sign-in), which a re-run cannot fix, so
+   it is 'degraded', never re-dispatched. Anything else: not delivered.
+   jobsOf(runId) returns the run's jobs (Actions API). Pure apart from it. */
+export const SANCTIONS_DELIVERY_STEP = 'Deliver and verify complete daily screening evidence in Asana';
+export async function sanctionsEvidence(runs, targetDayMs, jobsOf, branch = 'main') {
+  const today = (runs || []).filter(r => r && r.head_branch === branch && EVENTS.has(r.event)
+    && Number.isFinite(runTime(r)) && runTime(r) >= targetDayMs && r.status === 'completed')
+    .sort((a, b) => runTime(b) - runTime(a));
+  if (today.some(r => r.conclusion === 'success')) return true;
+  for (const r of today) {
+    const jobs = await jobsOf(r.id);
+    const steps = (Array.isArray(jobs) ? jobs : []).flatMap(j => (j && Array.isArray(j.steps)) ? j.steps : []);
+    if (steps.some(st => st && st.name === SANCTIONS_DELIVERY_STEP && st.conclusion === 'success')) return 'degraded';
+  }
+  return false;
 }
 
 async function guard() {
@@ -277,8 +302,8 @@ async function guard() {
   const { deadlineMs, endMs } = guardWindow(startMs, targetDayMs);
   const { reportEvidence } = await import('./delivery-watchdog.mjs');
   const evidence = {
-    'sanctions-screen.yml': async runs => runs.some(r => r.head_branch === 'main' && EVENTS.has(r.event)
-      && runTime(r) >= targetDayMs && r.status === 'completed' && r.conclusion === 'success'),
+    'sanctions-screen.yml': runs => sanctionsEvidence(runs, targetDayMs,
+      async id => ((await api(`/actions/runs/${encodeURIComponent(id)}/jobs?per_page=100`)).data || {}).jobs),
     'weekly-adverse-media.yml': async () => {
       if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN missing');
       return (await reportEvidence(day)).delivered;
@@ -294,6 +319,7 @@ async function guard() {
       catch (err) { s.last = 'run history unreadable: ' + err.message; console.log(`deadline-guard: ${s.id} -> ${s.last}`); continue; }
       try { delivered = await evidence[s.id](runs); }
       catch (err) { evidenceError = ' (' + String(err.message).slice(0, 200) + ')'; }
+      if (delivered === 'degraded') { s.degraded = true; delivered = true; }
       const step = guardStep(runs, { targetDayMs, nowMs: Date.now(), delivered,
         redispatches: s.redispatches, lastDispatchMs: s.lastDispatchMs });
       if (step.action === 'done') s.doneAtMs = Date.now();
@@ -318,6 +344,7 @@ async function guard() {
     ...states.map(s => `| ${cell(s.id)} | ${Number.isFinite(s.doneAtMs) ? new Date(s.doneAtMs).toISOString().slice(11, 16) : 'NOT delivered'} | ${s.redispatches} | ${cell(s.last)} |`), ''].join('\n');
   console.log(report);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
+  if (verdict.degraded) console.log('::warning::' + verdict.reason.replace(/[\r\n]/g, ' '));
   if (!verdict.ok) process.exitCode = 1;
 }
 
@@ -493,7 +520,26 @@ export async function selfTest() {
   assert.equal(guardVerdict([{ id: 'a', doneAtMs: deadline - 1 }, { id: 'b', doneAtMs: deadline }], deadline).ok, true);
   assert.equal(guardVerdict([{ id: 'a', doneAtMs: deadline + 1 }], deadline).ok, false, 'late delivery fails loudly');
   assert.equal(guardVerdict([{ id: 'a', doneAtMs: NaN }], deadline).ok, false);
-  console.log('workflow-recovery: 55 offline regression checks passed');
+  // Sanctions evidence: a delivered-but-assurance-red run is 'degraded', not
+  // re-dispatched (2 Oct 2026: EU list behind EU Login, results in Asana).
+  const day3 = Date.parse('2026-10-02T00:00:00Z');
+  const sr = (patch = {}) => r({ id: 7, created_at: '2026-10-02T00:05:02Z', ...patch });
+  const jobsWith = conclusion => async () => [{ steps: [{ name: 'Screen the customer base', conclusion: 'success' },
+    { name: 'Prove worldwide screening runtime assurance', conclusion: 'failure' },
+    { name: SANCTIONS_DELIVERY_STEP, conclusion }] }];
+  assert.equal(await sanctionsEvidence([sr()], day3, async () => { throw new Error('not needed'); }), true);
+  assert.equal(await sanctionsEvidence([sr({ conclusion: 'failure' })], day3, jobsWith('success')), 'degraded');
+  assert.equal(await sanctionsEvidence([sr({ conclusion: 'failure' })], day3, jobsWith('skipped')), false,
+    'a run whose delivery step did not succeed is not delivered');
+  assert.equal(await sanctionsEvidence([sr({ conclusion: 'failure', created_at: '2026-10-01T23:00:00Z' })], day3, jobsWith('success')), false,
+    'yesterday\'s delivery is not today\'s');
+  assert.equal(await sanctionsEvidence([sr({ status: 'in_progress', conclusion: null })], day3, jobsWith('success')), false);
+  await assert.rejects(sanctionsEvidence([sr({ conclusion: 'failure' })], day3, async () => { throw new Error('HTTP 502'); }),
+    'unreadable jobs propagate (the guard then waits, never re-dispatches blind)');
+  const dv = guardVerdict([{ id: 'sanctions-screen.yml', doneAtMs: deadline - 1, degraded: true }, { id: 'b', doneAtMs: deadline - 1 }], deadline);
+  assert.equal(dv.ok, true);
+  assert.ok(dv.degraded && /DEGRADED/.test(dv.reason) && /sanctions-screen\.yml/.test(dv.reason), 'degraded is named, never silent');
+  console.log('workflow-recovery: 63 offline regression checks passed');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

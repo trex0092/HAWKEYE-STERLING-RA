@@ -1597,6 +1597,16 @@ check("EU fallback provenance is explicit in the list date (audit trail)",
       bool(_fb) and "official" in _fb[1].lower())
 check("EU fallback targets webgate with the public FSF token",
       bool(_dl_urls) and "webgate.ec.europa.eu" in _dl_urls[0] and "token=" in _dl_urls[0])
+check("EU fallback: unset EU_FSF_TOKEN keeps the public URL",
+      screen.eu_official_xml_url({}) == screen.EU_OFFICIAL_XML_URL)
+_pu = screen.eu_official_xml_url({"EU_FSF_TOKEN": " personal_123 "})
+check("EU fallback: a personal EU_FSF_TOKEN replaces only the token parameter",
+      _pu.startswith("https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?")
+      and _pu.endswith("token=personal_123") and _pu.count("token=") == 1)
+check("EU fallback: an injection-shaped token is ignored",
+      screen.eu_official_xml_url({"EU_FSF_TOKEN": "x&url=https://evil"}) == screen.EU_OFFICIAL_XML_URL)
+check("EU fallback: an EU Login sign-in page parses to no names (fails loudly, never 'loaded')",
+      screen.parse_eu_official_xml(b"<!DOCTYPE html><html><title>EU Login</title></html>") == set())
 check("no official-XML fetch when the mirror loaded",
       screen._eu_official_fallback({"LOADED"}) is None and len(_dl_urls) == 1)
 screen.download = lambda url, label: None
