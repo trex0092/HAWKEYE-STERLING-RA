@@ -35,7 +35,7 @@
 
 [![CI](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/ci.yml/badge.svg)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/codeql.yml/badge.svg)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/codeql.yml)
-[![Daily Screening](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/weekly-adverse-media.yml?branch=main&label=daily%20screening)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/weekly-adverse-media.yml)
+[![Daily Screening](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/weekly-adverse-media.yml/badge.svg?branch=main)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/weekly-adverse-media.yml)
 [![Controls Freshness](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/freshness-check.yml?branch=main&label=controls%20freshness)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/freshness-check.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/trex0092/HAWKEYE-STERLING-RA/badge)](https://scorecard.dev/viewer/?uri=github.com/trex0092/HAWKEYE-STERLING-RA)
 [![Latest Release](https://img.shields.io/github/v/release/trex0092/HAWKEYE-STERLING-RA?label=release)](https://github.com/trex0092/HAWKEYE-STERLING-RA/releases)

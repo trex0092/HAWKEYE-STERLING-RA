@@ -14,6 +14,7 @@ bump merged to `main`.
 
 ### Fixed
 
+- **README: the Daily Screening badge reads GitHub's own status.** On 2 Oct 2026 shields.io's JSON for this workflow returned `failing` while GitHub's native badge for the same workflow returned `passing`, and the run history agrees with GitHub (every recent run succeeded; the 00:05 UTC run delivered the full results to Asana). The same mismatch was visible on 1 Oct. The badge now uses GitHub's native `badge.svg?branch=main`, like the CI and CodeQL badges. Its label becomes the workflow's display name: "Daily Screening (Sanctions + Adverse Media + PEP)".
 - **Adverse media: a post-sweep second pass for zero-coverage subjects.** The per-subject last-resort retry runs while the whole book is still being swept, at peak provider pressure. On 2 Oct 2026 it recovered 275 of 286 subjects and left 11 with zero backbone coverage (GDELT down for all 952, Google News for 925).
   - After the sweep, the Sanctions Screen now re-checks only those zero-coverage subjects: once, after a cool-down (`ADVERSE_SECOND_PASS_DELAY_MS`, default 60 s), at concurrency 2, within the enrichment deadline. It is capped at 100 subjects, because a mass failure means the providers are down globally and re-querying adds load.
   - A recovered subject is rebuilt through the same `finalize()` path as the sweep, so a recovered hit merges exactly like a first-pass hit, and its error is un-counted. A subject that still fails stays a counted, fatal error.
