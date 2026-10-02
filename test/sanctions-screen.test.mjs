@@ -1985,5 +1985,24 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     /const junk = screenableNames\(parsed\);[\s\S]{0,600}FORMAT DRIFT[\s\S]{0,400}const names = junk\.kept;/.test(src));
 }
 
+// describeFetchError: a network failure must say WHY, not just "fetch failed"
+// (EU consolidated list, 1 Oct 2026: the cause was hidden on error.cause).
+{
+  const d = scr.describeFetchError;
+  const tls = new TypeError('fetch failed', { cause: Object.assign(new Error('unable to verify the first certificate'), { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }) });
+  check('fetch error: the TLS cause code and message are surfaced',
+    d(tls) === 'fetch failed <- UNABLE_TO_VERIFY_LEAF_SIGNATURE: unable to verify the first certificate');
+  const reset = new TypeError('fetch failed', { cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }) });
+  check('fetch error: a connection reset is surfaced', /ECONNRESET/.test(d(reset)));
+  const nested = new TypeError('fetch failed', { cause: new Error('connect failed', { cause: Object.assign(new Error('connect ETIMEDOUT 1.2.3.4:443'), { code: 'ETIMEDOUT' }) }) });
+  check('fetch error: a nested cause chain is followed', /connect failed/.test(d(nested)) && /ETIMEDOUT/.test(d(nested)));
+  check('fetch error: a plain error is unchanged', d(new Error('HTTP 503')) === 'HTTP 503');
+  check('fetch error: null / string inputs never throw', d(null) === 'unknown error' && d('boom') === 'boom');
+  check('fetch error: bounded length', d(new Error('x'.repeat(1000))).length <= 300);
+  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('fetch error: every source-load failure reports the cause chain',
+    /could not be loaded \(' \+ describeFetchError\(e\)/.test(src) && /transport failure — retry in ' \+ delay \+ 'ms: ' \+ describeFetchError\(e\)/.test(src));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

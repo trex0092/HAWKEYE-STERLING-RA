@@ -1124,6 +1124,23 @@ async function withTimeout(promiseFactory, timeoutMs) {
   finally { clearTimeout(t); }
 }
 
+/* Node's fetch reports every network-level failure as the bare message
+   "fetch failed"; the actual reason (a TLS certificate error, a connection
+   reset, a DNS or connect timeout) is only on error.cause. Logging the bare
+   message hid why the EU consolidated list stopped loading on 1 Oct 2026, so
+   every source failure now carries its cause chain. Source URLs are public
+   list endpoints, never subject data. Pure — unit-tested. */
+export function describeFetchError(e) {
+  if (e == null) return 'unknown error';
+  const parts = [String((e && e.message) || e)];
+  let c = e && e.cause;
+  for (let depth = 0; c && depth < 3; depth++, c = c.cause) {
+    const bit = [c.code, c.message || (typeof c === 'string' ? c : '')].filter(Boolean).join(': ');
+    if (bit && !parts.includes(bit)) parts.push(bit);
+  }
+  return parts.join(' <- ').slice(0, 300);
+}
+
 /* National sanctions endpoints are materially less reliable than Asana.
    Retry transient transport failures and 429/5xx responses before declaring
    coverage degraded. Each attempt gets its own timeout. AbortError means the
@@ -1147,7 +1164,7 @@ async function fetchSourceResponse(url, options = {}, timeoutMs = 60000, attempt
       if (e && e.name === 'AbortError') throw e;
       if (attempt === max - 1) throw e;
       const delay = Math.min(4000, 750 * (2 ** attempt));
-      console.warn('sanctions-screen: ' + label + ' transport failure — retry in ' + delay + 'ms: ' + String(e && e.message || e).slice(0, 120));
+      console.warn('sanctions-screen: ' + label + ' transport failure — retry in ' + delay + 'ms: ' + describeFetchError(e));
       await asanaSleep(delay);
     }
   }
@@ -1699,8 +1716,8 @@ export async function loadSanctionsLists(cfg) {
       fetched++;
       console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');
     } catch (e) {
-      failures.push({ source: s, reason: 'could not be loaded (' + (e && e.message || e) + ')' });
-      console.error('sanctions-screen: ' + s.id + ' failed - ' + (e && e.message || e));
+      failures.push({ source: s, reason: 'could not be loaded (' + describeFetchError(e) + ')' });
+      console.error('sanctions-screen: ' + s.id + ' failed - ' + describeFetchError(e));
     }
   }));
 

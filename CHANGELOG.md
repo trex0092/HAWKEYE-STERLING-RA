@@ -14,6 +14,7 @@ bump merged to `main`.
 
 ### Fixed
 
+- **A sanctions list that fails to download now says why.** Since 1 Oct 2026 ~17:54 UTC the EU consolidated financial sanctions list (`eu-fsf`, a required list) has failed to load in the Sanctions Screen. The runner's firewall allows the EU host and the connection opens, but the log showed only Node's bare `fetch failed`, because Node keeps the real reason (TLS certificate error, connection reset, timeout) on `error.cause`. `describeFetchError` now reports the cause chain on every source failure: in the retry warning, the failure log line and the assurance note. The screen still fails red on the missing list, as before; this makes the next run name the root cause.
 - **README status board: no false red.**
   - The six coverage-count badges (sanctions lists, sanctions jurisdictions, sanctions countries researched, and the adverse-media editions, countries and languages) were fixed-colour red or orange. They showed red regardless of their value, which read as a failing control. They are now neutral blue, like the national-source depth badge. These are configured counts, not health states; runtime health stays on the operational badges.
   - The Advisor Eval badge stayed red after the 28–29 Sep Anthropic API usage-limit lapse, although today's run held 30/30 guardrails. The badge counts only scheduled and push runs. A change to `advisor-eval.yml` itself now re-runs the live eval, and this PR's merge produces that real verification on `main`.
