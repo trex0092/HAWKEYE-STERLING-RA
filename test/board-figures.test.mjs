@@ -110,7 +110,7 @@ console.log('\n— runtime worldwide screening assurance —\n');
           { id: 'ofac-sdn', required: true },
           { id: 'ofac-consolidated', required: true },
           { id: 'uk-ofsi', required: true },
-          { id: 'eu-fsf', required: true },
+          { id: 'eu-fsf', required: true, fallbackSourceId: 'fr-dgt' },
         ],
       },
     },
@@ -155,6 +155,41 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const miss = assessRuntime({ results: noOfac, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
   check('runtime assurance fails when a required sanctions backbone is missing',
     !miss.domains.sanctions.operational && miss.domains.sanctions.reasons.some(r => r.includes('ofac-sdn')));
+
+  /* eu-fsf behind EU Login: its declared fallback fr-dgt (which includes
+     every EU freeze) covers it only when fr-dgt itself loaded complete, and
+     the substitution is always named, never silent. */
+  const euDown = structuredClone(results);
+  euDown.lists = euDown.lists.filter(x => x.id !== 'eu-fsf').concat([{ id: 'fr-dgt', count: 19627, partial: false }]);
+  const eu = assessRuntime({ results: euDown, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance accepts a required source served by its complete declared fallback, with a named warning',
+    eu.domains.sanctions.operational
+    && eu.domains.sanctions.warnings.some(w => w.includes('eu-fsf') && w.includes('fr-dgt') && w.includes('19627'))
+    && eu.domains.sanctions.evidence.servedByFallback.length === 1
+    && eu.domains.sanctions.evidence.servedByFallback[0].fallback === 'fr-dgt');
+  const euFbPartial = structuredClone(euDown);
+  euFbPartial.lists = euFbPartial.lists.map(x => x.id === 'fr-dgt' ? { ...x, count: 600, partial: true } : x);
+  const efp = assessRuntime({ results: euFbPartial, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance still fails when the declared fallback is itself partial',
+    !efp.domains.sanctions.operational && efp.domains.sanctions.reasons.some(r => r.includes('eu-fsf'))
+    && efp.domains.sanctions.evidence.servedByFallback.length === 0);
+  const euBoth = structuredClone(results);
+  euBoth.lists = euBoth.lists.filter(x => x.id !== 'eu-fsf');
+  const eb = assessRuntime({ results: euBoth, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance fails when the required source and its fallback are both missing',
+    !eb.domains.sanctions.operational && eb.domains.sanctions.reasons.some(r => r.includes('missing: eu-fsf')));
+  const euPartial = structuredClone(euDown);
+  euPartial.lists.push({ id: 'eu-fsf', count: 900, partial: true });
+  const ep = assessRuntime({ results: euPartial, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('a partial required source with a complete fallback is served by the fallback, named',
+    ep.domains.sanctions.operational && ep.domains.sanctions.warnings.some(w => w.includes('eu-fsf') && w.includes('fr-dgt')));
+  const noFbOfac = structuredClone(euDown);
+  noFbOfac.lists = noFbOfac.lists.filter(x => x.id !== 'ofac-sdn');
+  const nfo = assessRuntime({ results: noFbOfac, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('a fallback for one required source never covers a different required source',
+    !nfo.domains.sanctions.operational && nfo.domains.sanctions.reasons.some(r => r.includes('ofac-sdn')));
+  check('a complete primary is never reported as served by fallback',
+    ok.domains.sanctions.warnings.length === 0 && ok.domains.sanctions.evidence.servedByFallback.length === 0);
 
   const supplementalDown = structuredClone(results);
   supplementalDown.degraded = true;

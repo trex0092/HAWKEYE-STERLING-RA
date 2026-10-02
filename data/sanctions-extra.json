@@ -100,8 +100,8 @@
       "type": "json",
       "parser": "json",
       "enabled": true,
-      "_note": "France DGT national freeze register (Registre national des gels). Re-enabled 2026-07-08 with the documented ApiPublic base path (the previous path 404'd); the generic JSON parser assembles Nom/Prenom + aliases. A failed fetch or 0-name parse degrades coverage loudly, never silently.",
-      "minNames": 500
+      "_note": "France DGT national freeze register (Registre national des gels). Re-enabled 2026-07-08 with the documented ApiPublic base path (the previous path 404'd); the generic JSON parser assembles Nom/Prenom + aliases. A failed fetch or 0-name parse degrades coverage loudly, never silently. Declared fallback for eu-fsf (the register includes every EU freeze), so its floor is ~50% of the 19,627 names loaded on 2026-10-02: a truncated register must not stand in for the EU list.",
+      "minNames": 9800
     },
     {
       "id": "nz-terror",

@@ -53,16 +53,33 @@ export function assessRuntime({
   pepMaxAgeHours = DEFAULT_PEP_MAX_AGE_HOURS,
   expectedAdverseMatrix = LOCALES.length,
 } = {}) {
-  const requiredSanctions = arr(contract?.domains?.sanctions?.sources)
-    .filter(s => s && s.required !== false)
-    .map(s => String(s.id || '')).filter(Boolean);
+  const requiredEntries = arr(contract?.domains?.sanctions?.sources)
+    .filter(s => s && s.required !== false && String(s.id || ''));
+  const requiredSanctions = requiredEntries.map(s => String(s.id));
+  const fallbackOf = new Map(requiredEntries.map(s => [String(s.id), String(s.fallbackSourceId || '')]));
   const loaded = arr(results?.lists);
   const loadedById = new Map(loaded.map(x => [String(x?.id || ''), x]));
-  const missingRequired = requiredSanctions.filter(id => !loadedById.has(id));
-  const partialRequired = requiredSanctions.filter(id => loadedById.get(id)?.partial === true);
-  const emptyRequired = requiredSanctions.filter(id => num(loadedById.get(id)?.count) <= 0);
+  const complete = id => {
+    const x = loadedById.get(id);
+    return !!x && x.partial !== true && num(x.count) > 0;
+  };
+  /* A required source that did not load completely is covered only by its
+     contract-declared fallback, and only when that fallback loaded complete
+     (above its own floor). The substitution is a named warning plus
+     evidence, never a silent pass; without a complete fallback the gap
+     stays a hard reason exactly as before. */
+  const servedByFallback = requiredSanctions
+    .filter(id => !complete(id) && fallbackOf.get(id) && complete(fallbackOf.get(id)))
+    .map(id => ({ id, fallback: fallbackOf.get(id), fallbackCount: num(loadedById.get(fallbackOf.get(id))?.count) }));
+  const covered = new Set(servedByFallback.map(x => x.id));
+  const unresolvedRequired = requiredSanctions.filter(id => !covered.has(id));
+  const missingRequired = unresolvedRequired.filter(id => !loadedById.has(id));
+  const partialRequired = unresolvedRequired.filter(id => loadedById.get(id)?.partial === true);
+  const emptyRequired = unresolvedRequired.filter(id => num(loadedById.get(id)?.count) <= 0);
   const sanctionsReasons = [];
-  const sanctionsWarnings = [];
+  const sanctionsWarnings = servedByFallback.map(x => 'required sanctions source ' + x.id
+    + ' did not load completely - screened via its declared fallback ' + x.fallback
+    + ' (' + x.fallbackCount + ' names)');
   if (num(results?.screened) <= 0) sanctionsReasons.push('no subjects were screened');
   if (missingRequired.length) sanctionsReasons.push('required sanctions sources missing: ' + missingRequired.join(', '));
   if (partialRequired.length) sanctionsReasons.push('required sanctions sources partial: ' + partialRequired.join(', '));
@@ -78,6 +95,7 @@ export function assessRuntime({
     screenedSubjects: num(results?.screened),
     loadedSources: loaded.map(x => ({ id: x?.id || '', name: x?.name || '', count: num(x?.count), partial: !!x?.partial })),
     requiredSourceIds: requiredSanctions,
+    servedByFallback,
     notes: arr(results?.failures),
   }, sanctionsWarnings);
 

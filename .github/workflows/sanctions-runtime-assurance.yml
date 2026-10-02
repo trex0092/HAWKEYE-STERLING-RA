@@ -46,6 +46,7 @@ jobs:
             unsolprodfiles.blob.core.windows.net:443
             webgate.ec.europa.eu:443
             ecas.ec.europa.eu:443
+            gels-avoirs.dgtresor.gouv.fr:443
             sanctionslist.fcdo.gov.uk:443
             *.githubapp.com:443
 

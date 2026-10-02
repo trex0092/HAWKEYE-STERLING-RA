@@ -8,7 +8,7 @@ import {
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
   whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
-  getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay
+  getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay, loadSanctionsLists
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName, parseIdbCsv } from '../scripts/sanctions-match.mjs';
 const scr = await import('../scripts/sanctions-screen.mjs');
@@ -1602,6 +1602,51 @@ check('sanctions loader resolves declared fallback coverage before setting degra
     && /coverage preserved/.test(src)
     && /unresolved\.length > 0/.test(src);
 })());
+
+check('EU FSF declares the French DGT register (all EU freezes, no sign-in) as its coverage fallback', (() => {
+  const core = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-sources.json'), 'utf8'));
+  const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
+  const contract = JSON.parse(readFileSync(join(ROOT, 'data/worldwide-screening-sources.json'), 'utf8'));
+  const eu = (core.sources || []).find(s => s.id === 'eu-fsf');
+  const fr = (extra.sources || []).find(s => s.id === 'fr-dgt');
+  const req = (contract.domains.sanctions.sources || []).find(s => s.id === 'eu-fsf');
+  return eu && fr && req && eu.fallbackSourceId === 'fr-dgt' && req.fallbackSourceId === 'fr-dgt'
+    && fr.enabled !== false && Number(fr.minNames) >= 9000;
+})());
+{
+  /* Behavioural: a selective load (sourceIds, as the runtime assurance does)
+     reaches a fallback that lives in the extra file, and a failed primary
+     with a complete fallback is "coverage preserved", not degraded; with the
+     fallback absent the same failure stays degraded. */
+  const { mkdtempSync, writeFileSync: wf } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'eu-fb-'));
+  const fbFile = join(dir, 'fr.json');
+  wf(fbFile, JSON.stringify({ entries: ['Alpha Trading Holdings', 'Bravo Shipping Company', 'Charlie Metals Group'] }));
+  const sourcesFile = join(dir, 'sources.json');
+  wf(sourcesFile, JSON.stringify({ sources: [
+    { id: 'eu-fsf', name: 'EU test', url: 'https://example.invalid/eu', file: join(dir, 'absent.csv'), parser: 'eu', fallbackSourceId: 'fr-dgt' },
+    { id: 'uk-ofsi', name: 'UK test', url: 'https://example.invalid/uk', file: join(dir, 'absent-uk.csv') },
+  ] }));
+  const extraFile = join(dir, 'extra.json');
+  wf(extraFile, JSON.stringify({ sources: [
+    { id: 'fr-dgt', name: 'DGT test', file: fbFile, parser: 'curated', minNames: 2 },
+    { id: 'zz-other', name: 'Not selected', file: fbFile, parser: 'curated' },
+  ] }));
+  const quiet = [console.log, console.warn, console.error];
+  console.log = console.warn = console.error = () => {};
+  let sel, bare;
+  try {
+    sel = await loadSanctionsLists({ sourcesFile, extraFile, sourceIds: ['eu-fsf', 'fr-dgt'], listTimeoutMs: 1000 });
+    bare = await loadSanctionsLists({ sourcesFile, extraFile, sourceIds: ['eu-fsf'], listTimeoutMs: 1000 });
+  } finally { [console.log, console.warn, console.error] = quiet; }
+  check('selective load includes the requested extra-file fallback and nothing unrequested',
+    sel.lists.map(l => l.id).join() === 'fr-dgt' && sel.total === 2);
+  check('failed EU primary with a complete DGT fallback: coverage preserved, run not degraded, substitution named',
+    sel.degraded === false && sel.notes.some(n => /EU test/.test(n) && /fallback fr-dgt/.test(n) && /coverage preserved/.test(n)));
+  check('failed EU primary without its fallback loaded stays degraded (never silent)',
+    bare.degraded === true && bare.unresolvedSources.includes('eu-fsf') && bare.notes.some(n => /coverage degraded/.test(n)));
+}
 
 check('SECO direct source declares its already-enabled SECO mirror as coverage fallback', (() => {
   const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));

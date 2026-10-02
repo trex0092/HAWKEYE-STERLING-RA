@@ -63,7 +63,9 @@
       "type": "csv",
       "parser": "eu",
       "minNames": 20000,
-      "tokenEnv": "EU_FSF_TOKEN"
+      "tokenEnv": "EU_FSF_TOKEN",
+      "fallbackSourceId": "fr-dgt",
+      "_note_fallback": "Without a personal EU_FSF_TOKEN this endpoint redirects to the EU Login sign-in page (since 1 Oct 2026). fr-dgt (data/sanctions-extra.json, France DG Tresor Registre national des gels, public JSON API, no sign-in) is the declared fallback: the DG Tresor states the register 'inclut bien tous les gels prononces par l'UE (en plus des gels prononces a titre autonome national et ONU)'. When eu-fsf fails and fr-dgt loads above its floor, the loader and the runtime assurance report the substitution by name (never silently)."
     }
   ],
   "_README_tokenEnv": "tokenEnv: name of a repository secret holding a personal download token. When set, it replaces the url's token parameter for the request only (scripts/sanctions-screen.mjs applySourceToken); the stored url keeps the shared public token. eu-fsf: since 1 Oct 2026 the shared public token redirects to the EU Login sign-in page; the FSF platform's documented machine route is an account's personal crawler/robot URL.",
