@@ -1108,7 +1108,7 @@ check("TM report: the body carries confidentiality, legal basis, screening, aler
 check("TM report: a STOP payment raises the TFS obligation (POL-07) in §③",
       "TFS — 1 potential sanctions match(es)" in _tm_notes and "POL-07" in _tm_notes)
 check("TM report: the STOP payment and the rule alert of one customer form ONE case with the A–H record",
-      _tm_notes.count("▸ CASE ") == 1 and "▸ CASE 1 — Example Trading LLC — highest severity CRITICAL" in _tm_notes
+      _tm_notes.count("▸ CASE ") == 1 and "▸ CASE 1 — Customer: Example Trading LLC — highest severity CRITICAL" in _tm_notes
       and all(x in _tm_notes for x in ("A  Case ref", "B  KYC / CDD / EDD", "D  Screening — sanctions",
                                        "G  [ ] escalated to Compliance Officer", "[ ] no action — reasons",
                                        "H  Evidence location", "filing + 5 years")))
@@ -1312,12 +1312,57 @@ _mn, _mb = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, txn_monitor.evaluate(_multi)["alerts"],
     register_read=1, flag_refs=txn_monitor.red_flag_refs)
 check("TM report: 3+ distinct indicators on one customer are marked MULTIPLE INDICATORS",
-      "▸ CASE 1 — Demo Gold FZE" in _mb and "MULTIPLE INDICATORS" in _mb)
+      "▸ CASE 1 — Customer: Demo Gold FZE" in _mb and "MULTIPLE INDICATORS" in _mb)
 check("TM report: a DPMSR-scope payment raises the DPMSR obligation and the case lists it",
       "DPMSR — 1 transaction(s)/series" in _mb and "Obligations: TFS (POL-07)" not in _mb
       and "DPMSR" in _mb.split("▸ CASE 1")[1])
 check("TM report: rule alerts cite the red-flag register entries they evidence",
       "Red-flag register: " in _mb)
+_en_n, _en_b = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
+    entity_name="Example Reporting Entity LLC")
+check("TM report: the reporting entity heads the report and is named on its own line",
+      _en_b.startswith("EXAMPLE REPORTING ENTITY LLC — TRANSACTION MONITORING — DAILY REPORT")
+      and "Reporting entity: Example Reporting Entity LLC" in _en_b)
+check("TM report: an unreadable reporting entity is shown as UNAVAILABLE, never guessed",
+      "Reporting entity: ⚠ UNAVAILABLE" in _tm_b0 and _tm_b0.startswith("REPORTING ENTITY UNAVAILABLE — "))
+check("no company name in GitHub: the workflow carries no reporting-entity name or default",
+      "REPORTING_ENTITY_NAME" not in open(
+          os.path.join(ROOT, ".github", "workflows", "weekly-adverse-media.yml"), encoding="utf-8").read())
+_orig_ar3 = screen.asana_request
+try:
+    screen.asana_request = lambda *a, **k: _RegResp(200, {"data": {"workspace": {"name": "Example Workspace"}}})
+    _ent_ok = screen._asana_entity_name()
+    screen.asana_request = lambda *a, **k: _RegResp(500)
+    _ent_bad = screen._asana_entity_name()
+finally:
+    screen.asana_request = _orig_ar3
+check("reporting entity: read from the Asana workspace; an Asana failure gives '' (report says UNAVAILABLE)",
+      _ent_ok == "Example Workspace" and _ent_bad == "")
+_book = [{"gid": "1214000000000001", "name": "Example Trading LLC", "permalink": "https://app.asana.com/x/1"},
+         {"gid": "1214000000000002", "name": "Demo Gold FZE", "permalink": "https://app.asana.com/x/2"},
+         {"gid": "1216000000000009", "name": "Sample Employee", "kind": "employee"}]
+_rr = [{"customer": "https://app.asana.com/1/1213645083721316/project/1214107620220121/task/1214000000000002"},
+       {"customer": "example trading llc"}, {"customer": "Unknown Buyer Ltd"}, {"customer": "Sample Employee"}]
+_links = screen.resolve_register_customers(_rr, _book)
+check("customer resolver: an Asana task link or the exact name ties the task to its Customer Database record",
+      _rr[0]["customer"] == "Demo Gold FZE" and _rr[1]["customer"] == "Example Trading LLC"
+      and _rr[0]["customer_in_db"] and _rr[1]["customer_in_db"]
+      and _links == {"Demo Gold FZE": "https://app.asana.com/x/2", "Example Trading LLC": "https://app.asana.com/x/1"})
+check("customer resolver: an unknown name, and an employee, are NOT customers (customer_in_db False)",
+      _rr[2]["customer_in_db"] is False and _rr[3]["customer_in_db"] is False)
+check("CUSTOMER_NOT_IN_DB: fires only when the resolver found no customer record",
+      "CUSTOMER_NOT_IN_DB" in _rules([{**_rr[2], "date": "2026-10-01", "amount": 1}])
+      and "CUSTOMER_NOT_IN_DB" not in _rules([{**_rr[1], "date": "2026-10-01", "amount": 1}])
+      and "CUSTOMER_NOT_IN_DB" not in _rules([{"customer": "X", "date": "2026-10-01", "amount": 1}]))
+_cl_n, _cl_b = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []},
+    txn_monitor.evaluate([{**_rr[1], "date": "2026-10-01", "amount": 60000, "method": "cash"},
+                          {**_rr[2], "date": "2026-10-01", "amount": 1}])["alerts"],
+    register_read=2, customer_links=_links)
+check("TM report: each case links its Customer Database record, or says NOT FOUND",
+      "Customer Database: https://app.asana.com/x/1" in _cl_b
+      and "Customer Database: ⚠ NOT FOUND" in _cl_b.split("Customer: Unknown Buyer Ltd")[1])
 _tm_ne, _tm_be = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
     rule_errors={"rule_funnel": 2})
@@ -1699,6 +1744,9 @@ def _reset_breaker():
     screen._GDELT_STATE["open"] = False
     screen._GNEWS_STATE["consecutive_zero"] = 0
     screen._GNEWS_STATE["open"] = False
+    screen._GNEWS_STATE["zero_since"] = None
+    screen._GNEWS_STATE["last_probe"] = 0.0
+    screen._GNEWS_STATE["tripped"] = False
     screen._BING_STATE["consecutive_failures"] = 0
     screen._BING_STATE["open"] = False
     screen._GNEWS_GATE.reset()
@@ -1855,6 +1903,51 @@ screen.search_gdelt = lambda *_a, **_k: []
 screen.search_adverse_media("One Good Fetch LLC")
 check("a single Google News success resets the breaker streak",
       screen._GNEWS_STATE["consecutive_zero"] == 0 and not screen._GNEWS_STATE["open"])
+
+# Time-based trip: a zero-coverage streak at max backoff lasting
+# GNEWS_BREAKER_SECONDS opens the circuit long before GNEWS_BREAKER_AFTER
+# subjects (2 Oct 2026: 30 subjects took ~29 min, all at zero coverage).
+_reset_breaker(); _calls["gnews"] = 0
+screen._GNEWS_GATE.interval = screen._GNEWS_GATE.cap
+screen.requests.get = _gnews_refused
+screen.search_gdelt = lambda *_a, **_k: []
+screen._GNEWS_STATE["consecutive_zero"] = 1
+screen._GNEWS_STATE["zero_since"] = screen.time.monotonic() - (screen.GNEWS_BREAKER_SECONDS + 1)
+screen.search_adverse_media("Slow Refusal LLC")
+check("Google News circuit opens once a zero-coverage streak at max backoff lasts GNEWS_BREAKER_SECONDS",
+      screen._GNEWS_STATE["open"] and screen._GNEWS_STATE["tripped"]
+      and screen._GNEWS_STATE["consecutive_zero"] < screen.GNEWS_BREAKER_AFTER)
+# Half-open probe: no probe before GNEWS_PROBE_SECONDS; then exactly ONE fetch.
+_calls["gnews"] = 0
+screen.search_adverse_media("Too Soon To Probe LLC")
+check("no recovery probe before GNEWS_PROBE_SECONDS have passed since the trip", _calls["gnews"] == 0)
+screen._GNEWS_STATE["last_probe"] = screen.time.monotonic() - (screen.GNEWS_PROBE_SECONDS + 1)
+_calls["gnews"] = 0
+screen.search_adverse_media("Probe Still Refused LLC")
+check("a failed recovery probe sends ONE fetch and leaves the circuit open",
+      _calls["gnews"] == 1 and screen._GNEWS_STATE["open"])
+screen._GNEWS_STATE["last_probe"] = screen.time.monotonic() - (screen.GNEWS_PROBE_SECONDS + 1)
+_calls["gnews"] = 0
+screen.requests.get = _gnews_first_ok
+screen.search_adverse_media("Probe Answered LLC")
+check("a successful recovery probe closes the circuit; the run still counts as tripped",
+      _calls["gnews"] == 1 and not screen._GNEWS_STATE["open"] and screen._GNEWS_STATE["tripped"])
+check("a run whose breaker tripped never stamps its rotation window as swept",
+      'and not _GNEWS_STATE.get("tripped")' in open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read())
+_reset_breaker()
+
+# Overlap: the news sweep starts BEFORE the CPU-bound watchlist/sanctions
+# matching (it needs only the subject set) and is collected after it; a crash
+# in between cancels the queued subjects instead of waiting them out.
+_sss = open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read()
+_sss = _sss[_sss.index("def screen_subject_set("):]
+check("enrichment starts before the watchlist and sanctions passes and is collected after them",
+      _sss.index("_enrich_pool.map(_enrich") < _sss.index("load_adverse_watchlist()")
+      < _sss.index("screen_customers(customers, all_lists)") < _sss.index("for i, r in zip(order, _enrich_iter)"))
+check("a crash during matching cancels the queued enrichment (no waiting out the sweep)",
+      "_enrich_pool.shutdown(wait=False, cancel_futures=True)" in _sss)
+check("per-match AI summaries run on the bounded triage pool, not one by one",
+      "_sx.map(_summarise, _summary_work)" in _sss)
 
 # GDELT is paced by its own fixed-interval gate (≤ 1 request / 5s per IP,
 # shared across all workers — 8 simultaneous first hits is how it 429'd).

@@ -104,6 +104,7 @@ ASANA_CUSTOMER_DB_GID = "1214107620220121"
 # Monitoring report (post_tm_report) is filed in the same section and is never
 # read back as a payment (payment_screen.TM_REPORT_PREFIX).
 ASANA_PAYMENTS_SECTION_GID = os.environ.get("ASANA_PAYMENTS_SECTION_GID", "").strip()
+
 # Delivery target is configurable so an Asana reorganisation can be repaired by
 # updating repository variables without waiting for a code release. The defaults
 # are the live HAWKEYE STERLING APP project and Assessment Report section,
@@ -1899,7 +1900,23 @@ GNEWS_BACKOFF_CAP = float(os.environ.get("GNEWS_BACKOFF_CAP", "10.0"))
 # merely-flaky feed never trips it. Subjects still degrade loudly (am_error)
 # unless GDELT covers them.
 GNEWS_BREAKER_AFTER = int(os.environ.get("GNEWS_BREAKER_AFTER", "30"))
-_GNEWS_STATE = {"consecutive_zero": 0, "open": False}
+# Time-based trip on the same streak: at max backoff every subject costs ≥ 4
+# fetches × GNEWS_BACKOFF_CAP of the ONE shared send slot, so 30 subjects took
+# ~29 min of the 2 Oct 2026 run (13:12→13:41, run 37009296159) while every one
+# of them got zero Google News coverage anyway. A streak of zero-coverage
+# subjects at max backoff lasting GNEWS_BREAKER_SECONDS trips the breaker too.
+GNEWS_BREAKER_SECONDS = float(os.environ.get("GNEWS_BREAKER_SECONDS", "300"))
+# Half-open recovery: while the breaker is open, one subject every
+# GNEWS_PROBE_SECONDS sends a single probe fetch; a success closes the circuit
+# and Google News coverage resumes for the rest of the book (previously an
+# open breaker stayed open for the whole run). 0 disables probing.
+GNEWS_PROBE_SECONDS = float(os.environ.get("GNEWS_PROBE_SECONDS", "300"))
+# "tripped" stays True for the rest of the run once the breaker opened, even
+# after a recovery probe closes it: subjects swept while it was open lost
+# Google News, so the run's rotation window must not be stamped as covered.
+_GNEWS_STATE = {"consecutive_zero": 0, "open": False, "zero_since": None, "last_probe": 0.0,
+                "tripped": False}
+_GNEWS_PROBE_LOCK = threading.Lock()
 # Diagnosability: count fetch/parse failures by exception kind so a systematic
 # bug (every ElementTree parse raising, the DTD guard firing) is visible in the
 # log instead of being swallowed as an indistinguishable "no result" (see the
@@ -2122,10 +2139,20 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
         passes.append((f'"{name}" ({AR_RISK_QUERY})', GNEWS_URLS[4:5]))
     attempts = failures = 0
     throttled = False
+    probe = False
     if _GNEWS_STATE["open"]:
-        passes = []   # run-level breaker open — Google News refused everything
-                      # at max backoff; the GDELT pass below still stands, and a
-                      # subject neither feed covers degrades loudly regardless.
+        # Run-level breaker open — Google News refused everything at max
+        # backoff; the GDELT pass below still stands, and a subject neither
+        # feed covers degrades loudly regardless. Half-open: one subject per
+        # GNEWS_PROBE_SECONDS sends ONE probe fetch to test for recovery.
+        with _GNEWS_PROBE_LOCK:
+            _now = time.monotonic()
+            _last = _GNEWS_STATE.get("last_probe", 0.0)
+            # last_probe is stamped when the breaker trips; no stamp, no probe.
+            if GNEWS_PROBE_SECONDS > 0 and _last > 0 and _now - _last >= GNEWS_PROBE_SECONDS:
+                _GNEWS_STATE["last_probe"] = _now
+                probe = True
+        passes = [(passes[0][0], passes[0][1][:1])] if probe else []
     for q, locales in passes:
         if throttled:
             break
@@ -2227,16 +2254,39 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
     # feed keeps refusing everything at maximum politeness. One success (any
     # subject, any locale) resets the streak, so partial throttling — where
     # patience still buys coverage — never trips it.
-    if attempts and not _GNEWS_STATE["open"]:
+    if probe:
+        if attempts and failures < attempts:
+            with _GNEWS_PROBE_LOCK:
+                _GNEWS_STATE.update(open=False, consecutive_zero=0, zero_since=None)
+            _GNEWS_GATE.reset()
+            log("  Google News answered the recovery probe — circuit CLOSED, coverage resumes "
+                "for the remaining subjects")
+    elif attempts and not _GNEWS_STATE["open"]:
         if failures >= attempts and _GNEWS_GATE.at_cap:
-            _GNEWS_STATE["consecutive_zero"] += 1
-            if _GNEWS_STATE["consecutive_zero"] >= GNEWS_BREAKER_AFTER:
-                _GNEWS_STATE["open"] = True
-                log(f"  Google News refusing all fetches ({GNEWS_BREAKER_AFTER} subjects in a row "
-                    "at max backoff) — circuit OPEN, skipping Google News for the rest of the run; "
-                    "GDELT coverage stands (uncovered subjects still degrade loudly)")
+            _now = time.monotonic()
+            with _GNEWS_PROBE_LOCK:
+                _GNEWS_STATE["consecutive_zero"] += 1
+                if _GNEWS_STATE.get("zero_since") is None:
+                    _GNEWS_STATE["zero_since"] = _now
+                _streak_s = _now - _GNEWS_STATE["zero_since"]
+                _trip = (not _GNEWS_STATE["open"]
+                         and (_GNEWS_STATE["consecutive_zero"] >= GNEWS_BREAKER_AFTER
+                              or (GNEWS_BREAKER_SECONDS > 0 and _GNEWS_STATE["consecutive_zero"] >= 2
+                                  and _streak_s >= GNEWS_BREAKER_SECONDS)))
+                if _trip:
+                    _GNEWS_STATE["open"] = True
+                    _GNEWS_STATE["tripped"] = True
+                    _GNEWS_STATE["last_probe"] = _now
+            if _trip:
+                log(f"  Google News refusing all fetches ({_GNEWS_STATE['consecutive_zero']} subjects "
+                    f"in a row at max backoff, {_streak_s / 60:.1f} min) — circuit OPEN; GDELT coverage "
+                    "stands (uncovered subjects still degrade loudly)"
+                    + (f"; a recovery probe runs every {GNEWS_PROBE_SECONDS / 60:g} min"
+                       if GNEWS_PROBE_SECONDS > 0 else ""))
         elif failures < attempts:
-            _GNEWS_STATE["consecutive_zero"] = 0
+            with _GNEWS_PROBE_LOCK:
+                _GNEWS_STATE["consecutive_zero"] = 0
+                _GNEWS_STATE["zero_since"] = None
 
     # Independent second source — GDELT. Its failure alone never fails the
     # subject (the Google News passes above already ran); it is logged so a quiet
@@ -6750,6 +6800,42 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     UNIFIED_DELIVERY_FAILED["failed"] = True
     return None
 
+def _asana_entity_name():
+    """The reporting entity's name, read from Asana (the workspace that holds
+    the monitoring project) — company names live in Asana only, never in the
+    repository or its settings. "" when it cannot be read: the report then
+    says so instead of guessing."""
+    try:
+        r = asana_request("GET", f"https://app.asana.com/api/1.0/projects/{ASANA_ONGOING_MON_GID}",
+                          params={"opt_fields": "workspace.name"})
+        data = (r.json() or {}).get("data") if r is not None and r.status_code == 200 else None
+        return str(((data or {}).get("workspace") or {}).get("name") or "").strip()
+    except Exception:
+        return ""
+
+def resolve_register_customers(records, customers):
+    """Tie each payment / activity task to its Customer Database record: an
+    Asana task link or gid on the 'Customer:' line, else the exact name
+    (normalised). A match takes the database's own name and link; no match
+    marks the record customer_in_db=False (txn_monitor alerts on it). Names
+    are never logged — they are disclosed in Asana only. Returns {name: link}."""
+    book = [c for c in customers if c.get("kind") != "employee"]
+    by_gid = {str(c.get("gid")): c for c in book if c.get("gid")}
+    by_name = {}
+    for c in book:
+        by_name.setdefault(normalize(c.get("name", "")), c)
+    links = {}
+    for r in records:
+        raw = str(r.get("customer") or "")
+        c = next((by_gid[g] for g in re.findall(r"\d{12,20}", raw) if g in by_gid), None)
+        if c is None and raw.strip():
+            c = by_name.get(normalize(raw))
+        r["customer_in_db"] = c is not None
+        if c is not None:
+            r["customer"] = c["name"]
+            links[c["name"]] = c.get("permalink", "")
+    return links
+
 def _tm_flag_refs(rule):
     """Red-flag register codes a rule evidences, for the TM report. A missing
     register is already a counted rule error (report DEGRADED), so here it
@@ -6792,7 +6878,8 @@ def post_tm_report(run_time, tm_report):
         dt, tm_report.get("feed"), tm_report.get("alerts"),
         register_read=tm_report.get("read", 0), unreadable=tm_report.get("unreadable", 0),
         degraded=tm_report.get("degraded", ""), rule_errors=tm_report.get("rule_errors"),
-        activities=tm_report.get("activities", 0), flag_refs=_tm_flag_refs)
+        activities=tm_report.get("activities", 0), flag_refs=_tm_flag_refs,
+        entity_name=_asana_entity_name(), customer_links=tm_report.get("customer_links"))
     payload = {"data": {"name": name[:250], "notes": cap_notes(notes, ASANA_NOTES_MAX),
                         "due_on": run_time.strftime("%Y-%m-%d"),
                         "assignee": ASANA_ASSIGNEE_GID, "projects": [ASANA_ONGOING_MON_GID]}}
@@ -7267,79 +7354,14 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         for ent in c.get("entity_owners", []):
             subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
 
-    # ADVERSE-EXPOSURE WATCHLIST (bulk, deterministic) — download + match BEFORE
-    # the enrichment pool, so adverse coverage exists even if both news feeds
-    # refuse the runner for the whole run (10–14 Jul).
-    wl_entries, wl_ids, wl_meta = load_adverse_watchlist()
-    wl_hits = screen_watchlist(subjects_all, wl_entries, wl_ids, today) if wl_entries else {}
-    if wl_entries:
-        log(f"  {WATCHLIST_LABEL}: {wl_meta['count']:,} names · "
-            f"{len(wl_hits)} subject name(s) matched")
-    # 4th adverse net: regulator enforcement bulletins — one fetch per feed
-    # per run, findings merged into the watchlist channel (same shape/merge
-    # path); failed feeds are disclosed in §② and the run log, never silent.
-    rb_items, rb_failures = fetch_regulator_bulletins()
-    if rb_items or rb_failures:
-        rb_hits = screen_regulator_bulletins(subjects_all, rb_items)
-        for _k, _v in rb_hits.items():
-            wl_hits.setdefault(_k, []).extend(_v)
-        log(f"  regulator bulletins: {len(rb_items)} item(s) from configured feeds · "
-            f"{len(rb_hits)} subject name(s) mentioned"
-            + (f" · {len(rb_failures)} feed(s) FAILED (coverage reduced)" if rb_failures else ""))
-        for _f in rb_failures:
-            log(f"  COVERAGE: regulator-bulletin feed failed — {_f}")
-    _t_watchlist = time.time()
-
-    # SOURCE-COVERAGE DRIFT (R-09): a list that silently shrank is the most
-    # dangerous failure mode — it creates false negatives. Check before screening.
-    # The watchlist joins as a SUPPLEMENTARY source (drift is a soft note, never
-    # a degraded core control); list_meta itself stays pure — it feeds the QA
-    # gate's core-list checks and the attestation.
-    coverage_meta = {**list_meta, "adverse_watchlist": wl_meta}
-    if isinstance(list_meta.get("eocn", {}).get("mirror"), dict):
-        coverage_meta["eocn_mirror"] = list_meta["eocn"]["mirror"]
-    coverage_result = monitoring.check_source_coverage(coverage_meta, today)
-    for a in coverage_result.get("alarms", []):
-        log(f"COVERAGE ALARM: {a}")
-    # EOCN cross-check (TFS freeze duty): a mirror designation missing from the
-    # curated local list is a possible FALSE NEGATIVE — alarm into the same
-    # coverage path (QA gate + report §⑤ + MLRO attention), degrade loudly.
-    _eocn_missing = list_meta.get("eocn", {}).get("crosscheck_missing") or []
-    if _eocn_missing:
-        _shown = ", ".join(_eocn_missing[:5]) + (f" +{len(_eocn_missing)-5} more"
-                                                 if len(_eocn_missing) > 5 else "")
-        _msg = (f"EOCN local list may be STALE — {len(_eocn_missing)} designation(s) on the "
-                f"OpenSanctions ae_local_terrorists mirror not found locally ({_shown}); "
-                "update data/eocn-local-terrorist-list.json from the EOCN notification and re-run "
-                "— treat EOCN 'clear' results as PROVISIONAL until resolved")
-        coverage_result.setdefault("alarms", []).append(_msg)
-        coverage_result.setdefault("drops", []).append(_msg)
-        log(f"COVERAGE ALARM: {_msg}")
-    # EOCN review-age gate: a lapsed manual review of the curated local list
-    # surfaces in the same coverage path (QA gate + report §⑤); the run itself
-    # fails post-delivery via enforce_eocn_review_gate().
-    if EOCN_REVIEW_ALERT["overdue"]:
-        coverage_result.setdefault("alarms", []).append(EOCN_REVIEW_ALERT["message"])
-        coverage_result.setdefault("drops", []).append(EOCN_REVIEW_ALERT["message"])
-        log(f"COVERAGE ALARM: {EOCN_REVIEW_ALERT['message']}")
-    # Persist for the post-delivery coverage gate: every alarm EXCEPT the
-    # review-age one, which has its own gate and exit code.
-    COVERAGE_ALARM_STATE["alarms"] = [
-        a for a in coverage_result.get("alarms", [])
-        if a != EOCN_REVIEW_ALERT.get("message")]
-
-    # 1) SANCTIONS — entities + individuals, ALL matching candidates
-    possible_matches, clear = screen_customers(customers, all_lists)
-    _t_sanctions = time.time()
-    log(f"Sanctions: {len(possible_matches)} flagged · {len(clear)} clear")
-    progress("sanctions-done", flagged=len(possible_matches), clear=len(clear))
-    for m in possible_matches:
-        if any(h["score"] >= 100 for h in m["hits"]):
-            post_confirmed_hit_comment(m["gid"], m["hits"], run_time)
-
-    # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual — run the
-    # network-bound sweep in PARALLEL (bounded pool) so a full book screens in
-    # minutes, not hours. Each worker still paces its own requests for politeness.
+    # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual — the
+    # network-bound sweep runs in PARALLEL (bounded pool), and it STARTS HERE,
+    # before the watchlist and sanctions passes: it needs only the subject set,
+    # so the ~15 min of CPU-bound matching below overlaps the network wait
+    # instead of preceding it (2 Oct 2026 run 37009296159: watchlist 6.7 min +
+    # sanctions 8.7 min, then enrichment). Results are collected after the
+    # sanctions pass, exactly as before. Each request still waits for its
+    # feed's shared rate gate.
 
     # Delivery-deadline budget (daily/make-up runs only — onboarding batches
     # are tiny): once continuing would push delivery past the daily target,
@@ -7372,8 +7394,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         return r
 
     total = len(subjects_all)
-    # Rotate the ENRICHMENT ORDER only (the sanctions pass above already
-    # screened every subject): a mid-run circuit trip costs whoever comes
+    # Rotate the ENRICHMENT ORDER only (the sanctions pass below screens
+    # every subject regardless): a mid-run circuit trip costs whoever comes
     # after it, and rotation stops that being the same subjects every day.
     # Results are restored to book order below, so nothing downstream — the
     # tally, the delta fingerprints, the report — sees the rotation.
@@ -7398,9 +7420,94 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # doesn't change what gets screened or how -- it only guarantees the
     # console keeps producing output at least once a minute so a long throttled
     # stretch can't look indistinguishable from a hung job.
+    _enrich_pool = concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY)
+    # Executor.map submits every subject now; results are consumed in order later.
+    _enrich_iter = _enrich_pool.map(_enrich, (subjects_all[j] for j in order))
+
+    try:
+        # ADVERSE-EXPOSURE WATCHLIST (bulk, deterministic) — download + match
+        # while the news sweep runs, so adverse coverage exists even if both news
+        # feeds refuse the runner for the whole run (10–14 Jul).
+        wl_entries, wl_ids, wl_meta = load_adverse_watchlist()
+        wl_hits = screen_watchlist(subjects_all, wl_entries, wl_ids, today) if wl_entries else {}
+        if wl_entries:
+            log(f"  {WATCHLIST_LABEL}: {wl_meta['count']:,} names · "
+                f"{len(wl_hits)} subject name(s) matched")
+        # 4th adverse net: regulator enforcement bulletins — one fetch per feed
+        # per run, findings merged into the watchlist channel (same shape/merge
+        # path); failed feeds are disclosed in §② and the run log, never silent.
+        rb_items, rb_failures = fetch_regulator_bulletins()
+        if rb_items or rb_failures:
+            rb_hits = screen_regulator_bulletins(subjects_all, rb_items)
+            for _k, _v in rb_hits.items():
+                wl_hits.setdefault(_k, []).extend(_v)
+            log(f"  regulator bulletins: {len(rb_items)} item(s) from configured feeds · "
+                f"{len(rb_hits)} subject name(s) mentioned"
+                + (f" · {len(rb_failures)} feed(s) FAILED (coverage reduced)" if rb_failures else ""))
+            for _f in rb_failures:
+                log(f"  COVERAGE: regulator-bulletin feed failed — {_f}")
+        _t_watchlist = time.time()
+
+        # SOURCE-COVERAGE DRIFT (R-09): a list that silently shrank is the most
+        # dangerous failure mode — it creates false negatives. Check before screening.
+        # The watchlist joins as a SUPPLEMENTARY source (drift is a soft note, never
+        # a degraded core control); list_meta itself stays pure — it feeds the QA
+        # gate's core-list checks and the attestation.
+        coverage_meta = {**list_meta, "adverse_watchlist": wl_meta}
+        if isinstance(list_meta.get("eocn", {}).get("mirror"), dict):
+            coverage_meta["eocn_mirror"] = list_meta["eocn"]["mirror"]
+        coverage_result = monitoring.check_source_coverage(coverage_meta, today)
+        for a in coverage_result.get("alarms", []):
+            log(f"COVERAGE ALARM: {a}")
+        # EOCN cross-check (TFS freeze duty): a mirror designation missing from the
+        # curated local list is a possible FALSE NEGATIVE — alarm into the same
+        # coverage path (QA gate + report §⑤ + MLRO attention), degrade loudly.
+        _eocn_missing = list_meta.get("eocn", {}).get("crosscheck_missing") or []
+        if _eocn_missing:
+            _shown = ", ".join(_eocn_missing[:5]) + (f" +{len(_eocn_missing)-5} more"
+                                                     if len(_eocn_missing) > 5 else "")
+            _msg = (f"EOCN local list may be STALE — {len(_eocn_missing)} designation(s) on the "
+                    f"OpenSanctions ae_local_terrorists mirror not found locally ({_shown}); "
+                    "update data/eocn-local-terrorist-list.json from the EOCN notification and re-run "
+                    "— treat EOCN 'clear' results as PROVISIONAL until resolved")
+            coverage_result.setdefault("alarms", []).append(_msg)
+            coverage_result.setdefault("drops", []).append(_msg)
+            log(f"COVERAGE ALARM: {_msg}")
+        # EOCN review-age gate: a lapsed manual review of the curated local list
+        # surfaces in the same coverage path (QA gate + report §⑤); the run itself
+        # fails post-delivery via enforce_eocn_review_gate().
+        if EOCN_REVIEW_ALERT["overdue"]:
+            coverage_result.setdefault("alarms", []).append(EOCN_REVIEW_ALERT["message"])
+            coverage_result.setdefault("drops", []).append(EOCN_REVIEW_ALERT["message"])
+            log(f"COVERAGE ALARM: {EOCN_REVIEW_ALERT['message']}")
+        # Persist for the post-delivery coverage gate: every alarm EXCEPT the
+        # review-age one, which has its own gate and exit code.
+        COVERAGE_ALARM_STATE["alarms"] = [
+            a for a in coverage_result.get("alarms", [])
+            if a != EOCN_REVIEW_ALERT.get("message")]
+
+        # 1) SANCTIONS — entities + individuals, ALL matching candidates
+        possible_matches, clear = screen_customers(customers, all_lists)
+        _t_sanctions = time.time()
+        log(f"Sanctions: {len(possible_matches)} flagged · {len(clear)} clear")
+        progress("sanctions-done", flagged=len(possible_matches), clear=len(clear))
+        for m in possible_matches:
+            if any(h["score"] >= 100 for h in m["hits"]):
+                post_confirmed_hit_comment(m["gid"], m["hits"], run_time)
+    except BaseException:
+        # A crash here must not leave the run waiting for the whole news sweep
+        # before it can fail: drop the queued subjects, then re-raise.
+        _enrich_pool.shutdown(wait=False, cancel_futures=True)
+        raise
+
+    # 2) + 3) COLLECT the enrichment started just after the subject set was
+    # built (above): it has been running on the network while the
+    # CPU-bound watchlist and sanctions matching ran here, so most subjects
+    # are already done. Collection order, heartbeat and book-order restore
+    # are unchanged.
     _last_log = time.monotonic()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY) as ex:
-        for i, r in zip(order, ex.map(_enrich, (subjects_all[j] for j in order))):
+    try:
+        for i, r in zip(order, _enrich_iter):
             done += 1
             indexed[i] = r
             now = time.monotonic()
@@ -7408,6 +7515,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 log(f"  enriched {done}/{total}")
                 progress("enrichment", done=done, total=total)
                 _last_log = now
+    finally:
+        _enrich_pool.shutdown(wait=True)
     if any(r is None for r in indexed):
         # Degrade loudly: a hole here means the rotation bookkeeping dropped a
         # subject — silently tallying the rest would report them as screened.
@@ -7470,7 +7579,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # Persisted with the delta-state on delivery, like everything else here.
     rotation_ledger = update_rotation_ledger(
         state, run_time,
-        swept_ok=(not _GNEWS_STATE["open"]) and counts["am_errors"] < counts["subjects"])
+        swept_ok=(not _GNEWS_STATE["open"]) and not _GNEWS_STATE.get("tripped")
+                 and counts["am_errors"] < counts["subjects"])
     # NOTE: state is persisted only AFTER the report is successfully delivered to
     # Asana (see end of function). Saving it here would let a failed post — which
     # the workflow commits anyway (`if: always()`) — permanently mark a brand-new
@@ -7529,6 +7639,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                             if (_a.get("triage") or {}).get("injection_suspected"))
     pep_links = {p.get("permalink", "") for p in pep_findings}
     jtable = kyc.load_jurisdiction_risk()   # FATF R.10 jurisdiction-risk (maintained list)
+    _summary_work = []
     for m in possible_matches:
         link = m.get("permalink", "")
         m_adverse = adv_by_link.get(link, [])
@@ -7564,7 +7675,18 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             jurisdiction_high_risk=(jtier == "high"),
             jurisdiction_grey=(jtier == "grey"),
             cdd_gaps=cdd_gap_count)
+        _summary_work.append((m, m_pep, m_adverse))
+    # One MLRO summary per flagged customer — each may be a model call, so they
+    # run on the same bounded pool as the triage above (llm_complete is
+    # thread-safe; the deterministic fallback is unchanged). Was sequential:
+    # ~3.8 min for 68 flagged on 2 Oct 2026.
+    def _summarise(item):
+        m, m_pep, m_adverse = item
         m["ai_summary"] = ai.alert_summary(m["name"], m["risk"], m["hits"], m_pep, m_adverse)
+    if _summary_work:
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=max(1, min(AI_TRIAGE_CONCURRENCY, len(_summary_work)))) as _sx:
+            list(_sx.map(_summarise, _summary_work))
     related = ai.related_parties(customers)
     mode_lbl = ("LLM" if ai.llm_available() and ai.LLM_TRIAGE else
                 "LLM-standby (triage off)" if ai.llm_available() else "deterministic")
@@ -7599,6 +7721,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         # repeat signal was NOT evaluated), not just this log line.
         adverse_evidence_error = str(e)[:160]
         log(f"evidence log skipped ({e})")
+    # "enrichment" is the news sweep's time AFTER the sanctions pass: the sweep
+    # now starts before the watchlist pass and overlaps it (see above).
     timings = {"watchlist": round(_t_watchlist - _t_start, 2),
                "sanctions": round(_t_sanctions - _t_watchlist, 2),
                "enrichment": round(_t_enrich - _t_sanctions, 2),
@@ -7647,6 +7771,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             _reg, _reg_bad = get_payment_register()
             # Activity-only records (red flags on a customer, no payment) go
             # through the monitoring rules, never through payment screening.
+            if mode in ("daily", "makeup"):
+                # Full book loaded: tie every task to its Customer Database record.
+                tm_report["customer_links"] = resolve_register_customers(_reg, customers)
             _reg_pay = [r for r in _reg if not r.get("activity_only")]
             tm_report.update(read=len(_reg_pay), unreadable=_reg_bad,
                              activities=len(_reg) - len(_reg_pay))

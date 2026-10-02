@@ -566,6 +566,17 @@ def rule_cash_no_source_of_funds(txns):
             and _amt(t) >= CDD_TRIGGER_THRESHOLD and t.get("source_of_funds_verified") is False]
 
 
+def rule_customer_not_in_db(txns):
+    """A payment or activity task whose customer matches no Customer Database
+    record (set by the daily run's resolver). No CDD file means no profile to
+    monitor against — the dealing itself is the R.10 gap. Records the resolver
+    never saw (no customer_in_db key, e.g. a file feed) are not judged."""
+    return [_alert("CUSTOMER_NOT_IN_DB", "HIGH", t,
+            "customer is not in the Customer Database — no CDD record on file; identify, verify "
+            "and onboard before completing, or link the task to the correct customer (R.10)")
+            for t in txns if t.get("customer_in_db") is False]
+
+
 def load_red_flags():
     """code -> flag, from the STR and SAR registers (data/str-red-flags.json,
     data/sar-red-flags.json). Raises if either is missing or malformed (the
@@ -629,7 +640,7 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_profile_deviation, rule_circular_flow, rule_new_geography,
           rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
           rule_reference_keyword, rule_personal_account, rule_linked_threshold,
-          rule_cash_no_source_of_funds, rule_red_flag_recorded]
+          rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db]
 
 
 def _any_customer(txns):

@@ -689,7 +689,7 @@ def _customer_cases(flagged, alerts):
 
 def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
                           unreadable=0, degraded="", rule_errors=None, activities=0,
-                          flag_refs=None):
+                          flag_refs=None, entity_name="", customer_links=None):
     """(task name, task notes) for the daily Transaction Monitoring report.
 
     feed_result — screen_feed() output for the section's payments (None when
@@ -700,7 +700,10 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
     section (then NOTHING is cleared and the title says so); rule_errors —
     {rule: count} of rules that crashed (title DEGRADED); flag_refs — optional
     rule -> [red-flag codes] lookup, so each alert cites the register entries
-    it evidences. Every decision field is left blank for the MLRO."""
+    it evidences; entity_name — the reporting entity named in the header, read
+    from Asana (blank says so, never a guess); customer_links — {customer:
+    Customer Database link} for the case headers. Every decision field is left
+    blank for the MLRO."""
     res = feed_result or {"n_payments": 0, "results": [], "errors": []}
     stop = [r for r in res["results"] if r["outcome"].startswith("STOP")]
     review = [r for r in res["results"] if r["outcome"].startswith("REVIEW")]
@@ -722,7 +725,12 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
     name = f"{TM_REPORT_PREFIX}{status}{tallies} — {date_label}"
 
     bar = "━" * 60
-    L = ["TRANSACTION MONITORING — DAILY REPORT",
+    entity = str(entity_name or "").strip()
+    customer_links = dict(customer_links or {})
+    L = [f"{entity.upper() or 'REPORTING ENTITY UNAVAILABLE'} — TRANSACTION MONITORING — DAILY REPORT",
+         "Reporting entity: " + (entity or "⚠ UNAVAILABLE — the Asana workspace name could not be "
+                                 + "read this run")
+         + " · prepared for the MLRO and the Compliance function.",
          "CONFIDENTIAL — AML/CFT/CPF. Need-to-know only. Do not tip off (Article 25, "
          + "Federal Decree-Law No. 10 of 2025).",
          f"Date: {date_label}",
@@ -821,8 +829,10 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
                                        ("STR/SAR assessment", c["str_sar"]),
                                        ("EDD / R.16 information", c["edd"]),
                                        ("CDD on file", c["cdd"])) if on]
-        L += [f"   ▸ CASE {n + 1} — {cust} — highest severity {c['severity']} · "
+        L += [f"   ▸ CASE {n + 1} — Customer: {cust} — highest severity {c['severity']} · "
               + f"{len(c['findings'])} finding(s) · {len(c['indicators'])} distinct indicator(s)",
+              "      Customer Database: " + (customer_links.get(cust) or "⚠ NOT FOUND — no customer "
+                                              + "record matches this name (see CUSTOMER_NOT_IN_DB)"),
               "      Obligations: " + (", ".join(obligations) or "review only")]
         if len(c["indicators"]) >= MULTIPLE_INDICATORS_MIN:
             L.append("      ⚠ MULTIPLE INDICATORS — heightened scrutiny; clearance is not assumed "
