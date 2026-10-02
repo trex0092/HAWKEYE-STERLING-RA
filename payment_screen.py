@@ -19,8 +19,15 @@ What it does, per payment:
 
 Inputs: a SWIFT MT103 message, an ISO 20022 pacs.008 message, or a transaction
 feed record (data/transaction-feed.schema.json) carrying `payment_message` or
-`parties`. Parsing is stdlib-only; pacs.008 goes through screen.safe_xml_fromstring
-(DTD/entity declarations refused, size capped).
+`parties`. Parsing is stdlib-only; pacs.008 goes through the caller-supplied
+`xml_parser` — in production screen.safe_xml_fromstring (DTD/entity declarations
+refused, size capped).
+
+DEPENDENCIES ARE INJECTED, NEVER IMPORTED: this module does not import screen.py
+(screen.py imports THIS module, so importing back would be a cycle). The caller
+passes the production `matcher` (screen.screen_name), `normalizer`
+(screen.normalize) and `xml_parser` (screen.safe_xml_fromstring). A missing one
+raises ValueError — screening never silently falls back to a weaker matcher.
 
 DEGRADE LOUDLY: a payment is never reported clear on unverified state. If a core
 sanctions list did not load, "no match" is PROVISIONAL and says which list; a
@@ -198,14 +205,15 @@ def _pacs_agent(tx, role, elname):
                   country=_text(a, "PstlAdr", "Ctry"), source=f"<{elname}>")
 
 
-def parse_pacs008(xml_text):
+def parse_pacs008(xml_text, xml_parser=None):
     """Parse an ISO 20022 pacs.008 (FI-to-FI customer credit transfer) into a
     list of normalised payments, one per <CdtTrfTxInf>. Namespace-agnostic.
-    DTD/entity declarations are refused before parsing (screen.safe_xml_fromstring)."""
-    from screen import safe_xml_fromstring   # lazy: the parser guard lives there
+    `xml_parser` must refuse DTD/entity declarations (screen.safe_xml_fromstring)."""
+    if xml_parser is None:
+        raise ValueError("no hardened XML parser supplied (pass screen.safe_xml_fromstring)")
     if len(str(xml_text or "")) > MAX_PAYMENT_TEXT:
         raise ValueError("payment message too large")
-    root = safe_xml_fromstring(xml_text)
+    root = xml_parser(xml_text)
     txs = [el for el in root.iter() if _local(el.tag) == "CdtTrfTxInf"]
     grp = next((el for el in root.iter() if _local(el.tag) == "GrpHdr"), None)
     grp_date = _text(grp, "IntrBkSttlmDt") if grp is not None else ""
@@ -241,15 +249,15 @@ def parse_pacs008(xml_text):
     return out
 
 
-def parse_payment_message(text):
+def parse_payment_message(text, xml_parser=None):
     """Detect the message type and return a list of normalised payments."""
     s = str(text or "").lstrip()
     if s.startswith("<"):
-        return parse_pacs008(s)
+        return parse_pacs008(s, xml_parser)
     return [parse_mt103(s)]
 
 
-def payment_from_feed(txn):
+def payment_from_feed(txn, xml_parser=None):
     """Normalised payments for ONE transaction-feed record. Uses, in order:
     `payment_message` (raw MT103 / pacs.008), an explicit `parties` array, or the
     legacy single `counterparty` (+ the customer as the other side). Returns []
@@ -257,7 +265,7 @@ def payment_from_feed(txn):
     if not isinstance(txn, dict):
         return []
     if txn.get("payment_message"):
-        return parse_payment_message(txn["payment_message"])
+        return parse_payment_message(txn["payment_message"], xml_parser)
     parties = []
     for p in txn.get("parties") or []:
         if isinstance(p, dict) and p.get("role") in ROLE_LABELS:
@@ -282,16 +290,6 @@ def payment_from_feed(txn):
 
 
 # ── SCREENING ─────────────────────────────────────────────────────────────────
-def _default_matcher(name, all_lists):
-    import screen
-    return screen.screen_name(name, all_lists)
-
-
-def _default_normalizer(s):
-    import screen
-    return screen.normalize(s)
-
-
 def _jurisdiction_tier(party, table):
     if not table:
         return None, ""
@@ -325,8 +323,8 @@ def screen_payment(payment, all_lists, *, jurisdiction_table=None, lists_degrade
     outcome ∈ STOP — POTENTIAL SANCTIONS MATCH | REVIEW — HIGH-RISK JURISDICTION |
               REVIEW — INCOMPLETE (R.16) | NO MATCH | NO MATCH — PROVISIONAL
     """
-    matcher = matcher or _default_matcher
-    normalizer = normalizer or _default_normalizer
+    if matcher is None or normalizer is None:
+        raise ValueError("matcher and normalizer are required (screen.screen_name, screen.normalize)")
     findings, parties_out = [], []
     max_tier = None
     for p in payment.get("parties", []):
@@ -383,13 +381,13 @@ def screen_payment(payment, all_lists, *, jurisdiction_table=None, lists_degrade
 
 
 def screen_feed(transactions, all_lists, *, jurisdiction_table=None, lists_degraded=(),
-                matcher=None, normalizer=None):
+                matcher=None, normalizer=None, xml_parser=None):
     """Screen every payment in a transaction feed. A record that cannot be parsed
     is COUNTED (never dropped silently). Returns {n_payments, results, errors}."""
     results, errors = [], []
     for i, t in enumerate(transactions or []):
         try:
-            pays = payment_from_feed(t)
+            pays = payment_from_feed(t, xml_parser)
         except Exception as e:   # a malformed message is disclosed, not skipped
             errors.append(f"record {i}: {type(e).__name__}: {str(e)[:120]}")
             continue

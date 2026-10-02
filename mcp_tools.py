@@ -156,7 +156,7 @@ def screen_payment(watchlist, message=None, parties=None, remittance_info=None,
             entries.append((norm, raw))
     if message is not None:
         msg = _req_str(message, "message", cap=MAX_PAYMENT_MESSAGE)
-        payments = payment_screen.parse_payment_message(msg)
+        payments = payment_screen.parse_payment_message(msg, screen.safe_xml_fromstring)
     elif parties is not None:
         if not isinstance(parties, list) or len(parties) > MAX_PARTIES:
             raise ValueError(f"'parties' must be an array of at most {MAX_PARTIES} objects")
@@ -169,7 +169,8 @@ def screen_payment(watchlist, message=None, parties=None, remittance_info=None,
     if not payments:
         raise ValueError("no payment party could be read from the input")
     results = [payment_screen.screen_payment(p, {lname: entries},
-                                             jurisdiction_table=kyc.load_jurisdiction_risk())
+                                             jurisdiction_table=kyc.load_jurisdiction_risk(),
+                                             matcher=screen.screen_name, normalizer=screen.normalize)
                for p in payments]
     for r in results:
         for party in r["parties"]:

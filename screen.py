@@ -7528,7 +7528,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                           if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
             _pay_res = payment_screen.screen_feed(
                 txn_monitor.load_transactions(), all_lists,
-                jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down)
+                jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down,
+                matcher=screen_name, normalizer=normalize, xml_parser=safe_xml_fromstring)
         txn_status = "\n   ".join([txn_status] + payment_screen.report_lines(_pay_res, _pay_cfg))
     except Exception as e:
         log(f"  ! payment screening failed: {safe_err(e)}")

@@ -939,6 +939,7 @@ check("every FATF-listed jurisdiction has an ISO code for payment screening (add
       "ISO2_TO_JURISDICTION): " + ", ".join(_missing_iso), not _missing_iso)
 _ps_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in
                           ("ACME GENERAL TRADING LLC", "SEA FALCON SHIPPING COMPANY", "ZED")]}
+_px = screen.safe_xml_fromstring
 _ps_kw = {"matcher": screen.screen_name, "normalizer": screen.normalize,
           "jurisdiction_table": {"islamic republic of iran": "high", "kenya": "grey"}}
 _mt103 = ("{1:F01TESTAEADAXXX0000000000}{2:I103TESTHKHHXXXXN}{4:\n:20:TRN123456789\n:23B:CRED\n"
@@ -994,7 +995,7 @@ _pacs = ('<?xml version="1.0"?><Document xmlns="urn:iso:std:iso:20022:tech:xsd:p
          '<CdtrAgt><FinInstnId><BICFI>TESTHKHHXXX</BICFI></FinInstnId></CdtrAgt>'
          '<Cdtr><Nm>Acme General Trading LLC</Nm><PstlAdr><Ctry>HK</Ctry></PstlAdr></Cdtr>'
          '<RmtInf><Ustrd>INV 1</Ustrd></RmtInf></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>')
-_pp = payment_screen.parse_payment_message(_pacs)
+_pp = payment_screen.parse_payment_message(_pacs, _px)
 check("pacs.008: one payment per CdtTrfTxInf with id, date, amount and currency",
       len(_pp) == 1 and _pp[0]["reference"] == "E2E-1" and _pp[0]["date"] == "2026-09-15"
       and _pp[0]["amount"] == 2500.5 and _pp[0]["currency"] == "AED")
@@ -1004,7 +1005,7 @@ check("pacs.008: debtor/creditor names and agent BIC countries are read",
 check("pacs.008: a listed creditor STOPs the payment",
       payment_screen.screen_payment(_pp[0], _ps_lists, **_ps_kw)["outcome"].startswith("STOP"))
 try:
-    payment_screen.parse_pacs008('<?xml version="1.0"?><!DOCTYPE d [<!ENTITY x "y">]><Document/>')
+    payment_screen.parse_pacs008('<?xml version="1.0"?><!DOCTYPE d [<!ENTITY x "y">]><Document/>', _px)
     check("pacs.008: a DTD/ENTITY declaration is refused before parsing", False)
 except ValueError:
     check("pacs.008: a DTD/ENTITY declaration is refused before parsing", True)
@@ -1013,16 +1014,26 @@ _fr = payment_screen.screen_feed(
       "payment_message": "<Document><unclosed>"},
      {"customer": "Example Trading LLC", "date": "2026-09-15", "amount": 1, "direction": "out",
       "method": "wire", "counterparty": "Harmless Textiles LLC", "counterparty_country": "Kenya"}],
-    _ps_lists, **_ps_kw)
+    _ps_lists, xml_parser=_px, **_ps_kw)
 check("feed: an unparseable payment message is COUNTED, never silently dropped", len(_fr["errors"]) == 1)
 check("feed: a legacy record's counterparty country NAME is checked against the FATF list",
       _fr["results"] and _fr["results"][0]["outcome"] == "REVIEW — HIGH-RISK JURISDICTION")
 _inactive = payment_screen.report_lines(None, False)
+for _call, _why in ((lambda: payment_screen.parse_pacs008(_pacs), "no hardened XML parser"),
+                    (lambda: payment_screen.screen_payment(_p, _ps_lists), "no matcher/normalizer")):
+    try:
+        _call()
+        check(f"payment_screen refuses to run with {_why} (no silent fallback)", False)
+    except ValueError:
+        check(f"payment_screen refuses to run with {_why} (no silent fallback)", True)
+check("payment_screen does not import screen.py (no import cycle)",
+      "import screen" not in open(os.path.join(ROOT, "payment_screen.py"), encoding="utf-8").read().replace(
+          "does not import screen.py", ""))
 check("report: payment screening says INACTIVE without a feed (no implied clearance)",
       len(_inactive) == 1 and "INACTIVE" in _inactive[0])
 _active = payment_screen.report_lines(payment_screen.screen_feed(
     [{"customer": "C", "date": "2026-09-15", "amount": 1, "direction": "out", "method": "wire",
-      "payment_message": _mt103}], _ps_lists, **_ps_kw), True)
+      "payment_message": _mt103}], _ps_lists, xml_parser=_px, **_ps_kw), True)
 check("report: a STOP payment carries the POL-07 PNMR / CNMR + FFR instruction",
       any("STOP" in ln for ln in _active) and any("PNMR" in ln and "CNMR + FFR" in ln for ln in _active))
 # Velocity baseline must EXCLUDE the spike day from its own mean, otherwise a large
