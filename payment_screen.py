@@ -269,6 +269,7 @@ def payment_from_feed(txn, xml_parser=None):
         for p in pays:
             p["reference"] = p.get("reference") or _clean(txn.get("transaction_id"))
             p["permalink"] = _clean(txn.get("permalink"))
+            p["customer"] = _clean(txn.get("customer"))
         return pays
     parties = []
     for p in txn.get("parties") or []:
@@ -294,7 +295,7 @@ def payment_from_feed(txn, xml_parser=None):
              "date": _clean(txn.get("date")), "currency": _clean(txn.get("currency")),
              "amount": txn.get("amount"), "parties": parties,
              "remittance": [_clean(rem)] if rem else [],
-             "permalink": _clean(txn.get("permalink"))}]
+             "permalink": _clean(txn.get("permalink")), "customer": _clean(txn.get("customer"))}]
 
 
 # ── ASANA "PAYMENTS REGISTER" ────────────────────────────────────────────────
@@ -398,7 +399,8 @@ def _register_monitoring_fields(fields):
         if fields.get(key):
             out[dest] = str(fields[key]).strip().lower() if dest == "third_party_relationship" \
                 else str(fields[key]).strip()
-    codes = re.findall(r"[A-Za-z]{2}-\d{1,3}", str(fields.get("red flags") or ""))
+    codes = re.findall(r"\b(?:(?:STR|SAR)-)?[A-Z]{2}-\d{1,3}\b", str(fields.get("red flags") or ""),
+                       re.IGNORECASE)
     if codes:
         out["red_flags"] = [c.upper() for c in codes]
     return out
@@ -429,6 +431,13 @@ def parse_register_entry(name, notes):
         else:
             fields[key] = val
     if not parties:
+        # An ACTIVITY record: no payment, but red flags observed on a customer
+        # (SAR register — behaviour, documents, ownership, sourcing …). It goes
+        # through the monitoring rules and the report, never payment screening.
+        extra = _register_monitoring_fields(fields)
+        if extra.get("red_flags") and fields.get("customer"):
+            return {"transaction_id": _clean(name), "activity_only": True,
+                    "customer": fields["customer"], "date": fields.get("date", ""), **extra}
         return None
     out_parties = []
     for role, entries in parties.items():
@@ -552,7 +561,7 @@ def screen_payment(payment, all_lists, *, jurisdiction_table=None, lists_degrade
     return {"reference": payment.get("reference", ""), "format": payment.get("format", ""),
             "date": payment.get("date", ""), "amount": payment.get("amount"),
             "currency": payment.get("currency", ""), "outcome": outcome,
-            "permalink": payment.get("permalink", ""),
+            "permalink": payment.get("permalink", ""), "customer": payment.get("customer", ""),
             "severity": severity, "parties": parties_out, "remittance_hits": rem_hits,
             "findings": findings, "r16_missing": r16_missing,
             "provisional": bool(lists_degraded) and not any_hit,
@@ -627,37 +636,105 @@ def is_tm_report_task(name):
     return str(name or "").startswith(TM_REPORT_PREFIX)
 
 
+_SEV_RANK = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+_DPMSR_RULES = {"THRESHOLD", "LINKED_THRESHOLD"}
+_NOT_SUSPICION_RULES = _DPMSR_RULES | {"CDD_TRIGGER"}   # obligations, not suspicion
+TM_CASES_SHOWN = 25          # customers detailed in §④; the rest are counted
+MULTIPLE_INDICATORS_MIN = 3  # distinct indicators on one customer → heightened scrutiny
+
+
+def _amount_label(r):
+    a = r.get("amount")
+    return f"{a:,.2f} {r.get('currency', '')}".strip() if isinstance(a, (int, float)) else ""
+
+
+def _customer_cases(flagged, alerts):
+    """Group every finding by customer: {customer: {...}}, worst first."""
+    cases = {}
+
+    def case(name):
+        return cases.setdefault(name or "(customer not stated)", {
+            "severity": "LOW", "findings": [], "indicators": set(), "refs": set(),
+            "dpmsr": False, "tfs": False, "edd": False, "str_sar": False, "cdd": False})
+    for r in flagged:
+        c = case(r.get("customer"))
+        ref = r["reference"] or "(no reference)"
+        c["findings"].append(f"[{r['severity']}] {r['outcome']} — payment {ref} {r['date']} "
+                             + _amount_label(r))
+        c["indicators"].add(r["outcome"].split(" — ")[0] + ":" + r["outcome"])
+        c["tfs"] |= r["outcome"].startswith("STOP")
+        c["edd"] |= r["outcome"].startswith("REVIEW")
+        if r.get("permalink"):
+            c["refs"].add(r["permalink"])
+        if _SEV_RANK.get(r["severity"], 0) > _SEV_RANK[c["severity"]]:
+            c["severity"] = r["severity"]
+    for a in alerts:
+        c = case(a.get("customer"))
+        c["findings"].append(f"[{a['severity']}] {a['rule']} — {a['date']}: {a['detail']}")
+        c["indicators"].add(a["rule"] + ":" + (a["detail"].split(" ")[0] if a["rule"] == "RED_FLAG" else ""))
+        c["dpmsr"] |= a["rule"] in _DPMSR_RULES
+        c["cdd"] |= a["rule"] == "CDD_TRIGGER"
+        c["tfs"] |= a["rule"] == "RED_FLAG" and a["severity"] == "CRITICAL"
+        c["str_sar"] |= (a["rule"] not in _NOT_SUSPICION_RULES
+                         and _SEV_RANK.get(a["severity"], 0) >= _SEV_RANK["MEDIUM"])
+        if a.get("permalink"):
+            c["refs"].add(a["permalink"])
+        if _SEV_RANK.get(a["severity"], 0) > _SEV_RANK[c["severity"]]:
+            c["severity"] = a["severity"]
+    for c in cases.values():
+        c["str_sar"] |= c["tfs"] or c["edd"]
+    return dict(sorted(cases.items(), key=lambda kv: (-_SEV_RANK[kv[1]["severity"]],
+                                                       -len(kv[1]["indicators"]), kv[0])))
+
+
 def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
-                          unreadable=0, degraded="", rule_errors=None):
+                          unreadable=0, degraded="", rule_errors=None, activities=0,
+                          flag_refs=None):
     """(task name, task notes) for the daily Transaction Monitoring report.
 
-    feed_result — screen_feed() output (None when screening did not run);
-    tm_alerts   — txn_monitor.evaluate(...)["alerts"] for the open entries;
-    register_read — open payments read from the section; unreadable — tasks
-    with nothing screenable; degraded — non-empty when the run could not read
-    or screen the register (then NOTHING is cleared and the title says so);
-    rule_errors — {rule: count} of monitoring rules that crashed (those
-    typologies were not checked, so the title says DEGRADED)."""
+    feed_result — screen_feed() output for the section's payments (None when
+    screening did not run); tm_alerts — txn_monitor.evaluate(...)["alerts"]
+    for the open payments and activity records; register_read / activities —
+    open payment / activity-only tasks read; unreadable — tasks with nothing
+    usable; degraded — non-empty when the run could not read or screen the
+    section (then NOTHING is cleared and the title says so); rule_errors —
+    {rule: count} of rules that crashed (title DEGRADED); flag_refs — optional
+    rule -> [red-flag codes] lookup, so each alert cites the register entries
+    it evidences. Every decision field is left blank for the MLRO."""
     res = feed_result or {"n_payments": 0, "results": [], "errors": []}
     stop = [r for r in res["results"] if r["outcome"].startswith("STOP")]
     review = [r for r in res["results"] if r["outcome"].startswith("REVIEW")]
     prov = [r for r in res["results"] if r["outcome"] == "NO MATCH — PROVISIONAL"]
     clear = [r for r in res["results"] if r["outcome"] == "NO MATCH"]
     alerts = list(tm_alerts or [])
-    tallies = f"STOP {len(stop)} · Review {len(review)} · Rule alerts {len(alerts)}"
     rule_errors = dict(rule_errors or {})
+    flagged = stop + review + prov
+    cases = _customer_cases(flagged, alerts)
+    dpmsr = [a for a in alerts if a["rule"] in _DPMSR_RULES]
+    tfs_flags = [a for a in alerts if a["rule"] == "RED_FLAG" and a["severity"] == "CRITICAL"]
+    tallies = f"STOP {len(stop)} · Review {len(review)} · Rule alerts {len(alerts)} · Customers {len(cases)}"
     if degraded or rule_errors:
         status = "DEGRADED — "
-    elif stop or review or alerts or prov or unreadable or res["errors"]:
+    elif flagged or alerts or unreadable or res["errors"]:
         status = "ACTION REQUIRED — "
     else:
         status = "No open findings — "
     name = f"{TM_REPORT_PREFIX}{status}{tallies} — {date_label}"
 
     bar = "━" * 60
-    L = ["TRANSACTION MONITORING — DAILY REPORT", f"Date: {date_label}",
-         "Source: open tasks in the \"Transaction Monitoring\" section (one task per payment). "
-         + "Completed tasks are out of scope.", ""]
+    L = ["TRANSACTION MONITORING — DAILY REPORT",
+         "CONFIDENTIAL — AML/CFT/CPF. Need-to-know only. Do not tip off (Article 25, "
+         + "Federal Decree-Law No. 10 of 2025).",
+         f"Date: {date_label}",
+         "Scope: open tasks in the \"Transaction Monitoring\" section — payments and activity "
+         + "records. Completed tasks are out of scope.",
+         "Basis: Federal Decree-Law No. 10 of 2025 · Cabinet Resolution No. 134 of 2025 · "
+         + "Cabinet Decision No. 74 of 2020 (TFS) · FATF R.10 / R.16 / R.20 · POL-07 TFS name-match "
+         + "procedure · POL-19 STR / DPMSR filing procedure.",
+         "Controls run: payment-party sanctions screening (lists as loaded for today's run) · "
+         + "typology rules · STR and SAR red flags recorded by staff.",
+         "Thresholds: DPMSR AED 55,000 (cash or international wire, single or same-day linked) · "
+         + "CDD AED 15,000. Typology rule parameters are defaults pending MLRO confirmation.", ""]
     if degraded:
         L += ["⚠ DEGRADED — " + degraded,
               "No payment is cleared by this run. Re-run the daily screening or review the "
@@ -665,26 +742,28 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
     if rule_errors:
         L += [f"⚠ {sum(rule_errors.values())} monitoring rule error(s) "
               + f"[{', '.join(sorted(rule_errors))}] — those typologies were NOT checked this run.", ""]
+
     L += [bar, "SUMMARY", bar,
-          f"Payments read: {register_read}"
-          + (f" · ⚠ {unreadable} task(s) with no screenable payment — fill the template "
-             "or paste the MT103 / pacs.008" if unreadable else ""),
+          f"Payments read: {register_read} · activity records: {activities}"
+          + (f" · ⚠ {unreadable} task(s) with nothing usable — fill the template, paste the "
+             + "MT103 / pacs.008, or add 'Customer:' and 'Red flags:'" if unreadable else ""),
           f"Payment screening: {len(stop)} STOP · {len(review)} REVIEW · "
           + f"{len(prov)} provisional · {len(clear)} no match",
-          f"Monitoring rules: {len(alerts)} alert(s)"]
+          f"Monitoring: {len(alerts)} alert(s) across {len(cases)} customer(s)",
+          f"Reporting obligations identified: DPMSR {len(dpmsr)} · possible TFS events "
+          + f"{len(stop) + len(tfs_flags)} · customers for STR/SAR assessment "
+          + f"{sum(1 for c in cases.values() if c['str_sar'])}"]
     if res["errors"]:
         L.append(f"⚠ {len(res['errors'])} payment(s) could not be parsed and were NOT screened.")
     L.append("")
 
     L += [bar, "①  PAYMENT SCREENING  (parties & payment reference vs sanctions lists · FATF R.16)", bar]
-    flagged = stop + review + prov
     if not flagged:
         L.append("   No payment needs attention." if res["n_payments"] else "   No payment to screen today.")
     for r in flagged:
         ref = r["reference"] or "(no reference)"
-        amt = (f"{r['amount']:,.2f} {r['currency']}".strip()
-               if isinstance(r["amount"], (int, float)) else "")
-        L.append(f"   [{r['severity']}] {r['outcome']} — payment {ref} {r['date']} {amt}".rstrip())
+        L.append(f"   [{r['severity']}] {r['outcome']} — payment {ref} · {r.get('customer') or '?'} · "
+                 + f"{r['date']} {_amount_label(r)}".rstrip())
         if r.get("permalink"):
             L.append(f"      Record: {r['permalink']}")
         L += [f"      • {f}" for f in r["findings"]]
@@ -696,27 +775,91 @@ def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
                      + " — 'no match' is provisional")
     L.append("")
 
-    L += [bar, "②  MONITORING RULE ALERTS  (typology rules + STR red flags recorded on the payments)", bar]
+    L += [bar, "②  MONITORING ALERTS  (typology rules + STR / SAR red flags recorded on the tasks)", bar]
     if not alerts:
         L.append("   No rule alert.")
-    L += [f"   [{a['severity']}] {a['rule']} — {a['customer']} {a['date']}: {a['detail']}"
-          for a in alerts[:50]]
+    for a in alerts[:50]:
+        L.append(f"   [{a['severity']}] {a['rule']} — {a['customer']} {a['date']}: {a['detail']}")
+        if a.get("permalink"):
+            L.append(f"      Record: {a['permalink']}")
+        refs = flag_refs(a["rule"]) if (flag_refs and a["rule"] != "RED_FLAG") else []
+        if refs:
+            L.append("      Red-flag register: " + ", ".join(refs[:6])
+                     + (f" +{len(refs) - 6} more" if len(refs) > 6 else ""))
     if len(alerts) > 50:
         L.append(f"   … +{len(alerts) - 50} more alert(s)")
     L.append("")
 
-    L += [bar, "③  WHAT TO DO", bar,
-          "   STOP — hold the payment; verify identifiers. Potential match: PNMR in goAML. "
-          + "Confirmed match: freeze + CNMR + FFR in goAML (POL-07). Release only on an "
-          + "EOCN/FIU written basis. Assess STR/SAR in parallel.",
-          "   REVIEW — high-risk jurisdiction: apply EDD before release. Incomplete (R.16): "
-          + "obtain the missing originator/beneficiary information before release.",
-          "   RULE ALERT — review against the customer profile; document the outcome; "
-          + "file an STR/SAR in goAML if suspicion is not dispelled.",
-          "   When a payment is reviewed, complete its task so it leaves monitoring scope.", "",
-          "MLRO DECISION (per flagged payment / alert)",
-          "   [ ] cleared — released   [ ] EDD obtained   [ ] PNMR filed   "
-          + "[ ] freeze + CNMR + FFR filed   [ ] STR/SAR filed   goAML Ref: ________",
-          "   Reviewed by: ________________   Date: ________", "",
-          "Do not tip off. UAE Cabinet Resolution 74/2020 applies."]
+    L += [bar, "③  REPORTING OBLIGATIONS  (decided by the MLRO; nothing here is filed automatically)", bar]
+    if not (dpmsr or stop or tfs_flags or cases):
+        L.append("   None identified today.")
+    if dpmsr:
+        L.append(f"   DPMSR — {len(dpmsr)} transaction(s)/series at or above AED 55,000 (cash or "
+                 + "international wire). File in goAML regardless of suspicion (POL-19 §3); where "
+                 + "also suspicious, file an STR as well.")
+    if stop or tfs_flags:
+        L.append(f"   TFS — {len(stop)} potential sanctions match(es) and {len(tfs_flags)} TF/PF/"
+                 + "sanctions red flag(s): hold, verify identifiers; PNMR (potential) or freeze + "
+                 + "CNMR + FFR (confirmed) in goAML within the POL-07 deadline; release only on an "
+                 + "EOCN/FIU written basis.")
+    n_assess = sum(1 for c in cases.values() if c["str_sar"])
+    if n_assess:
+        L.append(f"   STR / SAR — {n_assess} customer(s) to assess (see ④). No monetary threshold and "
+                 + "no need to prove the predicate offence; file without delay once suspicion is "
+                 + "formed. A no-action decision is documented with its reasons (POL-19 §2).")
+    L.append("")
+
+    L += [bar, "④  CASES BY CUSTOMER  (one case record per customer — complete it in this task's "
+          + "comments or on the linked tasks)", bar]
+    if not cases:
+        L.append("   No customer case today.")
+    for n, (cust, c) in enumerate(cases.items()):
+        if n >= TM_CASES_SHOWN:
+            L.append(f"   … +{len(cases) - TM_CASES_SHOWN} more customer case(s) — see ① and ②")
+            break
+        obligations = [x for x, on in (("TFS (POL-07)", c["tfs"]), ("DPMSR", c["dpmsr"]),
+                                       ("STR/SAR assessment", c["str_sar"]),
+                                       ("EDD / R.16 information", c["edd"]),
+                                       ("CDD on file", c["cdd"])) if on]
+        L += [f"   ▸ CASE {n + 1} — {cust} — highest severity {c['severity']} · "
+              + f"{len(c['findings'])} finding(s) · {len(c['indicators'])} distinct indicator(s)",
+              "      Obligations: " + (", ".join(obligations) or "review only")]
+        if len(c["indicators"]) >= MULTIPLE_INDICATORS_MIN:
+            L.append("      ⚠ MULTIPLE INDICATORS — heightened scrutiny; clearance is not assumed "
+                     + "while information is missing or unresolved.")
+        L += [f"      • {f}" for f in c["findings"][:8]]
+        if len(c["findings"]) > 8:
+            L.append(f"      • … +{len(c['findings']) - 8} more")
+        L += [f"      Record: {u}" for u in sorted(c["refs"])[:5]]
+        L += ["      Case record:",
+              f"        A  Case ref ______ · detected {date_label} · source: daily TM run",
+              "        B  KYC / CDD / EDD · UBO · source of funds · source of wealth evidence: ______ "
+              + "· explanation received: ______ · outstanding: ______",
+              "        C  Payment & bank records · invoices · shipping & customs · assay / chain of "
+              + "custody · CAHRA exposure: ______",
+              "        D  Screening — sanctions ______ · PEP ______ · adverse media ______ · "
+              + "geography ______ · PF ______",
+              "        E  Findings · inconsistencies · assessment against the known profile: ______",
+              "        F  [ ] CDD/EDD requested   [ ] transaction hold / restriction   follow-up "
+              + "monitoring: ______",
+              "        G  [ ] escalated to Compliance Officer   MLRO decision: [ ] STR  [ ] SAR  "
+              + "[ ] DPMSR  [ ] PNMR  [ ] freeze + CNMR + FFR  [ ] no action — reasons: ______   "
+              + "goAML ref: ______",
+              "        H  Evidence location ______ · retain until (filing + 5 years) ______ · "
+              + "closed ______ · reviewer ______", ""]
+
+    L += [bar, "⑤  OPERATING NOTES", bar,
+          "   • A red flag is an indicator requiring review, not evidence that an offence occurred. "
+          + "Multiple or repeated indicators, false information, attempts to avoid controls, opaque "
+          + "ownership or unusual routing receive heightened scrutiny.",
+          "   • For each finding: record the facts, keep the evidence, compare against the profile, "
+          + "decide on CDD/EDD, resolve discrepancies, escalate to the Compliance Officer, and "
+          + "document the decision and its rationale.",
+          "   • The MLRO is the sole decision-maker on external reporting. A red flag does not by "
+          + "itself require an STR/SAR; an undocumented no-action decision is a control failure.",
+          "   • Record red flags on a payment or activity task with a line such as "
+          + "'Red flags: STR-ML-11, SAR-CB-03'. When a matter is closed, complete its task.",
+          "   • Reports, evidence packs and decisions are retained for at least five years.", "",
+          "Do not tip off. UAE Cabinet Decision No. 74 of 2020 and Article 25 of Federal Decree-Law "
+          + "No. 10 of 2025 apply."]
     return name, "\n".join(L)

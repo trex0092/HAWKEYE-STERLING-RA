@@ -6750,6 +6750,15 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
     UNIFIED_DELIVERY_FAILED["failed"] = True
     return None
 
+def _tm_flag_refs(rule):
+    """Red-flag register codes a rule evidences, for the TM report. A missing
+    register is already a counted rule error (report DEGRADED), so here it
+    only drops the cross-reference."""
+    try:
+        return txn_monitor.red_flag_refs(rule)
+    except Exception:
+        return []
+
 def post_tm_report(run_time, tm_report):
     """File the daily Transaction Monitoring report in the Transaction
     Monitoring section — one per calendar day (repeat runs the same day find
@@ -6782,7 +6791,8 @@ def post_tm_report(run_time, tm_report):
     name, notes = payment_screen.build_tm_daily_report(
         dt, tm_report.get("feed"), tm_report.get("alerts"),
         register_read=tm_report.get("read", 0), unreadable=tm_report.get("unreadable", 0),
-        degraded=tm_report.get("degraded", ""), rule_errors=tm_report.get("rule_errors"))
+        degraded=tm_report.get("degraded", ""), rule_errors=tm_report.get("rule_errors"),
+        activities=tm_report.get("activities", 0), flag_refs=_tm_flag_refs)
     payload = {"data": {"name": name[:250], "notes": cap_notes(notes, ASANA_NOTES_MAX),
                         "due_on": run_time.strftime("%Y-%m-%d"),
                         "assignee": ASANA_ASSIGNEE_GID, "projects": [ASANA_ONGOING_MON_GID]}}
@@ -7625,6 +7635,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # starts DEGRADED and is only marked readable once the register was read
     # AND screened, so a crash anywhere below can never post an all-clear.
     tm_report = {"configured": bool(ASANA_PAYMENTS_SECTION_GID), "read": 0, "unreadable": 0,
+                 "activities": 0,
                  "feed": None, "alerts": [], "rule_errors": {},
                  "degraded": "the payments in the section could not be read or screened"}
     try:
@@ -7634,9 +7645,14 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         _reg, _tm = [], {"alerts": []}
         if ASANA_PAYMENTS_SECTION_GID:
             _reg, _reg_bad = get_payment_register()
-            tm_report.update(read=len(_reg), unreadable=_reg_bad)
-            _pay_records = _pay_records + _reg
-            _reg_lines.append(f"Transaction Monitoring section (Asana): {len(_reg)} open payment(s) read"
+            # Activity-only records (red flags on a customer, no payment) go
+            # through the monitoring rules, never through payment screening.
+            _reg_pay = [r for r in _reg if not r.get("activity_only")]
+            tm_report.update(read=len(_reg_pay), unreadable=_reg_bad,
+                             activities=len(_reg) - len(_reg_pay))
+            _pay_records = _pay_records + _reg_pay
+            _reg_lines.append(f"Transaction Monitoring section (Asana): {len(_reg_pay)} open payment(s)"
+                              f" and {len(_reg) - len(_reg_pay)} activity record(s) read"
                               + (f"; ⚠ {_reg_bad} task(s) carried no screenable payment "
                                  "(fill the template or paste the MT103/pacs.008)" if _reg_bad else "")
                               + ".")
@@ -7659,7 +7675,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             # Only the register's own payments belong in its report (a file
             # feed, if any, stays in the main report only).
             _reg_res = payment_screen.screen_feed(
-                _reg, all_lists, jurisdiction_table=kyc.load_jurisdiction_risk(),
+                _reg_pay, all_lists, jurisdiction_table=kyc.load_jurisdiction_risk(),
                 lists_degraded=_core_down, matcher=screen_name, normalizer=normalize,
                 xml_parser=safe_xml_fromstring) if _file_cfg else _pay_res
             tm_report.update(feed=_reg_res, alerts=_tm["alerts"],
