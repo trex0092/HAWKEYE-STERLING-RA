@@ -31,6 +31,7 @@ import ai      # AI layer — risk rating, adverse triage, summaries, transliter
 import agents  # Agentic operating model — identity/authorization, audit trail, QA gate
 import kyc      # KYC/identity layer — FATF R.10 (CDD) + R.25 (legal arrangements)
 import txn_monitor  # FATF R.16 transaction-monitoring engine (inert until a feed is configured)
+import payment_screen  # payment-party screening (inert until a feed is configured)
 import monitoring   # Runtime metrics + source-coverage drift detection
 
 try:
@@ -7515,6 +7516,25 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     for s in run_monitor.get("sustained", []):
         log(f"SUSTAINED ANOMALY (escalate to MLRO): {s} — persisted across recent runs")
     txn_status = txn_monitor.status_line()   # R.16 — honest about the (absent) feed
+    # Payment screening — the PARTIES of each payment (originator, beneficiary,
+    # banks in the chain, payment reference) against the same lists. Inert
+    # until the transaction feed exists; never fails the run, but a crash is
+    # disclosed in the report rather than read as "no payment flagged".
+    try:
+        _pay_cfg = txn_monitor.feed_configured() and not txn_monitor.feed_parse_error()
+        _pay_res = None
+        if _pay_cfg:
+            _core_down = [k.upper() for k, v in list_meta.items()
+                          if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
+            _pay_res = payment_screen.screen_feed(
+                txn_monitor.load_transactions(), all_lists,
+                jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down,
+                matcher=screen_name, normalizer=normalize, xml_parser=safe_xml_fromstring)
+        txn_status = "\n   ".join([txn_status] + payment_screen.report_lines(_pay_res, _pay_cfg))
+    except Exception as e:
+        log(f"  ! payment screening failed: {safe_err(e)}")
+        txn_status += ("\n   Payment screening (parties): DEGRADED — the run could not screen the "
+                       f"feed's payments ({type(e).__name__}); none is cleared by this run.")
     cdd_gaps_total = sum(m.get("cdd_gap_count", 0) for m in possible_matches)
     arrangements = sum(1 for m in possible_matches if m.get("arrangement"))
 

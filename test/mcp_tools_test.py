@@ -211,6 +211,8 @@ _valid_args = {
     "hawkeye_normalize_name": {"name": "Test Person"},
     "hawkeye_screen_name": {"name": "Test Person Ltd", "watchlist": ["ACME LLC"]},
     "hawkeye_screen_internal_watchlist": {"name": "Test Person Ltd"},
+    "hawkeye_screen_payment": {"watchlist": ["ACME LLC"], "parties": [
+        {"role": "originator", "name": "Test Person Ltd"}, {"role": "beneficiary", "name": "Other Co"}]},
     "hawkeye_monitor_transactions": {"transactions": [{"customer": "C", "date": "2026-01-01", "amount": 55000, "method": "cash"}]},
     "hawkeye_analyze_kyc_note": {"notes": "SECTION 4\nIndividual 1 — Director\nName: JANE DOE\n"},
     "hawkeye_jurisdiction_risk": {"country": "Iran"},
@@ -223,6 +225,25 @@ _valid_args = {
     "hawkeye_related_parties": {"customers": [{"name": "X FZE", "individuals": ["Jane Doe"]}]},
 }
 check("_valid_args covers every registered tool", set(_valid_args) == set(mcp_tools.TOOLS))
+
+# hawkeye_screen_payment: a listed beneficiary is found from a raw MT103 and the
+# originator from a parties array; bad input is refused, never half-screened.
+_mt = (":20:TRN0001\n:32A:260915AED1000,00\n:50K:/AE070331234567890123456\nTEST TRADING LLC\nDUBAI\n"
+       ":57A:TESTAEADXXX\n:59:/12345\nACME GENERAL TRADING LLC\nHONG KONG\n:70:INVOICE 12345\n")
+_sp = mcp_tools.screen_payment(["ACME GENERAL TRADING LLC"], message=_mt)
+_sp_b = next(p for p in _sp["payments"][0]["parties"] if p["role"] == "beneficiary")
+check("screen_payment (MT103) flags the listed beneficiary and stops the payment",
+      _sp_b["hits"] and _sp["payments"][0]["outcome"].startswith("STOP"))
+check("screen_payment hits use the stable MCP hit shape",
+      set(_sp_b["hits"][0]) == {"list", "matched_entry", "score", "confidence", "match_context"})
+for _bad, _why in (({"watchlist": "x", "parties": []}, "non-array watchlist"),
+                   ({"watchlist": []}, "neither message nor parties"),
+                   ({"watchlist": [], "parties": [{"role": "nobody"}]}, "no readable party")):
+    try:
+        mcp_tools.screen_payment(**_bad)
+        check(f"screen_payment refuses {_why}", False)
+    except ValueError:
+        check(f"screen_payment refuses {_why}", True)
 for _tname, _targs in _valid_args.items():
     try:
         json.dumps(mcp_tools.call_tool(_tname, _targs))

@@ -30,7 +30,7 @@ console.log('\n— legal-citation guard (repealed instruments never cited as ope
 
 /* Engine, Advisor and framework surfaces covered by the migration. */
 const SCAN = [
-  'screen.py', 'ai.py', 'kyc.py', 'monitoring.py', 'agents.py', 'txn_monitor.py',
+  'screen.py', 'ai.py', 'kyc.py', 'monitoring.py', 'agents.py', 'txn_monitor.py', 'payment_screen.py',
   'advisor.js', 'console.js', 'app.js', 'i18n.js',
   'netlify/functions/brain-soul.js',
   'docs/AI-GOVERNANCE.md',

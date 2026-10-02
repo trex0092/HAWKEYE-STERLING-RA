@@ -10,6 +10,9 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Payment screening** (`payment_screen.py`): screens the PARTIES of a payment, the counterpart of transaction monitoring, which watches behaviour. Every named party (originator, beneficiary, ultimate parties, ordering/intermediary/correspondent/beneficiary banks) goes through the production sanctions matcher. Every party country (stated, or taken from a BIC) is checked against the maintained FATF list. The payment reference is scanned for multi-word designated names. A missing originator or beneficiary name is reported as incomplete under FATF R.16. It reads SWIFT MT103 and ISO 20022 pacs.008 (DTD/entity declarations refused) or a feed record's `parties`. Outcomes: STOP (potential match, apply POL-07), REVIEW (FATF-listed jurisdiction or R.16 incomplete), NO MATCH, or NO MATCH — PROVISIONAL when a core list did not load. A bank given only by BIC is listed as not name-screened. It runs inside the daily screen and reports in §⑤, and is INACTIVE (and says so) until a transaction feed exists. New MCP tool `hawkeye_screen_payment`. The transaction-feed schema gains optional `payment_message`, `parties`, `remittance_info` and `expected_monthly_volume`.
+- Transaction monitoring: three new typologies. `PROFILE_DEVIATION` flags a month above 1.5× the customer's declared expected volume and runs only when the profile figure is supplied. `CIRCULAR_FLOW` flags money out to and back from the same counterparty within 30 days for a similar amount. `NEW_GEOGRAPHY` flags a first-ever counterparty country after 5 earlier transactions.
+
 - Retry Wikidata HTTP 200 maxlag and rate-limit error payloads with bounded backoff and Retry-After, rather than treating them as successfully fetched empty PEP name batches.
 
 ### Added
