@@ -1167,6 +1167,105 @@ check("TM report delivery: a report outside its section turns the run red", _g i
 screen.TM_REPORT_FAILED["failed"] = False
 check("TM report delivery: nothing is posted when the section is not configured",
       screen.post_tm_report(_tm_rt, {**_tm_ctx, "configured": False}) is None)
+# ── STR red-flag catalogue + the typology rules it maps to (fictional data) ──
+_rf_doc = json.load(open(os.path.join(ROOT, "data", "str-red-flags.json"), encoding="utf-8"))
+_rf_codes = [f["code"] for f in _rf_doc["flags"]]
+check("red flags: the catalogue holds the MLRO's 100 flags in 6 categories with unique codes",
+      len(_rf_codes) == 100 and len(set(_rf_codes)) == 100
+      and set(_rf_doc["categories"]) == {"ML", "TF", "PF", "SE", "CO", "CP"})
+import re as _re_rf
+_rule_codes = set(_re_rf.findall(r'_alert\("([A-Z_]+)"', open(os.path.join(ROOT, "txn_monitor.py"),
+                                                              encoding="utf-8").read()))
+_rf_bad = sorted({d for f in _rf_doc["flags"] for d in f["detected_by"]}
+                 - _rule_codes - {"manual", "screening", "payment_screening"})
+check("red flags: every 'detected_by' names a real rule or control" + (f" — unknown: {_rf_bad}" if _rf_bad else ""),
+      not _rf_bad)
+def _rules(rec_list):
+    return [a["rule"] for a in txn_monitor.evaluate(rec_list)["alerts"]]
+_c = "Example Trading LLC"
+check("RAPID_RESALE: 1,000 g bought then sold back 3 days later at a loss is flagged, with the loss",
+      any(a["rule"] == "RAPID_RESALE" and "loss" in a["detail"] for a in txn_monitor.evaluate([
+          {"customer": _c, "date": "2026-10-01", "amount": 300000, "direction": "in", "method": "wire",
+           "transaction_type": "buy", "weight_g": 1000},
+          {"customer": _c, "date": "2026-10-04", "amount": 270000, "direction": "out", "method": "wire",
+           "transaction_type": "sell", "weight_g": 990}])["alerts"]))
+check("RAPID_RESALE: not flagged when the resale is 20 days later or the weight differs by 30%",
+      "RAPID_RESALE" not in _rules([
+          {"customer": _c, "date": "2026-10-01", "amount": 1, "transaction_type": "buy", "weight_g": 1000},
+          {"customer": _c, "date": "2026-10-21", "amount": 1, "transaction_type": "sell", "weight_g": 1000}])
+      and "RAPID_RESALE" not in _rules([
+          {"customer": _c, "date": "2026-10-01", "amount": 1, "transaction_type": "buy", "weight_g": 1000},
+          {"customer": _c, "date": "2026-10-02", "amount": 1, "transaction_type": "sell", "weight_g": 700}]))
+_fn_in = [{"customer": _c, "date": f"2026-10-0{i}", "amount": 10000, "direction": "in", "method": "wire",
+           "counterparty": f"Payer {i}", "counterparty_country": "AE"} for i in range(1, 6)]
+_fn_out = {"customer": _c, "date": "2026-10-08", "amount": 45000, "direction": "out", "method": "wire",
+           "counterparty": "Foreign Recipient", "counterparty_country": "Testland"}
+check("FUNNEL: five payers in, then most of it out to one foreign payee, is flagged",
+      "FUNNEL" in _rules(_fn_in + [_fn_out]))
+check("FUNNEL: not flagged with four payers, or when the onward payee is in the UAE",
+      "FUNNEL" not in _rules(_fn_in[:4] + [_fn_out])
+      and "FUNNEL" not in _rules(_fn_in + [{**_fn_out, "counterparty_country": "United Arab Emirates"}]))
+_mj = lambda cs: {"customer": _c, "date": "2026-10-01", "amount": 1,
+                  "parties": [{"role": "x", "country": c} for c in cs]}
+check("MULTI_JURISDICTION: a payment chain through 4 countries is flagged, 3 is not",
+      "MULTI_JURISDICTION" in _rules([_mj(["AE", "HK", "TR", "GB"])])
+      and "MULTI_JURISDICTION" not in _rules([_mj(["AE", "HK", "GB"])]))
+_kw = lambda txt: {"customer": _c, "date": "2026-10-01", "amount": 1, "remittance_info": txt}
+check("REFERENCE_KEYWORD: 'consultancy fee' and 'via hawala' are flagged; 'furnace commissioning' is not",
+      "REFERENCE_KEYWORD" in _rules([_kw("consultancy fee Q3")])
+      and "REFERENCE_KEYWORD" in _rules([_kw("settled via hawala")])
+      and "REFERENCE_KEYWORD" not in _rules([_kw("furnace commissioning works")]))
+check("PERSONAL_ACCOUNT and CASH_NO_SOURCE_OF_FUNDS fire only on the recorded facts",
+      {"PERSONAL_ACCOUNT", "CASH_NO_SOURCE_OF_FUNDS"} <= set(_rules([
+          {"customer": _c, "date": "2026-10-01", "amount": 20000, "method": "cash",
+           "personal_account_for_corporate": True, "source_of_funds_verified": False}]))
+      and not {"PERSONAL_ACCOUNT", "CASH_NO_SOURCE_OF_FUNDS"} & set(_rules([
+          {"customer": _c, "date": "2026-10-01", "amount": 20000, "method": "cash",
+           "source_of_funds_verified": True},
+          {"customer": _c, "date": "2026-10-01", "amount": 20000, "method": "wire",
+           "source_of_funds_verified": False}])))
+_rfa = txn_monitor.evaluate([{"customer": _c, "date": "2026-10-01", "amount": 1,
+                              "red_flags": ["ML-11", "TF-07", "XX-99"]}])["alerts"]
+_rfa_by = {a["detail"].split(" ")[0]: a for a in _rfa if a["rule"] == "RED_FLAG"}
+check("RED_FLAG: a recorded ML flag is HIGH with its text; a TF flag is CRITICAL (possible TFS event)",
+      _rfa_by["ML-11"]["severity"] == "HIGH" and "rapidly resold" in _rfa_by["ML-11"]["detail"]
+      and _rfa_by["TF-07"]["severity"] == "CRITICAL" and "POL-07" in _rfa_by["TF-07"]["detail"])
+check("RED_FLAG: an unknown code is reported, never dropped",
+      any("unknown red-flag code 'XX-99'" in a["detail"] for a in _rfa))
+_rf_path = txn_monitor.RED_FLAGS_PATH
+try:
+    txn_monitor.RED_FLAGS_PATH = os.path.join(ROOT, "data", "no-such-red-flags.json")
+    txn_monitor._RED_FLAGS.clear()
+    _rf_err = txn_monitor.evaluate([{"customer": _c, "date": "2026-10-01", "amount": 1,
+                                     "red_flags": ["ML-11"]}])
+finally:
+    txn_monitor.RED_FLAGS_PATH = _rf_path
+    txn_monitor._RED_FLAGS.clear()
+check("RED_FLAG: a missing catalogue is a counted rule error, not a silent pass",
+      _rf_err["rule_errors"].get("rule_red_flag_recorded") == 1)
+_tpl = payment_screen.parse_register_entry("PAY-RF", (
+    "Date: 2026-10-02\nAmount: 60000\nDirection: out\nMethod: cash\nCustomer: Example Trading LLC\n"
+    "Beneficiary: Demo Refinery\nOriginator: Example Trading LLC\n"
+    "Type (buy | sell | refund): sell\nWeight (grams): 1,000 g\nPurpose: consultancy fee\n"
+    "Third party payment (yes/no): yes\nThird party relationship (related | unrelated): Unrelated\n"
+    "Source of funds verified (yes/no): no\nDelivery confirmed (yes/no): no\n"
+    "Payment completed (yes/no): yes\nInvoice mismatch (yes/no): maybe\n"
+    "Red flags (codes, e.g. ML-11, TF-07): ml-11, TF-07\n"))
+check("template: bracketed hints are ignored, yes/no and numbers are read, red-flag codes normalised",
+      _tpl["transaction_type"] == "sell" and _tpl["weight_g"] == 1000.0
+      and _tpl["third_party_payment"] is True and _tpl["third_party_relationship"] == "unrelated"
+      and _tpl["source_of_funds_verified"] is False and _tpl["goods_transaction"] is True
+      and _tpl["red_flags"] == ["ML-11", "TF-07"])
+check("template: a value that is not an explicit yes/no is ignored, never guessed",
+      "invoice_mismatch" not in _tpl)
+check("template: the filled-in facts reach the rules (third party, phantom delivery, SOF, keyword, red flags)",
+      {"THIRD_PARTY_PAYMENT", "PHANTOM_DELIVERY", "CASH_NO_SOURCE_OF_FUNDS", "REFERENCE_KEYWORD",
+       "RED_FLAG"} <= set(_rules([_tpl])))
+_tm_ne, _tm_be = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
+    rule_errors={"rule_funnel": 2})
+check("TM report: a crashed monitoring rule makes the report DEGRADED and names the rule",
+      "DEGRADED — " in _tm_ne and "rule_funnel" in _tm_be and "NOT checked" in _tm_be)
 check("report: payment screening says INACTIVE without a feed (no implied clearance)",
       len(_inactive) == 1 and "INACTIVE" in _inactive[0])
 _active = payment_screen.report_lines(payment_screen.screen_feed(

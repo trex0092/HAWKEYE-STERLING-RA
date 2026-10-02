@@ -25,7 +25,7 @@ THRESHOLDS (UAE DPMS context — tune in config):
   • AED 15,000  — CDD trigger for occasional transactions.
 No third-party dependencies. Deterministic. Human (MLRO) reviews & files.
 """
-import os, json, datetime
+import os, re, json, datetime
 from collections import defaultdict
 
 CASH_REPORT_THRESHOLD = float(os.environ.get("DPMS_CASH_THRESHOLD", "55000"))
@@ -42,6 +42,34 @@ PROFILE_DEVIATION_FACTOR = float(os.environ.get("TXN_PROFILE_DEVIATION_FACTOR", 
 CIRCULAR_WINDOW_D     = 30     # days: funds out to X and back from X (or reverse)
 CIRCULAR_AMOUNT_BAND  = 0.10   # within 10% = the same money coming back
 NEW_GEO_MIN_HISTORY   = 5      # prior transactions needed before a country is "new"
+# STR red-flag typologies (data/str-red-flags.json). Defaults pending MLRO
+# confirmation, like every threshold here; each is a constant, not a guess.
+RESALE_WINDOW_D       = 7      # days: gold bought then sold back (or reverse)
+RESALE_WEIGHT_BAND    = 0.10   # within 10% of the weight = the same gold
+RESALE_LOSS_PCT       = 5.0    # a resale this % below cost is called a loss
+FUNNEL_MIN_SOURCES    = 5      # distinct payers feeding one onward payment
+FUNNEL_WINDOW_D       = 14     # days the inbound payments are collected over
+FUNNEL_SHARE          = 0.5    # onward foreign payment ≥ this share of the inflow
+MULTI_JURISDICTION_MIN = 4     # distinct countries in ONE payment chain
+HOME_COUNTRIES        = {"ae", "are", "uae", "united arab emirates"}
+# Payment-reference wording tied to a red flag. Word-bounded, case-insensitive.
+# Deliberately no religious-giving terms: the indicator is an NPO/charity
+# channel, not a faith practice.
+REFERENCE_KEYWORDS = {
+    "commission / consultancy wording (possible concealed bribe or kickback)": (
+        "commission", "consultancy", "consulting fee", "facilitation fee",
+        "success fee", "finder's fee", "finders fee", "introducer fee", "kickback"),
+    "charity / NPO wording (possible TF funnelling through a non-profit)": (
+        "donation", "charity", "charitable", "non-profit", "nonprofit", "npo",
+        "relief fund"),
+    "informal value transfer wording (hawala / underground banking)": (
+        "hawala", "hundi", "informal transfer", "underground banking"),
+}
+RED_FLAGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "data", "str-red-flags.json")
+_RED_FLAGS = {}
+# Categories where a recorded flag can mean a TFS event, not only an STR.
+TFS_FLAG_CATEGORIES = {"TF", "PF", "SE"}
 
 
 def feed_configured():
@@ -382,13 +410,167 @@ def rule_new_geography(txns):
     return out
 
 
+def rule_rapid_resale(txns):
+    """Gold bought and sold back (or sold and bought back) within RESALE_WINDOW_D
+    days for about the same weight — layering through the metal, or the same
+    gold churned with no economic exposure. Needs transaction_type buy|sell and
+    weight_g on the records; states the loss when the resale is below cost."""
+    def wt(t):
+        try:
+            return float(t.get("weight_g"))
+        except (TypeError, ValueError):
+            return 0.0
+    legs = [t for t in txns if _norm(t.get("transaction_type")) in ("buy", "sell")
+            and _d(t.get("date")) and wt(t) > 0]
+    out = []
+    for a in legs:
+        for b in legs:
+            if a is b or _norm(a.get("transaction_type")) == _norm(b.get("transaction_type")):
+                continue
+            dd = (_d(b["date"]) - _d(a["date"])).days
+            if not (0 <= dd <= RESALE_WINDOW_D) or (dd == 0 and id(b) < id(a)):
+                continue
+            if abs(wt(b) - wt(a)) > RESALE_WEIGHT_BAND * wt(a):
+                continue
+            buy, sell = (a, b) if _norm(a.get("transaction_type")) == "buy" else (b, a)
+            loss = ""
+            if _amt(buy) > 0 and _amt(sell) > 0:
+                pct = (_amt(buy) - _amt(sell)) / _amt(buy) * 100
+                if pct >= RESALE_LOSS_PCT:
+                    loss = f" at a {pct:.1f}% loss"
+            out.append(_alert("RAPID_RESALE", "HIGH", a,
+                f"{_norm(a.get('transaction_type'))} {wt(a):,.0f} g then "
+                f"{_norm(b.get('transaction_type'))} {wt(b):,.0f} g within {dd}d{loss} — "
+                "possible layering / churning of the same gold"))
+            break
+    return out
+
+
+def rule_funnel(txns):
+    """Many payers, one foreign payee: FUNNEL_MIN_SOURCES or more distinct
+    counterparties pay in within FUNNEL_WINDOW_D days, then a payment of at
+    least FUNNEL_SHARE of that inflow goes to a counterparty abroad (TF
+    collection-and-funnel pattern). Counterparties are taken as recorded."""
+    ins = [t for t in txns if _norm(t.get("direction")) == "in"
+           and _d(t.get("date")) and _norm(t.get("counterparty"))]
+    outs = [t for t in txns if _norm(t.get("direction")) == "out" and _d(t.get("date"))
+            and _norm(t.get("counterparty_country"))
+            and _norm(t.get("counterparty_country")) not in HOME_COUNTRIES]
+    out = []
+    for o in outs:
+        window = [t for t in ins if 0 <= (_d(o["date"]) - _d(t["date"])).days <= FUNNEL_WINDOW_D]
+        sources = {_norm(t.get("counterparty")) for t in window}
+        inflow = sum(_amt(t) for t in window)
+        if len(sources) >= FUNNEL_MIN_SOURCES and inflow > 0 and _amt(o) >= FUNNEL_SHARE * inflow:
+            out.append(_alert("FUNNEL", "HIGH", o,
+                f"{len(sources)} payers sent {inflow:,.0f} AED within {FUNNEL_WINDOW_D}d, then "
+                f"{_amt(o):,.0f} AED went to {o.get('counterparty', '?')} in "
+                f"{o.get('counterparty_country')} — possible collect-and-funnel (TF)"))
+    return out
+
+
+def _party_country(p):
+    c = str(p.get("country") or "").strip().lower()
+    if len(c) == 2:
+        return c
+    bic = str(p.get("bic") or "").strip().upper()
+    if len(bic) in (8, 11) and bic[4:6].isalpha():
+        return bic[4:6].lower()
+    return _norm(p.get("country_name"))
+
+
+def rule_multi_jurisdiction(txns):
+    """One payment whose chain (originator, banks, beneficiary) touches
+    MULTI_JURISDICTION_MIN or more countries — layering or third-country
+    routing to distance a payment from its real origin or destination."""
+    out = []
+    for t in txns:
+        countries = {_party_country(p) for p in (t.get("parties") or [])} - {""}
+        if len(countries) >= MULTI_JURISDICTION_MIN:
+            out.append(_alert("MULTI_JURISDICTION", "MEDIUM", t,
+                f"payment chain spans {len(countries)} countries "
+                f"({', '.join(sorted(c.upper() for c in countries))}) — confirm the commercial "
+                "reason for the routing"))
+    return out
+
+
+def rule_reference_keyword(txns):
+    """Payment reference / purpose wording tied to a red flag (concealed
+    commission, NPO funnelling, informal value transfer). A prompt to check
+    the justification — not a finding of wrongdoing."""
+    out = []
+    for t in txns:
+        text = " ".join(str(t.get(k) or "") for k in ("remittance_info", "purpose")).lower()
+        if not text.strip():
+            continue
+        for label, words in REFERENCE_KEYWORDS.items():
+            hit = next((w for w in words if re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", text)), None)
+            if hit:
+                out.append(_alert("REFERENCE_KEYWORD", "MEDIUM", t,
+                    f"payment reference/purpose says \"{hit}\" — {label}; confirm the "
+                    "justification and the recipient"))
+    return out
+
+
+def rule_personal_account(txns):
+    """Corporate transaction paid from a personal account, as recorded."""
+    return [_alert("PERSONAL_ACCOUNT", "HIGH", t,
+            "corporate transaction funded from a personal account — obtain a legitimate explanation")
+            for t in txns if t.get("personal_account_for_corporate") is True]
+
+
+def rule_cash_no_source_of_funds(txns):
+    """Cash at/above the CDD trigger with the source of funds recorded as NOT
+    verified — cash converted into gold without a credible source."""
+    return [_alert("CASH_NO_SOURCE_OF_FUNDS", "HIGH", t,
+            f"cash {_amt(t):,.0f} AED with source of funds not verified — verify before "
+            "completing; assess STR/SAR if it cannot be")
+            for t in txns if _norm(t.get("method")) == "cash"
+            and _amt(t) >= CDD_TRIGGER_THRESHOLD and t.get("source_of_funds_verified") is False]
+
+
+def load_red_flags():
+    """code -> flag, from data/str-red-flags.json. Raises if the catalogue is
+    missing or malformed (the rule error is counted, never a silent pass)."""
+    if not _RED_FLAGS:
+        with open(RED_FLAGS_PATH, encoding="utf-8") as fh:
+            doc = json.load(fh)
+        cats = doc["categories"]
+        for f in doc["flags"]:
+            _RED_FLAGS[f["code"]] = {**f, "category_label": cats[f["category"]]}
+    return _RED_FLAGS
+
+
+def rule_red_flag_recorded(txns):
+    """Red flags a person recorded on the payment ('Red flags: ML-11, TF-07').
+    TF / PF / sanctions-evasion flags are CRITICAL: they can be a TFS event."""
+    catalogue = load_red_flags()
+    out = []
+    for t in txns:
+        for code in t.get("red_flags") or []:
+            f = catalogue.get(str(code).strip().upper())
+            if f is None:
+                out.append(_alert("RED_FLAG", "HIGH", t,
+                    f"unknown red-flag code '{code}' — correct it (codes: data/str-red-flags.json)"))
+                continue
+            tfs = f["category"] in TFS_FLAG_CATEGORIES
+            out.append(_alert("RED_FLAG", "CRITICAL" if tfs else "HIGH", t,
+                f"{f['code']} ({f['category_label']}): {f['text']} — "
+                + ("apply POL-07 if a designated party may be involved; assess STR/SAR"
+                   if tfs else "assess STR/SAR")))
+    return out
+
+
 _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_high_risk_counterparty, rule_rapid_passthrough,
           rule_cdd_trigger, rule_round_amount_cash,
           rule_third_party_payment, rule_refund_diversion,
           rule_pricing_deviation, rule_phantom_delivery,
           rule_invoice_mismatch, rule_route_mismatch,
-          rule_profile_deviation, rule_circular_flow, rule_new_geography]
+          rule_profile_deviation, rule_circular_flow, rule_new_geography,
+          rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
+          rule_reference_keyword, rule_personal_account,
+          rule_cash_no_source_of_funds, rule_red_flag_recorded]
 
 
 def _any_customer(txns):
