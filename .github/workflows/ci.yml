@@ -185,6 +185,8 @@ jobs:
         run: node test/composio-integration.test.mjs
       - name: Run obligation register test (instruments, controls, watch sources)
         run: node test/obligations.test.mjs
+      - name: Run country AML intelligence link test (every jurisdiction maps to a listed page; link-only, no content)
+        run: node test/country-intel-links.test.mjs
       - name: Run GRC metrics test (metric bases + KRI wiring + appetite vs code)
         run: node test/grc-metrics.test.mjs
       - name: Run policy register test (ownership, approval record, shadow-policy sweep)
