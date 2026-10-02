@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "description": "Ratchet floors for the external Cascade name-pair benchmark (JS engine). Counts measured 2026-10-02 at the commit that added the corpus. Floors may only rise; see test/fixtures/external-benchmark/README.md.",
+  "lots": {
+    "cascade-name-pairs.csv": { "rows": 300, "matches": 140, "non_matches": 160, "recall_hits_min": 87, "negative_clear_min": 93 },
+    "cascade-name-pairs-2.csv": { "rows": 185, "matches": 118, "non_matches": 67, "recall_hits_min": 33, "negative_clear_min": 65 }
+  }
+}

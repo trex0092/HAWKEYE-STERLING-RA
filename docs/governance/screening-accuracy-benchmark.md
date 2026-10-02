@@ -113,6 +113,28 @@ file substitutes for that. The corpus deliberately mixes pre-hardening anchors
 demonstrates improvement also guards against regression; corpus composition
 changes must keep that mix and be reviewed like code.
 
+### 6a. Independent external corpus
+
+The corpus above was written alongside the matcher, so it cannot by itself show
+how the matcher does on cases nobody tuned it for. From 2026-10-02 an
+**independent** corpus is measured too: 485 MIT-licensed company and vessel name
+pairs from the Cascade Screening project (also vendored by moov-io/watchman),
+in `test/fixtures/external-benchmark/` with provenance, licence and upstream
+caveats in its README. JS engine, at the commit that added it:
+
+| Lot | Recall | Negative clear |
+|---|---|---|
+| 1 (300 pairs) | 62.1% (87/140) | 58.1% (93/160) |
+| 2 (185 pairs: Hebrew/Burmese vs Latin, former names) | 28.0% (33/118) | 97.0% (65/67) |
+
+These numbers are far below the internal corpus's, and that gap is the point of
+measuring them: they mark where the matcher is weakest today (legal-form
+spellings, numerals, plurals, homophones, translated generic words, Hebrew and
+Burmese script). `test/external-benchmark.test.mjs` pins them as ratchet floors
+(`floors.json`). They may only rise, and a change that trades a caught true pair
+for a cleared non-match is still a regression. They are not targets and carry
+the same honesty constraint as §6.
+
 ## 7. Change log
 
 | Date | Change | Authority |
@@ -120,3 +142,4 @@ changes must keep that mix and be reviewed like code.
 | 2026-07-28 | Corpus authored (121 + 85 + 114 + 6); baseline frozen for js / py_rapidfuzz / py_difflib; Phase-0 no-regression floors committed | Model owner (this hardening programme) |
 | 2026-07-28 | Floors ratcheted to v2 (the 95% programme targets) after phases 1-4 landed. Achieved, all three backends: sanctions recall **97.5%** (118/121; the 3 misses are the documented residuals), hard negatives **100%** unnoted (py; js keeps its 3 pre-baseline boilerplate FPs at 96.5%), adverse classification **100%**, repeat-signal **100%**. Floors: recall ≥0.95 with fn cap 3, adverse/repeat ≥1.0, negatives ≥1.0 (py) / ≥0.964 (js). bias_eval floors raised 70→90%/group, gap 30→10%, + Cyrillic/CJK/Phonetic groups at 100% under both backends | Model owner (this hardening programme) |
 | 2026-08-05 | JS engine's decisive score ported to `min(full, core)` (screen.py `match_score` parity), replacing the collapse-to-core `max()` scorer whose token component also ran over sig tokens — any two corporates sharing ONE distinctive token scored 100/critical. Recall the collapse used to provide is kept honestly by porting the Python short-entry and near-exact-core gates; subset/phonetic-only hits now band review/medium with mechanism + confidence labels (nothing suppressed — still material matches). JS harness `pairHits` aligned to the Python list-hit definition (equivalence proven on the unchanged engine: identical 131/132 + 85/85 under both). Corpus +2 recall pins (r133 short-entry, r134 near-exact-core) and +5 hard negatives (n086-n090, the single-shared-distinctive-token corporate class). Measured: js 133/134 recall (r120 the sole residual) · 90/90 negatives; py 134/134 · 90/90 both backends. **js `negative_clear_min` ratcheted 0.964 → 1.0.** | Maintainer (engineering; floors ratcheted up only) |
+| 2026-10-02 | Independent external corpus added (§6a): 485 MIT Cascade company/vessel name pairs, JS engine measured at recall 87/140 + 33/118 and negative clear 93/160 + 65/67; pinned as ratchet floors in `test/fixtures/external-benchmark/floors.json`. Internal corpus and floors unchanged | Maintainer (engineering; new floors at measured values, ratchet up only) |
