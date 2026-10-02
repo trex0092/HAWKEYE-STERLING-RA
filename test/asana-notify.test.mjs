@@ -508,7 +508,7 @@ check('a sectionless mirror still joins the project',
    with a literal gid must name an approved section. */
 {
   const { SECTIONS: APPROVED, PAYMENTS_SECTION: PAY_IN } = await import('../scripts/asana-sections.mjs');
-  // The Payments Register section is a READ-ONLY input, allowed as a literal.
+  // The Transaction Monitoring (payments) section is allowed as a literal.
   const approvedGids = new Set([...Object.values(APPROVED).map(x => x.gid), PAY_IN]);
   const { readdirSync } = await import('node:fs');
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -529,15 +529,16 @@ check('a sectionless mirror still joins the project',
   }
   check('every literal monitoring section gid in workflows/scripts/screen.py is an approved section'
     + (offenders.length ? ' — unapproved: ' + offenders.join(', ') : ''), offenders.length === 0);
-  /* The Payments Register section is an INPUT: the daily run must read the
-     registered one, and it must never be accepted as a results destination. */
+  /* The Transaction Monitoring section holds the payments: the daily run must
+     read the registered one, and no JS notifier may file into it (only the
+     engine's own daily TM report goes there — screen.py post_tm_report). */
   const { PAYMENTS_SECTION, MONITORING_PROJECT, requireApprovedSection } = await import('../scripts/asana-sections.mjs');
   const wf = readFileSync(join(root, '.github/workflows/weekly-adverse-media.yml'), 'utf8');
-  check('the daily run reads the registered Payments Register section',
+  check('the daily run reads the registered Transaction Monitoring (payments) section',
     wf.includes("ASANA_PAYMENTS_SECTION_GID || '" + PAYMENTS_SECTION + "'"));
   let refused = false;
   try { requireApprovedSection(MONITORING_PROJECT, PAYMENTS_SECTION); } catch { refused = true; }
-  check('the Payments Register section is refused as a results destination (input only)', refused);
+  check('the Transaction Monitoring section is refused to the JS notifiers', refused);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

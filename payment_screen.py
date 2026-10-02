@@ -544,3 +544,105 @@ def report_lines(feed_result, configured):
             lines.append("      → POL-07: hold the payment, verify identifiers, then PNMR "
                          "(potential) or freeze + CNMR + FFR (confirmed) in goAML. MLRO decides.")
     return lines
+
+
+# ── DAILY TRANSACTION MONITORING REPORT (Asana "Transaction Monitoring") ──────
+# One task per day, filed in the SAME section the payments are entered in, so
+# the MLRO sees the results next to the payments. The register reader skips
+# every task whose name starts with TM_REPORT_PREFIX: a report is never read
+# back as a payment, and never counted as an unreadable payment either.
+TM_REPORT_PREFIX = "Transaction Monitoring Daily Report — "
+
+
+def is_tm_report_task(name):
+    return str(name or "").startswith(TM_REPORT_PREFIX)
+
+
+def build_tm_daily_report(date_label, feed_result, tm_alerts, *, register_read,
+                          unreadable=0, degraded=""):
+    """(task name, task notes) for the daily Transaction Monitoring report.
+
+    feed_result — screen_feed() output (None when screening did not run);
+    tm_alerts   — txn_monitor.evaluate(...)["alerts"] for the open entries;
+    register_read — open payments read from the section; unreadable — tasks
+    with nothing screenable; degraded — non-empty when the run could not read
+    or screen the register (then NOTHING is cleared and the title says so)."""
+    res = feed_result or {"n_payments": 0, "results": [], "errors": []}
+    stop = [r for r in res["results"] if r["outcome"].startswith("STOP")]
+    review = [r for r in res["results"] if r["outcome"].startswith("REVIEW")]
+    prov = [r for r in res["results"] if r["outcome"] == "NO MATCH — PROVISIONAL"]
+    clear = [r for r in res["results"] if r["outcome"] == "NO MATCH"]
+    alerts = list(tm_alerts or [])
+    tallies = f"STOP {len(stop)} · Review {len(review)} · Rule alerts {len(alerts)}"
+    if degraded:
+        status = "DEGRADED — "
+    elif stop or review or alerts or prov or unreadable or res["errors"]:
+        status = "ACTION REQUIRED — "
+    else:
+        status = "No open findings — "
+    name = f"{TM_REPORT_PREFIX}{status}{tallies} — {date_label}"
+
+    bar = "━" * 60
+    L = ["TRANSACTION MONITORING — DAILY REPORT", f"Date: {date_label}",
+         "Source: open tasks in the \"Transaction Monitoring\" section (one task per payment). "
+         "Completed tasks are out of scope.", ""]
+    if degraded:
+        L += ["⚠ DEGRADED — " + degraded,
+              "No payment is cleared by this run. Re-run the daily screening or review the "
+              "payments manually.", ""]
+    L += [bar, "SUMMARY", bar,
+          f"Payments read: {register_read}"
+          + (f" · ⚠ {unreadable} task(s) with no screenable payment — fill the template "
+             "or paste the MT103 / pacs.008" if unreadable else ""),
+          f"Payment screening: {len(stop)} STOP · {len(review)} REVIEW · "
+          f"{len(prov)} provisional · {len(clear)} no match",
+          f"Monitoring rules: {len(alerts)} alert(s)"]
+    if res["errors"]:
+        L.append(f"⚠ {len(res['errors'])} payment(s) could not be parsed and were NOT screened.")
+    L.append("")
+
+    L += [bar, "①  PAYMENT SCREENING  (parties & payment reference vs sanctions lists · FATF R.16)", bar]
+    flagged = stop + review + prov
+    if not flagged:
+        L.append("   No payment needs attention." if res["n_payments"] else "   No payment to screen today.")
+    for r in flagged:
+        ref = r["reference"] or "(no reference)"
+        amt = (f"{r['amount']:,.2f} {r['currency']}".strip()
+               if isinstance(r["amount"], (int, float)) else "")
+        L.append(f"   [{r['severity']}] {r['outcome']} — payment {ref} {r['date']} {amt}".rstrip())
+        if r.get("permalink"):
+            L.append(f"      Record: {r['permalink']}")
+        L += [f"      • {f}" for f in r["findings"]]
+        if r["r16_missing"]:
+            L.append("      • R.16: missing " + " and ".join(r["r16_missing"]) + " name")
+        L += [f"      • {p['label']}: {p['note']}" for p in r["parties"] if not p["name_screened"]]
+        if r["provisional"]:
+            L.append("      • core list(s) not loaded: " + ", ".join(r["lists_degraded"])
+                     + " — 'no match' is provisional")
+    L.append("")
+
+    L += [bar, "②  MONITORING RULE ALERTS  (cash threshold · structuring · velocity · profile · "
+          "circular flow · new geography · …)", bar]
+    if not alerts:
+        L.append("   No rule alert.")
+    L += [f"   [{a['severity']}] {a['rule']} — {a['customer']} {a['date']}: {a['detail']}"
+          for a in alerts[:50]]
+    if len(alerts) > 50:
+        L.append(f"   … +{len(alerts) - 50} more alert(s)")
+    L.append("")
+
+    L += [bar, "③  WHAT TO DO", bar,
+          "   STOP — hold the payment; verify identifiers. Potential match: PNMR in goAML. "
+          "Confirmed match: freeze + CNMR + FFR in goAML (POL-07). Release only on an "
+          "EOCN/FIU written basis. Assess STR/SAR in parallel.",
+          "   REVIEW — high-risk jurisdiction: apply EDD before release. Incomplete (R.16): "
+          "obtain the missing originator/beneficiary information before release.",
+          "   RULE ALERT — review against the customer profile; document the outcome; "
+          "file an STR/SAR in goAML if suspicion is not dispelled.",
+          "   When a payment is reviewed, complete its task so it leaves monitoring scope.", "",
+          "MLRO DECISION (per flagged payment / alert)",
+          "   [ ] cleared — released   [ ] EDD obtained   [ ] PNMR filed   "
+          "[ ] freeze + CNMR + FFR filed   [ ] STR/SAR filed   goAML Ref: ________",
+          "   Reviewed by: ________________   Date: ________", "",
+          "Do not tip off. UAE Cabinet Resolution 74/2020 applies."]
+    return name, "\n".join(L)

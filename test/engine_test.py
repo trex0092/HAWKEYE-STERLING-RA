@@ -1092,6 +1092,81 @@ except RuntimeError:
 finally:
     screen.asana_request = _orig_ar2
     screen.ASANA_PAYMENTS_SECTION_GID = ""
+# ── Daily Transaction Monitoring report (filed in the Transaction Monitoring section) ─
+_tm_alerts = txn_monitor.evaluate([_re1])["alerts"]
+_tm_name, _tm_notes = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", _reg_res, _tm_alerts, register_read=1, unreadable=1)
+check("TM report: a STOP payment titles the report ACTION REQUIRED with the tallies and date",
+      _tm_name.startswith(payment_screen.TM_REPORT_PREFIX + "ACTION REQUIRED — STOP 1 · Review 0 · Rule alerts ")
+      and _tm_name.endswith(" — 02 Oct 2026"))
+check("TM report: the body carries screening, rule alerts, actions, the MLRO decision record and the tipping-off line",
+      all(x in _tm_notes for x in ("①  PAYMENT SCREENING", "②  MONITORING RULE ALERTS", "③  WHAT TO DO",
+                                   "STOP — POTENTIAL SANCTIONS MATCH", "PROFILE_DEVIATION",
+                                   "Record: https://app.asana.com/0/1/2", "[ ] PNMR filed",
+                                   "Reviewed by: ________", "Do not tip off.")))
+check("TM report: unreadable payment tasks are disclosed, not dropped",
+      "1 task(s) with no screenable payment" in _tm_notes)
+_tm_n0, _tm_b0 = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0)
+check("TM report: an empty register posts 'No open findings' and says there was nothing to screen",
+      "No open findings — STOP 0 · Review 0 · Rule alerts 0" in _tm_n0 and "No payment to screen today." in _tm_b0)
+_tm_nd, _tm_bd = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", None, [], register_read=0, degraded="the payments could not be read (RuntimeError)")
+check("TM report: a run that could not read the payments is titled DEGRADED and clears nothing",
+      "DEGRADED — " in _tm_nd and "No payment is cleared by this run" in _tm_bd)
+
+_rep_pages = [_RegResp(200, {"data": [
+    {"gid": "9", "name": payment_screen.TM_REPORT_PREFIX + "No open findings — STOP 0 · Review 0 · "
+                        "Rule alerts 0 — 01 Oct 2026", "notes": "report body"},
+    {"gid": "1", "name": "PAY-001", "notes": _reg_note, "permalink_url": "u1"}], "next_page": None})]
+try:
+    screen.asana_request = lambda *a, **k: _rep_pages[0]
+    screen.ASANA_PAYMENTS_SECTION_GID = "999"
+    _recs2, _bad2 = screen.get_payment_register()
+finally:
+    screen.asana_request = _orig_ar2
+    screen.ASANA_PAYMENTS_SECTION_GID = ""
+check("register loader: the daily report card in the same section is neither read as a payment nor counted",
+      len(_recs2) == 1 and _bad2 == 0)
+
+_tm_ctx = {"configured": True, "read": 1, "unreadable": 0, "feed": _reg_res, "alerts": _tm_alerts,
+           "degraded": ""}
+_tm_rt = _dt.datetime(2026, 10, 2, 8, 0)
+def _tm_post(existing=(), post_code=201, place_code=200):
+    calls = []
+    def stub(method, url, **kw):
+        calls.append((method, url, kw))
+        if method == "GET":
+            return _RegResp(200, {"data": [{"gid": "7", "name": n} for n in existing], "next_page": None})
+        if url.endswith("/addProject"):
+            return _RegResp(place_code, {})
+        return _RegResp(post_code, {"data": {"gid": "55"}})
+    try:
+        screen.asana_request = stub
+        screen.ASANA_PAYMENTS_SECTION_GID = "999"
+        screen.TM_REPORT_FAILED["failed"] = False
+        gid = screen.post_tm_report(_tm_rt, _tm_ctx)
+    finally:
+        screen.asana_request = _orig_ar2
+        screen.ASANA_PAYMENTS_SECTION_GID = ""
+    return gid, calls, screen.TM_REPORT_FAILED["failed"]
+_g, _c, _f = _tm_post()
+_posts = [c for c in _c if c[0] == "POST" and c[1].endswith("/tasks")]
+_place = [c for c in _c if c[1].endswith("/addProject")]
+check("TM report delivery: posts one task and places it in the Transaction Monitoring section",
+      _g == "55" and not _f and len(_posts) == 1
+      and _posts[0][2]["json"]["data"]["name"].startswith(payment_screen.TM_REPORT_PREFIX)
+      and _place and _place[0][2]["json"]["data"]["section"] == "999")
+_g, _c, _f = _tm_post(existing=[_tm_name])
+check("TM report delivery: a second run the same day finds today's report and posts no duplicate",
+      _g == "7" and not any(c[0] == "POST" for c in _c) and not _f)
+_g, _c, _f = _tm_post(post_code=500)
+check("TM report delivery: a failed post turns the run red (TM_REPORT_FAILED)", _g is None and _f)
+_g, _c, _f = _tm_post(place_code=500)
+check("TM report delivery: a report outside its section turns the run red", _g is None and _f)
+screen.TM_REPORT_FAILED["failed"] = False
+check("TM report delivery: nothing is posted when the section is not configured",
+      screen.post_tm_report(_tm_rt, {**_tm_ctx, "configured": False}) is None)
 check("report: payment screening says INACTIVE without a feed (no implied clearance)",
       len(_inactive) == 1 and "INACTIVE" in _inactive[0])
 _active = payment_screen.report_lines(payment_screen.screen_feed(
