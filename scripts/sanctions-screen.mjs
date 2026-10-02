@@ -1158,6 +1158,11 @@ export async function fetchFollowingCookies(url, options = {}, { fetchImpl = fet
   for (let hop = 0; hop <= maxHops; hop++) {
     const headers = { ...(options.headers || {}) };
     if (jar.size) headers.cookie = [...jar].map(([k, v]) => k + '=' + v).join('; ');
+    // codeql[js/file-access-to-http]: reviewed 2026-10-02, intended design, not a leak.
+    // The URL is a public sanctions-list endpoint from the reviewed in-repo source
+    // config (data/sanctions-sources.json), scheme-validated by fetchListBody before
+    // this call and re-validated as http(s) on every redirect hop below. The request
+    // carries no subject data: only fixed headers and cookies the server itself set.
     const r = await fetchImpl(href, { ...options, headers, redirect: 'manual' });
     const setCookies = (r.headers && typeof r.headers.getSetCookie === 'function') ? r.headers.getSetCookie() : [];
     for (const c of setCookies) {
