@@ -1861,6 +1861,37 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+/* Adverse-media SECOND PASS. The per-subject last-resort retry runs while the
+   whole book is still being swept, so the providers are under peak pressure:
+   on 2 Oct 2026 it recovered 275 of 286 subjects and left 11 with ZERO
+   backbone coverage. After the sweep, once pressure has eased, re-check only
+   those zero-coverage subjects once — bounded by the enrichment deadline, a
+   cool-down, a cap (a mass failure means the providers are down globally and
+   re-querying the whole book only adds load) and low concurrency. Each queue
+   item's retry() resolves true when its subject recovered. A subject that
+   still fails stays a counted error: degrade loudly, never a false clear.
+   Pure orchestration (clock / sleep injectable) — unit-tested. */
+export const AM_SECOND_PASS_MAX = 100;
+export async function runAmSecondPass(queue, {
+  deadlineMs, delayMs = 60000, max = AM_SECOND_PASS_MAX, concurrency = 2,
+  now = Date.now, sleep = ms => new Promise(res => setTimeout(res, ms)),
+} = {}) {
+  const items = Array.isArray(queue) ? queue : [];
+  if (!items.length) return { attempted: 0, recovered: 0, skipped: '' };
+  if (items.length > max) return { attempted: 0, recovered: 0, skipped: items.length + ' zero-coverage subjects exceed the second-pass cap of ' + max + ' (providers down globally)' };
+  if (!Number.isFinite(deadlineMs) || now() + delayMs >= deadlineMs) return { attempted: 0, recovered: 0, skipped: 'enrichment time budget exhausted' };
+  if (delayMs > 0) await sleep(delayMs);
+  let recovered = 0, attempted = 0;
+  await mapLimit(items, Math.max(1, concurrency), async item => {
+    if (now() >= deadlineMs) return;
+    attempted++;
+    let ok = false;
+    try { ok = (await item.retry()) === true; } catch { ok = false; }
+    if (ok) recovered++;
+  });
+  return { attempted, recovered, skipped: attempted < items.length ? 'enrichment deadline reached mid-pass' : '' };
+}
+
 const BAND_RANK = { critical: 4, high: 3, medium: 2, low: 1, '': 0 };
 const strongerBand = (a, b) => ((BAND_RANK[a] || 0) >= (BAND_RANK[b] || 0) ? a : b);
 
@@ -1893,6 +1924,7 @@ export async function screenLocally(subjects, cfg) {
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
   let amErrors = 0, amPartial = 0, amRetryAttempted = 0, amRetryRecovered = 0;
+  const amSecondPassQueue = [];
   let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0 };
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
@@ -1954,6 +1986,7 @@ export async function screenLocally(subjects, cfg) {
     // run (errored or budget-skipped) so diffState won't silently clear a standing
     // enrichment-only match it couldn't re-verify.
     let enrichmentIncomplete = false;
+    let amIncomplete = false;   // the adverse-media part, recoverable by the second pass
     /* Per-SIGNAL "not re-verified this run" set — finer than the coarse
        enrichmentIncomplete flag. Adverse media sweeps a budgeted locale
        rotation by default, so on a day its originating regional edition was
@@ -1963,25 +1996,17 @@ export async function screenLocally(subjects, cfg) {
     const unverified = new Set();
     if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol || cfg.fbi)) { enrichSkipped++; enrichmentIncomplete = true; }
 
-    if (cfg.adverseMedia && enrich) {
-      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
-      if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
-      if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
-      if (!am.backbones?.bing) amBackboneFailures.bing++;
-      if (am.retryAttempted) amRetryAttempted++;
-      if (am.retryRecovered) amRetryRecovered++;
-      if (am.partial) amPartial++;   // narrowed redundancy — disclosed, never silent
-      if (am.errored) { amErrors++; enrichmentIncomplete = true; }
-      else {
-        /* A disclosed-partial sweep (a queried edition failed) OR a budgeted
-           sweep that did not cover the full matrix did NOT re-verify a standing
-           adverse-media match — the originating edition may not have been
-           queried. Mark the signal unverified so diffState carries a standing
-           adverse-media hit forward instead of clearing it off coverage that
-           never looked. Recall-safe: carry-forward only, never suppresses. */
-        if (am.partial || am.fullMatrix === false) unverified.add('Adverse media (Google News)');
-      }
-      if (!am.errored && am.hit) {
+    /* Applies a NON-errored adverse-media result to this subject's lists. Used
+       by the sweep and, for a subject that errored, by the second pass. */
+    const applyAm = (am) => {
+      /* A disclosed-partial sweep (a queried edition failed) OR a budgeted
+         sweep that did not cover the full matrix did NOT re-verify a standing
+         adverse-media match — the originating edition may not have been
+         queried. Mark the signal unverified so diffState carries a standing
+         adverse-media hit forward instead of clearing it off coverage that
+         never looked. Recall-safe: carry-forward only, never suppresses. */
+      if (am.partial || am.fullMatrix === false) unverified.add('Adverse media (Google News)');
+      if (am.hit) {
         const identity = corroborateArticleIdentity(s, am.top || {});
         lists.push({
           list: 'Adverse media (Google News)',
@@ -1998,6 +2023,29 @@ export async function screenLocally(subjects, cfg) {
         });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
+    };
+    if (cfg.adverseMedia && enrich) {
+      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
+      if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
+      if (!am.backbones?.bing) amBackboneFailures.bing++;
+      if (am.retryAttempted) amRetryAttempted++;
+      if (am.retryRecovered) amRetryRecovered++;
+      if (am.partial) amPartial++;   // narrowed redundancy — disclosed, never silent
+      if (am.errored) {
+        amErrors++; amIncomplete = true;
+        amSecondPassQueue.push({ key: s.key, retry: async () => {
+          const again = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+          if (again.errored) return false;
+          amErrors--; amIncomplete = false;
+          if (again.partial) amPartial++;
+          applyAm(again);
+          const rebuilt = finalize();
+          const at = results.findIndex(r => r && r.key === rebuilt.key);
+          if (at >= 0) results[at] = rebuilt;
+          return true;
+        } });
+      } else applyAm(am);
     }
     if (cfg.pep && enrich) {
       const pp = await checkPep(s.name, { timeoutMs: cfg.checkTimeoutMs });
@@ -2059,24 +2107,35 @@ export async function screenLocally(subjects, cfg) {
        and flag the record so the case engine opens no fresh case. A single
        non-whitelisted hit (incl. any enrichment finding) restores full
        severity — demote-never-suppress, pair-level only. */
-    const whitelistedOnly = lists.length > 0 && lists.every(h => h.whitelisted);
-    const hasSanctions = raw.recommendation === 'sanctions-match' && !whitelistedOnly;
-    const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
-    const merged = {
-      name: s.name,
-      topScore: lists.length ? topScore : raw.topScore,
-      band: lists.length ? (whitelistedOnly ? 'medium' : band) : 'low',
-      recommendation,
-      hitCount: lists.length,
-      lists
-    };
-    const nr = normalizeResult(merged, s);
-    nr.enrichmentIncomplete = enrichmentIncomplete;
-    if (unverified.size) nr.unverified = [...unverified];
-    if (whitelistedOnly) nr.whitelistedOnly = true;
+    function finalize() {
+      const whitelistedOnly = lists.length > 0 && lists.every(h => h.whitelisted);
+      const hasSanctions = raw.recommendation === 'sanctions-match' && !whitelistedOnly;
+      const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
+      const merged = {
+        name: s.name,
+        topScore: lists.length ? topScore : raw.topScore,
+        band: lists.length ? (whitelistedOnly ? 'medium' : band) : 'low',
+        recommendation,
+        hitCount: lists.length,
+        lists
+      };
+      const nr = normalizeResult(merged, s);
+      nr.enrichmentIncomplete = enrichmentIncomplete || amIncomplete;
+      if (unverified.size) nr.unverified = [...unverified];
+      if (whitelistedOnly) nr.whitelistedOnly = true;
+      return nr;
+    }
     heartbeat();
-    return nr;
+    return finalize();
   });
+  const amSecondPass = await runAmSecondPass(amSecondPassQueue, {
+    deadlineMs: enrichDeadline,
+    delayMs: Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0),
+  });
+  if (amSecondPassQueue.length) {
+    console.log('sanctions-screen: adverse-media second pass — ' + amSecondPassQueue.length + ' zero-coverage subject(s) after the sweep; re-checked '
+      + amSecondPass.attempted + ', recovered ' + amSecondPass.recovered + (amSecondPass.skipped ? ' (' + amSecondPass.skipped + ')' : ''));
+  }
   /* Restore the input order — the rotation exists only for enrichment fairness,
      and every downstream consumer (reports, state diff) sees a stable order. */
   {
@@ -2091,7 +2150,7 @@ export async function screenLocally(subjects, cfg) {
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -2353,6 +2412,7 @@ async function main() {
     failures: screen.notes || [],
     enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0,
       amRetryAttempted: screen.amRetryAttempted || 0, amRetryRecovered: screen.amRetryRecovered || 0,
+      amSecondPassAttempted: screen.amSecondPassAttempted || 0, amSecondPassRecovered: screen.amSecondPassRecovered || 0,
       pepErrors: screen.pepErrors || 0,
       skipped: screen.enrichSkipped || 0,
       pepLookupEnabled: !!cfg.pep,
