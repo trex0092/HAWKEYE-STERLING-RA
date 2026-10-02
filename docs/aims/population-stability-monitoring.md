@@ -52,6 +52,14 @@ re-freezes the current mix as the new baseline or records why not.
 - Until the wiring lands, the computation runs manually at the quarterly
   review from the persisted run metrics — the obligation exists from the first
   baseline freeze, tooling or not.
+- The §1 computation itself is implemented (2026-10-02) as
+  `monitoring.population_stability_index(expected_counts, actual_counts)` with
+  `monitoring.psi_reading()`, including the §1 guards (bins with expected n < 5
+  merged, n < 50 reports `n too small`, an empty bin floored at 1e-4 and
+  counted in `floored`). Pinned by `test/engine_test.py`. The quarterly review
+  calls it on the persisted counts instead of computing by hand. The scheduled
+  monthly run and the Anomaly Watch escalation above are still to be wired,
+  and need the first baseline freeze, which is the MLRO's sign-off act.
 
 ## 5. Log
 

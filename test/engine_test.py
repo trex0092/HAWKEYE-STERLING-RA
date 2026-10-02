@@ -998,6 +998,29 @@ for _d in ("2026-07-04", "2026-07-05", "2026-07-06"):
     _sus = monitoring.monitor_run(_d, {"subjects": 500, "errors": 150}, {"total": 100}, {}, _sp)
 check("sustained anomaly detected across consecutive runs", "error_rate" in _sus["sustained"])
 check("escalation fires on a sustained anomaly", monitoring.escalation(path=_sp)["escalate"])
+# Population Stability Index (docs/aims/population-stability-monitoring.md §1)
+_same = monitoring.population_stability_index([100, 200, 300], [100, 200, 300])
+check("PSI of an unchanged distribution is 0 and stable", _same["psi"] == 0 and _same["reading"] == "stable")
+_shift = monitoring.population_stability_index([500, 300, 200], [200, 300, 500])
+import math as _m
+_exp_psi = sum((a - e) * _m.log(a / e) for e, a in ((0.5, 0.2), (0.3, 0.3), (0.2, 0.5)))
+check("PSI matches the spec formula on a hand-computed shift", abs(_shift["psi"] - round(_exp_psi, 6)) < 1e-9)
+check("PSI reading bands follow the spec (<0.10 stable, 0.10-0.25 investigate, >0.25 action)",
+      monitoring.psi_reading(0.05) == "stable" and monitoring.psi_reading(0.10) == "investigate"
+      and monitoring.psi_reading(0.25) == "investigate" and monitoring.psi_reading(0.26) == "action"
+      and _shift["reading"] == "action")
+_small = monitoring.population_stability_index([10, 20], [10, 20])
+check("PSI refuses a window with n < 50 (reports 'n too small', never a score)",
+      _small["psi"] is None and _small["reading"] == "n too small")
+_merge = monitoring.population_stability_index([2, 98, 100], [3, 97, 100])
+check("PSI merges bins whose expected count is < 5 before computing", _merge["bins"] == 2 and _merge["psi"] is not None)
+_zero = monitoring.population_stability_index([50, 50], [100, 0])
+check("PSI floors an empty bin instead of failing, and says so", _zero["floored"] == 1 and _zero["reading"] == "action")
+try:
+    monitoring.population_stability_index([1, 2], [1])
+    check("PSI rejects mismatched bin lists", False)
+except ValueError:
+    check("PSI rejects mismatched bin lists", True)
 check("report renders a SUSTAINED ANOMALY escalate line", "SUSTAINED ANOMALY" in monitoring.build_monitoring_section(_sus, {}))
 _sp2 = os.path.join(_dir, "blip.json")
 for _d in ("2026-07-01", "2026-07-02", "2026-07-03"):
