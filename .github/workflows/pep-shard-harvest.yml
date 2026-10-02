@@ -214,14 +214,9 @@ jobs:
             echo "::error::shard ${SHARD} commit would carry more than its slice: ${staged}"
             exit 1
           fi
-          git commit -m "PEP shard ${SHARD} $(date -u +%F) [skip ci]"
-          pushed=
-          for attempt in 1 2 3 4 5; do
-            git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/pep-shard-${SHARD}" && { pushed=1; break; }
-            echo "push failed (attempt $attempt) — retrying"
-            sleep $((attempt * 5))
-          done
-          [ -n "$pushed" ] || { echo "::error::shard ${SHARD} push failed after 5 attempts — its slice is NOT available to the merge"; exit 1; }
+          # Built on the shard branch's own tip (scripts/push-state-branch.sh):
+          # only the slice may differ, never a workflow file.
+          scripts/push-state-branch.sh "pep-shard-${SHARD}" "PEP shard ${SHARD} $(date -u +%F) [skip ci]" data/pep-shard.json
 
   merge:
     needs: shard

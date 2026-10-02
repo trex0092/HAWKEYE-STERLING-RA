@@ -494,8 +494,9 @@ jobs:
             git config user.email "actions@github.com"
             if [ -n "$STATE_ENCRYPTION_KEY" ]; then
               node scripts/state-crypto.mjs encrypt "${state_files[@]}"
+              enc_files=()
               for f in "${state_files[@]}"; do
-                [ -f "$f.enc" ] && git add "$f.enc"
+                [ -f "$f.enc" ] && enc_files+=("$f.enc")
                 git checkout HEAD -- "$f" 2>/dev/null || true
               done
             else
@@ -504,18 +505,10 @@ jobs:
               echo "::error::STATE_ENCRYPTION_KEY is not set - refusing to publish delta-state in PLAINTEXT (customer/employee names) to the public repository; state NOT persisted (P30)"
               exit 1
             fi
-            git commit -m "chore(screen): update delta-state [skip ci]"
-            # Persist on the screen-delta-state branch (main is protected):
-            # rebuilt as <current main> + one data commit, force-updated.
-            # Auth is the ephemeral env token in the push URL — the checkout
-            # persists no credentials, so nothing lands in .git/config.
-            pushed=
-            for attempt in 1 2 3 4 5; do
-              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/screen-delta-state && { pushed=1; break; }
-              echo "push failed (attempt $attempt) — retrying"
-              sleep $((attempt * 3))
-            done
-            [ -n "$pushed" ] || { echo "::error::state push to screen-delta-state failed after 5 attempts — state NOT persisted"; exit 1; }
+            # Persist on the screen-delta-state branch (main is protected),
+            # built on the branch's own tip so the Actions token never pushes a
+            # workflow-file change (scripts/push-state-branch.sh explains why).
+            scripts/push-state-branch.sh screen-delta-state "chore(screen): update delta-state [skip ci]" "${enc_files[@]}"
           else
             echo "delta-state unchanged"
           fi
