@@ -12,6 +12,10 @@ bump merged to `main`.
 
 - Retry Wikidata HTTP 200 maxlag and rate-limit error payloads with bounded backoff and Retry-After, rather than treating them as successfully fetched empty PEP name batches.
 
+### Added
+
+- Assessment form: a "Country AML profile (KnowYourCountry) ↗" analyst-reference link under the jurisdiction select. It opens that jurisdiction's public KnowYourCountry AML profile in a new tab with `noopener noreferrer`. It is a link only: KnowYourCountry's terms of use bar republishing its country reports outside the reader's organisation, so none of its content is copied into the app or repository, and the link never feeds the score. All 245 jurisdictions map to a listed page; seven use explicit slug overrides. `test/country-intel-links.test.mjs` pins the mapping, wired into CI.
+
 ### Fixed
 
 - README: the Dependency Review badge showed "no status" because that workflow runs only on pull requests, while the badge asked for runs on `main`. It now reads the latest pull-request run (`event=pull_request`), which shields reports as passing.

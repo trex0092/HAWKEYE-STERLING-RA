@@ -1270,7 +1270,34 @@ function paintToggle(id, val, type) {
   if(tag){ tag.className = 'score-tag '+scoreTagClass(score); tag.textContent = 'Score: '+score+' · '+ratingLabel(score); }
 }
 function ovTitle(e){ return e && e.overridden ? 'Overridden from '+e.baseScore+' on '+(fmtDate(e.at)||e.at)+' — '+e.reason : ''; }
+/* Analyst reference only: a link to the jurisdiction's public KnowYourCountry
+   AML profile. No KnowYourCountry content is copied into this app or repo -
+   its terms of use bar republishing country reports outside the reader's
+   organisation - and the link never feeds the score. The site's page slugs
+   follow the COUNTRIES names; the seven that differ are mapped explicitly
+   (test/country-intel-links.test.mjs proves all 245 resolve to a listed page). */
+const KYC_INTEL_BASE = 'https://www.knowyourcountry.com/country-aml-intelligence/';
+const KYC_SLUG_OVERRIDES = {
+  'Svalbard and Jan Mayen': 'svalbard-and-mayen',
+  'Saint Helena, Ascension and Tristan da Cunha': 'saint-helena-ascension-and-tristan',
+  'Northern Mariana Islands': 'north-mariana-islands',
+  'São Tomé & Príncipe': 'sao-tome-prin',
+  'Central African Republic': 'central-african-rep',
+  'The Democratic Republic Of Congo': 'congo-the-democratic-republic',
+  'Islamic Republic of Iran': 'iran-islamic-republic-of'
+};
+function kycSlug(name) {
+  if (Object.prototype.hasOwnProperty.call(KYC_SLUG_OVERRIDES, name)) return KYC_SLUG_OVERRIDES[name];
+  return String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/['\u2019]/g, '').replace(/&/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+function countryIntelUrl(name) {
+  const s = kycSlug(name);
+  return s ? KYC_INTEL_BASE + 'country/' + s + '/' : KYC_INTEL_BASE;
+}
 function paintJurisdiction() {
+  const intel = $('jurisdictionIntel');
+  if (intel) intel.href = countryIntelUrl(state.entity.jurisdiction);
   const c = effCountry(state.entity.jurisdiction);
   const score = c ? c.score : 1;
   const tag = $('jurisdictionScore');
@@ -2404,6 +2431,7 @@ const I18N = {
   'fld.contact':    {en:'Website / Email', ar:'الموقع الإلكتروني / البريد الإلكتروني'},
   'fld.principals': {en:'Principals — Beneficial Owners / Controllers / Directors', ar:'الأطراف الرئيسية — المالكون المستفيدون / المسيطرون / المديرون'},
   'fld.jurisdiction': {en:'Jurisdiction & Incorporation', ar:'الولاية القضائية والتأسيس'},
+  'fld.countryIntel': {en:'Country AML profile (KnowYourCountry) ↗', ar:'ملف مخاطر غسل الأموال للدولة (KnowYourCountry) ↗'},
   'fld.activity':     {en:'Business Activity', ar:'النشاط التجاري'},
   'fld.onboard':      {en:'Onboarding Channel', ar:'قناة الإلحاق'},
   'fld.opHistory':    {en:'Operational History — Entity', ar:'السجل التشغيلي — الكيان'},
