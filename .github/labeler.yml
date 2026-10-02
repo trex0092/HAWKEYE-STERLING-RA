@@ -32,7 +32,7 @@ dependencies:
 
 engine:
   - changed-files:
-      - any-glob-to-any-file: ['screen.py', 'ai.py', 'agents.py', 'kyc.py', 'txn_monitor.py', 'monitoring.py', 'test/engine_test.py', 'test/bias_eval.py', 'test/redteam_injection.py', 'test/fuzz_properties.py']
+      - any-glob-to-any-file: ['screen.py', 'ai.py', 'agents.py', 'kyc.py', 'txn_monitor.py', 'payment_screen.py', 'monitoring.py', 'test/engine_test.py', 'test/bias_eval.py', 'test/redteam_injection.py', 'test/fuzz_properties.py']
 
 screening:
   - changed-files:

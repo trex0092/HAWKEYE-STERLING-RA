@@ -33,6 +33,7 @@ import txn_monitor
 import ai
 import str_dossier
 import tfs_dossier
+import payment_screen
 
 # ── input caps (defence in depth on untrusted MCP arguments) ──────────────────
 MAX_NAME_LEN = 512
@@ -124,6 +125,60 @@ def screen_name(name, watchlist, list_name="watchlist"):
             "POSSIBLE MATCH(ES) — decision-support only; an MLRO must adjudicate each hit."
         ),
     }
+
+
+# ── TOOL: screen_payment ──────────────────────────────────────────────────────
+MAX_PAYMENT_MESSAGE = 200_000
+MAX_PARTIES = 50
+
+
+def screen_payment(watchlist, message=None, parties=None, remittance_info=None,
+                   list_name="watchlist"):
+    """Screen the PARTIES of one payment — originator, beneficiary, ultimate
+    parties, banks in the chain and the payment reference — against a
+    CALLER-SUPPLIED watchlist, using the production matcher. Accepts a raw SWIFT
+    MT103 or ISO 20022 pacs.008 `message`, or a `parties` array
+    [{role, name?, bic?, country?}]. Also flags FATF-listed party countries and
+    a missing originator/beneficiary name (FATF R.16). Offline, deterministic,
+    decision-support only: a potential match opens the TFS Name-Match Procedure
+    (POL-07) and the MLRO decides."""
+    if not isinstance(watchlist, list):
+        raise ValueError("'watchlist' must be an array of names")
+    if len(watchlist) > MAX_WATCHLIST:
+        raise ValueError(f"'watchlist' exceeds the {MAX_WATCHLIST}-entry limit")
+    lname = _req_str(list_name, "list_name", cap=120)
+    entries = []
+    for i, raw in enumerate(watchlist):
+        if not isinstance(raw, str):
+            raise ValueError(f"watchlist[{i}] must be a string, got {type(raw).__name__}")
+        norm = screen.normalize(raw)
+        if norm:
+            entries.append((norm, raw))
+    if message is not None:
+        msg = _req_str(message, "message", cap=MAX_PAYMENT_MESSAGE)
+        payments = payment_screen.parse_payment_message(msg)
+    elif parties is not None:
+        if not isinstance(parties, list) or len(parties) > MAX_PARTIES:
+            raise ValueError(f"'parties' must be an array of at most {MAX_PARTIES} objects")
+        rec = {"parties": parties}
+        if remittance_info is not None:
+            rec["remittance_info"] = _req_str(remittance_info, "remittance_info", cap=MAX_NOTES_LEN)
+        payments = payment_screen.payment_from_feed(rec)
+    else:
+        raise ValueError("supply either 'message' (MT103 / pacs.008) or 'parties'")
+    if not payments:
+        raise ValueError("no payment party could be read from the input")
+    results = [payment_screen.screen_payment(p, {lname: entries},
+                                             jurisdiction_table=kyc.load_jurisdiction_risk())
+               for p in payments]
+    for r in results:
+        for party in r["parties"]:
+            party["hits"] = [_hit_view(h) for h in party["hits"]]
+    return {"screened_against": lname, "entries_screened": len(entries),
+            "payments": results,
+            "disposition_note": ("Screened against the SUPPLIED list only — official sanctions "
+                                 "lists must be screened separately. A potential match is "
+                                 "decision-support: hold the payment and apply POL-07; the MLRO decides.")}
 
 
 # ── TOOL: screen_internal_watchlist ───────────────────────────────────────────
@@ -472,6 +527,32 @@ TOOLS = {
                 "list_name": {"type": "string", "description": "Label for the supplied list (optional)."},
             },
             "required": ["name", "watchlist"],
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_screen_payment": (
+        screen_payment,
+        screen_payment.__doc__,
+        {
+            "type": "object",
+            "properties": {
+                "watchlist": {"type": "array", "items": {"type": "string"},
+                              "description": "Names to screen every payment party against."},
+                "message": {"type": "string",
+                            "description": "Raw SWIFT MT103 or ISO 20022 pacs.008 message."},
+                "parties": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Instead of a message: [{role, name?, bic?, country?}]; role is "
+                                   "originator, beneficiary, ultimate_originator, ultimate_beneficiary, "
+                                   "ordering_institution, intermediary, account_with_institution, "
+                                   "senders_correspondent, receivers_correspondent, beneficial_owner or other.",
+                },
+                "remittance_info": {"type": "string",
+                                    "description": "Payment reference text (with 'parties')."},
+                "list_name": {"type": "string", "description": "Label for the supplied list (optional)."},
+            },
+            "required": ["watchlist"],
             "additionalProperties": False,
         },
     ),

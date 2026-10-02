@@ -63,6 +63,7 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | --- | --- |
 | `hawkeye_normalize_name` | Canonicalise a name the way the matcher does (transliteration, diacritics, phonetic tokens). |
 | `hawkeye_screen_name` | Fuzzy-screen a subject against a caller-supplied list of names; returns matches with score/confidence/context or an explicit CLEARED result. |
+| `hawkeye_screen_payment` | Screen the **parties of one payment** — originator, beneficiary, ultimate parties, banks in the chain and the payment reference — against a caller-supplied list. Reads a raw SWIFT MT103 or ISO 20022 pacs.008 message, or a `parties` array; flags FATF-listed party countries and a missing originator/beneficiary name (R.16). A potential match means hold the payment and apply POL-07. |
 | `hawkeye_screen_internal_watchlist` | Screen against the firm's committed internal watchlist (`data/internal-watchlist.json`); an empty list is a valid "no designations" state, never a degraded screen. |
 | `hawkeye_monitor_transactions` | Run the FATF R.16 rule-set (cash threshold, structuring, velocity, round-amount, high-risk geography, CDD trigger) over one customer's transactions. |
 | `hawkeye_analyze_kyc_note` | Parse a structured KYC note into identity records + the CDD gaps an MLRO must close; ID numbers are privacy-masked. |

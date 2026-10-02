@@ -901,6 +901,130 @@ check("R.16 detects a corrupt feed (parse error), not silent empty",
 _ok_feed = os.path.join(_tf0.mkdtemp(), "ok.json")
 open(_ok_feed, "w").write('[]')
 check("R.16 an empty-but-valid feed is not a parse error", txn_monitor.feed_parse_error(_ok_feed) is False)
+
+# ── New R.16 typologies: profile deviation, circular flow, new geography ─────
+_pd = [{"customer": "P", "date": f"2026-05-{d:02d}", "amount": 40000, "direction": "in",
+        "method": "wire", "expected_monthly_volume": 50000} for d in (3, 10, 17)]
+check("R.16 PROFILE_DEVIATION fires when a month exceeds 1.5× the declared volume",
+      any(a["rule"] == "PROFILE_DEVIATION" for a in txn_monitor.evaluate(_pd)["alerts"]))
+check("R.16 PROFILE_DEVIATION stays quiet within the declared profile",
+      not any(a["rule"] == "PROFILE_DEVIATION" for a in txn_monitor.evaluate(_pd[:1])["alerts"]))
+check("R.16 PROFILE_DEVIATION never runs without a declared profile (no guessed baseline)",
+      not any(a["rule"] == "PROFILE_DEVIATION" for a in txn_monitor.evaluate(
+          [{k: v for k, v in t.items() if k != "expected_monthly_volume"} for t in _pd])["alerts"]))
+_cf = [{"customer": "C", "date": "2026-05-01", "amount": 100000, "direction": "out", "method": "wire",
+        "counterparty": "Example Metals FZE"},
+       {"customer": "C", "date": "2026-05-20", "amount": 97000, "direction": "in", "method": "wire",
+        "counterparty": "Example Metals FZE"}]
+check("R.16 CIRCULAR_FLOW fires on out-and-back with the same counterparty within 30d",
+      any(a["rule"] == "CIRCULAR_FLOW" for a in txn_monitor.evaluate(_cf)["alerts"]))
+check("R.16 CIRCULAR_FLOW does not fire across different counterparties",
+      not any(a["rule"] == "CIRCULAR_FLOW" for a in txn_monitor.evaluate(
+          [_cf[0], {**_cf[1], "counterparty": "Unrelated Co"}])["alerts"]))
+_ng = [{"customer": "G", "date": f"2026-04-{d:02d}", "amount": 1000, "direction": "in", "method": "wire",
+        "counterparty": "X", "counterparty_country": "Turkey"} for d in range(1, 7)]
+_ng.append({**_ng[0], "date": "2026-04-20", "counterparty_country": "Kenya"})
+check("R.16 NEW_GEOGRAPHY flags a first-ever country after enough history",
+      any(a["rule"] == "NEW_GEOGRAPHY" and "Kenya" in a["detail"] for a in txn_monitor.evaluate(_ng)["alerts"]))
+check("R.16 NEW_GEOGRAPHY does not flag a new customer's first payments",
+      not any(a["rule"] == "NEW_GEOGRAPHY" for a in txn_monitor.evaluate(_ng[:3])["alerts"]))
+
+# ── payment_screen.py: parties of a payment (inert without a feed) ───────────
+print("payment_screen.py — MT103 / pacs.008 parties, R.16 completeness")
+payment_screen = _load("payment_screen")
+_jr = json.load(open(os.path.join(ROOT, "data", "jurisdiction-risk.json"), encoding="utf-8"))
+_iso_names = set(payment_screen.ISO2_TO_JURISDICTION.values())
+_missing_iso = [c for c in _jr.get("grey", []) + _jr.get("high", []) if c.strip().lower() not in _iso_names]
+check("every FATF-listed jurisdiction has an ISO code for payment screening (add it to "
+      "ISO2_TO_JURISDICTION): " + ", ".join(_missing_iso), not _missing_iso)
+_ps_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in
+                          ("ACME GENERAL TRADING LLC", "SEA FALCON SHIPPING COMPANY", "ZED")]}
+_ps_kw = {"matcher": screen.screen_name, "normalizer": screen.normalize,
+          "jurisdiction_table": {"islamic republic of iran": "high", "kenya": "grey"}}
+_mt103 = ("{1:F01TESTAEADAXXX0000000000}{2:I103TESTHKHHXXXXN}{4:\n:20:TRN123456789\n:23B:CRED\n"
+          ":32A:250915AED1000000,00\n:50K:/AE070331234567890123456\nEXAMPLE TRADING LLC\nDUBAI AE\n"
+          ":52A:TESTAEADXXX\n:56A:INTMIRTHXXX\n:57A:TESTHKHHXXX\n"
+          ":59F:/12345678\n1/ACME GENERAL TRADING LLC\n2/1 EXAMPLE ROAD\n3/HK/HONG KONG\n"
+          ":70:INVOICE 12345 GOODS PAYMENT\n:71A:SHA\n-}")
+_p = payment_screen.parse_mt103(_mt103)
+_roles = {x["role"]: x for x in _p["parties"]}
+check("MT103: reference, value date, currency and amount are read",
+      _p["reference"] == "TRN123456789" and _p["date"] == "2025-09-15"
+      and _p["currency"] == "AED" and _p["amount"] == 1000000.0)
+check("MT103: :50K: account line is stripped, the name is kept",
+      _roles["originator"]["name"] == "EXAMPLE TRADING LLC")
+check("MT103: :59F: structured beneficiary name and country are read",
+      _roles["beneficiary"]["name"] == "ACME GENERAL TRADING LLC" and _roles["beneficiary"]["country"] == "HK")
+check("MT103: a BIC party gets its country from the BIC (:56A: intermediary → IR)",
+      _roles["intermediary"]["bic"] == "INTMIRTHXXX" and _roles["intermediary"]["country"] == "IR")
+check("MT103: :70: remittance text is captured", _p["remittance"] == ["INVOICE 12345 GOODS PAYMENT"])
+_r = payment_screen.screen_payment(_p, _ps_lists, **_ps_kw)
+check("a listed beneficiary STOPs the payment (CRITICAL, POL-07)",
+      _r["outcome"].startswith("STOP") and _r["severity"] == "CRITICAL")
+check("a party bank in a call-for-action jurisdiction is reported",
+      any("call-for-action" in f for f in _r["findings"]))
+check("a BIC-only bank is disclosed as not name-screened, never silently skipped",
+      any(not x["name_screened"] and "BIC only" in x["note"] for x in _r["parties"]))
+_clean = payment_screen.parse_mt103(_mt103.replace("ACME GENERAL TRADING LLC", "HARMLESS TEXTILES LLC")
+                                    .replace("INTMIRTHXXX", "INTMGB2LXXX"))
+check("a payment with no listed party and no listed country is NO MATCH",
+      payment_screen.screen_payment(_clean, _ps_lists, **_ps_kw)["outcome"] == "NO MATCH")
+check("a down core list makes 'no match' PROVISIONAL, naming the list",
+      payment_screen.screen_payment(_clean, _ps_lists, lists_degraded=["UN"], **_ps_kw)["outcome"]
+      == "NO MATCH — PROVISIONAL")
+_nobn = payment_screen.parse_mt103(_mt103.replace("1/ACME GENERAL TRADING LLC\n", "").replace("INTMIRTHXXX", "INTMGB2LXXX"))
+_r16 = payment_screen.screen_payment(_nobn, _ps_lists, **_ps_kw)
+check("a missing beneficiary name is REVIEW — INCOMPLETE (R.16)",
+      _r16["outcome"] == "REVIEW — INCOMPLETE (R.16)" and _r16["r16_missing"])
+_rem = payment_screen.parse_mt103(_clean and _mt103.replace("ACME GENERAL TRADING LLC", "HARMLESS TEXTILES LLC")
+                                  .replace("INTMIRTHXXX", "INTMGB2LXXX")
+                                  .replace("GOODS PAYMENT", "FREIGHT SEA FALCON SHIPPING COMPANY"))
+check("a designated multi-word name inside the payment reference is caught",
+      payment_screen.screen_payment(_rem, _ps_lists, **_ps_kw)["remittance_hits"])
+check("a single short designated token inside free text is not flagged (noise guard)",
+      not payment_screen.screen_payment(
+          payment_screen.parse_mt103(_mt103.replace("GOODS PAYMENT", "ZED")), _ps_lists, **_ps_kw)["remittance_hits"])
+_pacs = ('<?xml version="1.0"?><Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf>'
+         '<GrpHdr><MsgId>M1</MsgId><IntrBkSttlmDt>2026-09-15</IntrBkSttlmDt></GrpHdr>'
+         '<CdtTrfTxInf><PmtId><EndToEndId>E2E-1</EndToEndId></PmtId>'
+         '<IntrBkSttlmAmt Ccy="AED">2500.50</IntrBkSttlmAmt>'
+         '<Dbtr><Nm>Example Trading LLC</Nm><PstlAdr><Ctry>AE</Ctry></PstlAdr></Dbtr>'
+         '<DbtrAgt><FinInstnId><BICFI>TESTAEADXXX</BICFI></FinInstnId></DbtrAgt>'
+         '<IntrmyAgt1><FinInstnId><BICFI>INTMKEN1XXX</BICFI></FinInstnId></IntrmyAgt1>'
+         '<CdtrAgt><FinInstnId><BICFI>TESTHKHHXXX</BICFI></FinInstnId></CdtrAgt>'
+         '<Cdtr><Nm>Acme General Trading LLC</Nm><PstlAdr><Ctry>HK</Ctry></PstlAdr></Cdtr>'
+         '<RmtInf><Ustrd>INV 1</Ustrd></RmtInf></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>')
+_pp = payment_screen.parse_payment_message(_pacs)
+check("pacs.008: one payment per CdtTrfTxInf with id, date, amount and currency",
+      len(_pp) == 1 and _pp[0]["reference"] == "E2E-1" and _pp[0]["date"] == "2026-09-15"
+      and _pp[0]["amount"] == 2500.5 and _pp[0]["currency"] == "AED")
+check("pacs.008: debtor/creditor names and agent BIC countries are read",
+      {x["role"]: x["name"] for x in _pp[0]["parties"]}.get("beneficiary") == "Acme General Trading LLC"
+      and any(x["role"] == "intermediary" and x["country"] == "KE" for x in _pp[0]["parties"]))
+check("pacs.008: a listed creditor STOPs the payment",
+      payment_screen.screen_payment(_pp[0], _ps_lists, **_ps_kw)["outcome"].startswith("STOP"))
+try:
+    payment_screen.parse_pacs008('<?xml version="1.0"?><!DOCTYPE d [<!ENTITY x "y">]><Document/>')
+    check("pacs.008: a DTD/ENTITY declaration is refused before parsing", False)
+except ValueError:
+    check("pacs.008: a DTD/ENTITY declaration is refused before parsing", True)
+_fr = payment_screen.screen_feed(
+    [{"customer": "C", "date": "2026-09-15", "amount": 1, "direction": "out", "method": "wire",
+      "payment_message": "<Document><unclosed>"},
+     {"customer": "Example Trading LLC", "date": "2026-09-15", "amount": 1, "direction": "out",
+      "method": "wire", "counterparty": "Harmless Textiles LLC", "counterparty_country": "Kenya"}],
+    _ps_lists, **_ps_kw)
+check("feed: an unparseable payment message is COUNTED, never silently dropped", len(_fr["errors"]) == 1)
+check("feed: a legacy record's counterparty country NAME is checked against the FATF list",
+      _fr["results"] and _fr["results"][0]["outcome"] == "REVIEW — HIGH-RISK JURISDICTION")
+_inactive = payment_screen.report_lines(None, False)
+check("report: payment screening says INACTIVE without a feed (no implied clearance)",
+      len(_inactive) == 1 and "INACTIVE" in _inactive[0])
+_active = payment_screen.report_lines(payment_screen.screen_feed(
+    [{"customer": "C", "date": "2026-09-15", "amount": 1, "direction": "out", "method": "wire",
+      "payment_message": _mt103}], _ps_lists, **_ps_kw), True)
+check("report: a STOP payment carries the POL-07 PNMR / CNMR + FFR instruction",
+      any("STOP" in ln for ln in _active) and any("PNMR" in ln and "CNMR + FFR" in ln for ln in _active))
 # Velocity baseline must EXCLUDE the spike day from its own mean, otherwise a large
 # single-day spike inflates the threshold and never fires (regression guard).
 _vel = txn_monitor.evaluate([

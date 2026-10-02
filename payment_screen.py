@@ -1,0 +1,436 @@
+#!/usr/bin/env python3
+"""
+HAWKEYE STERLING — PAYMENT SCREENING  (payment_screen.py)
+==========================================================
+Screens the PARTIES of a payment, not the customer's behaviour: originator,
+beneficiary, ultimate parties, the banks in the chain (ordering, intermediary,
+correspondent, account-with) and the free-text payment reference. It answers
+"is anyone involved in this payment a sanctioned or prohibited party?" — the
+counterpart of txn_monitor.py, which answers "is the activity unusual?".
+
+What it does, per payment:
+  • every NAMED party → the production sanctions matcher (screen.screen_name,
+    the same recall-monotone matcher as the daily screen — nothing re-implemented);
+  • every party COUNTRY (stated, or derived from a BIC's country code) → the
+    maintained FATF jurisdiction list (data/jurisdiction-risk.json);
+  • the payment reference / remittance text → multi-word designated names
+    appearing inside it (a vessel or company named in ":70: INVOICE …");
+  • FATF R.16 completeness — originator AND beneficiary names must be present.
+
+Inputs: a SWIFT MT103 message, an ISO 20022 pacs.008 message, or a transaction
+feed record (data/transaction-feed.schema.json) carrying `payment_message` or
+`parties`. Parsing is stdlib-only; pacs.008 goes through screen.safe_xml_fromstring
+(DTD/entity declarations refused, size capped).
+
+DEGRADE LOUDLY: a payment is never reported clear on unverified state. If a core
+sanctions list did not load, "no match" is PROVISIONAL and says which list; a
+party that could not be name-screened (a bank given only by BIC) is listed as
+such; a payment missing originator/beneficiary names is INCOMPLETE.
+
+INERT IN PRODUCTION until a transaction feed is configured (TXN_FEED_PATH, see
+txn_monitor.py). It never invents payments; it is tested on synthetic fixtures.
+Every outcome is decision-support: a potential match opens the TFS Name-Match
+Procedure (POL-07, docs/aims/tfs-name-match-procedure.md) and the MLRO decides.
+"""
+import re
+
+# ISO 3166-1 alpha-2 codes for every jurisdiction in data/jurisdiction-risk.json,
+# keyed to the exact spelling used there. A payment carries country CODES
+# (pacs.008 <Ctry>, a BIC's 5th-6th characters); the maintained list carries
+# NAMES. test/engine_test.py fails if a listed jurisdiction has no code here, so
+# a plenary update cannot silently drop a jurisdiction from payment screening.
+ISO2_TO_JURISDICTION = {
+    "AO": "angola", "BO": "bolivia", "BA": "bosnia-herzegovina",
+    "VG": "british virgin islands", "BG": "bulgaria", "CM": "cameroon",
+    "CI": "cote d'ivoire", "CD": "the democratic republic of congo", "HT": "haiti",
+    "IQ": "iraq", "KE": "kenya", "KW": "kuwait",
+    "LA": "lao people's democratic republic", "LB": "lebanon", "MC": "monaco",
+    "NP": "nepal", "PG": "papua new guinea", "SS": "south sudan", "SY": "syria",
+    "VE": "venezuela", "VN": "vietnam", "YE": "yemen",
+    "IR": "islamic republic of iran", "KP": "north korea", "MM": "myanmar",
+}
+
+# Party roles. ORIGINATOR / BENEFICIARY are the R.16 mandatory pair.
+ORIGINATOR, BENEFICIARY = "originator", "beneficiary"
+ROLE_LABELS = {
+    "originator": "Originator (ordering customer)",
+    "ultimate_originator": "Ultimate originator",
+    "beneficiary": "Beneficiary",
+    "ultimate_beneficiary": "Ultimate beneficiary",
+    "ordering_institution": "Ordering institution",
+    "senders_correspondent": "Sender's correspondent",
+    "receivers_correspondent": "Receiver's correspondent",
+    "intermediary": "Intermediary institution",
+    "account_with_institution": "Beneficiary's bank (account-with institution)",
+    "beneficial_owner": "Beneficial owner",
+    "other": "Other party",
+}
+
+# MT103 tag → role. The option letter (A = BIC, D/K/F/no letter = name and
+# address) only changes how the party is read, not who it is.
+_MT103_ROLES = {
+    "50": "originator", "52": "ordering_institution", "53": "senders_correspondent",
+    "54": "receivers_correspondent", "56": "intermediary",
+    "57": "account_with_institution", "59": "beneficiary",
+}
+_BIC_RE = re.compile(r"^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?$")
+# A designated name embedded in free text only counts when it is long and
+# multi-word: single tokens ("GOLD", "STAR") inside an invoice line are noise.
+REMITTANCE_MIN_TOKENS = 2
+REMITTANCE_MIN_CHARS = 10
+MAX_PAYMENT_TEXT = 200_000
+
+
+def _clean(s):
+    return re.sub(r"\s+", " ", str(s or "")).strip()
+
+
+def bic_country(bic):
+    """The ISO country code inside a BIC (characters 5-6), or ''."""
+    b = _clean(bic).upper()
+    return b[4:6] if _BIC_RE.match(b) else ""
+
+
+def _party(role, name="", bic="", country="", source=""):
+    bic = _clean(bic).upper()
+    country = _clean(country).upper()[:2] or bic_country(bic)
+    return {"role": role, "name": _clean(name), "bic": bic, "country": country,
+            "source": source}
+
+
+# ── SWIFT MT103 ───────────────────────────────────────────────────────────────
+_MT_FIELD_RE = re.compile(r"(?m)^:(\d{2})([A-Z]?):")
+
+
+def _mt_fields(text):
+    """Split block 4 of an MT message into [(tag, option, value)] in order."""
+    body = str(text or "")
+    if len(body) > MAX_PAYMENT_TEXT:
+        raise ValueError("payment message too large")
+    m = re.search(r"\{4:\s*(.*?)-\}", body, re.S)
+    if m:
+        body = m.group(1)
+    body = body.replace("\r\n", "\n").replace("\r", "\n")
+    marks = list(_MT_FIELD_RE.finditer(body))
+    out = []
+    for i, mk in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(body)
+        out.append((mk.group(1), mk.group(2), body[mk.end():end].strip("\n")))
+    return out
+
+
+def _mt_party(role, option, value):
+    lines = [ln.strip() for ln in value.split("\n") if ln.strip()]
+    account_free = [ln for ln in lines if not ln.startswith("/")]
+    if option == "A":                       # [/account] + BIC
+        bic = account_free[0] if account_free else ""
+        return _party(role, bic=bic, source=f":{_tag(role)}A:")
+    if option == "F":                       # structured: 1/name 2/address 3/CC/town
+        names = [ln[2:] for ln in lines if ln.startswith("1/")]
+        ctry = next((ln[2:4] for ln in lines if ln.startswith("3/")), "")
+        return _party(role, name=" ".join(names), country=ctry, source=f":{_tag(role)}F:")
+    # K / D / no letter: [/account] then name, then address lines.
+    return _party(role, name=account_free[0] if account_free else "",
+                  source=f":{_tag(role)}{option}:")
+
+
+def _tag(role):
+    return next((t for t, r in _MT103_ROLES.items() if r == role), "")
+
+
+def parse_mt103(text):
+    """Parse a SWIFT MT103 into the normalised payment shape. Unknown fields are
+    ignored; nothing is invented — an absent party is simply absent."""
+    pay = {"format": "MT103", "reference": "", "date": "", "currency": "",
+           "amount": None, "parties": [], "remittance": []}
+    for tag, opt, val in _mt_fields(text):
+        if tag == "20":
+            pay["reference"] = _clean(val)
+        elif tag == "32" and opt == "A":
+            m = re.match(r"\s*(\d{6})([A-Z]{3})([\d,\.]+)", val)
+            if m:
+                d = m.group(1)
+                pay["date"] = f"20{d[0:2]}-{d[2:4]}-{d[4:6]}"
+                pay["currency"] = m.group(2)
+                try:
+                    pay["amount"] = float(m.group(3).replace(",", "."))
+                except ValueError:
+                    pay["amount"] = None
+        elif tag in _MT103_ROLES:
+            pay["parties"].append(_mt_party(_MT103_ROLES[tag], opt, val))
+        elif tag in ("70", "72"):
+            pay["remittance"].append(_clean(val.replace("\n", " ")))
+    return pay
+
+
+# ── ISO 20022 pacs.008 ────────────────────────────────────────────────────────
+def _local(tag):
+    return str(tag).split("}")[-1]
+
+
+def _child(el, *path):
+    cur = el
+    for name in path:
+        if cur is None:
+            return None
+        cur = next((c for c in cur if _local(c.tag) == name), None)
+    return cur
+
+
+def _text(el, *path):
+    node = _child(el, *path)
+    return _clean(node.text) if node is not None and node.text else ""
+
+
+def _pacs_party(tx, role, elname):
+    p = _child(tx, elname)
+    if p is None:
+        return None
+    return _party(role, name=_text(p, "Nm"), country=_text(p, "PstlAdr", "Ctry")
+                  or _text(p, "CtryOfRes"), source=f"<{elname}>")
+
+
+def _pacs_agent(tx, role, elname):
+    a = _child(tx, elname, "FinInstnId")
+    if a is None:
+        return None
+    return _party(role, name=_text(a, "Nm"), bic=_text(a, "BICFI") or _text(a, "BIC"),
+                  country=_text(a, "PstlAdr", "Ctry"), source=f"<{elname}>")
+
+
+def parse_pacs008(xml_text):
+    """Parse an ISO 20022 pacs.008 (FI-to-FI customer credit transfer) into a
+    list of normalised payments, one per <CdtTrfTxInf>. Namespace-agnostic.
+    DTD/entity declarations are refused before parsing (screen.safe_xml_fromstring)."""
+    from screen import safe_xml_fromstring   # lazy: the parser guard lives there
+    if len(str(xml_text or "")) > MAX_PAYMENT_TEXT:
+        raise ValueError("payment message too large")
+    root = safe_xml_fromstring(xml_text)
+    txs = [el for el in root.iter() if _local(el.tag) == "CdtTrfTxInf"]
+    grp = next((el for el in root.iter() if _local(el.tag) == "GrpHdr"), None)
+    grp_date = _text(grp, "IntrBkSttlmDt") if grp is not None else ""
+    out = []
+    for tx in txs:
+        amt = _child(tx, "IntrBkSttlmAmt")
+        try:
+            amount = float(amt.text) if amt is not None and amt.text else None
+        except ValueError:
+            amount = None
+        parties = [
+            _pacs_party(tx, "originator", "Dbtr"),
+            _pacs_party(tx, "ultimate_originator", "UltmtDbtr"),
+            _pacs_agent(tx, "ordering_institution", "DbtrAgt"),
+            _pacs_agent(tx, "intermediary", "IntrmyAgt1"),
+            _pacs_agent(tx, "intermediary", "IntrmyAgt2"),
+            _pacs_agent(tx, "intermediary", "IntrmyAgt3"),
+            _pacs_agent(tx, "account_with_institution", "CdtrAgt"),
+            _pacs_party(tx, "beneficiary", "Cdtr"),
+            _pacs_party(tx, "ultimate_beneficiary", "UltmtCdtr"),
+        ]
+        rmt = [_clean(el.text) for el in tx.iter()
+               if _local(el.tag) == "Ustrd" and el.text and el.text.strip()]
+        out.append({
+            "format": "pacs.008",
+            "reference": _text(tx, "PmtId", "EndToEndId") or _text(tx, "PmtId", "TxId"),
+            "date": _text(tx, "IntrBkSttlmDt") or grp_date,
+            "currency": (amt.get("Ccy") if amt is not None else "") or "",
+            "amount": amount,
+            "parties": [p for p in parties if p is not None],
+            "remittance": rmt,
+        })
+    return out
+
+
+def parse_payment_message(text):
+    """Detect the message type and return a list of normalised payments."""
+    s = str(text or "").lstrip()
+    if s.startswith("<"):
+        return parse_pacs008(s)
+    return [parse_mt103(s)]
+
+
+def payment_from_feed(txn):
+    """Normalised payments for ONE transaction-feed record. Uses, in order:
+    `payment_message` (raw MT103 / pacs.008), an explicit `parties` array, or the
+    legacy single `counterparty` (+ the customer as the other side). Returns []
+    when the record names no party at all."""
+    if not isinstance(txn, dict):
+        return []
+    if txn.get("payment_message"):
+        return parse_payment_message(txn["payment_message"])
+    parties = []
+    for p in txn.get("parties") or []:
+        if isinstance(p, dict) and p.get("role") in ROLE_LABELS:
+            parties.append(_party(p["role"], p.get("name", ""), p.get("bic", ""),
+                                  p.get("country", ""), source="feed.parties"))
+    if not parties and (txn.get("counterparty") or txn.get("customer")):
+        inbound = str(txn.get("direction", "")).lower() == "in"
+        cust = _party(BENEFICIARY if inbound else ORIGINATOR, txn.get("customer", ""),
+                      source="feed.customer")
+        cpty = _party(ORIGINATOR if inbound else BENEFICIARY, txn.get("counterparty", ""),
+                      source="feed.counterparty")
+        # The legacy feed records the counterparty country as a NAME.
+        cpty["country_name"] = _clean(txn.get("counterparty_country"))
+        parties = [cust, cpty]
+    if not parties:
+        return []
+    rem = txn.get("remittance_info")
+    return [{"format": "feed", "reference": _clean(txn.get("transaction_id")),
+             "date": _clean(txn.get("date")), "currency": _clean(txn.get("currency")),
+             "amount": txn.get("amount"), "parties": parties,
+             "remittance": [_clean(rem)] if rem else []}]
+
+
+# ── SCREENING ─────────────────────────────────────────────────────────────────
+def _default_matcher(name, all_lists):
+    import screen
+    return screen.screen_name(name, all_lists)
+
+
+def _default_normalizer(s):
+    import screen
+    return screen.normalize(s)
+
+
+def _jurisdiction_tier(party, table):
+    if not table:
+        return None, ""
+    name = party.get("country_name") or ISO2_TO_JURISDICTION.get(party.get("country", ""), "")
+    key = _clean(name).lower()
+    return table.get(key), (name or party.get("country", ""))
+
+
+def _remittance_hits(texts, all_lists, normalizer):
+    hits = []
+    padded = [" " + normalizer(t) + " " for t in texts if t]
+    if not padded:
+        return hits
+    for list_name, entries in all_lists.items():
+        for en, orig in entries:
+            if len(en) < REMITTANCE_MIN_CHARS or len(en.split()) < REMITTANCE_MIN_TOKENS:
+                continue
+            needle = " " + en + " "
+            if any(needle in p for p in padded):
+                hits.append({"list": list_name, "matched_entry": orig, "score": 100,
+                             "where": "payment reference / remittance text"})
+    return hits
+
+
+def screen_payment(payment, all_lists, *, jurisdiction_table=None, lists_degraded=(),
+                   matcher=None, normalizer=None):
+    """Screen ONE normalised payment. Returns
+    {reference, outcome, severity, parties:[...], remittance_hits, findings:[...],
+     r16_missing:[...], provisional}.
+
+    outcome ∈ STOP — POTENTIAL SANCTIONS MATCH | REVIEW — HIGH-RISK JURISDICTION |
+              REVIEW — INCOMPLETE (R.16) | NO MATCH | NO MATCH — PROVISIONAL
+    """
+    matcher = matcher or _default_matcher
+    normalizer = normalizer or _default_normalizer
+    findings, parties_out = [], []
+    max_tier = None
+    for p in payment.get("parties", []):
+        rec = dict(p)
+        rec["label"] = ROLE_LABELS.get(p["role"], p["role"])
+        if p.get("name") and len(normalizer(p["name"])) >= 4:
+            rec["hits"] = matcher(p["name"], all_lists) or []
+            rec["name_screened"] = True
+        else:
+            rec["hits"] = []
+            rec["name_screened"] = False
+            rec["note"] = ("BIC only — name not supplied, so not name-screened; country checked"
+                           if p.get("bic") else "no screenable name supplied")
+        tier, where = _jurisdiction_tier(p, jurisdiction_table)
+        rec["jurisdiction_tier"] = tier
+        rec["jurisdiction"] = where
+        if tier == "high" or (tier == "grey" and max_tier is None):
+            max_tier = tier
+        for h in rec["hits"]:
+            findings.append(f"{rec['label']} \"{p['name']}\" → {h.get('list')}: "
+                            f"\"{h.get('matched_entry')}\" {h.get('score')}%")
+        if tier:
+            findings.append(f"{rec['label']} in {where} — FATF "
+                            + ("call-for-action" if tier == "high" else "increased-monitoring")
+                            + " jurisdiction")
+        parties_out.append(rec)
+    rem_hits = _remittance_hits(payment.get("remittance", []), all_lists, normalizer)
+    for h in rem_hits:
+        findings.append(f"Payment reference names \"{h['matched_entry']}\" ({h['list']})")
+
+    named = {p["role"] for p in payment.get("parties", []) if p.get("name")}
+    r16_missing = [ROLE_LABELS[r] for r in (ORIGINATOR, BENEFICIARY) if r not in named]
+
+    any_hit = rem_hits or any(r["hits"] for r in parties_out)
+    if any_hit:
+        outcome, severity = "STOP — POTENTIAL SANCTIONS MATCH", "CRITICAL"
+    elif max_tier == "high":
+        outcome, severity = "REVIEW — HIGH-RISK JURISDICTION", "HIGH"
+    elif r16_missing:
+        outcome, severity = "REVIEW — INCOMPLETE (R.16)", "HIGH"
+    elif max_tier == "grey":
+        outcome, severity = "REVIEW — HIGH-RISK JURISDICTION", "MEDIUM"
+    elif lists_degraded:
+        outcome, severity = "NO MATCH — PROVISIONAL", "MEDIUM"
+    else:
+        outcome, severity = "NO MATCH", "LOW"
+    return {"reference": payment.get("reference", ""), "format": payment.get("format", ""),
+            "date": payment.get("date", ""), "amount": payment.get("amount"),
+            "currency": payment.get("currency", ""), "outcome": outcome,
+            "severity": severity, "parties": parties_out, "remittance_hits": rem_hits,
+            "findings": findings, "r16_missing": r16_missing,
+            "provisional": bool(lists_degraded) and not any_hit,
+            "lists_degraded": list(lists_degraded)}
+
+
+def screen_feed(transactions, all_lists, *, jurisdiction_table=None, lists_degraded=(),
+                matcher=None, normalizer=None):
+    """Screen every payment in a transaction feed. A record that cannot be parsed
+    is COUNTED (never dropped silently). Returns {n_payments, results, errors}."""
+    results, errors = [], []
+    for i, t in enumerate(transactions or []):
+        try:
+            pays = payment_from_feed(t)
+        except Exception as e:   # a malformed message is disclosed, not skipped
+            errors.append(f"record {i}: {type(e).__name__}: {str(e)[:120]}")
+            continue
+        for p in pays:
+            results.append(screen_payment(p, all_lists, jurisdiction_table=jurisdiction_table,
+                                          lists_degraded=lists_degraded, matcher=matcher,
+                                          normalizer=normalizer))
+    rank = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+    results.sort(key=lambda r: rank.get(r["severity"], 0), reverse=True)
+    return {"n_payments": len(results), "results": results, "errors": errors}
+
+
+def report_lines(feed_result, configured):
+    """Lines for the daily report. Honest about an absent feed and about every
+    payment that is not a plain NO MATCH."""
+    if not configured:
+        return ["Payment screening (parties): engine ready & tested, INACTIVE — no "
+                "transaction feed connected (set TXN_FEED_PATH). No payment is screened "
+                "until a real feed is configured."]
+    res = feed_result or {"n_payments": 0, "results": [], "errors": []}
+    flagged = [r for r in res["results"] if r["outcome"] != "NO MATCH"]
+    lines = [f"Payment screening (parties): ACTIVE — {res['n_payments']} payment(s) screened → "
+             f"{len(flagged)} need attention."]
+    if res["errors"]:
+        lines.append(f"   ⚠ {len(res['errors'])} feed record(s) could not be parsed and were NOT "
+                     "screened: " + "; ".join(res["errors"][:3]))
+    for r in flagged:
+        ref = r["reference"] or "(no reference)"
+        amt = f"{r['amount']:,.2f} {r['currency']}".strip() if isinstance(r["amount"], (int, float)) else ""
+        lines.append(f"   [{r['severity']}] {r['outcome']} — payment {ref} {r['date']} {amt}".rstrip())
+        for f in r["findings"]:
+            lines.append(f"      • {f}")
+        if r["r16_missing"]:
+            lines.append("      • R.16: missing " + " and ".join(r["r16_missing"]) + " name")
+        for p in r["parties"]:
+            if not p["name_screened"]:
+                lines.append(f"      • {p['label']}: {p['note']}")
+        if r["provisional"]:
+            lines.append("      • core list(s) not loaded: " + ", ".join(r["lists_degraded"])
+                         + " — 'no match' is provisional")
+        if r["severity"] == "CRITICAL":
+            lines.append("      → POL-07: hold the payment, verify identifiers, then PNMR "
+                         "(potential) or freeze + CNMR + FFR (confirmed) in goAML. MLRO decides.")
+    return lines

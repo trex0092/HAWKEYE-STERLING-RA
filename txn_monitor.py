@@ -36,6 +36,12 @@ STRUCTURING_WINDOW_D  = 7      # days
 VELOCITY_FACTOR       = 4.0    # a day > N× the customer's mean daily volume
 PRICE_DEVIATION_PCT   = float(os.environ.get("TXN_PRICE_DEVIATION_PCT", "10"))
 TXN_FEED_PATH         = os.environ.get("TXN_FEED_PATH", "")
+# Profile deviation: a month's volume above N× the customer's DECLARED expected
+# monthly volume (the KYC profile figure, feed field expected_monthly_volume).
+PROFILE_DEVIATION_FACTOR = float(os.environ.get("TXN_PROFILE_DEVIATION_FACTOR", "1.5"))
+CIRCULAR_WINDOW_D     = 30     # days: funds out to X and back from X (or reverse)
+CIRCULAR_AMOUNT_BAND  = 0.10   # within 10% = the same money coming back
+NEW_GEO_MIN_HISTORY   = 5      # prior transactions needed before a country is "new"
 
 
 def feed_configured():
@@ -303,12 +309,86 @@ def rule_route_mismatch(txns):
             for t in txns if t.get("route_mismatch") is True]
 
 
+def rule_profile_deviation(txns):
+    """Activity inconsistent with the customer's declared profile: a calendar
+    month's total above PROFILE_DEVIATION_FACTOR × the declared expected monthly
+    volume. Fires only when the feed carries expected_monthly_volume — never
+    guesses a profile from the activity it is meant to check."""
+    declared = [float(t["expected_monthly_volume"]) for t in txns
+                if isinstance(t.get("expected_monthly_volume"), (int, float))
+                and t["expected_monthly_volume"] > 0]
+    if not declared:
+        return []
+    expected = declared[-1]
+    months = defaultdict(list)
+    for t in txns:
+        d = _d(t.get("date"))
+        if d:
+            months[(d.year, d.month)].append(t)
+    out = []
+    for (y, m), ts in sorted(months.items()):
+        total = sum(_amt(t) for t in ts)
+        if total > PROFILE_DEVIATION_FACTOR * expected:
+            out.append(_alert("PROFILE_DEVIATION", "HIGH", ts[-1],
+                f"{y}-{m:02d} volume {total:,.0f} AED is {total / expected:.1f}× the declared "
+                f"expected monthly volume {expected:,.0f} AED — refresh the profile / source of funds"))
+    return out
+
+
+def rule_circular_flow(txns):
+    """Round-tripping: money leaves to a counterparty and comes back from the SAME
+    counterparty (or the reverse) within CIRCULAR_WINDOW_D days for a similar
+    amount. Matching is on the recorded counterparty field, never on a guess."""
+    dated = [t for t in txns if _d(t.get("date")) and _norm(t.get("counterparty"))]
+    out = []
+    seen = set()
+    for a in dated:
+        for b in dated:
+            if a is b or _norm(a.get("counterparty")) != _norm(b.get("counterparty")):
+                continue
+            if {_norm(a.get("direction")), _norm(b.get("direction"))} != {"in", "out"}:
+                continue
+            dd = (_d(b["date"]) - _d(a["date"])).days
+            if not (0 <= dd <= CIRCULAR_WINDOW_D) or _amt(a) <= 0:
+                continue
+            if abs(_amt(b) - _amt(a)) <= CIRCULAR_AMOUNT_BAND * _amt(a):
+                key = (id(a), id(b))
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(_alert("CIRCULAR_FLOW", "HIGH", a,
+                    f"{_amt(a):,.0f} AED {_norm(a.get('direction'))} and ~{_amt(b):,.0f} "
+                    f"{_norm(b.get('direction'))} with the same counterparty "
+                    f"{a.get('counterparty')} within {dd}d — possible round-tripping"))
+    return out
+
+
+def rule_new_geography(txns):
+    """Unexpected cross-border activity: a counterparty country never seen in the
+    customer's earlier history (needs NEW_GEO_MIN_HISTORY prior transactions, so
+    a new customer's first payments are not all flagged)."""
+    dated = sorted((t for t in txns if _d(t.get("date"))), key=lambda t: _d(t["date"]))
+    out = []
+    seen = set()
+    for i, t in enumerate(dated):
+        c = _norm(t.get("counterparty_country"))
+        if not c:
+            continue
+        if i >= NEW_GEO_MIN_HISTORY and c not in seen:
+            out.append(_alert("NEW_GEOGRAPHY", "MEDIUM", t,
+                f"first payment involving {t.get('counterparty_country')} after "
+                f"{i} earlier transaction(s) in other countries — confirm the business reason"))
+        seen.add(c)
+    return out
+
+
 _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_high_risk_counterparty, rule_rapid_passthrough,
           rule_cdd_trigger, rule_round_amount_cash,
           rule_third_party_payment, rule_refund_diversion,
           rule_pricing_deviation, rule_phantom_delivery,
-          rule_invoice_mismatch, rule_route_mismatch]
+          rule_invoice_mismatch, rule_route_mismatch,
+          rule_profile_deviation, rule_circular_flow, rule_new_geography]
 
 
 def _any_customer(txns):
