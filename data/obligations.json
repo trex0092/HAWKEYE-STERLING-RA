@@ -4,7 +4,8 @@
   "owner_role": "MLRO (accountable) / Compliance Engineering (operational)",
   "review_cadence": "Quarterly, on any change flagged by Regulatory Watch, and on any new instrument entering force.",
   "last_reviewed": "2026-07-28",
-  "citation_policy": "Instrument-level citations only. Article-level mapping to Cabinet Resolution No. 134 of 2025 is counsel's worklist (open-actions register item 5); no article number is asserted here that has not been verified in-repo. The one exception is Article 25 of FDL 10/2025 (tipping-off), which is already cited operatively in code and pinned by test/advisor-assurance.test.js.",
+  "citation_policy": "Instrument-level citations only until a row's source_citation is sourced. Article-level mapping to Cabinet Resolution No. 134 of 2025 is counsel's worklist (open-actions register item 5); no article number is asserted here that has not been verified in-repo. The one exception is Article 25 of FDL 10/2025 (tipping-off), which is already cited operatively in code and pinned by test/advisor-assurance.test.js.",
+  "source_citation_standard": "Every row carries a source_citation. The obligation text is the firm's paraphrase, never statutory text. basis \"needs-source\": no article, quote or locator is asserted; all of those fields stay null, so nothing drafted can pass as law. basis \"sourced\": the row carries the article, the verbatim quote copied from the official text, the official source URL, a page/section locator, and the named human role (MLRO or Counsel) and date of the verification. Only that human sets a row to sourced; tooling and AI agents never do. test/obligations.test.mjs enforces both shapes, and data/grc-metrics.json counts the rows still needing a source (obligationsWithoutSourcedCitation).",
   "status_meanings": {
     "met": "Control built AND operating AND evidenced — nothing outstanding.",
     "partial": "Control built and evidenced; a human act (a sitting, a filing, a delivery, a signature) is outstanding. Every partial row names the open-actions register item that closes it.",
@@ -31,7 +32,16 @@
       ],
       "watch_source": "uae-moe",
       "status": "met",
-      "note": "The 0-30 methodology scores identification, ownership and UBO factors; hard rules force PROHIBITED regardless of score."
+      "note": "The 0-30 methodology scores identification, ownership and UBO factors; hard rules force PROHIBITED regardless of score.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-02",
@@ -52,7 +62,16 @@
       ],
       "watch_source": "uae-moe",
       "status": "met",
-      "note": "EDD triggers are hard-coded escalations that override the numeric band; PEP/RCA/SOE detection runs in the daily screen."
+      "note": "EDD triggers are hard-coded escalations that override the numeric band; PEP/RCA/SOE detection runs in the daily screen.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-03",
@@ -73,7 +92,16 @@
       "watch_source": "uae-moe",
       "status": "partial",
       "open_action": 6,
-      "note": "The R.16 engine is built and inactive: no transaction feed is wired. The prepared manual compensating control is drafted and unsigned."
+      "note": "The R.16 engine is built and inactive: no transaction feed is wired. The prepared manual compensating control is drafted and unsigned.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-04",
@@ -96,7 +124,16 @@
       "watch_source": "uae-eocn",
       "calendar_duty": "tfs-procedure-annual-review",
       "status": "met",
-      "note": "Daily screen with CI-enforced accuracy floors; an empty core list reads DEGRADED and never a silent clear."
+      "note": "Daily screen with CI-enforced accuracy floors; an empty core list reads DEGRADED and never a silent clear.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-05",
@@ -116,7 +153,16 @@
       "calendar_duty": "tfs-training-refresh-annual",
       "status": "partial",
       "open_action": 7,
-      "note": "Procedure written with the TFS gate ahead of the STR question and a §4 event log. Filing is a human act; the role-based training that makes it reliable is outstanding."
+      "note": "Procedure written with the TFS gate ahead of the STR question and a §4 event log. Filing is a human act; the role-based training that makes it reliable is outstanding.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-06",
@@ -135,7 +181,16 @@
       "watch_source": "uae-fiu",
       "status": "partial",
       "open_action": 7,
-      "note": "The dossier builder assembles the narrative and evidence pack; the filing decision and the goAML submission are the MLRO's, outside the repository."
+      "note": "The dossier builder assembles the narrative and evidence pack; the filing decision and the goAML submission are the MLRO's, outside the repository.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-07",
@@ -154,7 +209,16 @@
       ],
       "watch_source": "uae-fiu",
       "status": "met",
-      "note": "Charter prohibition plus an independent post-output guard: the Advisor withholds the answer rather than risk the disclosure. Red-team phrasings are pinned in CI."
+      "note": "Charter prohibition plus an independent post-output guard: the Advisor withholds the answer rather than risk the disclosure. Red-team phrasings are pinned in CI.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-08",
@@ -173,7 +237,16 @@
       ],
       "watch_source": "uae-moe",
       "status": "met",
-      "note": "Stores, retention windows, lineage and purge are documented and the purge path is tested."
+      "note": "Stores, retention windows, lineage and purge are documented and the purge path is tested.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-09",
@@ -192,7 +265,16 @@
       "watch_source": "uae-moe",
       "status": "partial",
       "open_action": 4,
-      "note": "The delegation matrix and RACI are documented; the appointment record and the committee's adoption are board acts."
+      "note": "The delegation matrix and RACI are documented; the appointment record and the committee's adoption are board acts.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-10",
@@ -209,7 +291,16 @@
       ],
       "watch_source": "uae-moe",
       "status": "pending",
-      "note": "The repository holds the AI-system risk register (R-01…R-20), not the firm's business-wide assessment. The EWRA covers customers, products, channels and geographies the repository has no sight of; it is firm-side work."
+      "note": "The repository holds the AI-system risk register (R-01…R-20), not the firm's business-wide assessment. The EWRA covers customers, products, channels and geographies the repository has no sight of; it is firm-side work.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-11",
@@ -229,7 +320,16 @@
       "calendar_duty": "ai-awareness-training-annual",
       "status": "partial",
       "open_action": 7,
-      "note": "Cadence is scheduled and the record table exists; delivery beyond Compliance and the named rows are outstanding."
+      "note": "Cadence is scheduled and the record table exists; delivery beyond Compliance and the named rows are outstanding.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-12",
@@ -247,7 +347,16 @@
       "watch_source": "uae-moe",
       "status": "partial",
       "open_action": 8,
-      "note": "The programme, scope and CAPA route are documented; the first thematic review has not run."
+      "note": "The programme, scope and CAPA route are documented; the first thematic review has not run.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-13",
@@ -267,7 +376,16 @@
       "watch_source": "uae-moe",
       "status": "partial",
       "open_action": 6,
-      "note": "The threshold and the linked-series rule are encoded in the methodology and the compensating control; automated detection needs the transaction feed decision."
+      "note": "The threshold and the linked-series rule are encoded in the methodology and the compensating control; automated detection needs the transaction feed decision.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-14",
@@ -289,7 +407,16 @@
       "watch_source": "uae-cbuae",
       "status": "partial",
       "open_action": 11,
-      "note": "DPIA and PDPL assessment are complete and data minimisation is enforced in code (name + one headline). The transfer basis and the DPO determination await counsel and the board; LLM egress stays gated OFF until then."
+      "note": "DPIA and PDPL assessment are complete and data minimisation is enforced in code (name + one headline). The transfer basis and the DPO determination await counsel and the board; LLM egress stays gated OFF until then.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-15",
@@ -310,7 +437,16 @@
       "watch_source": "uae-eocn",
       "calendar_duty": "internal-watchlist-annual-review",
       "status": "met",
-      "note": "Daily refresh with per-list movement reporting, a freshness watchdog, and the EOCN mirror cross-check that alarms without becoming the screening source."
+      "note": "Daily refresh with per-list movement reporting, a freshness watchdog, and the EOCN mirror cross-check that alarms without becoming the screening source.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-16",
@@ -327,7 +463,16 @@
       ],
       "watch_source": "uae-fiu",
       "status": "pending",
-      "note": "Registration and credential currency are firm-side facts the repository cannot observe. Add the renewal anniversary to the compliance calendar once the date is known."
+      "note": "Registration and credential currency are firm-side facts the repository cannot observe. Add the renewal anniversary to the compliance calendar once the date is known.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-17",
@@ -344,7 +489,16 @@
       ],
       "watch_source": "eu-ai-act",
       "status": "monitored",
-      "note": "Assessed as outside territorial scope today (no EU establishment, no EU market offering); the design aligns voluntarily with the high-risk obligations should scope change. General applicability of the broader obligations falls on 2 August 2026 and the source is under Regulatory Watch, including the Digital Omnibus amendments."
+      "note": "Assessed as outside territorial scope today (no EU establishment, no EU market offering); the design aligns voluntarily with the high-risk obligations should scope change. General applicability of the broader obligations falls on 2 August 2026 and the source is under Regulatory Watch, including the Digital Omnibus amendments.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-18",
@@ -364,7 +518,16 @@
       "calendar_duty": "governance-pack-annual-review",
       "status": "monitored",
       "open_action": 10,
-      "note": "Self-assessed as substantially implemented. Readiness assessment vs certification vs continued self-assessment is resolution R6 at the board sitting. No Regulatory Watch source applies: this is a voluntary standard published by a standards body, not a supervisor feed, so revisions are picked up at the annual governance-pack review rather than by the watcher."
+      "note": "Self-assessed as substantially implemented. Readiness assessment vs certification vs continued self-assessment is resolution R6 at the board sitting. No Regulatory Watch source applies: this is a voluntary standard published by a standards body, not a supervisor feed, so revisions are picked up at the annual governance-pack review rather than by the watcher.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-19",
@@ -381,7 +544,16 @@
       ],
       "watch_source": "lbma",
       "status": "monitored",
-      "note": "LBMA and OECD sources are watched so a change in guidance is detected. The firm's responsible-sourcing programme (KYS, refinery due diligence, Step 4 audit) is outside this repository's scope."
+      "note": "LBMA and OECD sources are watched so a change in guidance is detected. The firm's responsible-sourcing programme (KYS, refinery due diligence, Step 4 audit) is outside this repository's scope.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-20",
@@ -401,7 +573,16 @@
       "watch_source": "uae-eocn",
       "status": "partial",
       "open_action": 18,
-      "note": "PF became a standalone offence under FDL 10/2025 and can no longer be treated as a sub-case of sanctions screening. The CPF policy, the separate PF section in the risk-assessment method and the distinct PF training module are drafted; approval and the PF section of the business-wide assessment itself are outstanding."
+      "note": "PF became a standalone offence under FDL 10/2025 and can no longer be treated as a sub-case of sanctions screening. The CPF policy, the separate PF section in the risk-assessment method and the distinct PF training module are drafted; approval and the PF section of the business-wide assessment itself are outstanding.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     },
     {
       "id": "OB-21",
@@ -419,7 +600,16 @@
       "watch_source": "uae-cbuae",
       "status": "partial",
       "open_action": 6,
-      "note": "The data requirement and the escalation rule for an incomplete incoming transfer are stated in policy; systematic enforcement depends on the same transaction-feed decision as OB-03 and OB-13."
+      "note": "The data requirement and the escalation rule for an incomplete incoming transfer are stated in policy; systematic enforcement depends on the same transaction-feed decision as OB-03 and OB-13.",
+      "source_citation": {
+        "basis": "needs-source",
+        "article": null,
+        "quote": null,
+        "source_url": null,
+        "locator": null,
+        "verified_by": null,
+        "verified_on": null
+      }
     }
   ],
   "coverage_note": "Every obligation names the Regulatory Watch source that would tell us it changed, or states why none applies. test/obligations.test.mjs verifies that each watch_source exists in data/reg-sources.json, each calendar_duty exists in data/compliance-calendar.json, every control and evidence path exists on disk, every partial row names an open-actions register item, and that no obligation cites a repealed instrument (FDL 20/2018, Cabinet Decision 10/2019) as an operative basis."

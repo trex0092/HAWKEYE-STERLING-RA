@@ -171,7 +171,10 @@ export function obligationHygiene(root = ROOT) {
   const reg = json(root, 'data/obligations.json');
   return {
     withoutOwner: reg.obligations.filter((o) => !o.owner || !String(o.owner).trim()).length,
-    withoutWatchSource: reg.obligations.filter((o) => !o.watch_source).length
+    withoutWatchSource: reg.obligations.filter((o) => !o.watch_source).length,
+    /* Article-level evidence still owed by counsel/MLRO (open-actions item 5):
+       a row counts until a named human promotes its source_citation to sourced. */
+    withoutSourcedCitation: reg.obligations.filter((o) => !o.source_citation || o.source_citation.basis !== 'sourced').length
   };
 }
 
@@ -278,6 +281,7 @@ export async function computeMetrics(root = ROOT) {
     unjustifiedSuppressions: unjustifiedSuppressions(root),
     obligationsWithoutOwner: hygiene.withoutOwner,
     obligationsWithoutWatchSource: hygiene.withoutWatchSource,
+    obligationsWithoutSourcedCitation: hygiene.withoutSourcedCitation,
     openActionsWithoutTargetDate: openActionsWithoutTargetDate(root),
     residualAboveAppetite: rva.above.length,
     risksWithoutAppetitePosition: rva.unclaimed.length
