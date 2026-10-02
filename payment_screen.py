@@ -265,12 +265,19 @@ def payment_from_feed(txn, xml_parser=None):
     if not isinstance(txn, dict):
         return []
     if txn.get("payment_message"):
-        return parse_payment_message(txn["payment_message"], xml_parser)
+        pays = parse_payment_message(txn["payment_message"], xml_parser)
+        for p in pays:
+            p["reference"] = p.get("reference") or _clean(txn.get("transaction_id"))
+            p["permalink"] = _clean(txn.get("permalink"))
+        return pays
     parties = []
     for p in txn.get("parties") or []:
         if isinstance(p, dict) and p.get("role") in ROLE_LABELS:
-            parties.append(_party(p["role"], p.get("name", ""), p.get("bic", ""),
-                                  p.get("country", ""), source="feed.parties"))
+            party = _party(p["role"], p.get("name", ""), p.get("bic", ""),
+                           p.get("country", ""), source="feed.parties")
+            if p.get("country_name"):
+                party["country_name"] = _clean(p["country_name"])
+            parties.append(party)
     if not parties and (txn.get("counterparty") or txn.get("customer")):
         inbound = str(txn.get("direction", "")).lower() == "in"
         cust = _party(BENEFICIARY if inbound else ORIGINATOR, txn.get("customer", ""),
@@ -286,7 +293,109 @@ def payment_from_feed(txn, xml_parser=None):
     return [{"format": "feed", "reference": _clean(txn.get("transaction_id")),
              "date": _clean(txn.get("date")), "currency": _clean(txn.get("currency")),
              "amount": txn.get("amount"), "parties": parties,
-             "remittance": [_clean(rem)] if rem else []}]
+             "remittance": [_clean(rem)] if rem else [],
+             "permalink": _clean(txn.get("permalink"))}]
+
+
+# ── ASANA "PAYMENTS REGISTER" ────────────────────────────────────────────────
+# One Asana task per payment. The task NAME is the payment reference; the task
+# DESCRIPTION is either a pasted SWIFT MT103 / ISO 20022 pacs.008 message, or
+# this template (one "Field: value" per line, unknown lines ignored):
+#
+#   Date: 2026-10-01                 Direction: in | out
+#   Amount: 250000                   Currency: AED
+#   Method: wire | cash | gold       Customer: <our customer>
+#   Originator: <name>               Originator country: AE
+#   Beneficiary: <name>              Beneficiary country: HK
+#   Ultimate originator: <name>      Ultimate beneficiary: <name>
+#   Ordering bank: <name or BIC>     Intermediary bank: <name or BIC>
+#   Beneficiary bank: <name or BIC>  Beneficial owner: <name>
+#   Reference: INVOICE 12345 GOODS PAYMENT
+#   Expected monthly volume: 500000  (the customer's declared KYC profile, AED)
+#
+# A "... country" line takes an ISO code (AE) or a name; a "... bank" line
+# holding a BIC is read as a BIC (its country comes from the code).
+REGISTER_TEMPLATE_FIELDS = {
+    "originator": "originator", "ordering customer": "originator",
+    "ultimate originator": "ultimate_originator",
+    "beneficiary": "beneficiary", "ultimate beneficiary": "ultimate_beneficiary",
+    "ordering bank": "ordering_institution", "ordering institution": "ordering_institution",
+    "intermediary bank": "intermediary", "intermediary": "intermediary",
+    "correspondent bank": "intermediary",
+    "beneficiary bank": "account_with_institution",
+    "account with institution": "account_with_institution",
+    "beneficial owner": "beneficial_owner",
+}
+_REG_LINE_RE = re.compile(r"^\s*([A-Za-z][A-Za-z ]{1,40}?)\s*:\s*(.*?)\s*$")
+
+
+def _num(v):
+    try:
+        return float(str(v).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_register_entry(name, notes):
+    """Turn ONE Payments Register task (name + description) into a transaction-
+    feed record. Returns None when the description is neither a payment message
+    nor a filled template (nothing to screen — the caller counts it)."""
+    text = str(notes or "")
+    if len(text) > MAX_PAYMENT_TEXT:
+        raise ValueError("payment register entry too large")
+    stripped = text.lstrip()
+    if stripped.startswith("<") or re.search(r"(?m)^:20:", text):
+        return {"transaction_id": _clean(name), "payment_message": stripped}
+    fields, parties, countries = {}, {}, {}
+    for line in text.splitlines():
+        m = _REG_LINE_RE.match(line)
+        if not m:
+            continue
+        key, val = m.group(1).strip().lower(), _clean(m.group(2))
+        if not val:
+            continue
+        if key.endswith(" country"):
+            countries[key[:-len(" country")]] = val
+        elif key in REGISTER_TEMPLATE_FIELDS:
+            parties.setdefault(REGISTER_TEMPLATE_FIELDS[key], []).append((key, val))
+        else:
+            fields[key] = val
+    if not parties:
+        return None
+    out_parties = []
+    for role, entries in parties.items():
+        for key, val in entries:
+            ctry = countries.get(key, "")
+            party = {"role": role}
+            if _BIC_RE.match(val.upper()):
+                party["bic"] = val.upper()
+            else:
+                party["name"] = val
+            if len(ctry) == 2 and ctry.isalpha():
+                party["country"] = ctry.upper()
+            elif ctry:
+                party["country_name"] = ctry
+            out_parties.append(party)
+    rec = {"transaction_id": _clean(name), "parties": out_parties,
+           "date": fields.get("date", ""), "currency": fields.get("currency", "").upper(),
+           "direction": fields.get("direction", "").lower(),
+           "method": fields.get("method", "").lower(),
+           "customer": fields.get("customer", ""),
+           "remittance_info": fields.get("reference", "")}
+    amount = _num(fields.get("amount"))
+    if amount is not None:
+        rec["amount"] = amount
+    emv = _num(fields.get("expected monthly volume"))
+    if emv:
+        rec["expected_monthly_volume"] = emv
+    # Mirror the main parties into the legacy fields the monitoring rules read.
+    other = "originator" if rec["direction"] == "in" else "beneficiary"
+    cp = next((p for p in out_parties if p["role"] == other and p.get("name")), None)
+    if cp:
+        rec["counterparty"] = cp["name"]
+        rec["counterparty_country"] = (ISO2_TO_JURISDICTION.get(cp.get("country", ""), "")
+                                       or cp.get("country_name") or cp.get("country", ""))
+    return rec
 
 
 # ── SCREENING ─────────────────────────────────────────────────────────────────
@@ -374,6 +483,7 @@ def screen_payment(payment, all_lists, *, jurisdiction_table=None, lists_degrade
     return {"reference": payment.get("reference", ""), "format": payment.get("format", ""),
             "date": payment.get("date", ""), "amount": payment.get("amount"),
             "currency": payment.get("currency", ""), "outcome": outcome,
+            "permalink": payment.get("permalink", ""),
             "severity": severity, "parties": parties_out, "remittance_hits": rem_hits,
             "findings": findings, "r16_missing": r16_missing,
             "provisional": bool(lists_degraded) and not any_hit,
@@ -404,9 +514,9 @@ def report_lines(feed_result, configured):
     """Lines for the daily report. Honest about an absent feed and about every
     payment that is not a plain NO MATCH."""
     if not configured:
-        return ["Payment screening (parties): engine ready & tested, INACTIVE — no "
-                "transaction feed connected (set TXN_FEED_PATH). No payment is screened "
-                "until a real feed is configured."]
+        return ["Payment screening (parties): engine ready & tested, INACTIVE — no payment "
+                "source connected (Asana Payments Register: ASANA_PAYMENTS_GID; or a file feed: "
+                "TXN_FEED_PATH). No payment is screened until one is configured."]
     res = feed_result or {"n_payments": 0, "results": [], "errors": []}
     flagged = [r for r in res["results"] if r["outcome"] != "NO MATCH"]
     lines = [f"Payment screening (parties): ACTIVE — {res['n_payments']} payment(s) screened → "
@@ -418,6 +528,8 @@ def report_lines(feed_result, configured):
         ref = r["reference"] or "(no reference)"
         amt = f"{r['amount']:,.2f} {r['currency']}".strip() if isinstance(r["amount"], (int, float)) else ""
         lines.append(f"   [{r['severity']}] {r['outcome']} — payment {ref} {r['date']} {amt}".rstrip())
+        if r.get("permalink"):
+            lines.append(f"      Record: {r['permalink']}")
         for f in r["findings"]:
             lines.append(f"      • {f}")
         if r["r16_missing"]:
