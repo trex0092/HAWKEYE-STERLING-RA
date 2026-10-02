@@ -1744,6 +1744,9 @@ def _reset_breaker():
     screen._GDELT_STATE["open"] = False
     screen._GNEWS_STATE["consecutive_zero"] = 0
     screen._GNEWS_STATE["open"] = False
+    screen._GNEWS_STATE["zero_since"] = None
+    screen._GNEWS_STATE["last_probe"] = 0.0
+    screen._GNEWS_STATE["tripped"] = False
     screen._BING_STATE["consecutive_failures"] = 0
     screen._BING_STATE["open"] = False
     screen._GNEWS_GATE.reset()
@@ -1900,6 +1903,51 @@ screen.search_gdelt = lambda *_a, **_k: []
 screen.search_adverse_media("One Good Fetch LLC")
 check("a single Google News success resets the breaker streak",
       screen._GNEWS_STATE["consecutive_zero"] == 0 and not screen._GNEWS_STATE["open"])
+
+# Time-based trip: a zero-coverage streak at max backoff lasting
+# GNEWS_BREAKER_SECONDS opens the circuit long before GNEWS_BREAKER_AFTER
+# subjects (2 Oct 2026: 30 subjects took ~29 min, all at zero coverage).
+_reset_breaker(); _calls["gnews"] = 0
+screen._GNEWS_GATE.interval = screen._GNEWS_GATE.cap
+screen.requests.get = _gnews_refused
+screen.search_gdelt = lambda *_a, **_k: []
+screen._GNEWS_STATE["consecutive_zero"] = 1
+screen._GNEWS_STATE["zero_since"] = screen.time.monotonic() - (screen.GNEWS_BREAKER_SECONDS + 1)
+screen.search_adverse_media("Slow Refusal LLC")
+check("Google News circuit opens once a zero-coverage streak at max backoff lasts GNEWS_BREAKER_SECONDS",
+      screen._GNEWS_STATE["open"] and screen._GNEWS_STATE["tripped"]
+      and screen._GNEWS_STATE["consecutive_zero"] < screen.GNEWS_BREAKER_AFTER)
+# Half-open probe: no probe before GNEWS_PROBE_SECONDS; then exactly ONE fetch.
+_calls["gnews"] = 0
+screen.search_adverse_media("Too Soon To Probe LLC")
+check("no recovery probe before GNEWS_PROBE_SECONDS have passed since the trip", _calls["gnews"] == 0)
+screen._GNEWS_STATE["last_probe"] = screen.time.monotonic() - (screen.GNEWS_PROBE_SECONDS + 1)
+_calls["gnews"] = 0
+screen.search_adverse_media("Probe Still Refused LLC")
+check("a failed recovery probe sends ONE fetch and leaves the circuit open",
+      _calls["gnews"] == 1 and screen._GNEWS_STATE["open"])
+screen._GNEWS_STATE["last_probe"] = screen.time.monotonic() - (screen.GNEWS_PROBE_SECONDS + 1)
+_calls["gnews"] = 0
+screen.requests.get = _gnews_first_ok
+screen.search_adverse_media("Probe Answered LLC")
+check("a successful recovery probe closes the circuit; the run still counts as tripped",
+      _calls["gnews"] == 1 and not screen._GNEWS_STATE["open"] and screen._GNEWS_STATE["tripped"])
+check("a run whose breaker tripped never stamps its rotation window as swept",
+      'and not _GNEWS_STATE.get("tripped")' in open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read())
+_reset_breaker()
+
+# Overlap: the news sweep starts BEFORE the CPU-bound watchlist/sanctions
+# matching (it needs only the subject set) and is collected after it; a crash
+# in between cancels the queued subjects instead of waiting them out.
+_sss = open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read()
+_sss = _sss[_sss.index("def screen_subject_set("):]
+check("enrichment starts before the watchlist and sanctions passes and is collected after them",
+      _sss.index("_enrich_pool.map(_enrich") < _sss.index("load_adverse_watchlist()")
+      < _sss.index("screen_customers(customers, all_lists)") < _sss.index("for i, r in zip(order, _enrich_iter)"))
+check("a crash during matching cancels the queued enrichment (no waiting out the sweep)",
+      "_enrich_pool.shutdown(wait=False, cancel_futures=True)" in _sss)
+check("per-match AI summaries run on the bounded triage pool, not one by one",
+      "_sx.map(_summarise, _summary_work)" in _sss)
 
 # GDELT is paced by its own fixed-interval gate (≤ 1 request / 5s per IP,
 # shared across all workers — 8 simultaneous first hits is how it 429'd).

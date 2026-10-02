@@ -10,6 +10,11 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Faster delivery of the daily screening results.** On 2 Oct 2026 (run 37009296159) the run took about 59 minutes: watchlist 6.7, sanctions 8.7, news enrichment 39, AI 3.8. Coverage and matching are unchanged; only the waiting is cut.
+  - The news enrichment now **starts before** the watchlist and sanctions matching, which it never depended on, and is collected after them. That overlaps about 15 minutes of CPU-bound matching with the network sweep. A crash during matching cancels the queued sweep rather than waiting it out.
+  - The **Google News breaker** also trips after `GNEWS_BREAKER_SECONDS` (default 300 s) of zero-coverage subjects at max backoff, not only after 30 subjects. On 2 Oct those 30 subjects cost about 29 minutes, all at zero coverage anyway.
+  - While the breaker is open, a **recovery probe** (one fetch every `GNEWS_PROBE_SECONDS`, default 300 s) closes it again when Google News answers. Before this, an open breaker stayed open for the rest of the run. A run that tripped never stamps its market-rotation window as swept.
+  - The per-match **AI summaries** run on the existing bounded triage pool (`AI_TRIAGE_CONCURRENCY`) instead of one by one.
 - **The daily Transaction Monitoring report takes its names from Asana only.** The repository and its settings hold no company name.
   - The header now names the reporting entity, read at run time from the Asana workspace that holds the monitoring project. If Asana cannot be read, the header says UNAVAILABLE instead of guessing.
   - Each payment or activity task is tied to its Customer Database record (project `1214107620220121`), by an Asana task link or gid on the `Customer:` line, or by the exact name. A match takes the database's own name, and the case shows its Customer Database link. Names are never logged.
