@@ -57,7 +57,7 @@
 [![Attestation Verify](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/attestation-verify.yml?branch=main&label=attestation%20verify)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/attestation-verify.yml)
 [![Bandit](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/bandit.yml?branch=main&label=bandit)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/bandit.yml)
 [![Fortify](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/fortify.yml?branch=main&label=fortify)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/fortify.yml)
-[![Dependency Review](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/dependency-review.yml?branch=main&label=dependency%20review)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/dependency-review.yml)
+[![Dependency Review](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/dependency-review.yml?event=pull_request&label=dependency%20review)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/dependency-review.yml)
 [![Lighthouse](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/lighthouse.yml?branch=main&label=lighthouse)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/lighthouse.yml)
 [![Scorecard](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/scorecard.yml?branch=main&label=scorecard)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/scorecard.yml)
 
