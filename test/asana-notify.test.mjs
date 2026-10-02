@@ -102,6 +102,12 @@ check('buildHtmlBody renders the severity triage badge before the change text', 
   const h = buildHtmlBody({ heading: 'x', summary: 's', changes: [{ name: 'FATF', url: 'https://u', status: 'changed', severity: 'HIGH', severityReason: 'new threshold', diff: { addedCount: 1, removedCount: 0, added: ['a new threshold applies to dealers now.'], removed: [] } }] });
   return h.includes('🔴 HIGH (new threshold) — content changed — 1 added / 0 removed') && h.includes('➕ added:');
 })());
+check('buildHtmlBody renders an optional reviewer record, escaped, after the reviewed-decision line', (() => {
+  const h = buildHtmlBody({ heading: 'x', summary: 's', changes: [{ name: 'A', status: 'changed' }], reviewNote: ['Impact: [ ] none', 'a < b'] });
+  return h.includes('<strong>Reviewer record</strong><ul><li>Impact: [ ] none</li><li>a &lt; b</li></ul>')
+    && h.indexOf('reviewed decision') < h.indexOf('Reviewer record');
+})());
+check('buildHtmlBody without a reviewNote renders no reviewer record', !buildHtmlBody({ heading: 'x', summary: 's', changes: [] }).includes('Reviewer record'));
 check('buildHtmlBody produces a single <body> root with escaped content', (() => {
   const h = buildHtmlBody({ heading: 'A & B', summary: 's', changes: [{ name: '<X>', url: 'https://u', status: 'new' }], runLink: 'https://r' });
   return h.startsWith('<body>') && h.endsWith('</body>') && h.includes('&lt;X&gt;') && h.includes('A &amp; B');

@@ -19,6 +19,7 @@
         change is never lost. */
 import { readFileSync } from 'node:fs';
 import { notifyAsana, asanaEnabled, runUrl, buildHtmlBody, REG_PROJECT_GID } from './asana-notify.mjs';
+import { REG_REVIEW_CHECKLIST } from './reg-watch.mjs';
 
 const title = process.argv[2];
 const reportFile = process.argv[3];
@@ -59,7 +60,10 @@ if (changes && changes.length) {
     heading: title,
     summary: parts.join(', ') + ' — review and apply any needed updates.',
     changes,
-    runLink: link
+    runLink: link,
+    /* Law-change cards carry the reviewer record; list-change (Sanctions
+       Watch) cards are driven by the re-screen trigger instead. */
+    reviewNote: moved && /^Regulatory Watch/.test(title) ? REG_REVIEW_CHECKLIST : undefined
   });
 }
 

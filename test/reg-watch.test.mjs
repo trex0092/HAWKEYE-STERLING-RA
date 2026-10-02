@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
   persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
-  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
+  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS,
+  REG_REVIEW_CHECKLIST,
 } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -113,6 +114,12 @@ const rep = buildReport(changes, '2026-06-16');
 check('report names changed sources and the data files to edit',
   rep.includes('Source A') && rep.includes('Source B') && rep.includes('assets/super-data.js'));
 check('report folds fetch errors into a no-action note', rep.includes('could not be fetched') && rep.includes('Source D'));
+check('a change report carries the reviewer record (impact, instrument, assessor) with blanks',
+  rep.includes('**Reviewer record:**') && REG_REVIEW_CHECKLIST.every(item => rep.includes(item))
+  && rep.includes('Assessed by: ______'));
+check('a no-change or seed report carries no reviewer record',
+  !seedRep.includes('Reviewer record')
+  && !buildReport([{ id: 'c', name: 'C', status: 'unchanged' }], '2026-06-16').includes('Reviewer record'));
 check('report is quiet when nothing moved',
   buildReport([{ id: 'c', name: 'C', status: 'unchanged' }], '2026-06-16').includes('No regulatory content changes detected'));
 

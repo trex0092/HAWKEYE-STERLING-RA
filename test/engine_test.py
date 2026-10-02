@@ -2591,6 +2591,79 @@ check("an open candidate still raises an MLRO case", _n_open == 1)
 check("an identity-excluded candidate raises NO case (the queue, not just the report)",
       _n_excl == 0)
 
+# ── Case-card wording follows the registered TFS procedure (POL-07) ──────────
+# A sanctions match is a PNMR (potential) or freeze + CNMR + FFR (confirmed) in
+# goAML, with the STR/SAR decided in parallel; the card must say so, start with
+# the stop-the-dealing instruction, and leave every MLRO field blank.
+_case_notes = {}
+def _rec_notes(method, url, **kw):
+    if method == "GET" and url.endswith("/subtasks"):
+        return _NoSubtasks()
+    if "/addProject" in url:
+        return _CaseResp()
+    _d = ((kw.get("json") or {}).get("data") or {})
+    _case_notes[_d.get("name", "")] = _d.get("notes", "")
+    return _CaseResp()
+try:
+    screen.asana_request = _rec_notes
+    screen.open_mlro_cases(
+        "parent", _mk_match(None),
+        [{"subject_type": "INDIVIDUAL", "subject_name": "B", "permalink": "p",
+          "articles": [{"is_new": True, "title": "t", "source": "s", "date": "d", "url": "u"}]}],
+        [{"is_new": True, "subject_name": "C", "id": "Q1", "category": "PEP", "permalink": "p"}],
+        _dtmod.datetime(2026, 7, 30))
+finally:
+    screen.asana_request = _orig_ar
+_sn = next((v for k, v in _case_notes.items() if k.startswith("🔴 SANCTIONS case")), "")
+_pn = next((v for k, v in _case_notes.items() if k.startswith("🟠 PEP case")), "")
+_an = next((v for k, v in _case_notes.items() if k.startswith("🟡 Adverse-media case")), "")
+check("sanctions case opens with the POL-07 stop-the-dealing instruction",
+      _sn.splitlines()[2] == screen.TFS_CASE_STOP_LINE)
+check("sanctions case offers PNMR (potential) and freeze + CNMR + FFR (confirmed) via goAML",
+      "PNMR filed in goAML" in _sn and "CNMR + FFR filed in goAML" in _sn)
+check("sanctions case keeps the STR/SAR decision parallel, not instead",
+      "STR/SAR assessed in parallel (not instead)" in _sn)
+check("sanctions case asks for the evidence POL-07 step 7 requires (identifiers, time, goAML ref)",
+      "Identifiers compared" in _sn and "goAML reference: ______" in _sn)
+check("sanctions case ends its decision block with the tip-off warning (kept by the protected tail)",
+      _sn.rstrip().endswith("Do not tip off. UAE Cabinet Resolution 74/2020 applies."))
+check("sanctions case no longer says a generic 'escalate / freeze (TFS)'",
+      "escalate / freeze (TFS)" not in _sn)
+check("PEP case names the R.12 controls and leaves the approver blank",
+      "senior-management approval" in _pn and "source of funds/wealth" in _pn
+      and "Senior-management approver: ______" in _pn and "tip off" in _pn)
+check("adverse-media case states it is not a TFS event and asks for the identity check",
+      "not a TFS event (no PNMR/CNMR)" in _an and "name-only — disambiguate before acting" in _an
+      and "tip off" in _an)
+check("no case card pre-fills an MLRO decision",
+      all("[x]" not in v.lower() for v in _case_notes.values()))
+
+# The decision block must survive truncation on an oversized HIGH-risk case:
+# the STR/SAR draft follows it, and both sit inside the protected tail.
+_big = ("\n".join(f"- [INDIVIDUAL] S → OFAC SDN: \"N{i}\"  90%" for i in range(5000))
+        + "\n\n" + "\n".join(screen.TFS_CASE_DISPOSITION) + "\n\n"
+        + ai.draft_str("Example Trading LLC", "p",
+                       [{"subject_type": "INDIVIDUAL", "subject_name": "S", "list": "OFAC SDN",
+                         "matched_entry": "N", "score": 97}], False, [],
+                       {"rating": "HIGH", "factors": ["f"], "edd": "e"}))
+_capped = screen.cap_notes(_big, screen.CASE_NOTES_FLOOR, tail_chars=screen.CASE_NOTES_TAIL)
+check("truncated HIGH-risk case keeps the full POL-07 decision block",
+      all(line in _capped for line in screen.TFS_CASE_DISPOSITION))
+
+# The daily report's §① action class and sign-off carry the same filings.
+_narr_tfs = screen.build_unified_narrative(
+    [], [], [], [], _meta_deg,
+    {"subjects_total": 1, "companies_screened": 1, "individuals_screened": 0,
+     "am_errors": 0, "pep_errors": 0, "delta": {}},
+    _dtmod.datetime(2026, 7, 30))
+check("report §① states PNMR / CNMR + FFR in goAML (POL-07), not a generic FIU report",
+      "PNMR in goAML" in _narr_tfs and "CNMR + FFR in goAML" in _narr_tfs
+      and "report to the FIU" not in _narr_tfs)
+check("report sign-off offers PNMR and CNMR/FFR outcomes with a goAML reference",
+      "[ ] PNMR filed" in _narr_tfs and "CNMR/FFR filed" in _narr_tfs and "goAML Ref: ______" in _narr_tfs)
+check("report §② marks adverse media as not a TFS event",
+      "Not a TFS event (no PNMR/CNMR)" in _narr_tfs)
+
 _prev_ie = screen.IDENTITY_EXCLUSION
 screen.IDENTITY_EXCLUSION = False
 check("kill-switch IDENTITY_EXCLUSION=0 excludes nothing",

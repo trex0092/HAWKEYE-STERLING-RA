@@ -423,7 +423,7 @@ export function esc(s) {
 /* Build an Asana-safe rich-text body from a watcher's structured changes
    ({id,name,jurisdiction,url,status}). Asana rich text has no tables, so each
    changed source becomes a list item. Returns a single <body>…</body> root. */
-export function buildHtmlBody({ heading, summary, changes = [], runLink }) {
+export function buildHtmlBody({ heading, summary, changes = [], runLink, reviewNote }) {
   const SEV_BADGE = { HIGH: '🔴 HIGH', MEDIUM: '🟠 MEDIUM', LOW: '🟢 LOW' };
   const items = changes.map(c => {
     /* Severity triage first, so the reviewer knows what to read first. */
@@ -455,6 +455,10 @@ export function buildHtmlBody({ heading, summary, changes = [], runLink }) {
   if (summary) parts.push('<strong>' + esc(summary) + '</strong>');
   if (items) parts.push('<ul>' + items + '</ul>');
   parts.push('<em>Detection is automatic; applying any wording change stays a reviewed decision.</em>');
+  /* Optional reviewer checklist (Regulatory Watch): what the reviewed
+     decision has to record, so the card is the evidence of it. */
+  if (reviewNote) parts.push('<strong>Reviewer record</strong><ul>'
+    + [].concat(reviewNote).map(line => '<li>' + esc(line) + '</li>').join('') + '</ul>');
   if (runLink) parts.push('<a href="' + esc(runLink) + '">View the workflow run</a>');
   parts.push('</body>');
   return parts.join('');
