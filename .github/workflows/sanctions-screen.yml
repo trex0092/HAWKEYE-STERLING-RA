@@ -117,6 +117,7 @@ jobs:
             umsaszjsdz5c04wqdhbq.blob.core.windows.net:443
             umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
             webgate.ec.europa.eu:443
+            ecas.ec.europa.eu:443
             ofsistorage.blob.core.windows.net:443
             news.google.com:443
             api.gdeltproject.org:443
