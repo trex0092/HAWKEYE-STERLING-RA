@@ -1174,7 +1174,12 @@ export async function fetchFollowingCookies(url, options = {}, { fetchImpl = fet
     try { const u = new URL(href); where = u.host + u.pathname; } catch { where = '?'; }
     chain.push(r.status + ' ' + where + (setCookies.length ? ' (+' + setCookies.length + ' cookie)' : ''));
     const loc = r.headers && r.headers.get && r.headers.get('location');
-    if (r.status < 300 || r.status > 399 || !loc) return Object.assign(r, { redirectChain: chain });
+    if (r.status < 300 || r.status > 399 || !loc) {
+      if (hop > 0 && /\/(cas\/)?login\b/i.test(where)) {
+        throw new Error('the endpoint requires a sign-in: redirected to the login page ' + where + ' (' + chain.join(' -> ') + ')');
+      }
+      return Object.assign(r, { redirectChain: chain });
+    }
     let next;
     try { next = new URL(loc, href); } catch { throw new Error('redirect to an invalid location after: ' + chain.join(' -> ')); }
     if (next.protocol !== 'https:' && next.protocol !== 'http:') throw new Error('redirect to unsupported scheme ' + next.protocol);
@@ -1565,6 +1570,23 @@ export function discoverDatedLink(html, pageUrl, fileStem, linkMatch) {
 
 /* Fetch one consolidated list — a remote URL, or an in-repo curated file
    (source.file, e.g. the UAE EOCN list). Returns the raw body or throws. */
+/* Personal download token for sources that need one. Since 1 Oct 2026 the EU
+   Financial Sanctions Files platform sends the shared public token
+   (token=dG9rZW4tMjAxNw) to the EU Login sign-in page; its documented machine
+   route is the personal "crawler/robot" URL of an FSF account. A source opts in
+   with tokenEnv (e.g. "EU_FSF_TOKEN"): when that secret is set, its value
+   replaces the URL's token parameter for the request only. The personal URL is
+   never stored (reports keep the config URL) and GitHub masks the secret in
+   logs. Unset / malformed values leave the config URL unchanged. Pure. */
+export function applySourceToken(url, tokenEnv, env = process.env) {
+  const raw = tokenEnv ? String(env[tokenEnv] || '').trim() : '';
+  if (!raw || !/^[A-Za-z0-9._~+/=-]{1,256}$/.test(raw)) return { href: url, personal: false };
+  let u;
+  try { u = new URL(url); } catch { return { href: url, personal: false }; }
+  u.searchParams.set('token', raw);
+  return { href: u.href, personal: true };
+}
+
 async function fetchListBody(source, timeoutMs = 60000) {
   if (source.file) {
     if (!existsSync(source.file)) throw new Error('curated file missing: ' + source.file);
@@ -1573,7 +1595,7 @@ async function fetchListBody(source, timeoutMs = 60000) {
   /* The URL comes from the in-repo sources config; still validate the scheme so a
      tampered/extra source can only ever trigger an ordinary http(s) GET (never
      file:, ftp:, etc.) before it reaches fetch. */
-  let href = source.url;
+  let href = applySourceToken(source.url, source.tokenEnv).href;
   if (source.discover && source.discover.page) {
     const page = String(source.discover.page);
     if (!/^https:\/\//.test(page)) throw new Error('discover.page must be https');
@@ -1764,7 +1786,10 @@ export async function loadSanctionsLists(cfg) {
       fetched++;
       console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');
     } catch (e) {
-      failures.push({ source: s, reason: 'could not be loaded (' + describeFetchError(e) + ')' });
+      const hint = (s.tokenEnv && /sign-in|login page/.test(describeFetchError(e)) && !process.env[s.tokenEnv])
+        ? ' - this source now needs a personal download token: set the ' + s.tokenEnv + ' repository secret'
+        : '';
+      failures.push({ source: s, reason: 'could not be loaded (' + describeFetchError(e) + ')' + hint });
       console.error('sanctions-screen: ' + s.id + ' failed - ' + describeFetchError(e));
     }
   }));

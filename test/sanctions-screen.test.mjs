@@ -2044,5 +2044,40 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     /\/redirect count exceeded\/i\.test\(describeFetchError\(e\)\)[\s\S]{0,300}fetchFollowingCookies\(url/.test(src));
 }
 
+// EU Login gate (2 Oct 2026 live chain): a redirect that lands on a sign-in
+// page is a loud, named failure — never a 200 "list" — and a personal
+// download token, when configured, replaces only the request's token.
+{
+  const resp = (status, { location, cookies = [] } = {}) => ({
+    status, ok: status >= 200 && status < 300,
+    headers: { get: k => (k === 'location' ? (location || null) : null), getSetCookie: () => cookies },
+    text: async () => '<html>EU Login</html>',
+  });
+  const hops = {
+    'https://webgate.example/fsd/content?token=t': resp(307, { location: 'https://webgate.example/fsd/content?token=t&s=1', cookies: ['a=1'] }),
+    'https://webgate.example/fsd/content?token=t&s=1': resp(303, { location: 'https://ecas.example/cas/login?loginRequestId=x' }),
+    'https://ecas.example/cas/login?loginRequestId=x': resp(200),
+  };
+  let err = null;
+  try { await scr.fetchFollowingCookies('https://webgate.example/fsd/content?token=t', {}, { fetchImpl: async u => hops[u] }); } catch (e) { err = e; }
+  check('login gate: landing on a sign-in page fails loudly and says so',
+    err && /requires a sign-in/.test(err.message) && /ecas\.example\/cas\/login/.test(err.message) && !/loginRequestId/.test(err.message));
+  const t = scr.applySourceToken;
+  const pub = 'https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw';
+  check('token: unset secret keeps the configured URL', t(pub, 'EU_FSF_TOKEN', {}).href === pub && !t(pub, 'EU_FSF_TOKEN', {}).personal);
+  const pers = t(pub, 'EU_FSF_TOKEN', { EU_FSF_TOKEN: ' abc-123_XYZ ' });
+  check('token: a set secret replaces only the token parameter', pers.personal && new URL(pers.href).searchParams.get('token') === 'abc-123_XYZ'
+    && new URL(pers.href).pathname === new URL(pub).pathname && new URL(pers.href).host === 'webgate.ec.europa.eu');
+  check('token: a malformed secret (injection attempt) is ignored', t(pub, 'EU_FSF_TOKEN', { EU_FSF_TOKEN: 'x&url=https://evil' }).href === pub);
+  check('token: no tokenEnv on a source = no change', t(pub, undefined, { EU_FSF_TOKEN: 'abc' }).href === pub);
+  const cfg = JSON.parse(readFileSync(fileURLToPath(new URL('../data/sanctions-sources.json', import.meta.url)), 'utf8'));
+  const eu = (cfg.sources || []).find(x => x.id === 'eu-fsf');
+  check('token: the EU source opts in via EU_FSF_TOKEN and keeps the public URL in config', eu && eu.tokenEnv === 'EU_FSF_TOKEN' && /token=dG9rZW4tMjAxNw$/.test(eu.url));
+  for (const wf of ['sanctions-screen.yml', 'sanctions-runtime-assurance.yml']) {
+    const y = readFileSync(fileURLToPath(new URL('../.github/workflows/' + wf, import.meta.url)), 'utf8');
+    check('token: ' + wf + ' passes the secret to the list loader', /EU_FSF_TOKEN: \$\{\{ secrets\.EU_FSF_TOKEN \}\}/.test(y));
+  }
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
