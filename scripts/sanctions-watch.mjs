@@ -20,6 +20,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { loadSources, computeChanges, contentChanges } from './reg-watch.mjs';
+import { describeFetchError, fetchFollowingCookies, applySourceToken } from './sanctions-screen.mjs';
 
 export const SOURCES_FILE = 'data/sanctions-sources.json';
 export const STATE_FILE   = 'data/sanctions-state.json';
@@ -85,15 +86,49 @@ export function buildReport(changes, today, mode, counts) {
 }
 
 /* ── Network (runner only; not imported by tests) ── */
-async function fetchSource(s, timeoutMs = 45000) {
+/* A designation list is CSV / XML / JSON. An HTML page in its place is a
+   sign-in, error or holding page; fingerprinting it would record a fake "list
+   change" in the TFS evidence log and leave the list unwatched. Pure. */
+export function looksLikeHtmlPage(body) {
+  const head = String(body || '').slice(0, 512).replace(/^\uFEFF/, '').trimStart().toLowerCase();
+  return head.startsWith('<!doctype html') || head.startsWith('<html');
+}
+const LIST_TYPES = new Set(['csv', 'xml', 'json']);
+/* A source that now needs a sign-in (EU FSF since 1 Oct 2026) is not a
+   transient outage: escalate on the first run instead of after the streak. */
+export const SIGN_IN_RE = /requires a sign-in|login page|HTML page/i;
+
+/* Fetch one list for fingerprinting, on the same path as the screen
+   (scripts/sanctions-screen.mjs): optional personal token (tokenEnv), the
+   cookie-carrying redirect follower when a redirect loops, and the full cause
+   chain on failure instead of a bare "fetch failed". fetchImpl is injectable
+   for the offline tests. */
+export async function fetchSource(s, timeoutMs = 45000, { fetchImpl = fetch } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  const headers = { 'user-agent': 'HawkeyeSterling-SanctionsWatch/1.0' };
+  const href = applySourceToken(s.url, s.tokenEnv).href;
   try {
-    const res = await fetch(s.url, { signal: ctrl.signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsWatch/1.0' } });
+    let res;
+    try {
+      // codeql[js/file-access-to-http]: reviewed 2026-10-02, intended design, not a leak.
+      // Same flow the watcher always had: a public designation-list URL from the
+      // reviewed in-repo config (data/sanctions-sources.json); no subject data is sent.
+      res = await fetchImpl(href, { signal: ctrl.signal, redirect: 'follow', headers });
+    } catch (e) {
+      if (!/redirect count exceeded/i.test(describeFetchError(e))) throw e;
+      res = await fetchFollowingCookies(href, { signal: ctrl.signal, headers }, { fetchImpl });
+    }
     const body = await res.text();
-    return { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
+    if (!res.ok) return { ok: false, status: res.status, body: '', error: 'HTTP ' + res.status };
+    if (LIST_TYPES.has(String(s.type || '').toLowerCase()) && looksLikeHtmlPage(body)) {
+      return { ok: false, status: res.status, body: '', gated: true,
+        error: 'served an HTML page, not the ' + s.type + ' list (sign-in or error page) - not fingerprinted' };
+    }
+    return { ok: true, status: res.status, body, error: null };
   } catch (e) {
-    return { ok: false, status: 'error', body: '', error: String(e && e.message || e).slice(0, 200) };
+    const error = describeFetchError(e);
+    return { ok: false, status: 'error', body: '', error, gated: SIGN_IN_RE.test(error) };
   } finally { clearTimeout(t); }
 }
 
@@ -120,7 +155,15 @@ export function trackErrorStreaks(sources, fetched, stateSources, threshold) {
     else {
       anyError = true;
       rec.errStreak = (Number(rec.errStreak) || 0) + 1;
-      if (rec.errStreak >= threshold) persistentErrors.push({
+      if (f && f.gated) {
+        persistentErrors.push({
+          name: s.name, id: s.id, url: s.url, streak: rec.errStreak,
+          status: 'sign-in required', errorStreak: rec.errStreak,
+          detail: 'the list now requires a sign-in — change-detection is blind'
+            + (s.tokenEnv ? '; set the ' + s.tokenEnv + ' repository secret (personal download token)' : '')
+            + ' (' + String(f.error || '').slice(0, 160) + ')'
+        });
+      } else if (rec.errStreak >= threshold) persistentErrors.push({
         name: s.name, id: s.id, url: s.url, streak: rec.errStreak,
         status: 'unreachable', errorStreak: rec.errStreak,
         detail: 'unreachable ' + rec.errStreak + ' consecutive runs — change-detection is blind'

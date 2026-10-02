@@ -5481,6 +5481,22 @@ def stale_core_lists(list_meta, today=None, max_age=None):
 # data/sanctions-sources.json documents and .gitleaks.toml allowlists).
 EU_OFFICIAL_XML_URL = ("https://webgate.ec.europa.eu/fsd/fsf/public/files/"
                        "xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw")
+# Since 1 Oct 2026 the shared public token lands on the EU Login sign-in page.
+# The FSF platform's documented machine route is an account's personal
+# crawler/robot token: when the EU_FSF_TOKEN secret is set (charset-validated,
+# so it can never inject other query parameters) it replaces the token for the
+# request only. Mirrors applySourceToken in scripts/sanctions-screen.mjs.
+_EU_TOKEN_RE = re.compile(r"^[A-Za-z0-9._~+/=-]{1,256}$")
+
+def eu_official_xml_url(env=None):
+    env = os.environ if env is None else env
+    tok = str(env.get("EU_FSF_TOKEN") or "").strip()
+    if not tok or not _EU_TOKEN_RE.match(tok):
+        return EU_OFFICIAL_XML_URL
+    from urllib.parse import urlsplit, urlunsplit, urlencode, parse_qsl
+    u = urlsplit(EU_OFFICIAL_XML_URL)
+    q = [(k, v) for k, v in parse_qsl(u.query) if k != "token"] + [("token", tok)]
+    return urlunsplit((u.scheme, u.netloc, u.path, urlencode(q), u.fragment))
 
 def parse_eu_official_xml(data):
     """Names from the FSF fullSanctionsList XML: every <nameAlias> carries the
@@ -5502,7 +5518,7 @@ def _eu_official_fallback(names):
     trail show which source actually screened."""
     if names:
         return None
-    data = download(EU_OFFICIAL_XML_URL, "EU FSF (official webgate XML)")
+    data = download(eu_official_xml_url(), "EU FSF (official webgate XML)")
     xml_names = parse_eu_official_xml(data)
     if not xml_names:
         return None

@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { countEntries, buildReport, trackErrorStreaks, extractPublishedDate, tfsNewEntries,
   resolveRescreens, capTfsEntries, sealTfsLog, verifyTfsChain, canonicalJson,
-  SCREEN_WORKFLOWS, TFS_LOG_CAP } from '../scripts/sanctions-watch.mjs';
+  SCREEN_WORKFLOWS, TFS_LOG_CAP, fetchSource, looksLikeHtmlPage } from '../scripts/sanctions-watch.mjs';
 import { loadSources, fingerprint, computeChanges, contentChanges } from '../scripts/reg-watch.mjs';
 
 let passed = 0, failed = 0;
@@ -220,6 +220,46 @@ check('report is quiet when nothing moved',
   check('the watch workflow verifies log integrity before each run',
     wyml.indexOf('sanctions-watch.mjs verify-log') !== -1
     && wyml.indexOf('verify-log') < wyml.indexOf('Run sanctions watch'));
+}
+
+// EU FSF since 1 Oct 2026: the public token redirects to EU Login. The watch
+// must never fingerprint a sign-in/HTML page as a list, must name the cause,
+// and must escalate a sign-in gate at once (not after the 3-run streak).
+{
+  const resp = (status, body, { location, cookies = [] } = {}) => ({
+    status, ok: status >= 200 && status < 300,
+    headers: { get: k => (k === 'location' ? (location || null) : null), getSetCookie: () => cookies },
+    text: async () => body,
+  });
+  const csvSrc = { id: 'eu-fsf', name: 'EU', type: 'csv', url: 'https://list.example/content?token=pub', tokenEnv: 'EU_FSF_TOKEN' };
+  const html = await fetchSource(csvSrc, 5000, { fetchImpl: async () => resp(200, '<!DOCTYPE html><html><title>EU Login</title>') });
+  check('watch: an HTML page served for a CSV list is an error, never fingerprinted', !html.ok && html.gated && html.body === '' && /HTML page/.test(html.error));
+  check('watch: XML lists are not mistaken for HTML', !looksLikeHtmlPage('<?xml version="1.0"?><sanctions/>') && looksLikeHtmlPage('\uFEFF  <html lang="en">'));
+  const loopErr = new TypeError('fetch failed', { cause: new Error('redirect count exceeded') });
+  const gateHops = {
+    'https://list.example/content?token=pub': resp(307, '', { location: 'https://sso.example/cas/login?id=1', cookies: ['s=1'] }),
+    'https://sso.example/cas/login?id=1': resp(200, '<html>login</html>'),
+  };
+  const gated = await fetchSource(csvSrc, 5000, { fetchImpl: async (u, o) => { if (o.redirect === 'follow') throw loopErr; return gateHops[u]; } });
+  check('watch: a redirect loop ending on a sign-in page is named, not a bare "fetch failed"', !gated.ok && gated.gated && /requires a sign-in/.test(gated.error));
+  const ok = await fetchSource(csvSrc, 5000, { fetchImpl: async (u, o) => { if (o.redirect === 'follow') throw loopErr; return resp(200, 'Entity;Name\n1;X'); } });
+  check('watch: a cookie-gated loop that resolves to the list is fingerprinted normally', ok.ok && ok.body.startsWith('Entity'));
+  const plainErr = await fetchSource(csvSrc, 5000, { fetchImpl: async () => { throw new TypeError('fetch failed', { cause: Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' }) }); } });
+  check('watch: a network failure carries its cause chain and is not a sign-in gate', !plainErr.ok && /ENOTFOUND/.test(plainErr.error) && !plainErr.gated);
+  let seenUrl = '';
+  const prevTok = process.env.EU_FSF_TOKEN;
+  process.env.EU_FSF_TOKEN = 'personal123';
+  await fetchSource(csvSrc, 5000, { fetchImpl: async u => { seenUrl = u; return resp(200, 'a,b\n1,2'); } });
+  if (prevTok === undefined) delete process.env.EU_FSF_TOKEN; else process.env.EU_FSF_TOKEN = prevTok;
+  check('watch: the personal token, when set, is used for the request', new URL(seenUrl).searchParams.get('token') === 'personal123');
+  const st = { 'eu-fsf': { errStreak: 0 } };
+  const r1 = trackErrorStreaks([csvSrc], { 'eu-fsf': gated }, st, 3);
+  check('watch: a sign-in gate escalates on the FIRST run, naming the secret',
+    r1.persistentErrors.length === 1 && r1.persistentErrors[0].status === 'sign-in required' && /EU_FSF_TOKEN/.test(r1.persistentErrors[0].detail));
+  const r2 = trackErrorStreaks([csvSrc], { 'eu-fsf': plainErr }, { 'eu-fsf': { errStreak: 0 } }, 3);
+  check('watch: an ordinary outage still waits for the streak threshold', r2.persistentErrors.length === 0 && r2.anyError);
+  const wf = readFileSync(new URL('../.github/workflows/sanctions-watch.yml', import.meta.url), 'utf8');
+  check('watch: the workflow passes EU_FSF_TOKEN to the check step', /EU_FSF_TOKEN: \$\{\{ secrets\.EU_FSF_TOKEN \}\}\n\s+run: node scripts\/sanctions-watch\.mjs "\$MODE"/.test(wf));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
