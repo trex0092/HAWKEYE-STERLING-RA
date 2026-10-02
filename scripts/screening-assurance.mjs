@@ -114,6 +114,10 @@ export function assessRuntime({
     adverseWarnings.push('last-resort backbone retry attempted for ' + num(e.amRetryAttempted)
       + ' subject(s), recovered ' + num(e.amRetryRecovered));
   }
+  if (num(e.amSecondPassAttempted) > 0) {
+    adverseWarnings.push('post-sweep second pass re-checked ' + num(e.amSecondPassAttempted)
+      + ' zero-coverage subject(s), recovered ' + num(e.amSecondPassRecovered));
+  }
 
   const adverseMedia = domain(adverseReasons.length === 0, adverseReasons, {
     screenedSubjects: num(results?.screened),
@@ -130,6 +134,8 @@ export function assessRuntime({
     partialSubjects: num(e.amPartial),
     retryAttempted: num(e.amRetryAttempted),
     retryRecovered: num(e.amRetryRecovered),
+    secondPassAttempted: num(e.amSecondPassAttempted),
+    secondPassRecovered: num(e.amSecondPassRecovered),
     skippedSubjects: num(e.skipped),
   }, adverseWarnings);
 

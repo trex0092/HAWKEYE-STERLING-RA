@@ -2079,5 +2079,37 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   }
 }
 
+// Adverse-media second pass (2 Oct 2026: 11 zero-coverage subjects left after
+// the in-sweep retry). Re-check only those, after a cool-down, bounded.
+{
+  const run = scr.runAmSecondPass;
+  let t = 1000;
+  const clock = () => t;
+  const slept = [];
+  const sleep = async ms => { slept.push(ms); t += ms; };
+  const item = ok => ({ retry: async () => { t += 10; if (ok === 'throw') throw new Error('x'); return ok; } });
+  const r1 = await run([item(true), item(false), item(true)], { deadlineMs: 1e9, delayMs: 60000, now: clock, sleep });
+  check('second pass: re-checks every queued subject after a cool-down and counts recoveries',
+    r1.attempted === 3 && r1.recovered === 2 && slept[0] === 60000 && r1.skipped === '');
+  const r2 = await run([item(true)], { deadlineMs: t + 30000, delayMs: 60000, now: clock, sleep });
+  check('second pass: skipped (and said so) when the cool-down would cross the enrichment deadline',
+    r2.attempted === 0 && /budget/.test(r2.skipped));
+  const many = Array.from({ length: scr.AM_SECOND_PASS_MAX + 1 }, () => item(true));
+  const r3 = await run(many, { deadlineMs: 1e12, delayMs: 0, now: clock, sleep });
+  check('second pass: a mass failure (providers down globally) is not re-queried', r3.attempted === 0 && /cap/.test(r3.skipped));
+  const r4 = await run([item('throw'), item(true)], { deadlineMs: 1e12, delayMs: 0, now: clock, sleep });
+  check('second pass: a retry that throws stays unrecovered, never aborts the pass', r4.attempted === 2 && r4.recovered === 1);
+  const r5 = await run([], { deadlineMs: 0 });
+  check('second pass: an empty queue is a no-op', r5.attempted === 0 && r5.recovered === 0 && r5.skipped === '');
+  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('second pass: only ERRORED (zero-coverage) subjects are queued, and a recovery un-counts the error',
+    /if \(am\.errored\) \{\s*amErrors\+\+; amIncomplete = true;\s*amSecondPassQueue\.push/.test(src)
+    && /if \(again\.errored\) return false;\s*amErrors--; amIncomplete = false;/.test(src));
+  check('second pass: a recovered subject is rebuilt through the same finalize() path',
+    /applyAm\(again\);\s*const rebuilt = finalize\(\);/.test(src) && /heartbeat\(\);\s*return finalize\(\);/.test(src));
+  check('second pass: runs before the input-order restore, bounded by the enrichment deadline',
+    src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order') && /deadlineMs: enrichDeadline/.test(src));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
