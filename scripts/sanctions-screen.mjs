@@ -1738,14 +1738,17 @@ export async function loadSanctionsLists(cfg) {
   try { sources = loadSources(readFileSync(cfg.sourcesFile, 'utf8')).filter(s => s.enabled !== false); }
   catch (e) { return { lists: [], degraded: true, fetched: 0, total: 0, notes: ['sources file unreadable: ' + (e && e.message || e)] }; }
 
-  if (Array.isArray(cfg.sourceIds) && cfg.sourceIds.length) {
-    const wanted = new Set(cfg.sourceIds.map(String));
-    sources = sources.filter(s => wanted.has(String(s.id || '')));
-  }
-  if (existsSync(cfg.extraFile) && !(Array.isArray(cfg.sourceIds) && cfg.sourceIds.length)) {
+  /* sourceIds selects from BOTH files, so a selective load (the sanctions
+     runtime assurance) can include a core source's declared fallback that
+     lives in the extra file (eu-fsf -> fr-dgt). */
+  const wanted = Array.isArray(cfg.sourceIds) && cfg.sourceIds.length ? new Set(cfg.sourceIds.map(String)) : null;
+  if (wanted) sources = sources.filter(s => wanted.has(String(s.id || '')));
+  if (existsSync(cfg.extraFile)) {
     try {
       const extra = JSON.parse(readFileSync(cfg.extraFile, 'utf8'));
-      for (const s of ((extra && extra.sources) || [])) if (s && s.enabled !== false && (s.url || s.file)) sources.push(s);
+      for (const s of ((extra && extra.sources) || [])) {
+        if (s && s.enabled !== false && (s.url || s.file) && (!wanted || wanted.has(String(s.id || '')))) sources.push(s);
+      }
     } catch (e) { console.error('sanctions-screen: extra sources unreadable (' + (e && e.message || e) + ')'); }
   }
 

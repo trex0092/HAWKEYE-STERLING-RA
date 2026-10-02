@@ -22,6 +22,13 @@ async function main() {
     .filter(s => s && s.required !== false)
     .map(s => String(s.id || '')).filter(Boolean);
   if (!required.length) throw new Error('no required sanctions sources are defined');
+  /* A required source's declared fallback is loaded alongside it, so an
+     outage of the primary (eu-fsf behind EU Login) is judged on whether the
+     fallback actually covered it, not reported as a bare gap. */
+  const fallbacks = (contract?.domains?.sanctions?.sources || [])
+    .filter(s => s && s.required !== false && s.fallbackSourceId)
+    .map(s => String(s.fallbackSourceId));
+  const loadIds = [...new Set(required.concat(fallbacks))];
 
   const customers = await fetchAsanaSubjects(
     process.env.ASANA_CUSTOMER_PROJECT_GID || CUSTOMER_PROJECT_GID,
@@ -42,7 +49,7 @@ async function main() {
   const probe = await screenLocally(subjects, {
     sourcesFile: SANCTIONS_SOURCES_FILE,
     extraFile: 'data/sanctions-extra.json',
-    sourceIds: required,
+    sourceIds: loadIds,
     threshold: resolveThreshold(process.env.SCREEN_MATCH_THRESHOLD),
     adverseMedia: false,
     pep: false,
