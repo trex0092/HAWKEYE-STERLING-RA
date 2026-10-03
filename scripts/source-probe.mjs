@@ -122,7 +122,7 @@ export async function sheetHeaders(buf) {
 export async function parseSummary(s, buf) {
   try {
     const m = await import('./sanctions-match.mjs');
-    const binary = /^(xlsx|dfat|ods)$/i.test(String(s.parser || '')) || /^(xlsx|ods)$/i.test(String(s.type || ''));
+    const binary = /^(xlsx|dfat|ods|lbisf)$/i.test(String(s.parser || '')) || /^(xlsx|ods)$/i.test(String(s.type || ''));
     const body = binary ? buf
       : (typeof s.charset === 'string' && s.charset ? new TextDecoder(s.charset).decode(buf) : Buffer.from(buf).toString('utf8'));
     const names = m.parseList(s, body);

@@ -1624,7 +1624,7 @@ async function fetchListBody(source, timeoutMs = 60000) {
   /* XLSX sources (e.g. Australia DFAT) are binary ZIP containers — read the raw
      bytes as a Buffer; reading them as text would corrupt the archive. Text lists
      (CSV/XML) stay on the string path the parsers expect. */
-  const binary = /^(xlsx|dfat|ods)$/.test(String(source.parser || '').toLowerCase())
+  const binary = /^(xlsx|dfat|ods|lbisf)$/.test(String(source.parser || '').toLowerCase())
     || /^(xlsx|ods)$/.test(String(source.type || '').toLowerCase())
     || /\.(xlsx|ods)(\?|$)/i.test(parsed.href);
   /* Per-source browser headers: several national endpoints answer the plain

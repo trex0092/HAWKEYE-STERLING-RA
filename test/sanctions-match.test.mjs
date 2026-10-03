@@ -789,5 +789,109 @@ check('normalizeName folds Ɖ to d (Ɖamir == Damir)', normalizeName('Ɖamir') =
   check('isScreenableName: a two-letter name and a name containing "Part" are kept',
     sm.isScreenableName('Li') && sm.isScreenableName('Partners Trading LLC') && sm.isScreenableName('Al Part Group'));
 }
+/* ── legacy .xls (OLE2 compound file + BIFF8) reader: Lebanon ISF list ──
+   The fixture is built byte by byte here: a BIFF8 workbook stream (SST split
+   across a CONTINUE record mid-string with a UTF-16 continuation, LABELSST /
+   LABEL / NUMBER / RK cells) wrapped in a compound file, once in regular
+   sectors (>= 4096 bytes) and once in the mini stream (< 4096 bytes). */
+{
+  const xm = await import('../scripts/sanctions-match.mjs');
+  const rec = (id, data) => { const h = Buffer.alloc(4); h.writeUInt16LE(id, 0); h.writeUInt16LE(data.length, 2); return Buffer.concat([h, data]); };
+  const u16 = (v) => { const b = Buffer.alloc(2); b.writeUInt16LE(v); return b; };
+  const u32 = (v) => { const b = Buffer.alloc(4); b.writeUInt32LE(v); return b; };
+  const xlStr = (s) => Buffer.concat([u16(s.length), Buffer.from([0]), Buffer.from(s, 'latin1')]);
+  const cell = (r, c) => Buffer.concat([u16(r), u16(c), u16(0)]);
+  /* SST strings: index 4 ("Abdel- Metwali Bou Mariam") is split across the
+     CONTINUE boundary, its tail re-flagged as UTF-16. */
+  const strs = ['Serial #', 'First Name and Family Name', 'Alias Type', 'Walid Al- Boustani', 'Abdel- Metwali Bou Mariam',
+    'Bou Hasan- Abou Youssef Alhajji - Abou Hussein- Alhaj Al-Hajji -Abou Saheeb', 'Fath Al Islam Organization'];
+  const sstParts = [u32(strs.length), u32(strs.length)];
+  for (let i = 0; i < 4; i++) sstParts.push(xlStr(strs[i]));
+  const s4 = strs[4];
+  sstParts.push(u16(s4.length), Buffer.from([0]), Buffer.from(s4.slice(0, 7), 'latin1'));
+  const sst = Buffer.concat(sstParts);
+  const cont = Buffer.concat([Buffer.from([1]), Buffer.from(s4.slice(7), 'utf16le'), xlStr(strs[5]), xlStr(strs[6])]);
+  const bof = (type) => rec(0x0809, Buffer.concat([u16(0x0600), u16(type), Buffer.alloc(12)]));
+  const eof = rec(0x000A, Buffer.alloc(0));
+  const sheetName = Buffer.concat([Buffer.from([5, 0]), Buffer.from('Sheet', 'latin1')]);
+  const globalsNoSheet = (off) => Buffer.concat([bof(5), rec(0x00FC, sst), rec(0x003C, cont),
+    rec(0x0085, Buffer.concat([u32(off), Buffer.from([0, 0]), sheetName])), eof]);
+  const sheetOffset = globalsNoSheet(0).length;
+  const labelsst = (r, c, i) => rec(0x00FD, Buffer.concat([cell(r, c), u32(i)]));
+  const number = (r, c, v) => { const d = Buffer.alloc(8); d.writeDoubleLE(v); return rec(0x0203, Buffer.concat([cell(r, c), d])); };
+  const rk = (r, c, n) => rec(0x027E, Buffer.concat([cell(r, c), u32((n << 2) | 2)]));
+  const label = (r, c, s) => rec(0x0204, Buffer.concat([cell(r, c), xlStr(s)]));
+  const sheet = Buffer.concat([bof(0x10),
+    labelsst(1, 0, 0), labelsst(1, 1, 1), labelsst(1, 2, 2),
+    number(2, 0, 2), labelsst(2, 1, 3), labelsst(2, 2, 4),
+    rk(3, 0, 1), label(3, 1, 'Shaker Al-Abssi'), labelsst(3, 2, 5),
+    rk(4, 0, 56), labelsst(4, 1, 6), eof]);
+  const workbook = Buffer.concat([globalsNoSheet(sheetOffset), sheet]);
+  /* Compound file writer (v3, 512-byte sectors). */
+  const cfb = (stream) => {
+    const SS = 512, END = 0xFFFFFFFE, FREE = 0xFFFFFFFF;
+    const small = stream.length < 4096;
+    const pad = (b, n) => Buffer.concat([b, Buffer.alloc((n - (b.length % n)) % n)]);
+    const dirEntry = (name, type, start, size, child = FREE) => {
+      const e = Buffer.alloc(128);
+      const nm = Buffer.from(name + '\0', 'utf16le'); nm.copy(e, 0);
+      e.writeUInt16LE(nm.length, 64); e[66] = type; e[67] = 1;
+      e.writeUInt32LE(FREE, 68); e.writeUInt32LE(FREE, 72); e.writeUInt32LE(child, 76);
+      e.writeUInt32LE(start, 116); e.writeUInt32LE(size, 120);
+      return e;
+    };
+    const fat = new Array(SS / 4).fill(FREE);
+    fat[0] = 0xFFFFFFFD; fat[1] = END; // sector 0 = FAT, sector 1 = directory
+    let body, miniFatStart = END, miniFatCount = 0, rootStart = END, rootSize = 0, wbStart;
+    if (small) {
+      const mini = pad(stream, 64);
+      const miniFat = new Array(SS / 4).fill(FREE);
+      const n = mini.length / 64;
+      for (let i = 0; i < n; i++) miniFat[i] = i === n - 1 ? END : i + 1;
+      fat[2] = END; miniFatStart = 2; miniFatCount = 1;
+      const miniSectors = Math.ceil(mini.length / SS);
+      for (let i = 0; i < miniSectors; i++) fat[3 + i] = i === miniSectors - 1 ? END : 4 + i;
+      rootStart = 3; rootSize = mini.length; wbStart = 0;
+      const mf = Buffer.alloc(SS); miniFat.forEach((v, i) => mf.writeUInt32LE(v, i * 4));
+      body = Buffer.concat([mf, pad(mini, SS)]);
+    } else {
+      const sectors = Math.ceil(stream.length / SS);
+      for (let i = 0; i < sectors; i++) fat[2 + i] = i === sectors - 1 ? END : 3 + i;
+      wbStart = 2;
+      body = pad(stream, SS);
+    }
+    const header = Buffer.alloc(SS, 0);
+    Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]).copy(header, 0);
+    header.writeUInt16LE(0x3E, 24); header.writeUInt16LE(3, 26); header.writeUInt16LE(0xFFFE, 28);
+    header.writeUInt16LE(9, 30); header.writeUInt16LE(6, 32); header.writeUInt32LE(1, 44); header.writeUInt32LE(1, 48);
+    header.writeUInt32LE(4096, 56); header.writeUInt32LE(miniFatStart, 60); header.writeUInt32LE(miniFatCount, 64);
+    header.writeUInt32LE(END, 68); header.writeUInt32LE(0, 72);
+    for (let i = 0; i < 109; i++) header.writeUInt32LE(i === 0 ? 0 : FREE, 76 + i * 4);
+    const fatSec = Buffer.alloc(SS); fat.forEach((v, i) => fatSec.writeUInt32LE(v, i * 4));
+    const dir = Buffer.concat([dirEntry('Root Entry', 5, rootStart, rootSize, 1), dirEntry('Workbook', 2, wbStart, stream.length),
+      Buffer.alloc(128), Buffer.alloc(128)]);
+    return Buffer.concat([header, fatSec, dir, body]);
+  };
+  const want = ['Walid Al- Boustani', 'Walid Al-Boustani', 'Abdel-Metwali Bou Mariam', 'Shaker Al-Abssi',
+    'Bou Hasan', 'Abou Youssef Alhajji', 'Abou Hussein', 'Alhaj Al-Hajji', 'Abou Saheeb', 'Fath Al Islam Organization'];
+  const big = Buffer.concat([workbook, Buffer.alloc(4200 - workbook.length)]);
+  for (const [label, file] of [['mini-stream', cfb(workbook)], ['regular-sector', cfb(big)]]) {
+    const sheets = xm.parseXlsSheets(file);
+    check('xls (' + label + '): one worksheet, header + 4 data rows, SST string split across CONTINUE rebuilt',
+      sheets.length === 1 && sheets[0].name === 'Sheet' && sheets[0].rows.length === 4
+      && sheets[0].rows[1][2] === 'Abdel- Metwali Bou Mariam' && sheets[0].rows[1][0] === '2' && sheets[0].rows[2][0] === '1');
+    const names = xm.parseList({ id: 'lb-isf-ntfl', parser: 'lbisf' }, file);
+    check('lbisf (' + label + '): every name and split alias screens, particle hyphen closed, no single-word fragment',
+      JSON.stringify(names.slice().sort()) === JSON.stringify(want.slice().sort()));
+  }
+  check('xls: a non-compound-file body yields no rows (degrades, never throws)',
+    xm.parseXlsSheets(Buffer.from('<html>not a workbook</html>')).length === 0 && xm.parseLbIsfXls(Buffer.alloc(600)).length === 0);
+  const trunc = cfb(big).subarray(0, 1500);
+  let threw = false; let r = [];
+  try { r = xm.parseLbIsfXls(trunc); } catch { threw = true; }
+  check('xls: a truncated compound file degrades to fewer names without throwing', !threw && Array.isArray(r));
+  check('splitLbAliases: comma list with a trailing full stop',
+    JSON.stringify(xm.splitLbAliases('Abu Misaab, Abu Ahmad, Abu Abdel Rahman.')) === JSON.stringify(['Abu Misaab', 'Abu Ahmad', 'Abu Abdel Rahman']));
+}
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
