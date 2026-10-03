@@ -2124,6 +2124,264 @@ def search_bing_news(name: str, max_results: int = 8) -> list:
         raise RuntimeError(f"Bing News HTTP {r.status_code}")
     return parse_bing_news(r.content, max_results)
 
+# ── GDELT GKG — 24-HOUR WORLDWIDE NEWS STREAM (bulk, no per-query limit) ─────
+# GDELT's DOC search API answers HTTP 429 ("Please limit requests to one every
+# 5 seconds") to GitHub-hosted runners from the FIRST call — source-probe run
+# 37147225906 (3 Oct 2026) got 429 on three calls six seconds apart, and the
+# 3 Oct daily runs reached 0 of 996 subjects through it. GDELT also publishes
+# the same monitoring as free bulk files every 15 minutes: the Global Knowledge
+# Graph (GKG), one row per article from local news worldwide, with the persons
+# and organisations its NLP found in the article BODY, the page title, the
+# source outlet and (translated stream) the source language. The same probe
+# fetched one file in 133 ms: 632 rows, 27 tab-separated columns, persons on
+# 543, PAGE_TITLE on all 632. Reading the last GKG_HOURS of files once per run
+# and matching every subject locally gives every subject the same worldwide,
+# multilingual news reach with no rate limit — the subject list never leaves
+# the runner. Additive: articles land in the same shape as the other feeds and
+# pass through the same multilingual red-flag flagger and dedupe; a subject is
+# only ever ADDED a story. A failed or partial sweep is reported with its file
+# counts (degrade loudly), never as "no media". Kill-switch: GKG_SWEEP=0.
+GKG_SWEEP = os.environ.get("GKG_SWEEP", "1") == "1"
+GKG_BASE = os.environ.get("GKG_BASE", "https://data.gdeltproject.org/gdeltv2/")
+GKG_HOURS = max(1, min(72, int(os.environ.get("GKG_HOURS", "24") or 24)))
+GKG_STREAMS = ("gkg", "translation.gkg")     # English stream + machine-translated stream (65 languages)
+GKG_WORKERS = max(1, int(os.environ.get("GKG_WORKERS", "6") or 6))
+GKG_DEADLINE_SEC = float(os.environ.get("GKG_DEADLINE_SEC", "900") or 900)
+GKG_LABEL = "GDELT GKG (24-hour worldwide news stream)"
+_GKG_TITLE_RE = re.compile(r"<PAGE_TITLE>(.*?)</PAGE_TITLE>", re.S | re.I)
+# GKG theme codes that mark an AML-relevant story even when its headline is
+# neutral. Chosen from codes OBSERVED in live files (source-probe run
+# 37148079938: ECON_MONEYLAUNDERING, WB_2076_MONEY_LAUNDERING, CORRUPTION,
+# WB_2020_BRIBERY_FRAUD_AND_COLLUSION, SANCTIONS, SMUGGLING, HUMAN_TRAFFICKING,
+# ORGANIZED_CRIME, CRIME_CARTELS, DRUG_TRADE ...), each mapped to the phrase the
+# existing red-flag lexicon already knows, so typology and tier come from the
+# same lexicon as every other feed. Generic codes (ARREST, TRIAL, TERROR,
+# KILL, POLICE) are deliberately excluded: they describe most crime news and
+# say nothing about the subject's own conduct.
+GKG_RISK_THEMES = {
+    "ECON_MONEYLAUNDERING": "money laundering", "WB_2076_MONEY_LAUNDERING": "money laundering",
+    "CORRUPTION": "corruption", "WB_2020_BRIBERY_FRAUD_AND_COLLUSION": "bribery",
+    "SANCTIONS": "sanctions", "SMUGGLING": "smuggling", "TAX_FNCACT_SMUGGLER": "smuggling",
+    "HUMAN_TRAFFICKING": "human trafficking", "WB_2458_HUMAN_TRAFFICKING": "human trafficking",
+    "ORGANIZED_CRIME": "organized crime", "WB_2453_ORGANIZED_CRIME": "organized crime",
+    "CRIME_CARTELS": "cartel", "DRUG_TRADE": "drug trafficking",
+}
+_GKG_SRCLC_RE = re.compile(r"srclc:([a-z]{2,3})", re.I)
+
+# The translated stream publishes later than the English one: source-probe run
+# 37148079938 found the newest translated file 404 while the file one hour
+# back was present (1,645 rows). The window therefore ends GKG_LAG_SLOTS
+# fifteen-minute slots before now, so a complete run reads complete files.
+GKG_LAG_SLOTS = max(1, int(os.environ.get("GKG_LAG_SLOTS", "4") or 4))
+
+def gkg_file_stamps(end_utc, hours, lag_slots=None):
+    """15-minute GKG stamps (YYYYMMDDHHMMSS) for `hours` ending lag_slots
+    slots before end_utc (default GKG_LAG_SLOTS = one hour), newest first —
+    the window is complete, not the bleeding edge."""
+    lag = GKG_LAG_SLOTS if lag_slots is None else lag_slots
+    end = end_utc.replace(second=0, microsecond=0)
+    end = end - datetime.timedelta(minutes=end.minute % 15 + 15 * lag)
+    n = hours * 4
+    return [(end - datetime.timedelta(minutes=15 * i)).strftime("%Y%m%d%H%M00") for i in range(n)]
+
+def _gkg_names(field):
+    """'Name,offset;Name,offset' (V2.1 enhanced persons/organisations) →
+    unique names in order."""
+    out, seen = [], set()
+    for part in (field or "").split(";"):
+        name = part.rsplit(",", 1)[0].strip() if "," in part else part.strip()
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+def parse_gkg_rows(text):
+    """GKG 2.1 tab-separated rows → dicts. A row without the documented 27
+    columns is skipped and counted (format drift is visible, never silent)."""
+    rows, bad = [], 0
+    for line in (text or "").split("\n"):
+        if not line:
+            continue
+        f = line.split("\t")
+        if len(f) < 27:
+            bad += 1
+            continue
+        tm = _GKG_TITLE_RE.search(f[26] or "")
+        lm = _GKG_SRCLC_RE.search(f[25] or "")
+        rows.append({
+            "date": f[1][:8], "stamp": f[1], "source": f[3], "url": f[4],
+            "persons": _gkg_names(f[12]), "orgs": _gkg_names(f[14]),
+            "themes": [t for t in (f[7] or "").split(";") if t],
+            "title": html.unescape(tm.group(1)).strip() if tm else "",
+            "lang": (lm.group(1).lower() if lm else "en"),
+        })
+    return rows, bad
+
+def gkg_subject_index(subjects):
+    """subjects: iterable of (key, name, kind) with kind 'person' | 'org'.
+    Persons index by their full token set and by (first, last) token; orgs by
+    their distinctive (core) token set, only when it has ≥ 2 tokens — a
+    one-word company core ('aims') would match unrelated press."""
+    full, fl, org = {}, {}, {}
+    for key, name, kind in subjects:
+        toks = [t for t in normalize(name).split() if t]
+        if kind == "person":
+            if len(toks) < 2:
+                continue
+            full.setdefault(frozenset(toks), set()).add(key)
+            fl.setdefault((toks[0], toks[-1]), []).append((key, frozenset(toks)))
+        else:
+            core = core_tokens(normalize(name))
+            if len(core) >= 2:
+                org.setdefault(frozenset(core), set()).add(key)
+    return {"full": full, "fl": fl, "org": org}
+
+def gkg_match(row, idx):
+    """Subject keys a GKG row names. A person matches when the article names
+    the subject's full name (any order), or the subject's first and last name
+    with nothing the subject's name does not contain ('Mohamed Alhammadi' for
+    'Mohamed Ibrahim Mohamed Ismail Alhammadi'). Single-token names never
+    match. An organisation matches on its full distinctive-token set."""
+    keys = set()
+    for p in row["persons"]:
+        toks = [t for t in normalize(p).split() if t]
+        if len(toks) < 2:
+            continue
+        s = frozenset(toks)
+        keys |= idx["full"].get(s, set())
+        for key, subj in idx["fl"].get((toks[0], toks[-1]), ()):
+            if s <= subj:
+                keys.add(key)
+    for o in row["orgs"]:
+        core = core_tokens(normalize(o))
+        if len(core) >= 2:
+            keys |= idx["org"].get(frozenset(core), set())
+    return keys
+
+def gkg_article(row):
+    """A matched GKG row in the shape every other feed emits. Flagged by the
+    headline (multilingual lexicon) or, failing that, by an AML risk theme
+    GDELT assigned to the article body — a theme-only flag is tier 'weak', so
+    it is shown and retained but needs a second outlet before it counts toward
+    repeat escalation (adverse_actionable)."""
+    matched = adverse_keywords_for(row["title"], "")
+    themes = sorted({GKG_RISK_THEMES[t] for t in row.get("themes", ()) if t in GKG_RISK_THEMES})
+    theme_only = False
+    if not matched and themes:
+        for phrase in themes:
+            for kw in match_adverse_keywords(phrase):
+                if kw not in matched:
+                    matched.append(kw)
+        theme_only = bool(matched)
+    d = row["date"]
+    date = f"{d[:4]}-{d[4:6]}-{d[6:8]}" if len(d) == 8 else ""
+    try:
+        ts = datetime.datetime.strptime(row["stamp"][:14], "%Y%m%d%H%M%S").replace(
+            tzinfo=datetime.timezone.utc).timestamp()
+    except Exception:
+        ts = 0
+    return {"title": row["title"], "source": (row["source"] or "GDELT") + " (via GDELT GKG)",
+            "date": date, "ts": ts, "url": row["url"], "snippet": "",
+            "flagged": bool(matched), "keywords": matched, "tier": keyword_tier(matched),
+            "categories": typology_for(matched), "feed": "gdelt-gkg", "lang": row["lang"],
+            **({"tier": "weak"} if theme_only else {}),
+            "evidence": ("named in the article body (GDELT person/organisation extraction)"
+                         + (f"; flagged by GDELT article theme(s): {', '.join(themes)} — headline not adverse"
+                            if theme_only else ""))}
+
+_GKG_STATS = {"ran": False, "expected": 0, "read": 0, "missing": 0, "failed": 0, "rows": 0,
+              "bad_rows": 0, "matched_rows": 0, "flagged": 0, "subjects": 0, "langs": {},
+              "hours": GKG_HOURS, "deadline_hit": False}
+
+def gkg_stats_snapshot():
+    return json.loads(json.dumps(_GKG_STATS))
+
+def gkg_sweep(subjects, end_utc=None, fetch=None):
+    """Read the last GKG_HOURS of GKG files (both streams) and return
+    {subject key: [flagged articles]}. `fetch(url) -> bytes|None` is injectable
+    for the offline tests; production uses requests with a 404 treated as
+    'not published' (missing), anything else as a failure."""
+    out = {}
+    if not GKG_SWEEP:
+        return out
+    end_utc = end_utc or datetime.datetime.now(datetime.timezone.utc)
+    idx = gkg_subject_index(subjects)
+    urls = [GKG_BASE + st + "." + s + ".csv.zip" for st in gkg_file_stamps(end_utc, GKG_HOURS) for s in GKG_STREAMS]
+    _GKG_STATS.update(ran=True, expected=len(urls))
+    lock = threading.Lock()
+    t0 = time.time()
+
+    def _get(url):
+        if fetch is not None:
+            return fetch(url)
+        r = requests.get(url, timeout=60, headers={"User-Agent": "HawkeyeSterlingCompliance/3.0"})
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.content
+
+    def _one(url):
+        if time.time() - t0 > GKG_DEADLINE_SEC:
+            with lock:
+                _GKG_STATS["deadline_hit"] = True
+            return
+        try:
+            data = _get(url)
+        except Exception:
+            with lock:
+                _GKG_STATS["failed"] += 1
+            return
+        if data is None:
+            with lock:
+                _GKG_STATS["missing"] += 1
+            return
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                text = "\n".join(z.read(n).decode("utf-8", "replace") for n in z.namelist())
+        except Exception:
+            with lock:
+                _GKG_STATS["failed"] += 1
+            return
+        rows, bad = parse_gkg_rows(text)
+        local = {}
+        matched_rows = 0
+        for row in rows:
+            keys = gkg_match(row, idx)
+            if not keys or not row["title"]:
+                continue
+            matched_rows += 1
+            art = gkg_article(row)
+            if not art["flagged"]:
+                continue
+            for k in keys:
+                local.setdefault(k, []).append(art)
+        with lock:
+            _GKG_STATS["read"] += 1
+            _GKG_STATS["rows"] += len(rows)
+            _GKG_STATS["bad_rows"] += bad
+            _GKG_STATS["matched_rows"] += matched_rows
+            for row in rows:
+                _GKG_STATS["langs"][row["lang"]] = _GKG_STATS["langs"].get(row["lang"], 0) + 1
+            for k, arts in local.items():
+                out.setdefault(k, []).extend(arts)
+                _GKG_STATS["flagged"] += len(arts)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=GKG_WORKERS) as ex:
+        list(ex.map(_one, urls))
+    _GKG_STATS["subjects"] = len(out)
+    log(f"  {GKG_LABEL}: {_GKG_STATS['read']}/{_GKG_STATS['expected']} files read "
+        f"({_GKG_STATS['missing']} not published, {_GKG_STATS['failed']} failed"
+        + (", deadline reached" if _GKG_STATS["deadline_hit"] else "") + f"), "
+        f"{_GKG_STATS['rows']:,} articles in {len(_GKG_STATS['langs'])} source language(s); "
+        f"{_GKG_STATS['flagged']} adverse item(s) for {len(out)} subject(s)")
+    return out
+
+def gkg_complete(stats=None):
+    """True when the sweep read at least 90% of the files it expected — the bar
+    for describing the 24-hour stream as scanned for every subject."""
+    s = stats or _GKG_STATS
+    return bool(s.get("ran")) and s.get("expected", 0) > 0 and s.get("read", 0) >= 0.9 * s["expected"]
+
 # Per-run news-feed coverage. The report used to say GDELT "runs on EVERY
 # subject every run regardless" even on runs where its circuit opened after 5
 # subjects (21 Sep 2026: HTTP 429), and never said how many subjects were
@@ -6660,6 +6918,20 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         if _fc.get("single", 0) or _fc.get("none", 0):
             A("   Read 'no adverse media' as PROVISIONAL for subjects reached by one feed or none: "
               "a single feed has narrower recall than the full sweep, and the watchlist is not news.")
+    _gk = stats.get("gkg") or {}
+    if _gk.get("ran"):
+        _langs = sorted((_gk.get("langs") or {}).items(), key=lambda kv: -kv[1])
+        _gk_line = (f"   GDELT 24-hour worldwide stream (bulk GKG, every subject matched locally): "
+                    f"{_gk.get('read', 0)}/{_gk.get('expected', 0)} file(s) read · "
+                    f"{int(_gk.get('rows', 0)):,} articles from local news worldwide in "
+                    f"{len(_langs)} source language(s) · {_gk.get('flagged', 0)} adverse item(s) "
+                    f"naming {_gk.get('subjects', 0)} subject(s) in the article body.")
+        A(_gk_line)
+        if not gkg_complete(_gk):
+            A(f"   ⚠ GDELT 24-hour stream INCOMPLETE ({_gk.get('missing', 0)} not published, "
+              f"{_gk.get('failed', 0)} failed"
+              + (", deadline reached" if _gk.get("deadline_hit") else "")
+              + ") — the stream did not cover the full window this run.")
     _gdelt_full = (not _fc_n) or int(_fc.get("gdelt", 0) or 0) >= _fc_n
     if not adverse_findings:
         A("   No adverse media identified across any company or individual.")
@@ -7845,6 +8117,12 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     _enrich_pool = concurrent.futures.ThreadPoolExecutor(max_workers=SCREEN_CONCURRENCY)
     # Executor.map submits every subject now; results are consumed in order later.
     _enrich_iter = _enrich_pool.map(_enrich, (subjects_all[j] for j in order))
+    # GDELT GKG 24-hour worldwide stream: one bulk read for the whole subject
+    # set, on its own thread while the per-subject sweep and the matching run.
+    _gkg_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    _gkg_future = _gkg_pool.submit(
+        gkg_sweep, [(normalize(sj[1]), sj[1], "person" if sj[0] == "INDIVIDUAL" else "org")
+                    for sj in subjects_all])
 
     try:
         # ADVERSE-EXPOSURE WATCHLIST (bulk, deterministic) — download + match
@@ -7925,6 +8203,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         # A crash here must not leave the run waiting for the whole news sweep
         # before it can fail: drop the queued subjects, then re-raise.
         _enrich_pool.shutdown(wait=False, cancel_futures=True)
+        _gkg_pool.shutdown(wait=False, cancel_futures=True)
         raise
 
     # 2) + 3) COLLECT the enrichment started just after the subject set was
@@ -7949,6 +8228,38 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         # subject — silently tallying the rest would report them as screened.
         raise RuntimeError("enrichment rotation lost subject results — refusing to tally a partial book")
     results = indexed
+
+    # Merge the GDELT GKG findings: strictly additive (a story already found
+    # by another feed is not repeated), identity-corroboration annotated like
+    # every other article. A failed sweep is disclosed in §② with its file
+    # counts; it never removes or replaces anything.
+    try:
+        _gkg_hits = _gkg_future.result(timeout=GKG_DEADLINE_SEC + 300)
+    except Exception as e:
+        _gkg_hits = {}
+        log(f"  {GKG_LABEL}: sweep failed ({safe_err(e, 120)}) — other feeds stand")
+    finally:
+        _gkg_pool.shutdown(wait=False)
+    if _gkg_hits:
+        _gkg_added = 0
+        for r, sj in zip(results, subjects_all):
+            arts = _gkg_hits.get(normalize(r["name"]))
+            if not arts:
+                continue
+            have = {(a.get("title") or "").strip().lower() for a in (r.get("adverse") or [])}
+            have |= {a.get("url") for a in (r.get("adverse") or []) if a.get("url")}
+            new = []
+            for a in arts:
+                t = (a.get("title") or "").strip().lower()
+                if t in have or a.get("url") in have:
+                    continue
+                have.add(t)
+                new.append(dict(a))
+            if new:
+                annotate_identity_corroboration(new, sj[1], sj[2], sj[3])
+                r["adverse"] = (r.get("adverse") or []) + new
+                _gkg_added += len(new)
+        log(f"  {GKG_LABEL}: {_gkg_added} new adverse item(s) merged")
 
     # WORLDWIDE PEP + RCA NET — screened on EVERY run, over EVERY individual.
     # Wikidata is an encyclopaedia, not a PEP register: a domestic PEP or a
@@ -8288,6 +8599,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              # so every report silently lost its coverage disclosure and asserted GDELT reaches
              # every subject. test/engine_test.py now fails if a report-read key has no writer.
              "news_feed_coverage": feed_coverage_snapshot(),
+             "gkg": gkg_stats_snapshot(),
              "pep_mirror": counts["pep_mirror"], "pep_nets": pep_nets,
              "opensanctions_data": OPENSANCTIONS_DATA,
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
