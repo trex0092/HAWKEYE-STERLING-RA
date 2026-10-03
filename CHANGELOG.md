@@ -10,6 +10,24 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Sanctions: national-source depth 48 → 56 / 195. Eight official national lists added, each from its official publisher, verified on the runner.**
+  - **How they were found.** A new fixed probe suite (`opensanctions-catalogue`, run 37147223927) read the OpenSanctions `sanctions` collection that the daily engine's worldwide net already screens: 95 member datasets, each with its publisher. Eight of them are official lists of countries the coverage file did not yet count.
+  - **Added.** Each list now has its own registry entry, so the JS Sanctions Screen reads it with a coverage floor and the badge counts it. A second probe (run 37147471222) parsed each one; floors are about 85% of the count.
+
+    | Country | Registry id | Publisher | Names |
+    | --- | --- | --- | --- |
+    | Austria | `at-oenb-terror` | Austrian National Bank | 81 |
+    | Bulgaria | `bg-dans-mft` | State Agency for National Security | 30 |
+    | Serbia | `rs-apml-domestic` | APML (7 persons, matching the 2018 Government decision) | 21 |
+    | Romania | `ro-onpcsb-terror` | ONPCSB, GD 1.272/2005 | 458 |
+    | Nepal | `np-moha-prohibited` | Ministry of Home Affairs | 18 |
+    | Iraq | `iq-aml-freeze` | AML/CFT Office; Latin-script names, unlike the Arabic-only API | 14,801 |
+    | Germany | `de-bfv-banned-orgs` | BfV association bans; proscriptions, not financial sanctions | 31 |
+    | Ireland | `ie-unlawful-orgs` | Offences Against the State Acts orders; proscriptions | 5 |
+
+  - **Not added.** Russia (MFA counter-sanctions), Iran (MFA sanctions list) and Vietnam (MPS terrorist list) are also in the collection. They stay an MLRO decision and get no registry entry.
+  - **Probe.** `scripts/source-probe.mjs` gains two fixed suites, `opensanctions-catalogue` and `news-feeds`, whose URLs are fixed in code. It also accepts several registry ids in one dispatch.
+
 - **Asana: AI and platform cards file under "AI & Platform Governance", not "Regulatory Changes".**
   - **Cause.** Earlier gids of the "AI & Platform Governance" section had been deleted, so #701/#703 pinned the AI Governance & Platform Report, Advisor Eval, the weekly summary and every fallback platform alert to "Regulatory Changes", where they sat among law changes. The section now exists in the live project (gid 1218985347982681) and is registered as an approved destination in `scripts/asana-sections.mjs`, pinned by gid and never created by name.
   - **Now filed there:**

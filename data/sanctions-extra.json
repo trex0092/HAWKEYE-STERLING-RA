@@ -932,8 +932,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 1,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Austrian National Bank\" (official: true), 48 targets, last change 2026-01-06, source page oenb.at \"Verordnungen nach dem Sanktionengesetz\". minNames is provisional until a runner parse count is recorded."
+      "minNames": 69,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Austrian National Bank\" (official: true), 48 targets, last change 2026-01-06, source page oenb.at \"Verordnungen nach dem Sanktionengesetz\". Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 81 names (primary names plus aliases); minNames 69 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
     },
     {
       "id": "bg-dans-mft",
@@ -943,8 +943,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 1,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"State Agency for National Security\" (official: true), 19 targets, last change 2026-08-13, source page dans.bg/bg/28. This is the list kept current by DANS; it replaces the need to reconcile the BNB consolidated PDF with its amendments (bg-bnb-lmft stays disabled). minNames is provisional until a runner parse count is recorded."
+      "minNames": 25,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"State Agency for National Security\" (official: true), 19 targets, last change 2026-08-13, source page dans.bg/bg/28. This is the list kept current by DANS; it replaces the need to reconcile the BNB consolidated PDF with its amendments (bg-bnb-lmft stays disabled). Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 30 names (primary names plus aliases); minNames 25 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
     },
     {
       "id": "rs-apml-domestic",
@@ -954,8 +954,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 1,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Administration for the Prevention of Money Laundering\" (official: true), 7 targets, last change 2026-01-13, source page apml.gov.rs targeted financial sanctions. 7 matches the 7 persons in Government decision 05 No 337-12096/2018-1 read 2026-10-03, whose scanned PDF could not be read cleanly. minNames is provisional until a runner parse count is recorded."
+      "minNames": 18,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Administration for the Prevention of Money Laundering\" (official: true), 7 targets, last change 2026-01-13, source page apml.gov.rs targeted financial sanctions. 7 matches the 7 persons in Government decision 05 No 337-12096/2018-1 read 2026-10-03, whose scanned PDF could not be read cleanly. Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 21 names (primary names plus aliases); minNames 18 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
     },
     {
       "id": "ro-onpcsb-terror",
@@ -965,8 +965,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 1,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"The National Office for the Prevention and Combating of Money Laundering of Romania\" (official: true), 251 targets, last change 2024-08-30. minNames is provisional until a runner parse count is recorded."
+      "minNames": 390,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"The National Office for the Prevention and Combating of Money Laundering of Romania\" (official: true), 251 targets, last change 2024-08-30. Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 458 names (primary names plus aliases); minNames 390 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
     },
     {
       "id": "np-moha-prohibited",
@@ -976,8 +976,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 1,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Ministry of Home Affairs, Government of Nepal\" (official: true), 10 targets, last change 2024-10-22, source page moha.gov.np. minNames is provisional until a runner parse count is recorded."
+      "minNames": 15,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Ministry of Home Affairs, Government of Nepal\" (official: true), 10 targets, last change 2024-10-22, source page moha.gov.np. Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 18 names (primary names plus aliases); minNames 15 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
     },
     {
       "id": "iq-aml-freeze",
@@ -987,8 +987,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 1,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Republic of Iraq Anti-Money Laundering and Countering Financing of Terrorism Office\" (official: true), 5,678 targets, last change 2026-10-03, source aml.iq. The direct API (api.aml.iq) is Arabic-only, which the matcher cannot compare with Latin-script customer names; this dataset carries Latin-script names, and production screening already attributes Latin-script candidates to it. minNames is provisional until a runner parse count is recorded."
+      "minNames": 12500,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Republic of Iraq Anti-Money Laundering and Countering Financing of Terrorism Office\" (official: true), 5,678 targets, last change 2026-10-03, source aml.iq. The direct API (api.aml.iq) is Arabic-only, which the matcher cannot compare with Latin-script customer names; this dataset carries Latin-script names, and production screening already attributes Latin-script candidates to it. Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 14,801 names (primary names plus aliases); minNames 12500 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
     },
     {
       "id": "de-bfv-banned-orgs",
@@ -998,8 +998,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 1,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Bundesamt für Verfassungsschutz\" (official: true), 13 targets, last change 2026-09-19. These are association bans (Vereinsverbote) of foreign-related extremist organisations, i.e. national proscriptions, not financial sanctions; Germany's financial sanctions remain UN/EU (screened via those lists). minNames is provisional until a runner parse count is recorded."
+      "minNames": 26,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Bundesamt für Verfassungsschutz\" (official: true), 13 targets, last change 2026-09-19. These are association bans (Vereinsverbote) of foreign-related extremist organisations, i.e. national proscriptions, not financial sanctions; Germany's financial sanctions remain UN/EU (screened via those lists). Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 31 names (primary names plus aliases); minNames 26 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
     },
     {
       "id": "ie-unlawful-orgs",
@@ -1009,8 +1009,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": true,
-      "minNames": 1,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"electronic Irish Statute Book\" (official: true), 2 targets, last change 2024-07-11. Proscriptions under the Offences Against the State Acts, not financial sanctions; Ireland imposes no unilateral financial sanctions (UN/EU screened via those lists). minNames is provisional until a runner parse count is recorded."
+      "minNames": 4,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"electronic Irish Statute Book\" (official: true), 2 targets, last change 2024-07-11. Proscriptions under the Offences Against the State Acts, not financial sanctions; Ireland imposes no unilateral financial sanctions (UN/EU screened via those lists). Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 5 names (primary names plus aliases); minNames 4 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
     }
   ]
 }
