@@ -598,6 +598,20 @@ check("report: adverse feed failure causes are rendered with subject counts",
       "Why the news sweep failed" in _narr_amerr and "HTTP 429 rate-limited  ×2" in _narr_amerr
       and "timed out after 20s  ×1" in _narr_amerr)
 check("report: no failure-cause block when the sweep had no errors", "Why the news sweep failed" not in _narr)
+# A hit whose tier rests on the distinctive-name (core) score must say so: the
+# 3 Oct 2026 report rendered a short-designation core match as "8% · STRONG".
+_pm_core = [{"name": "ZZ Example Metals", "permalink": "https://app.asana.com/x/9", "hits": [
+    {"subject_type": "ENTITY", "subject_name": "ZZ Example Metals", "list": "UN Consolidated",
+     "matched_entry": "ZZ", "score": 8, "name_score": 8, "core_score": 100, "confidence": "STRONG"},
+    {"subject_type": "ENTITY", "subject_name": "ZZ Example Metals", "list": "EU FSF",
+     "matched_entry": "ZZ EXAMPLE", "score": 90, "name_score": 90, "core_score": 92, "confidence": "STRONG"}]}]
+_narr_core = screen.build_unified_narrative(_pm_core, [], [], [], _meta_deg,
+    {"subjects_total": 1, "companies_screened": 1, "individuals_screened": 0, "am_errors": 0, "pep_errors": 0, "delta": {}},
+    _dt.datetime(2026, 10, 3))
+check("report: a tier resting on the distinctive name says so (no bare '8% · STRONG')",
+      "8% · STRONG on the distinctive name (100%; full name 8%)" in _narr_core)
+check("report: a hit whose scores agree keeps the plain 'N% · TIER' form",
+      "90% · STRONG" in _narr_core and "90% · STRONG on the distinctive" not in _narr_core)
 # tally_enrichment: distinct am_msg samples are tallied (top 3, by subject count).
 _tally_counts, _tf, _tp = screen.tally_enrichment(
     [{"type": "ENTITY", "name": "A", "parent": "", "permalink": "", "adverse": None, "pep": None,
