@@ -10,6 +10,12 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Three more national sanctions lists are screened; national-source depth rises from 45 to 48 of 195 countries.** Each list is read from the issuing authority's own publication, and each count was checked against a second read of the same document.
+  - **Lebanon:** the ISF National Terrorism Financial List (Law No. 44/2015) is fetched live from isf.gov.lb on every run. The download link is resolved from the official page each time. The file is a legacy Excel 97-2003 workbook, so the screen gained a stdlib-only `.xls` reader (OLE2 compound file + BIFF8, `parseXlsSheets`, parser `lbisf`). Source-probe run 37128209902 confirmed the format. Run 37128512274 read 286 names on the runner, the same count and order as an independent read of the same file.
+  - **Somalia:** both NAMLC lists of Al-Shabaab financiers and leaders, NAMLC/001/24 and NAMLC/002/24 (17 persons), are kept in `data/so-namlc-curated-list.json`, transcribed from the primary PDFs.
+  - **Côte d'Ivoire:** CENTIF's consolidated national UNSCR 1373 list (update of 4 July 2025, 78 persons) is kept in `data/ci-centif-curated-list.json`. A script checks that every name and alias occurs verbatim in the official text.
+  - **Register corrections.** Fiji is now `assessed-not-loadable`: its FIU states there are currently no local designations. Armenia stays `identified`: its 2021 list (341 individuals, 13 entities) was read, but the PDF text garbles the Arabic script and one entry, so it is not screened until a second independent extraction verifies it.
+
 - **Screening hardening.**
   - **Thin news coverage now earns a same-day make-up sweep.** On 3 Oct 2026, 972 of 996 subjects were reached by Bing alone. That counted as covered, so the 03:07 make-up firing exited in 40 s. Run metrics now record feed reach as counts only. When at least `MAKEUP_THIN_FEED_PCT` (default 50%) of the book had one feed or none, a fresh runner re-sweeps. A make-up run never re-triggers on this ground, so it runs at most once a day.
   - **The Wikidata PEP net reports a stale harvest.** If the weekly harvest is older than `PEP_WIKIDATA_MAX_AGE_DAYS` (default 14) or undated, the run logs it and §③ says STALE. The net still screens.

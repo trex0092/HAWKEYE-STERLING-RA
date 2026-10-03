@@ -1,0 +1,240 @@
+{
+  "_README": "Somalia national targeted-financial-sanctions list: the two lists issued by the National Anti-Money Laundering and Countering the Financing of Terrorism Committee (NAMLC) under Article 6 of the Targeted Financial Sanctions Act 2023, against Al-Shabaab financiers and leaders. Transcribed from the primary NAMLC PDFs (English versions), not from a secondary source. The NAMLC page \"Targeted Financial Sanction List\" (namlc.gov.so/targeted-financial-sanction-list/, read 2026-10-03) states that the Committee has issued two lists; both are here. Names are reproduced as printed, including the Somali-orthography forms and the spellings that differ between the numbered summary and the designee table of the first list (both kept as aliases). Single-word nicknames and English glosses of nicknames (e.g. \"the limp\") are kept in aka_unscreened and are not screened alone, as elsewhere in the registry. To refresh: check namlc.gov.so and frc.gov.so/list-of-financial-sanction-targets-copy/ for a further list, add its entries, and update lastReviewed.",
+  "sources": [
+    {
+      "ref": "NAMLC/001/24",
+      "date": "2024-04-13",
+      "url": "https://namlc.gov.so/wp-content/uploads/2024/04/English-Version-Financial-Sanctions-Target-List.pdf",
+      "entries": 9
+    },
+    {
+      "ref": "NAMLC/002/24",
+      "date": "2024-07-18",
+      "url": "https://frc.gov.so/wp-content/uploads/2024/07/Sanction-List-English-Version.pdf",
+      "entries": 8
+    }
+  ],
+  "lastReviewed": "2026-10-03",
+  "count": 17,
+  "verificationNote": "Both PDFs fetched 2026-10-03 through an external fetcher and read in full (9 pages and 3 pages). First list: a numbered summary (items 1-5 and 7-9; item 6 is missing from the summary) plus a nine-row designee table, which carries the sixth designee (Sayid Ali Shirwa). Second list: one eight-row table. Every name and alias below was compared with the extracted text before commit.",
+  "entries": [
+    {
+      "ref": "NAMLC/001/24-1",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Abdullahi Tahleel Hirey",
+      "aliases": [
+        "Abdullahi Tahlil Hirey",
+        "Cabdulaahi Tahlil Xiiireey",
+        "Abdullahi Jiis",
+        "Cabdullahi Jiis"
+      ],
+      "aka_unscreened": [
+        "the limp"
+      ],
+      "role": "Head of arms procurement, ammunition and logistics"
+    },
+    {
+      "ref": "NAMLC/001/24-2",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Hassan Ali Afgio",
+      "aliases": [
+        "Hassann Ali Afgoye",
+        "Xasan Cali Afgoye",
+        "Hassan Afgoye",
+        "Xasan afgoye"
+      ],
+      "role": "Auditor general of AS"
+    },
+    {
+      "ref": "NAMLC/001/24-3",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Abdulkarim Ahmed Jugjuge",
+      "aliases": [
+        "Abdikarim Ahmed Jugajuge",
+        "Cabdikariim Axmed Jugajuge"
+      ],
+      "aka_unscreened": [
+        "Jugajuge"
+      ],
+      "role": "Head of AS Finances in Banadir region"
+    },
+    {
+      "ref": "NAMLC/001/24-4",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Feisal Abdullahi Yusuf",
+      "aliases": [
+        "Faisal Abdullahi Yusuf",
+        "Faysal Cabdullaahi Yuusuf",
+        "Abdikariin Horseed",
+        "Faysal Gaagaale"
+      ],
+      "role": "Deputy head of finance"
+    },
+    {
+      "ref": "NAMLC/001/24-5",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Noah Isse Lugole",
+      "aliases": [
+        "Nuh Issa Lugole",
+        "Nuux Ciise Lugoole"
+      ],
+      "aka_unscreened": [
+        "Nuux"
+      ],
+      "role": "Accountant general for AS"
+    },
+    {
+      "ref": "NAMLC/001/24-6",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Sayid Ali shirwa",
+      "aliases": [
+        "Sayid Ali Shirwac"
+      ],
+      "aka_unscreened": [
+        "Shirwa"
+      ],
+      "role": "General Treasurer",
+      "note": "Sixth designee: present in the designee information table; the numbered summary on page 1 of the PDF skips item 6"
+    },
+    {
+      "ref": "NAMLC/001/24-7",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Abdullahi Osman Mohamed",
+      "aliases": [
+        "Abdullahi Osman Mohamed Tutah",
+        "Cabdulaahi Cismaan Maxamed Tuutax"
+      ],
+      "aka_unscreened": [
+        "Tutah"
+      ],
+      "role": "Head of explosives finances"
+    },
+    {
+      "ref": "NAMLC/001/24-8",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Abdullahi Hassan Abdi Osobleh",
+      "aliases": [
+        "Abdullahi Hassan abdi Ososble",
+        "Cabdulaahi Xasan Cabdi Cosoble",
+        "Abdullahi Wadaad",
+        "Cabdullahi wadaad"
+      ],
+      "role": "Financial liaison between Benadir & Middle Shabelle regions"
+    },
+    {
+      "ref": "NAMLC/001/24-9",
+      "list": "NAMLC/001/24 (13/04/2024)",
+      "name": "Mohamed Sahal Idleh",
+      "aliases": [
+        "Mohamed Sahal Idle",
+        "Maxamed Sahal Iidle"
+      ],
+      "aka_unscreened": [
+        "Idle",
+        "Iidle"
+      ],
+      "role": "Head of AS Finances"
+    },
+    {
+      "ref": "NAMLC/002/24-1",
+      "list": "NAMLC/002/24 (18/07/2024)",
+      "name": "Abukar Ali Adan",
+      "aliases": [
+        "Abuukar Cali Aadan",
+        "Cabdullaahi Garweyne"
+      ],
+      "aka_unscreened": [
+        "Abdullahi large beard"
+      ],
+      "role": "Deputy of the AS leader"
+    },
+    {
+      "ref": "NAMLC/002/24-2",
+      "list": "NAMLC/002/24 (18/07/2024)",
+      "name": "Mohamed Mire Jama",
+      "aliases": [
+        "Maxamed Mire Jaamac"
+      ],
+      "aka_unscreened": [
+        "Mire"
+      ],
+      "role": "Governor of the regions"
+    },
+    {
+      "ref": "NAMLC/002/24-3",
+      "list": "NAMLC/002/24 (18/07/2024)",
+      "name": "Hassan Yakub Ali Bari",
+      "aliases": [
+        "Xasan Yacquub Cali Bari",
+        "Abu Abbaas"
+      ],
+      "aka_unscreened": [
+        "Khawlajaan"
+      ],
+      "role": "Leader of the Council of Shura"
+    },
+    {
+      "ref": "NAMLC/002/24-4",
+      "list": "NAMLC/002/24 (18/07/2024)",
+      "name": "Mahad Abdirahman Warsame",
+      "aliases": [
+        "Abu Abdirahman"
+      ],
+      "aka_unscreened": [
+        "Karatay",
+        "Qaley"
+      ],
+      "role": "Deputy AS leader"
+    },
+    {
+      "ref": "NAMLC/002/24-5",
+      "list": "NAMLC/002/24 (18/07/2024)",
+      "name": "Yusuf Ahmed Haji Nunow",
+      "aliases": [
+        "Yuusuf Axmed Xaaji Nuunow"
+      ],
+      "aka_unscreened": [
+        "Geescadde",
+        "Bishaar"
+      ],
+      "role": "Head of the security branch"
+    },
+    {
+      "ref": "NAMLC/002/24-6",
+      "list": "NAMLC/002/24 (18/07/2024)",
+      "name": "Abdikarim Osman Jilaow",
+      "aliases": [
+        "Cabdikariin Cismaan Jilacow",
+        "Mustaf Caato"
+      ],
+      "aka_unscreened": [
+        "Mustaf skinny"
+      ],
+      "role": "Head of regional security branch"
+    },
+    {
+      "ref": "NAMLC/002/24-7",
+      "list": "NAMLC/002/24 (18/07/2024)",
+      "name": "Nur Abdi Roble",
+      "aliases": [
+        "Nuur Cabdi Rooble"
+      ],
+      "aka_unscreened": [
+        "Nuunuule"
+      ],
+      "role": "Head of the AS in Mudug"
+    },
+    {
+      "ref": "NAMLC/002/24-8",
+      "list": "NAMLC/002/24 (18/07/2024)",
+      "name": "Bakar Bashe Adan Ahmed",
+      "aliases": [
+        "Bakar Baashe Aadan Axmed"
+      ],
+      "aka_unscreened": [
+        "Shariif"
+      ],
+      "role": "Head of the zakawaat"
+    }
+  ]
+}
