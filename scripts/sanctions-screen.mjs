@@ -1736,7 +1736,10 @@ export function licenceFreeFilter(sources, env = process.env) {
   const off = String((env && env.OPENSANCTIONS_DATA) || '').trim() === '0';
   if (!off) return { kept: sources, skipped: [] };
   const isOs = (s) => {
-    try { return new URL(String(s.url || '')).hostname.endsWith('opensanctions.org'); } catch { return false; }
+    try {
+      const host = new URL(String(s.url || '')).hostname.toLowerCase();
+      return host === 'opensanctions.org' || host.endsWith('.opensanctions.org');
+    } catch { return false; }
   };
   return { kept: sources.filter(s => !isOs(s)), skipped: sources.filter(isOs) };
 }

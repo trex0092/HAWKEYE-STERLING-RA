@@ -2169,6 +2169,9 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   const off = scr.licenceFreeFilter(srcs, { OPENSANCTIONS_DATA: '0' });
   check('licence-free filter: "0" skips only OpenSanctions-hosted sources (official + file sources kept)',
     off.skipped.map(x => x.id).join() === 'ch-seco-opensanctions' && off.kept.map(x => x.id).join() === 'ch-seco,internal');
+  const lookalike = scr.licenceFreeFilter([{ id: 'x', url: 'https://evilopensanctions.org/a.csv' }], { OPENSANCTIONS_DATA: '0' });
+  check('licence-free filter: matches the opensanctions.org host exactly, not a look-alike suffix',
+    lookalike.skipped.length === 0 && lookalike.kept.length === 1);
   const loaderSrc = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
   check('licence-free filter: the loader applies it and names the skipped sources in the run notes',
     /const licence = licenceFreeFilter\(sources\);/.test(loaderSrc) && /not screened - ' \+ licence\.skipped\.map/.test(loaderSrc));
