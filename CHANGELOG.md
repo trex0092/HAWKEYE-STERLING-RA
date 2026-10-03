@@ -10,6 +10,20 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **FATF watchdog: a false grey-list "removal" of Côte d'Ivoire and Lao PDR is fixed, and the stored lists self-repair.**
+  - **What happened.** On 3 Oct 2026 the watchdog read an archived FATF page (web.archive.org snapshot 20261002051513) that wrote "Côte d'Ivoire" and "Lao People's Democratic Republic" with a typographic apostrophe or an HTML entity. Its dictionary matched only the plain apostrophe, so both names dropped out of the grey list. It alerted that the FATF had removed them, and it overwrote the stored state with 20 jurisdictions instead of 22.
+  - **What is true.** The FATF statement of 19 June 2026 still lists both, and there has been no plenary since; the next is 26–30 October 2026.
+  - **Parser fix.** Entities and apostrophe variants are now folded before classification (`foldEntities`).
+  - **Plenary anchor.** A page that agrees exactly with the recorded plenary lists in `data/fatf-assessments.json` repairs a disagreeing stored state silently instead of alerting. This also covers the stale-capture branch.
+  - **Removal check.** A removal whose name is still spelt on the page (compared on letters only) is recorded as parser drift, never alerted as a delisting.
+  - **Gap alert wording.** The alert title now reads "lists not verified" instead of "list source unreachable".
+  - A pinned correction was posted on the Asana alert task.
+- **Screening matcher: apostrophe variants and HTML entities now key like the plain spelling in both engines.** This applies to `normalizeName` in `sanctions-match.mjs` and `normalize` in `screen.py`, which are kept byte-identical.
+  - **Before.** "OʼBrien" (U+02BC, common in transliterated names) keyed as one letter-token and was routed to MANUAL REVIEW as lost script. "O&#39;Brien" keyed as "O 39 BRIEN" and "Smith &amp; Co" as "SMITH AMP CO", so none of them met the plain spelling.
+  - **After.** Plain-apostrophe names keep exactly the key they had.
+  - **Benchmarks.** Every recall and negative floor held. The parity corpus gained 5 names and 2 pairs, both scoring 100 in each engine.
+  - **Property tests.** The fuzz property "ASCII names keep their historic key" now excludes strings carrying an HTML character reference. A new, stricter property requires such names to key exactly as their decoded form.
+
 - **Three more national sanctions lists are screened; national-source depth rises from 45 to 48 of 195 countries.** Each list is read from the issuing authority's own publication, and each count was checked against a second read of the same document.
   - **Lebanon:** the ISF National Terrorism Financial List (Law No. 44/2015) is fetched live from isf.gov.lb on every run. The download link is resolved from the official page each time. The file is a legacy Excel 97-2003 workbook, so the screen gained a stdlib-only `.xls` reader (OLE2 compound file + BIFF8, `parseXlsSheets`, parser `lbisf`). Source-probe run 37128209902 confirmed the format. Run 37128512274 read 286 names on the runner, the same count and order as an independent read of the same file.
   - **Somalia:** both NAMLC lists of Al-Shabaab financiers and leaders, NAMLC/001/24 and NAMLC/002/24 (17 persons), are kept in `data/so-namlc-curated-list.json`, transcribed from the primary PDFs.

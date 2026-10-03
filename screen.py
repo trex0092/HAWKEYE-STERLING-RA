@@ -1149,6 +1149,33 @@ def _fold_for_key(name):
     s = "".join(c if unicodedata.category(c)[0] in ("L", "N") else " " for c in s)
     return re.sub(r"\s+", " ", s).strip()
 
+# Apostrophe variants and HTML entities, folded BEFORE anything else — kept
+# byte-identical with the JS engine's foldApostropheVariants (see the comment
+# there): "OʼBrien" (U+02BC), "O’Brien", "O&#39;Brien" and "Smith &amp; Co"
+# keyed as "OʼBRIEN" (lost script → manual review), "O 39 BRIEN" and
+# "SMITH AMP CO", never meeting the plain spelling. Plain-apostrophe names keep
+# exactly the key they had. A closed set of named entities, not html.unescape,
+# so the two engines decode exactly the same things.
+_NAMED_ENT = {"amp": "&", "apos": "'", "quot": '"', "nbsp": " ", "rsquo": "'", "lsquo": "'", "ndash": "-", "mdash": "-"}
+_NUM_ENT_RE = re.compile(r"&#(x[0-9a-fA-F]+|[0-9]+);")
+_ACC_ENT_RE = re.compile(r"&([A-Za-z])(acute|grave|circ|uml|tilde|cedil|ring);")
+_NAMED_ENT_RE = re.compile(r"&([A-Za-z]+);")
+_APOS_RE = re.compile("[\u2018\u2019\u201B\u02BC\u02BB\u2032\u0060\u00B4]")
+
+def _num_ent(m):
+    n = m.group(1)
+    try:
+        cp = int(n[1:], 16) if n[0] in "xX" else int(n, 10)
+    except ValueError:
+        return " "
+    return chr(cp) if 0 < cp < 0x110000 else " "
+
+def _fold_apostrophe_variants(s):
+    s = _NUM_ENT_RE.sub(_num_ent, str(s or ""))
+    s = _ACC_ENT_RE.sub(lambda m: m.group(1), s)
+    s = _NAMED_ENT_RE.sub(lambda m: _NAMED_ENT.get(m.group(1).lower(), m.group(0)), s)
+    return _APOS_RE.sub("'", s)
+
 def normalize(name):
     """Matching key for a name.
 
@@ -1168,6 +1195,7 @@ def normalize(name):
     their MANUAL REVIEW routing (_unscreenable tests the ORIGINAL string, so a
     romanized name is still surfaced for a human as well as screened)."""
     if not name: return ""
+    name = _fold_apostrophe_variants(name)
     # MIXED-SCRIPT DROP: the Latin pipeline used to run first and win outright,
     # so a name that produced ANY Latin output had its non-Latin letters thrown
     # away silently. Live instance in data/eocn-local-terrorist-list.json — the
@@ -4861,7 +4889,7 @@ def _lost_script_letters(name):
         return True
     return any(unicodedata.category(c).startswith("L")
                and not unicodedata.name(c, "").startswith("LATIN")
-               for c in str(name or ""))
+               for c in _fold_apostrophe_variants(name))
 
 def _unscreenable(name):
     # A name that carries content but collapses to fewer than 4 matchable chars

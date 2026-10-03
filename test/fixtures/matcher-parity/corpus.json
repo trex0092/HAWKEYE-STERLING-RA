@@ -47,7 +47,12 @@
     "Ɔla",
     "Ola",
     "Ɖamir",
-    "Damir"
+    "Damir",
+    "OʼBrien Trading",
+    "O&#39;Brien Trading",
+    "O&rsquo;Brien Trading",
+    "Smith &amp; Co",
+    "Mar&#x2019;yana"
   ],
   "names_note": "Grouped: Turkish-i regression class; diacritic Latin that MUST fold to A-Z; short/two-letter token class (the sigTokens regression); transliteration-variant class; lost-script class (Cyrillic/Arabic/CJK/Greek and unfoldable Latin) which both engines must FLAG rather than silently clear; and degenerate inputs (blank, symbols, digits, single char).",
   "pairs": [
@@ -135,6 +140,16 @@
       "subject": "Ɖamir",
       "listed": "DAMIR",
       "why": "African-Latin Ɖ must fold to D in both engines"
+    },
+    {
+      "subject": "OʼBrien Gold Trading",
+      "listed": "O'BRIEN GOLD TRADING",
+      "why": "apostrophe variants (U+02BC modifier apostrophe, typographic quotes, HTML entities) must fold to the plain apostrophe in both engines (FATF watchdog false delisting, 3 Oct 2026)"
+    },
+    {
+      "subject": "Smith & Co Bullion",
+      "listed": "SMITH &amp; CO BULLION",
+      "why": "an HTML-entity-encoded list name must key like its decoded form in both engines"
     }
   ],
   "pairs_note": "Every pair is a TRUE match that both engines must reach. The invariant is engine-to-engine agreement on reachability, not score equality: rapidfuzz and the JS Levenshtein legitimately differ by a point or two (measured: 93 vs 94 on Muhammad Alfayed), so the test asserts both engines HIT, never that they score the same."
