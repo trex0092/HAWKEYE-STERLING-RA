@@ -900,6 +900,29 @@
       "enabled": true,
       "minNames": 70,
       "_note": "ADDED 2026-10-03. 78 persons designated by order of the Minister of Finance and Budget (Ordonnance n° 2023-875; Décret n° 2024-216 as amended), transcribed from CENTIF's consolidated PDF (centif.ci/wp-content/uploads/2025/02/listenationale1373.pdf, update of 4 July 2025, which replaces earlier versions), linked from centif.ci/liste-des-sanctions/. Curated because the list is PDF only. Every name and alias is checked to occur verbatim in the extracted text; refresh procedure in the file's _README."
+    },
+    {
+      "id": "tt-fiu-hco",
+      "name": "Trinidad and Tobago — FIUTT TFS Search Tool (Consolidated List of High Court Orders, ATA s.22AA)",
+      "jurisdiction": "Trinidad and Tobago",
+      "url": "https://fiu.sanctionslist.gov.tt/unsanctionsportal/initilize",
+      "type": "html",
+      "parser": "htmltable",
+      "browserHeaders": true,
+      "enabled": false,
+      "minNames": 5,
+      "_note": "STAGED 2026-10-03, DISABLED: diagnostic entry so the source probe can list the data-file links the FIUTT portal exposes (the portal offers an Excel download of all persons/entities listed by T&T High Court order, per fiu.gov.tt/tfs-search-tool/tfs-search-tool-2/, read 2026-10-03). Not a screening source until the download URL and layout are verified."
+    },
+    {
+      "id": "bg-bnb-lmft",
+      "name": "Bulgaria — BNB consolidated list under the Law on Measures against the Financing of Terrorism (art. 4b)",
+      "jurisdiction": "Bulgaria",
+      "url": "https://www.bnb.bg/BankSupervision/BSAnti-moneyLaundering/BSAMLListInAccordanceWithTheLMFT/index.htm",
+      "type": "html",
+      "parser": "htmltable",
+      "enabled": false,
+      "minNames": 5,
+      "_note": "STAGED 2026-10-03, DISABLED: diagnostic entry. The BNB page (read 2026-10-03) links the consolidated list (eu_lf_eu_list_lmst_bg.pdf, 261 KB) and amendments by Council of Ministers Decisions No 652/2022, No 392/2023 and No 606/2024, all PDF. Not a screening source: PDF only, and its national part is not yet separated from UN/EU entries."
     }
   ]
 }
