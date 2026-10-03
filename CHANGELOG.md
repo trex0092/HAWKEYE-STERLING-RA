@@ -10,6 +10,9 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Optional extra bulk adverse-media nets: OpenSanctions debarment and regulatory.** On 3 Oct 2026 the daily report showed GDELT reaching 0 of 996 subjects and Google News 24, so 972 subjects rested on one news feed. Bulk nets do not depend on news feeds being reachable. Setting the repository variable `ADVERSE_WATCHLIST_EXTRA=debarment,regulatory` now screens every subject, alongside the crime watchlist, against the OpenSanctions **debarment** collection (61 sources, 197,914 targets on 3 Oct) and the **regulatory** collection (37 sources, 163,209 targets on 2 Oct). It uses the same matcher, and each hit is titled and linked to its dataset.
+  - **Off by default:** the data is CC-BY-NC 4.0, and a commercial deployment needs an OpenSanctions licence first (`docs/aims/third-party-register.md` updated).
+  - **Reporting:** a failed download is shown as UNAVAILABLE in §② and never reads as clear. Crime-list findings keep their exact titles, so delta fingerprints are unchanged.
 - **Faster delivery of the daily screening results.** On 2 Oct 2026 (run 37009296159) the run took about 59 minutes: watchlist 6.7, sanctions 8.7, news enrichment 39, AI 3.8. Coverage and matching are unchanged; only the waiting is cut.
   - The news enrichment now **starts before** the watchlist and sanctions matching, which it never depended on, and is collected after them. That overlaps about 15 minutes of CPU-bound matching with the network sweep. A crash during matching cancels the queued sweep rather than waiting it out.
   - The **Google News breaker** also trips after `GNEWS_BREAKER_SECONDS` (default 300 s) of zero-coverage subjects at max backoff, not only after 30 subjects. On 2 Oct those 30 subjects cost about 29 minutes, all at zero coverage anyway.

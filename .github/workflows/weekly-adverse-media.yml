@@ -383,6 +383,10 @@ jobs:
           # names the reason instead of a bare 403.
           REGULATOR_UA_CONTACT: ${{ vars.REGULATOR_UA_CONTACT }}
           RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
+          # Optional extra bulk adverse nets (OpenSanctions debarment / regulatory).
+          # OFF unless the repository variable is set — CC-BY-NC data, see
+          # docs/aims/third-party-register.md before enabling.
+          ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}
           # "Transaction Monitoring" section of HAWKEYE STERLING APP: one task per
           # payment (open tasks only) + the engine's daily Transaction Monitoring
           # report, filed there once a day. Unset = payment screening reports

@@ -171,6 +171,10 @@ jobs:
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
           RUN_MODE: onboarding
+          # Optional extra bulk adverse nets (OpenSanctions debarment / regulatory).
+          # OFF unless the repository variable is set — CC-BY-NC data, see
+          # docs/aims/third-party-register.md before enabling.
+          ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}
           # HR - Employees screening population (MLRO-directed 2026-07-29,
           # see screen.py). Never forwarded here before, so screen.py always
           # fell back to its own hardcoded default (1216139945846994), which

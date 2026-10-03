@@ -2849,6 +2849,43 @@ def parse_watchlist(data):
         log(f"  {WATCHLIST_LABEL} parse error: {e}")
     return entries, ids
 
+# OPTIONAL extra bulk adverse nets — OpenSanctions DEBARMENT (debarred firms
+# and individuals; 61 sources, ~198k targets on 3 Oct 2026) and REGULATORY
+# (regulatory watchlists / enforcement actions; 37 sources, ~163k targets).
+# Like the crime net they are immune to news-feed rate limits — on 3 Oct 2026
+# GDELT reached 0 of 996 subjects and Google News 24, so 972 subjects rested on
+# a single news feed. OFF by default: the data is CC-BY-NC 4.0 and a commercial
+# deployment needs an OpenSanctions licence before relying on it (see
+# docs/aims/third-party-register.md). Turn on with the repository variable
+# ADVERSE_WATCHLIST_EXTRA=debarment,regulatory once that decision is taken.
+WATCHLIST_EXTRA_DATASETS = {
+    "debarment": "OpenSanctions debarment watchlist",
+    "regulatory": "OpenSanctions regulatory watchlist",
+}
+ADVERSE_WATCHLIST_EXTRA = [d.strip().lower() for d in
+                           os.environ.get("ADVERSE_WATCHLIST_EXTRA", "").split(",") if d.strip()]
+
+def load_adverse_watchlist_extra(datasets=None):
+    """{label: (entries, ids, meta)} for each enabled extra collection. An
+    unknown name or a failed download is logged loudly and loads nothing —
+    never a silent all-clear (the label then reads UNAVAILABLE in §②)."""
+    out = {}
+    for ds in (ADVERSE_WATCHLIST_EXTRA if datasets is None else datasets):
+        label = WATCHLIST_EXTRA_DATASETS.get(ds)
+        if not label:
+            log(f"  ADVERSE_WATCHLIST_EXTRA: unknown dataset '{ds}' ignored "
+                f"(allowed: {', '.join(sorted(WATCHLIST_EXTRA_DATASETS))})")
+            continue
+        data = download(f"https://data.opensanctions.org/datasets/latest/{ds}/targets.simple.csv", label)
+        entries, ids = parse_watchlist(data)
+        if not entries:
+            log(f"  {label}: UNAVAILABLE this run")
+            out[label] = ([], {}, {"count": 0, "date": "unavailable", "hash": "", "tier": "supplementary"})
+            continue
+        out[label] = (entries, ids, {"count": len(entries), "date": "live (OpenSanctions mirror)",
+                                     "hash": sha256_of(data), "tier": "supplementary"})
+    return out
+
 def load_adverse_watchlist():
     """Returns (entries, ids, meta). meta feeds source-coverage drift tracking as
     a SUPPLEMENTARY list (a fetch miss is a soft note, never a degraded core
@@ -3013,15 +3050,22 @@ def annotate_identity_corroboration(articles, subj_name, parent, customer):
             a["identity_context"] = found
 
 
-def screen_watchlist(subjects_all, entries, ids, today_iso):
+def screen_watchlist(subjects_all, entries, ids, today_iso, extra=None):
     """One local pass of every DISTINCT subject name against the crime watchlist,
     using the same matcher + thresholds as sanctions screening. Returns
     {subject_name: [article, ...]} in the article shape the news path emits.
     Titles are deterministic so delta fingerprints stay stable: a listing reads
     NEW once, then STANDING on every later run."""
-    if not entries:
+    extra = {k: v for k, v in (extra or {}).items() if v[0]}
+    if not entries and not extra:
         return {}
-    wl = {WATCHLIST_LABEL: entries}
+    wl = {WATCHLIST_LABEL: entries} if entries else {}
+    ids = dict(ids or {})
+    _slug = {lbl: ds for ds, lbl in WATCHLIST_EXTRA_DATASETS.items()}
+    for _lbl, (_ents, _ids, _meta) in extra.items():
+        wl[_lbl] = _ents
+        for _n, _pid in _ids.items():
+            ids.setdefault(_n, _pid)
     out = {}
     # Subject names the watchlist matcher could not screen at all. Exposed via
     # WATCHLIST_UNSCREENABLE rather than the return value so every existing
@@ -3043,11 +3087,13 @@ def screen_watchlist(subjects_all, entries, ids, today_iso):
         arts = []
         for h in screen_name(name, wl):
             ent = h["matched_entry"]
+            # crime keeps its exact title/source (delta fingerprints stay stable)
+            ds = _slug.get(h.get("list"), "crime")
             url = (f"https://www.opensanctions.org/entities/{ids[ent]}/" if ids.get(ent)
-                   else "https://www.opensanctions.org/datasets/crime/")
+                   else f"https://www.opensanctions.org/datasets/{ds}/")
             arts.append({
-                "title": f"Adverse-exposure watchlist: {ent} — OpenSanctions crime dataset",
-                "source": "OpenSanctions crime dataset (watchlist)", "url": url,
+                "title": f"Adverse-exposure watchlist: {ent} — OpenSanctions {ds} dataset",
+                "source": f"OpenSanctions {ds} dataset (watchlist)", "url": url,
                 "date": str(today_iso)[:10], "ts": None, "flagged": True,
                 "keywords": ["watchlist"], "categories": ["Adverse exposure (watchlist)"],
                 "watchlist": True, "score": h["score"]})
@@ -6361,6 +6407,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         if stats.get("watchlist_loaded"):
             A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
               f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
+        for _lbl, _cnt in (stats.get("watchlist_extra") or {}).items():
+            A(f"   Source: {_lbl} (bulk, deterministic) · "
+              + (f"{_cnt:,} names screened" if _cnt else "⚠ UNAVAILABLE this run — not screened"))
     A("")
 
     A("━" * 70)
@@ -7429,10 +7478,15 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         # while the news sweep runs, so adverse coverage exists even if both news
         # feeds refuse the runner for the whole run (10–14 Jul).
         wl_entries, wl_ids, wl_meta = load_adverse_watchlist()
-        wl_hits = screen_watchlist(subjects_all, wl_entries, wl_ids, today) if wl_entries else {}
+        wl_extra = load_adverse_watchlist_extra() if ADVERSE_WATCHLIST_EXTRA else {}
+        wl_hits = (screen_watchlist(subjects_all, wl_entries, wl_ids, today, extra=wl_extra)
+                   if (wl_entries or any(v[0] for v in wl_extra.values())) else {})
         if wl_entries:
             log(f"  {WATCHLIST_LABEL}: {wl_meta['count']:,} names · "
                 f"{len(wl_hits)} subject name(s) matched")
+        for _lbl, (_e, _i, _m) in wl_extra.items():
+            if _e:
+                log(f"  {_lbl}: {_m['count']:,} names screened alongside")
         # 4th adverse net: regulator enforcement bulletins — one fetch per feed
         # per run, findings merged into the watchlist channel (same shape/merge
         # path); failed feeds are disclosed in §② and the run log, never silent.
@@ -7837,6 +7891,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              "news_feed_coverage": feed_coverage_snapshot(),
              "pep_mirror": counts["pep_mirror"],
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
+             "watchlist_extra": {k: v[2]["count"] for k, v in wl_extra.items()},
              "bulletin_failures": rb_failures,
              "adverse_repeat": repeat_patterns,
              "related_parties": related, "injection_blocked": injection_blocked,
