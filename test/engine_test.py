@@ -1368,6 +1368,35 @@ _tm_ne, _tm_be = payment_screen.build_tm_daily_report(
     rule_errors={"rule_funnel": 2})
 check("TM report: a crashed monitoring rule makes the report DEGRADED and names the rule",
       "DEGRADED — " in _tm_ne and "rule_funnel" in _tm_be and "NOT checked" in _tm_be)
+# ── Optional extra bulk adverse nets (OpenSanctions debarment / regulatory) ──
+check("extra adverse nets are OFF by default (CC-BY-NC — an explicit decision turns them on)",
+      screen.ADVERSE_WATCHLIST_EXTRA == [] or os.environ.get("ADVERSE_WATCHLIST_EXTRA"))
+_ex_csv = ("id,schema,name,aliases\n"
+           "deb-1,Company,Sample Debarred Contractor Ltd,Sample Debarred Contractor\n").encode()
+_ex_dl = screen.download
+try:
+    screen.download = lambda url, label: _ex_csv if "/debarment/" in url else b""
+    _ex = screen.load_adverse_watchlist_extra(["debarment", "regulatory", "bogus"])
+finally:
+    screen.download = _ex_dl
+_deb = _ex.get("OpenSanctions debarment watchlist")
+_reg = _ex.get("OpenSanctions regulatory watchlist")
+check("extra nets: a loaded collection carries its entries; a failed one is UNAVAILABLE (count 0); unknown names are ignored",
+      _deb and len(_deb[0]) == 2 and _reg and _reg[2]["count"] == 0 and len(_ex) == 2)
+_ex_hits = screen.screen_watchlist(
+    [("COMPANY", "Sample Debarred Contractor Ltd", None, {})], [], {}, "2026-10-03", extra=_ex)
+_ex_art = (_ex_hits.get("Sample Debarred Contractor Ltd") or [{}])[0]
+check("extra nets: a debarment listing is found even with the crime list empty, titled and linked to its dataset",
+      "OpenSanctions debarment dataset" in _ex_art.get("title", "")
+      and _ex_art.get("url", "").endswith("/entities/deb-1/") and _ex_art.get("watchlist") is True)
+_cr_hits = screen.screen_watchlist([("COMPANY", "Sample Debarred Contractor Ltd", None, {})],
+                                   _deb[0], {}, "2026-10-03")
+check("extra nets: crime-list findings keep their exact title (delta fingerprints unchanged)",
+      (_cr_hits.get("Sample Debarred Contractor Ltd") or [{}])[0].get("title", "").endswith("— OpenSanctions crime dataset"))
+for _wf in ("weekly-adverse-media.yml", "onboarding-screen.yml"):
+    _wft = open(os.path.join(ROOT, ".github", "workflows", _wf), encoding="utf-8").read()
+    check(f"{_wf} passes ADVERSE_WATCHLIST_EXTRA from a repository variable, with no default",
+          "ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}\n" in _wft)
 check("report: payment screening says INACTIVE without a feed (no implied clearance)",
       len(_inactive) == 1 and "INACTIVE" in _inactive[0])
 _active = payment_screen.report_lines(payment_screen.screen_feed(
