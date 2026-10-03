@@ -227,7 +227,7 @@
     {
       "country": "Bulgaria",
       "status": "identified",
-      "note": "national terrorism-financing list (State Agency for National Security web page); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified",
+      "note": "researched 2026-10-03: the national list is the annex to Council of Ministers Decision No 265/2003 under art. 5(1) of the Law on Measures against the Financing of Terrorism, amended many times, latest by Decision No 606 of 16 August 2024 (State Gazette No 70/2024, repealing section III item 16). The BNB page \"Списък на лица във връзка със ЗМФТРОМУ\" (bnb.bg) publishes a consolidated PDF and separate amendment PDFs (2022, 2023, 2024). Not loaded yet: PDF only, and the consolidated text must be reconciled with every later amendment. Registry entry bg-bnb-lmft (disabled) records this.",
       "baseline": [
         "UN",
         "EU"
@@ -1346,7 +1346,7 @@
     {
       "country": "Serbia",
       "status": "identified",
-      "note": "domestic list of designated persons (APML search engine); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified",
+      "note": "researched 2026-10-03: the domestic list is set by Government decision under art. 4(1)(1) of the Law on the Restriction of Disposal of Property for the Prevention of Terrorism. The APML page \"Liste označenih lica i pretraživač\" (apml.gov.rs) states the Government adopted the domestic list on 20 December 2018; the linked PDF (apml.gov.rs/uploads/useruploads/Documents/lista oznacenih lica.pdf, decision 05 No 337-12096/2018-1) designates 7 persons convicted of terrorism offences linked to the \"Islamic State\". Not loaded yet: the PDF is a scanned image whose machine-read text garbles the Cyrillic names, so a clean text (e.g. the Official Gazette publication) is needed before the names can be screened as verified; later amendments, if any, are not yet checked.",
       "baseline": [
         "UN"
       ]
@@ -1549,7 +1549,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "national list exists: the FIUTT Consolidated List of High Court Orders (Anti-Terrorism Act s.22AA), now served through the TFS Search Tool (fiu.gov.tt/tfs-search-tool/tfs-search-tool-2/, portal fiu.sanctionslist.gov.tt) which offers a downloadable Excel of all persons/entities listed by T&T High Court order; the download URL has not yet been verified from a runner"
+      "note": "national list exists: the FIUTT Consolidated List of High Court Orders (Anti-Terrorism Act s.22AA), now served through the TFS Search Tool (fiu.gov.tt/tfs-search-tool/tfs-search-tool-2/, portal fiu.sanctionslist.gov.tt) which offers a downloadable Excel of all persons/entities listed by T&T High Court order; the download URL has not yet been verified from a runner Update 2026-10-03: source-probe run 37129541443 reached the portal fiu.sanctionslist.gov.tt (HTTP 200) and found a session-bound search form (POST) with no direct data-file link, so the Excel export cannot be fetched with the screen's single keyless GET. Registry entry tt-fiu-hco (disabled) records this."
     },
     {
       "country": "Tunisia",

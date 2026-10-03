@@ -900,6 +900,29 @@
       "enabled": true,
       "minNames": 70,
       "_note": "ADDED 2026-10-03. 78 persons designated by order of the Minister of Finance and Budget (Ordonnance n° 2023-875; Décret n° 2024-216 as amended), transcribed from CENTIF's consolidated PDF (centif.ci/wp-content/uploads/2025/02/listenationale1373.pdf, update of 4 July 2025, which replaces earlier versions), linked from centif.ci/liste-des-sanctions/. Curated because the list is PDF only. Every name and alias is checked to occur verbatim in the extracted text; refresh procedure in the file's _README."
+    },
+    {
+      "id": "tt-fiu-hco",
+      "name": "Trinidad and Tobago — FIUTT TFS Search Tool (Consolidated List of High Court Orders, ATA s.22AA)",
+      "jurisdiction": "Trinidad and Tobago",
+      "url": "https://fiu.sanctionslist.gov.tt/unsanctionsportal/initilize",
+      "type": "html",
+      "parser": "htmltable",
+      "browserHeaders": true,
+      "enabled": false,
+      "minNames": 5,
+      "_note": "DIAGNOSTIC, DISABLED. Source-probe run 37129541443 (GitHub runner, 2026-10-03): the portal page answers HTTP 200 (text/html, 38,885 bytes) with a search form (POST to /unsanctionsportal/initialsubmit with a session id in the URL) and exposes no direct data-file link, so the Excel export described on fiu.gov.tt/tfs-search-tool/tfs-search-tool-2/ cannot be fetched with the single keyless GET the screen uses. Kept as a probe target; not a screening source."
+    },
+    {
+      "id": "bg-bnb-lmft",
+      "name": "Bulgaria — BNB consolidated list under the Law on Measures against the Financing of Terrorism (art. 4b)",
+      "jurisdiction": "Bulgaria",
+      "url": "https://www.bnb.bg/BankSupervision/BSAnti-moneyLaundering/BSAMLListInAccordanceWithTheLMFT/index.htm",
+      "type": "html",
+      "parser": "htmltable",
+      "enabled": false,
+      "minNames": 5,
+      "_note": "DIAGNOSTIC, DISABLED. Bulgaria's national list is the annex to Council of Ministers Decision No 265 of 2003 (State Gazette No 64/2003), adopted under art. 5(1) of the Law on Measures against the Financing of Terrorism and amended many times (State Gazette Nos 86/2003, 34, 61 and 87/2004, 16/2006, 44 and 66/2016, 73/2022, 47/2023; latest Decision No 606 of 16 August 2024, State Gazette No 70 of 20 August 2024, which repeals section III item 16 — read 2026-10-03 from the BNB PDF eu_lf_eu_list_lmst_2024_bg.pdf). The BNB page publishes a consolidated PDF plus separate amendment PDFs; loading it correctly requires reconciling the consolidated text with every later amendment, which is not done yet. Not a screening source."
     }
   ]
 }

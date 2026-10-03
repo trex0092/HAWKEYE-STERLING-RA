@@ -15,6 +15,10 @@ bump merged to `main`.
   - **Somalia:** both NAMLC lists of Al-Shabaab financiers and leaders, NAMLC/001/24 and NAMLC/002/24 (17 persons), are kept in `data/so-namlc-curated-list.json`, transcribed from the primary PDFs.
   - **Côte d'Ivoire:** CENTIF's consolidated national UNSCR 1373 list (update of 4 July 2025, 78 persons) is kept in `data/ci-centif-curated-list.json`. A script checks that every name and alias occurs verbatim in the official text.
   - **Register corrections.** Fiji is now `assessed-not-loadable`: its FIU states there are currently no local designations. Armenia stays `identified`: its 2021 list (341 individuals, 13 entities) was read, but the PDF text garbles the Arabic script and one entry, so it is not screened until a second independent extraction verifies it.
+  - **Further research recorded, nothing loaded yet.**
+    - Serbia's 2018 government decision (7 persons) is a scanned PDF whose machine-read names are garbled.
+    - Bulgaria's Council of Ministers list (Decision No 265/2003, last amended 16 Aug 2024) is a consolidated PDF that must be reconciled with each amendment.
+    - Trinidad and Tobago's FIU portal is a session-bound search form with no downloadable file link (source-probe run 37129541443).
 
 - **Screening hardening.**
   - **Thin news coverage now earns a same-day make-up sweep.** On 3 Oct 2026, 972 of 996 subjects were reached by Bing alone. That counted as covered, so the 03:07 make-up firing exited in 40 s. Run metrics now record feed reach as counts only. When at least `MAKEUP_THIN_FEED_PCT` (default 50%) of the book had one feed or none, a fresh runner re-sweeps. A make-up run never re-triggers on this ground, so it runs at most once a day.
