@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical, snapshotDate } from '../scripts/fatf-watchdog.mjs';
+import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical, snapshotDate, fetchRetrying, snapshotUrls } from '../scripts/fatf-watchdog.mjs';
 
 function throws(fn) { try { fn(); return false; } catch { return true; } }
 
@@ -161,6 +161,31 @@ check('a label carrying no stamp, or none at all, persists nothing network-shape
   && snapshotDate(undefined) === 'unknown');
 check('injected text around a stamp cannot reach the file',
   snapshotDate('20260731091550","x":"\n../../evil') === '2026-07-31');
+
+/* ── archive reads: retry 429/5xx, fall back across captures (3 Oct 2026: a
+   1-day-old capture existed, its single fetch got 429, the watchdog skipped) ── */
+{
+  const resp = (status, retryAfter) => ({ status, ok: status >= 200 && status < 300,
+    headers: { get: (h) => (h.toLowerCase() === 'retry-after' ? retryAfter || null : null) } });
+  const waits = [];
+  let calls = 0;
+  const seq = [resp(429, '2'), resp(503), resp(200)];
+  const ok = await fetchRetrying('https://web.archive.org/web/x', {}, {
+    fetchImpl: async () => seq[calls++], sleep: async (ms) => { waits.push(ms); }, baseMs: 1000, capMs: 60000 });
+  check('archive fetch: a 429 then a 503 are retried and the third attempt succeeds', ok && ok.status === 200 && calls === 3);
+  check('archive fetch: Retry-After is honoured, never below the linear backoff', waits[0] === 2000 && waits[1] === 2000);
+  calls = 0;
+  const gone = await fetchRetrying('u', {}, { fetchImpl: async () => { calls++; return resp(404); }, sleep: async () => {} });
+  check('archive fetch: a 404 is not retried', gone === null && calls === 1);
+  calls = 0;
+  const down = await fetchRetrying('u', {}, { fetchImpl: async () => { calls++; throw new Error('reset'); }, sleep: async () => {} });
+  check('archive fetch: network errors are retried, then null (never a fabricated page)', down === null && calls === 3);
+  const urls = snapshotUrls(['20261001000000', 'junk', '20261002020916', '20261002020916', '20260930000000', '20260901000000'], 'https://p/x');
+  check('snapshot fallback: newest 3 distinct captures, raw id_ form first, junk ignored',
+    urls.length === 6 && urls[0].url === 'https://web.archive.org/web/20261002020916id_/https://p/x'
+    && urls[1].url === 'https://web.archive.org/web/20261002020916/https://p/x'
+    && urls[2].ts === '20261001000000' && urls[4].ts === '20260930000000');
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

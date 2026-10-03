@@ -10,6 +10,12 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **FATF Watchdog and Regulatory Watch recover archived pages instead of skipping.** Both read archive.org captures when the official site blocks the GitHub runner. On 3 Oct 2026 a capture existed for each, but its single read got HTTP 429, so the FATF lists went unverified for an 8th run in a row and the UAE NAMLCFTC page for a 3rd.
+  - Capture reads now retry 429, 5xx and network errors with backoff and honour Retry-After.
+  - FATF tries the newest three captures, in raw and normal form.
+  - Regulatory Watch also uses a fresh capture that Save Page Now redirects to on a 429.
+  - A 404 is never retried, and no page is ever fabricated.
+
 - **Free official sources first, and a licence-free mode.** OpenSanctions states that businesses must acquire a data licence. The engine now needs none for its core screening.
   - **Official lists are the primary source.** The Python daily screen reads the UK Sanctions List (official FCDO CSV), EU FSF (official webgate XML), Australia DFAT (official .xlsx) and Switzerland SECO (official XML) directly. On 3 Oct 2026 the JS engine loaded these same files: UK 58,311, EU 31,070, AU 11,413 and CH 44,361 names. The OpenSanctions mirrors are now only fallbacks. The DFAT and SECO parsers are ported from `scripts/sanctions-match.mjs`.
   - **Free worldwide PEP net.** The Python screen now also runs the repo's own Wikidata PEP harvest, which is CC0. The 2 Oct 2026 harvest holds 423,826 office-holders. The report names its harvest date.
