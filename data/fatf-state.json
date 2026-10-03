@@ -11,10 +11,12 @@
     "British Virgin Islands",
     "Bulgaria",
     "Cameroon",
+    "Cote D'Ivoire",
     "Haiti",
     "Iraq",
     "Kenya",
     "Kuwait",
+    "Lao People's Democratic Republic",
     "Lebanon",
     "Monaco",
     "Nepal",
@@ -26,5 +28,7 @@
     "Vietnam",
     "Yemen"
   ],
-  "updated": "2026-10-03"
+  "updated": "2026-10-03",
+  "repairedFrom": "recorded plenary 2026-06-19",
+  "lastCorroboratedSnapshot": "2026-09-14"
 }
