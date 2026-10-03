@@ -2,13 +2,13 @@
   "updated": "2026-10-03",
   "sources": {
     "uae-moe": {
-      "hash": "d6deded2e51c8ccd450871f7dee1e09c63d62db47c1796c6b83ef777ee6b7194",
+      "hash": "1501f5fc552f33f5ef73a4bae0e2a918462dc37340b8c102887cde52683d304c",
       "bytes": 10532,
       "checkedAt": "2026-10-03",
       "changedAt": "2026-10-03",
       "contentAsOf": "2026-10-03",
       "status": 200,
-      "prevHash": "510eb2a319994406eef05ee73027aef804549b45d6c05e1316d64cc02f189e94"
+      "prevHash": "d6deded2e51c8ccd450871f7dee1e09c63d62db47c1796c6b83ef777ee6b7194"
     },
     "uae-fiu": {
       "hash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
@@ -24,12 +24,10 @@
       "bytes": 6329,
       "checkedAt": "2026-10-03",
       "changedAt": "2026-09-21",
-      "contentAsOf": "2026-09-28",
-      "status": 403,
+      "contentAsOf": "2026-10-03",
+      "status": 200,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org snapshot 20260928140124",
-      "error": "HTTP 403",
-      "errorStreak": 3
+      "via": "web.archive.org save-page-now 20261003114402"
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -72,11 +70,9 @@
       "checkedAt": "2026-10-03",
       "changedAt": "2026-09-15",
       "contentAsOf": "2026-09-14",
-      "status": 403,
+      "status": 200,
       "prevHash": "425f1487e2975aa19395aae53602eab8258d0bf862ee540b188ba3a9b3142ae1",
-      "via": "web.archive.org snapshot 20260914091451",
-      "error": "HTTP 403",
-      "errorStreak": 1
+      "via": "web.archive.org snapshot 20260914091451"
     },
     "wolfsberg": {
       "hash": "575ebdfe1028c70db1de23dfd4f5f5ec3d9b6ed11ef6646943945d298c284815",
@@ -115,7 +111,7 @@
       "prevHash": "11f8e179f88fb94214ab9242170cedefb8f9f5c0e83b7d82a8adf22080ed61d1",
       "via": "web.archive.org snapshot 20260930195304",
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "ofac": {
       "hash": "c6e088392908ec2b4f5749057908e8ec30950a895d8abf214003cc5a1c0bf2b7",
