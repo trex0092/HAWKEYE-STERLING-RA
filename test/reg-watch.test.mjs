@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
-  persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
+  persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback, fetchCaptureRetrying,
   captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS,
   REG_REVIEW_CHECKLIST,
 } from '../scripts/reg-watch.mjs';
@@ -213,6 +213,28 @@ check('fetchWithFallback returns the direct response when it succeeds (no waybac
     const fn = async () => { calls++; return { ok: true, status: 200, body: 'direct', error: null }; };
     const r = await fetchWithFallback('https://x', fn);
     return r.body === 'direct' && !r.via && calls === 1;
+  })());
+
+check('capture reads: a 429 then a 503 are retried and the capture is used (3 Oct NAMLCFTC case)',
+  await (async () => {
+    const seq = [{ ok: false, status: 429, body: '' }, { ok: false, status: 503, body: '' }, { ok: true, status: 200, body: 'page' }];
+    let i = 0; const waits = [];
+    const r = await fetchCaptureRetrying(async () => seq[i++], 'u', { sleep: async (ms) => { waits.push(ms); }, baseMs: 5 });
+    return r.body === 'page' && i === 3 && waits.join() === '5,10';
+  })());
+check('capture reads: a 404 is not retried; persistent 429 returns the failure (never a fabricated page)',
+  await (async () => {
+    let n = 0;
+    const a = await fetchCaptureRetrying(async () => { n++; return { ok: false, status: 404, body: '' }; }, 'u', { sleep: async () => {} });
+    let m = 0;
+    const b = await fetchCaptureRetrying(async () => { m++; return { ok: false, status: 429, body: '' }; }, 'u', { sleep: async () => {} });
+    return a.status === 404 && n === 1 && b.status === 429 && !b.ok && m === 3;
+  })());
+check('fetchWithFallback reads captures through the retrying helper, and accepts an SPN redirect to a fresh capture even on 429',
+  (() => {
+    const src = readFileSync(new URL('../scripts/reg-watch.mjs', import.meta.url), 'utf8');
+    return (src.match(/fetchCaptureRetrying\(fetchFn, 'https:\/\/web\.archive\.org\/web\/' \+ ts \+ 'id_\/' \+ url, opts\.retry\)/g) || []).length === 3
+      && /if \(ts && captureAcceptable\(ts, notBefore\)\) \{/.test(src);
   })());
 
 /* ── diffTexts: detailed change delivery ── */

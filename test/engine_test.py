@@ -1397,6 +1397,77 @@ for _wf in ("weekly-adverse-media.yml", "onboarding-screen.yml"):
     _wft = open(os.path.join(ROOT, ".github", "workflows", _wf), encoding="utf-8").read()
     check(f"{_wf} passes ADVERSE_WATCHLIST_EXTRA from a repository variable, with no default",
           "ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}\n" in _wft)
+# ── Licence-free mode (OPENSANCTIONS_DATA=0) + free Wikidata PEP net ────────
+check("licence switch: unset/empty OPENSANCTIONS_DATA keeps today's behaviour (on)",
+      screen.OPENSANCTIONS_DATA is True or os.environ.get("OPENSANCTIONS_DATA", "").strip() == "0")
+_lf_urls = []
+_lf_saved = (screen.download, screen.OPENSANCTIONS_DATA)
+try:
+    screen.download = lambda url, label: (_lf_urls.append(url) or _ex_csv)
+    screen.OPENSANCTIONS_DATA = False
+    _lf_pep = screen.load_pep_mirror()
+    _lf_wl = screen.load_adverse_watchlist()
+    _lf_ex = screen.load_adverse_watchlist_extra(["debarment"])
+    _lf_al, _lf_lm = {}, {}
+    screen.load_worldwide_sanctions(_lf_al, _lf_lm)
+    _lf_eocn = screen.load_eocn_mirror()
+    check("licence-free mode: no OpenSanctions net downloads anything",
+          _lf_urls == [] and _lf_pep is None and _lf_wl[0] is None and _lf_ex == {}
+          and _lf_eocn[0] == set() and _lf_al == {})
+    check("licence-free mode: the switched-off nets are marked licence-off (reported by name, not 'unavailable')",
+          _lf_wl[2]["date"] == "licence-off" and _lf_lm["worldwide"]["date"] == "licence-off"
+          and _lf_eocn[1]["date"] == "licence-off")
+finally:
+    screen.download, screen.OPENSANCTIONS_DATA = _lf_saved
+for _wf in ("weekly-adverse-media.yml", "onboarding-screen.yml"):
+    _wft = open(os.path.join(ROOT, ".github", "workflows", _wf), encoding="utf-8").read()
+    check(f"{_wf} passes OPENSANCTIONS_DATA from a repository variable, with no default",
+          "OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}\n" in _wft)
+    check(f"{_wf} allows the official UK / AU / CH list hosts and overlays the Wikidata PEP list",
+          all(h in _wft for h in ("sanctionslist.fcdo.gov.uk:443", "www.dfat.gov.au:443",
+                                  "www.sesam.search.admin.ch:443"))
+          and "git checkout FETCH_HEAD -- data/pep-worldwide.json" in _wft)
+import gzip as _gz, tempfile as _tf
+_wd_ds = {"v": 1, "harvested": "2026-10-02T06:51:13Z", "count": 2, "entries": [
+    {"qid": "Q1", "name": "Example Minister Person", "aliases": ["E. Minister Person", "Пример"],
+     "position": "Minister of Finance", "country": "Exampleland", "current": True},
+    {"qid": "Q2", "name": "Ng W", "aliases": [], "position": "senator", "country": "", "current": True}]}
+with _tf.NamedTemporaryFile(suffix=".json", delete=False) as _wf_tmp:
+    _wf_tmp.write(_gz.compress(json.dumps(_wd_ds).encode()))
+_wd_idx, _wd_meta = screen.load_pep_wikidata_net(_wf_tmp.name)
+os.unlink(_wf_tmp.name)
+check("Wikidata PEP net: the gzipped harvest loads with its count and harvest date",
+      _wd_idx is not None and _wd_meta["count"] == 2 and _wd_meta["date"] == "2026-10-02")
+_wd_hit = screen.pep_wikidata_lookup(_wd_idx, "person example minister")
+check("Wikidata PEP net: exact + word-order match, office and Wikidata link carried as evidence",
+      _wd_hit.get("hit") and _wd_hit["id"] == "Q1" and "Minister of Finance, Exampleland" in _wd_hit["category"]
+      and _wd_hit["source_url"] == "https://www.wikidata.org/wiki/Q1" and _wd_hit.get("via_mirror"))
+check("Wikidata PEP net: an alias matches; a stranger does not; a sub-5-char key is never indexed",
+      screen.pep_wikidata_lookup(_wd_idx, "E. Minister Person").get("hit")
+      and not screen.pep_wikidata_lookup(_wd_idx, "Unrelated Person").get("hit")
+      and not screen.pep_wikidata_lookup(_wd_idx, "Ng W").get("hit"))
+check("Wikidata PEP net: a missing file is unavailable (logged), never a silent clear",
+      screen.load_pep_wikidata_net("/nonexistent/pep.json") == (None, {"count": 0, "date": "unavailable"}))
+_pn_stats = {"subjects_total": 2, "companies_screened": 1, "individuals_screened": 1, "am_errors": 0,
+             "pep_errors": 0, "delta": {}, "opensanctions_data": False,
+             "pep_nets": {"OpenSanctions PEP/RCA dataset": {"count": 0, "date": "licence-off"},
+                          screen.PEP_WIKIDATA_LABEL: {"count": 423826, "date": "2026-10-02"}}}
+_pn_n = screen.build_unified_narrative([], [], [], [], _meta_deg, _pn_stats, _dt.datetime(2026, 10, 3))
+check("report: each PEP net is named with its state (Wikidata count + harvest date; OpenSanctions OFF, RCA gap stated)",
+      "Wikidata worldwide PEP list (CC0) · 423,826 office-holders, harvested 2026-10-02" in _pn_n
+      and "OpenSanctions PEP/RCA dataset · OFF — licence-free mode" in _pn_n
+      and "relatives / close associates (RCA) are NOT bulk-screened" in _pn_n)
+check("report: licence-free mode says the crime watchlist is OFF and the news feeds are the only adverse nets",
+      "OpenSanctions crime watchlist · OFF — licence-free mode" in _pn_n)
+_meta_lo = {**_meta_deg, "worldwide": {"count": 0, "date": "licence-off", "tier": "supplementary"}}
+check("report: a licence-off worldwide sanctions net is named, not 'not reached'",
+      "OFF — licence-free mode (OPENSANCTIONS_DATA=0) - not screened"
+      in screen.build_unified_narrative([], [], [], [], _meta_lo, _pn_stats, _dt.datetime(2026, 10, 3)))
+import inspect as _insp_pn
+_ssrc = _insp_pn.getsource(screen.screen_subject_set)
+check("run: the free Wikidata PEP net runs after the OpenSanctions net (first hit wins), and its state reaches the report",
+      _ssrc.find("load_pep_mirror()") < _ssrc.find("load_pep_wikidata_net()")
+      and '"pep_nets": pep_nets' in _ssrc and '"opensanctions_data": OPENSANCTIONS_DATA' in _ssrc)
 check("report: payment screening says INACTIVE without a feed (no implied clearance)",
       len(_inactive) == 1 and "INACTIVE" in _inactive[0])
 _active = payment_screen.report_lines(payment_screen.screen_feed(
@@ -1771,6 +1842,7 @@ screen.time.monotonic = lambda: 1000.0
 def _reset_breaker():
     screen._GDELT_STATE["consecutive_failures"] = 0
     screen._GDELT_STATE["open"] = False
+    screen._GDELT_STATE["last_probe"] = 0.0
     screen._GNEWS_STATE["consecutive_zero"] = 0
     screen._GNEWS_STATE["open"] = False
     screen._GNEWS_STATE["zero_since"] = None
@@ -1871,6 +1943,35 @@ screen.search_gdelt = lambda *_a, **_k: []
 screen.search_adverse_media("Acme")
 check("a GDELT success keeps the circuit closed and the streak at zero",
       screen._GDELT_STATE["consecutive_failures"] == 0 and not screen._GDELT_STATE["open"])
+
+# GDELT half-open recovery (3 Oct 2026: GDELT 429'd for 2 minutes, then
+# stayed off for the remaining 26 minutes of the run).
+_reset_breaker(); _calls["gdelt"] = 0
+screen.search_gdelt = _gdelt_down
+for _ in range(screen.GDELT_BREAKER_AFTER):
+    screen.search_adverse_media("Acme")
+_t_trip = screen._GDELT_STATE["last_probe"]
+check("GDELT trip stamps last_probe (probe clock armed)", screen._GDELT_STATE["open"] and _t_trip > 0)
+check("no GDELT probe before GDELT_PROBE_SECONDS have passed",
+      screen._gdelt_should_probe(now=_t_trip + screen.GDELT_PROBE_SECONDS - 1) is False)
+_mono = screen.time.monotonic
+try:
+    screen.time.monotonic = lambda: _t_trip + screen.GDELT_PROBE_SECONDS + 1
+    _calls["gdelt"] = 0
+    screen.search_adverse_media("Acme")
+    check("a failed GDELT probe sends ONE query and leaves the circuit open",
+          _calls["gdelt"] == 1 and screen._GDELT_STATE["open"])
+    _calls["gdelt"] = 0
+    screen.search_adverse_media("Acme")
+    check("the next subject inside the same interval does not probe again", _calls["gdelt"] == 0)
+    screen.time.monotonic = lambda: _t_trip + 2 * screen.GDELT_PROBE_SECONDS + 2
+    screen.search_gdelt = lambda *_a, **_k: []
+    screen.search_adverse_media("Acme")
+    check("a successful GDELT probe closes the circuit — GDELT coverage resumes",
+          not screen._GDELT_STATE["open"] and screen._GDELT_STATE["consecutive_failures"] == 0)
+finally:
+    screen.time.monotonic = _mono
+_reset_breaker()
 
 # ── run-global rate gate + Google News circuit breaker (13 Jul regression) ────
 # Per-worker pacing was not enough: 8 workers each sleeping 0.4s still burst
@@ -2152,9 +2253,9 @@ screen.download = _orig_download
 check("parse_eu still parses via the shared simple-csv parser",
       screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
 
-# EU FSF is the one core list whose PRIMARY is the OpenSanctions host, so its
-# fallback runs the other way: official webgate XML. Names live in wholeName
-# attributes on <nameAlias> elements (entities and aliases alike).
+# EU FSF: the official webgate XML is the PRIMARY (free) since 2026-10-03; the
+# OpenSanctions mirror is a fallback only while OPENSANCTIONS_DATA allows it.
+# Names live in wholeName attributes on <nameAlias> elements.
 _FSF_XML = (b'<?xml version="1.0" encoding="UTF-8"?><export generationDate="2026-07-29">'
             b'<sanctionEntity logicalId="1"><nameAlias wholeName="EVIL CORP" firstName=""/>'
             b'<nameAlias wholeName="E &amp; CORP"/></sanctionEntity>'
@@ -2162,46 +2263,150 @@ _FSF_XML = (b'<?xml version="1.0" encoding="UTF-8"?><export generationDate="2026
             b'</export>')
 check("FSF official XML parses wholeName attributes (entities + aliases, unescaped)",
       screen.parse_eu_official_xml(_FSF_XML) == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+# Tiny fixtures sit below the real coverage floors; zero them for the loader
+# tests (the below-floor path has its own checks further down).
+_floors_real = dict(screen.CORE_LIST_FLOORS)
+screen.CORE_LIST_FLOORS.update({k: 0 for k in screen.CORE_LIST_FLOORS})
 _dl_urls.clear()
-screen.download = lambda url, label: (_dl_urls.append(url) or _FSF_XML)
-_fb = screen._eu_official_fallback(set())
-check("EU fallback loads the official XML when the mirror yielded nothing",
-      bool(_fb) and _fb[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
-check("EU fallback provenance is explicit in the list date (audit trail)",
-      bool(_fb) and "official" in _fb[1].lower())
-check("EU fallback targets webgate with the public FSF token",
-      bool(_dl_urls) and "webgate.ec.europa.eu" in _dl_urls[0] and "token=" in _dl_urls[0])
-check("EU fallback: unset EU_FSF_TOKEN keeps the public URL",
+screen.download = lambda url, label: (_dl_urls.append(url) or (_FSF_XML if "webgate" in url else _SIMPLE))
+_eu = screen.load_eu_list()
+check("EU: the official XML is the primary and the mirror is not fetched when it loads",
+      _eu[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"} and _eu[3] is True
+      and len(_dl_urls) == 1 and "webgate.ec.europa.eu" in _dl_urls[0] and "token=" in _dl_urls[0])
+check("EU: provenance names the official XML (audit trail)", "official" in _eu[1].lower())
+check("EU: unset EU_FSF_TOKEN keeps the public URL",
       screen.eu_official_xml_url({}) == screen.EU_OFFICIAL_XML_URL)
 _pu = screen.eu_official_xml_url({"EU_FSF_TOKEN": " personal_123 "})
-check("EU fallback: a personal EU_FSF_TOKEN replaces only the token parameter",
+check("EU: a personal EU_FSF_TOKEN replaces only the token parameter",
       _pu.startswith("https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?")
       and _pu.endswith("token=personal_123") and _pu.count("token=") == 1)
-check("EU fallback: an injection-shaped token is ignored",
+check("EU: an injection-shaped token is ignored",
       screen.eu_official_xml_url({"EU_FSF_TOKEN": "x&url=https://evil"}) == screen.EU_OFFICIAL_XML_URL)
-check("EU fallback: an EU Login sign-in page parses to no names (fails loudly, never 'loaded')",
+check("EU: an EU Login sign-in page parses to no names (fails loudly, never 'loaded')",
       screen.parse_eu_official_xml(b"<!DOCTYPE html><html><title>EU Login</title></html>") == set())
-check("no official-XML fetch when the mirror loaded",
-      screen._eu_official_fallback({"LOADED"}) is None and len(_dl_urls) == 1)
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url)
+                                      or (b"<html><title>EU Login</title></html>" if "webgate" in url else _SIMPLE))
+_eu = screen.load_eu_list()
+check("EU: a sign-in page falls back to the mirror while the licence switch allows it",
+      _eu[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _eu[1].lower() and _eu[3] is True
+      and len(_dl_urls) == 2 and "eu_fsf/targets.simple.csv" in _dl_urls[1])
+_os_saved = screen.OPENSANCTIONS_DATA
+try:
+    screen.OPENSANCTIONS_DATA = False
+    _dl_urls.clear()
+    _eu = screen.load_eu_list()
+    check("EU: licence-free mode never touches the mirror — the list is unavailable, not fetched",
+          _eu[0] == set() and _eu[3] is False and len(_dl_urls) == 1
+          and not any("opensanctions" in u for u in _dl_urls))
+    check("licence-free mode: OFAC/UN mirror fallbacks are off",
+          screen._mirror_fallback(set(), "us_ofac_sdn", "OFAC SDN") is None and len(_dl_urls) == 1)
+finally:
+    screen.OPENSANCTIONS_DATA = _os_saved
 screen.download = lambda url, label: None
-check("official XML also down → no fallback (degrade-loudly paths take over)",
-      screen._eu_official_fallback(set()) is None)
+check("EU: official XML and mirror both down -> unavailable, not fetched",
+      screen.load_eu_list() == (set(), "unavailable", "", False))
 screen.download = _orig_download
 
-# Every core list with a second origin must actually be WIRED to it, on BOTH
-# load paths — the 2026-07-29 multi-homing bug class was exactly a helper that
-# existed but one path didn't call. UK falls back to the OpenSanctions
-# gb_hmt_sanctions mirror; EU to the official XML; AU/CH have no second origin
-# (documented in the loader) and rely on the outage gate.
+# AU / CH: official DFAT .xlsx and SECO XML (free) — ported from
+# parseDfatXlsx / parseSecoXml in scripts/sanctions-match.mjs.
+_SECO = (b'<swiss-sanctions-list><target><individual><identity main="true">'
+         b'<name name-type="primary-name"><name-part name-part-type="given-name"><value>Ivan</value></name-part>'
+         b'<name-part name-part-type="family-name"><value lang="ru"><![CDATA[Petrov &amp; Sons]]></value></name-part></name>'
+         b'<name name-type="alias"><name-part name-part-type="whole-name"><value>IVAN P</value></name-part></name>'
+         b'</identity></individual></target></swiss-sanctions-list>')
+check("SECO XML: every <name> block assembles its <value> parts (attributes + CDATA kept)",
+      screen.parse_seco_xml(_SECO) == {"Ivan Petrov & Sons", "IVAN P"})
+check("SECO XML: empty / HTML input parses to nothing", screen.parse_seco_xml(None) == set()
+      and screen.parse_seco_xml(b"<html><body>Just a moment...</body></html>") == set())
+import zipfile as _zf, io as _zio
+def _xlsx(sheets, shared):
+    b = _zio.BytesIO()
+    with _zf.ZipFile(b, "w", _zf.ZIP_DEFLATED) as z:
+        z.writestr("xl/sharedStrings.xml", "<sst>" + "".join(f"<si><t>{t}</t></si>" for t in shared) + "</sst>")
+        for i, rows in enumerate(sheets, 1):
+            xml = "<worksheet><sheetData>"
+            for r, cells in enumerate(rows, 1):
+                xml += f'<row r="{r}">' + "".join(
+                    (f'<c r="{c}{r}" t="s"><v>{v}</v></c>' if isinstance(v, int) else
+                     f'<c r="{c}{r}" t="inlineStr"><is><r><t>{v[:4]}</t></r><r><t>{v[4:]}</t></r></is></c>')
+                    for c, v in cells) + "</row>"
+            z.writestr(f"xl/worksheets/sheet{i}.xml", xml + "</sheetData></worksheet>")
+    return b.getvalue()
+_dfat = _xlsx([[[("A", 0), ("B", 1), ("C", 2)],
+                [("A", 3), ("B", 4), ("C", 5)],
+                [("A", 6), ("B", "ISLAMIC REVOLUTIONARY GUARD CORPS"), ("C", 5)],
+                [("A", 7), ("B", 8)]]],
+              ["Reference", "Name of Individual or Entity", "Name Type",
+               "1", "EXAMPLE DESIGNEE &amp; CO", "Primary Name", "1a", "2", "----"])
+check("DFAT xlsx: name columns are read (shared + multi-run inline strings), Name Type and dash placeholders skipped",
+      screen.parse_dfat_xlsx(_dfat) == {"EXAMPLE DESIGNEE & CO", "ISLAMIC REVOLUTIONARY GUARD CORPS"})
+check("DFAT xlsx: a non-zip body (bot page) parses to nothing", screen.parse_dfat_xlsx(b"<html>blocked</html>") == set())
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url) or (_dfat if "dfat.gov.au" in url else _SIMPLE))
+_au = screen.load_au_list()
+check("AU: the official DFAT file is the primary; no mirror fetch when it loads",
+      _au[0] == {"EXAMPLE DESIGNEE & CO", "ISLAMIC REVOLUTIONARY GUARD CORPS"} and _au[3] is True
+      and "official" in _au[1] and len(_dl_urls) == 1)
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url) or (b"<html>blocked</html>" if "admin.ch" in url else _SIMPLE))
+_ch = screen.load_ch_list()
+check("CH: an unparseable official file falls back to the mirror (licence permitting), provenance marked",
+      _ch[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _ch[1].lower() and _ch[3] is True
+      and "ch_seco_sanctions" in _dl_urls[1])
+try:
+    screen.OPENSANCTIONS_DATA = False
+    _dl_urls.clear()
+    check("CH: licence-free mode -> unavailable and NOT fetched (outage gate, never a refusal)",
+          screen.load_ch_list() == (set(), "unavailable", "", False) and len(_dl_urls) == 1)
+finally:
+    screen.OPENSANCTIONS_DATA = _os_saved
+screen.download = _orig_download
+_floor_saved = dict(screen.CORE_LIST_FLOORS)
+try:
+    screen.CORE_LIST_FLOORS["au"] = 5   # the 2-name official fixture is now "truncated"
+    _dl_urls.clear()
+    screen.download = lambda url, label: (_dl_urls.append(url) or (_dfat if "dfat.gov.au" in url else _SIMPLE))
+    _au2 = screen.load_au_list()
+    check("AU: an official file below its floor falls back to the mirror instead of refusing the run (delivery protected)",
+          _au2[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _au2[1] and len(_dl_urls) == 2)
+    screen.download = lambda url, label: (_dfat if "dfat.gov.au" in url else None)
+    _au3 = screen.load_au_list()
+    check("AU: below floor with no mirror -> the official names stay 'obtained' so the floor gate still refuses corrupt data",
+          _au3[0] == {"EXAMPLE DESIGNEE & CO", "ISLAMIC REVOLUTIONARY GUARD CORPS"} and _au3[3] is True)
+finally:
+    screen.CORE_LIST_FLOORS.clear(); screen.CORE_LIST_FLOORS.update(_floor_saved)
+    screen.download = _orig_download
+try:
+    screen.CORE_LIST_FLOORS["eu"] = 5; screen.CORE_LIST_FLOORS["uk"] = 5
+    screen.download = lambda url, label: (_FSF_XML if "webgate" in url else _SIMPLE)
+    _eu_bf = screen.load_eu_list()
+    check("EU: an official XML below its floor falls back to the mirror (delivery protected)",
+          _eu_bf[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _eu_bf[1])
+    screen.download = lambda url, label: (_FSF_XML if "webgate" in url else None)
+    check("EU: below floor with no mirror -> official names kept as obtained (floor gate decides)",
+          screen.load_eu_list()[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"} and screen.load_eu_list()[3] is True)
+    screen.download = lambda url, label: (b"Name 6,Name 1\nEXAMPLE,ONE\n" if "fcdo.gov.uk" in url else _SIMPLE)
+    _uk_bf = screen.load_uk_list()
+    check("UK: an official CSV below its floor falls back to the mirror (delivery protected)",
+          _uk_bf[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _uk_bf[1])
+finally:
+    screen.download = _orig_download
+screen.CORE_LIST_FLOORS.clear(); screen.CORE_LIST_FLOORS.update(_floors_real)
+check("CH: the slow SESAM endpoint gets its longer timeout",
+      screen.DOWNLOAD_TIMEOUTS.get(screen.CH_OFFICIAL_XML_URL) == 150)
+
+# Every core list must be WIRED to its loader on BOTH load paths — the
+# 2026-07-29 multi-homing bug class was a helper one path didn't call.
 import inspect as _inspect
 _src_daily  = _inspect.getsource(screen.load_all_lists)
 _src_legacy = _inspect.getsource(screen.main)
 for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
     check(f"{_pname} path wires the OFAC mirror fallback", "us_ofac_sdn" in _psrc)
     check(f"{_pname} path wires the UN mirror fallback", "un_sc_sanctions" in _psrc)
-    check(f"{_pname} path loads the UK list via load_uk_list (UK Sanctions List first)",
-          "load_uk_list()" in _psrc and "gb_hmt_sanctions" not in _psrc)
-    check(f"{_pname} path wires the EU official-XML fallback", "_eu_official_fallback" in _psrc)
+    check(f"{_pname} path loads UK/EU/AU/CH via their official-first loaders",
+          all(f"{f}()" in _psrc for f in ("load_uk_list", "load_eu_list", "load_au_list", "load_ch_list"))
+          and "gb_hmt_sanctions" not in _psrc and "data.opensanctions.org" not in _psrc)
     check(f"{_pname} path folds OFAC aliases only when the mirror did not serve",
           "_fold_ofac_aliases" in _psrc
           and _psrc.find("us_ofac_sdn") < _psrc.find("_fold_ofac_aliases"))
@@ -4945,40 +5150,69 @@ check("stale_core_lists: respects the configured limit",
 _fcdo_csv = (b'"id","schema","name","aliases"\n'
              b'"a1","Person","EXAMPLE DESIGNEE ONE","E. DESIGNEE;DESIGNEE EXAMPLE"\n'
              b'"a2","Organization","EXAMPLE HOLDINGS LLC",""\n')
+# Official UK Sanctions List CSV: a report-date title row, then the Name 1..6
+# header (GOV.UK format guide), one row per name record.
+_uksl_csv = (b'Report Date: 02/10/2026\n'
+             b'Last Updated,Name 6,Name 1,Name 2,Name 3,Name 4,Name 5,Name type\n'
+             b'01/10/2026,DESIGNEE,EXAMPLE,ONE,,,,Primary Name\n'
+             b'01/10/2026,EXAMPLE HOLDINGS LLC,,,,,,Primary Name\n')
 _uk_calls = []
 _orig_dl_uk, _orig_parse_uk = screen.download, screen.parse_uk
+_uk_floor = screen.CORE_LIST_FLOORS["uk"]
+screen.CORE_LIST_FLOORS["uk"] = 0
 try:
     def _dl_ok(url, label):
-        _uk_calls.append(url); return _fcdo_csv if "gb_fcdo_sanctions" in url else b"CONLIST"
+        _uk_calls.append(url)
+        return _uksl_csv if "sanctionslist.fcdo.gov.uk" in url else _fcdo_csv
     screen.download = _dl_ok
     _n, _d, _h, _f = screen.load_uk_list()
-    check("UK: the UK Sanctions List mirror is the primary and carries names + aliases",
-          _n == {"EXAMPLE DESIGNEE ONE", "E. DESIGNEE", "DESIGNEE EXAMPLE", "EXAMPLE HOLDINGS LLC"} and _f is True)
-    check("UK: the retired ConList is NOT fetched when the primary loaded",
-          len(_uk_calls) == 1 and "gb_fcdo_sanctions" in _uk_calls[0])
-    check("UK: provenance names the UK Sanctions List (no stale-date claim)",
-          _d.startswith("live (UK Sanctions List") and screen.list_age_days(_d) is None)
+    check("UK: the official FCDO CSV is the primary (assembled Name 1..6)",
+          _n == {"EXAMPLE ONE DESIGNEE", "EXAMPLE HOLDINGS LLC"} and _f is True)
+    check("UK: neither the mirror nor the retired ConList is fetched when the official file loaded",
+          len(_uk_calls) == 1 and "sanctionslist.fcdo.gov.uk" in _uk_calls[0])
+    check("UK: the official file's report date becomes the list date (staleness-checkable)",
+          _d == "02/10/2026" and screen.list_age_days(_d, _dt.date(2026, 10, 3), dayfirst=True) == 1)
 
     _uk_calls.clear()
-    def _dl_mirror_empty(url, label):
+    screen.download = lambda url, label: (_uk_calls.append(url)
+                                          or (b"<html>error</html>" if "fcdo.gov.uk" in url else _fcdo_csv))
+    _n1, _d1, _h1, _f1 = screen.load_uk_list()
+    check("UK: an unusable official file falls back to the OpenSanctions mirror (licence permitting)",
+          _n1 == {"EXAMPLE DESIGNEE ONE", "E. DESIGNEE", "DESIGNEE EXAMPLE", "EXAMPLE HOLDINGS LLC"}
+          and "mirror" in _d1 and _f1 is True and "gb_fcdo_sanctions" in _uk_calls[1])
+    check("UK: mirror provenance carries no stale-date claim", screen.list_age_days(_d1) is None)
+
+    _uk_calls.clear()
+    def _dl_both_empty(url, label):
         _uk_calls.append(url)
+        if "fcdo.gov.uk" in url: return None
         return b'"id","schema","name","aliases"\n' if "gb_fcdo_sanctions" in url else b"CONLIST-BYTES"
-    screen.download = _dl_mirror_empty
-    screen.parse_uk = lambda data: ({"OLD DESIGNEE"}, "03/06/2026", "hash")
+    screen.download = _dl_both_empty
+    screen.parse_uk = lambda data: ({"OLD DESIGNEE"}, "03/06/2026", "hash") if data == b"CONLIST-BYTES" else (set(), "unknown", "")
     _n2, _d2, _h2, _f2 = screen.load_uk_list()
-    check("UK: an empty primary falls back to the retired ConList", _n2 == {"OLD DESIGNEE"} and _f2 is True
-          and len(_uk_calls) == 2 and "ConList.csv" in _uk_calls[1])
+    check("UK: official and mirror empty -> the retired ConList", _n2 == {"OLD DESIGNEE"} and _f2 is True
+          and len(_uk_calls) == 3 and "ConList.csv" in _uk_calls[2])
     check("UK: the fallback keeps ConList's own date, which the staleness check then flags",
           _d2 == "03/06/2026"
           and screen.stale_core_lists({"uk": {"count": 1, "date": _d2}}, _today) == [("uk", 110)])
+    _os_saved_uk = screen.OPENSANCTIONS_DATA
+    try:
+        screen.OPENSANCTIONS_DATA = False
+        _uk_calls.clear()
+        screen.load_uk_list()
+        check("UK: licence-free mode skips the OpenSanctions mirror",
+              not any("opensanctions" in u for u in _uk_calls) and len(_uk_calls) == 2)
+    finally:
+        screen.OPENSANCTIONS_DATA = _os_saved_uk
 
     screen.download = lambda url, label: None
     screen.parse_uk = _orig_parse_uk
     _n3, _d3, _h3, _f3 = screen.load_uk_list()
-    check("UK: both sources down -> empty and not fetched (the outage gate takes over)",
+    check("UK: every source down -> empty and not fetched (the outage gate takes over)",
           not _n3 and _f3 is False)
 finally:
     screen.download, screen.parse_uk = _orig_dl_uk, _orig_parse_uk
+    screen.CORE_LIST_FLOORS["uk"] = _uk_floor
 
 _run_dt = _dt.datetime(2026, 9, 21, 5, 0)
 _meta_fresh = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},

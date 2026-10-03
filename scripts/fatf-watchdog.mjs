@@ -13,6 +13,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 /* Shared Asana client: bounded retry on 429/5xx + the re-run dedup guard. */
 import { asana, findRecentDuplicate, listProjectTasks as listTasksIn } from './asana-notify.mjs';
+import { retryAfterDelayMs } from './runtime-recovery.mjs';
 
 export const STATE_FILE = 'data/fatf-state.json';
 const FATF_URL = 'https://www.fatf-gafi.org/en/countries/black-and-grey-lists.html';
@@ -265,6 +266,47 @@ export function parseCdxTimestamps(json) {
   return out.sort().reverse();
 }
 
+/* Archive reads that answer 429 (rate limit) or 5xx are retried, honouring
+   Retry-After (capped). On 3 Oct 2026 a 1-day-old capture existed but its ONE
+   fetch got a 429, so the watchdog skipped for the 8th run in a row.
+   Returns the ok Response, or null after the last attempt. Pure (injectable
+   fetch/sleep) for the test suite. */
+export async function fetchRetrying(url, opts = {}, { attempts = 3, fetchImpl = fetch,
+  sleep = (ms) => new Promise(r => setTimeout(r, ms)), baseMs = 10000, capMs = 60000 } = {}) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    let r;
+    try { r = await fetchImpl(url, opts); }
+    catch (e) { console.log('archive fetch error (attempt ' + attempt + '): ' + e.message); }
+    if (r) {
+      let shown = url;
+      try { const u = new URL(url); shown = u.pathname + u.search; } catch { /* not a URL — log as given */ }
+      console.log('archive fetch ' + shown + ' (attempt ' + attempt + '): ' + r.status);
+      if (r.ok) return r;
+      if (r.status !== 429 && r.status < 500) return null;   /* a 404/403 will not heal on retry */
+    }
+    if (attempt < attempts) {
+      const hinted = r && r.headers && typeof r.headers.get === 'function'
+        ? retryAfterDelayMs(r.headers.get('retry-after')) : 0;
+      await sleep(Math.min(capMs, Math.max(hinted, baseMs * attempt)));
+    }
+  }
+  return null;
+}
+
+/* Snapshot URLs to try, newest capture first: the raw `id_` form (FATF's own
+   HTML with no Wayback toolbar, served by a different path) and the normal
+   form, for up to `max` distinct captures — one rate-limited capture must not
+   blind the watchdog when an older-but-fresh one is readable. */
+export function snapshotUrls(timestamps, pageUrl, max = 3) {
+  const uniq = [...new Set((timestamps || []).filter(t => /^\d{14}$/.test(String(t))))].sort().reverse().slice(0, max);
+  const out = [];
+  for (const ts of uniq) {
+    out.push({ ts, url: 'https://web.archive.org/web/' + ts + 'id_/' + pageUrl });
+    out.push({ ts, url: 'https://web.archive.org/web/' + ts + '/' + pageUrl });
+  }
+  return out;
+}
+
 /* The only authoritative source is the official FATF page. It 403s our
    datacenter runner directly, so when that fails we (2) ask archive.org to fetch
    the live page *now* (Save Page Now) and (3) failing that, take the most recent
@@ -333,19 +375,19 @@ async function fetchFatfSegments() {
     console.log('wayback CDX index: ' + cd.status);
     if (cd.ok) candidates.push(...parseCdxTimestamps(await cd.json()));
   } catch (e) { console.log('wayback CDX error: ' + e.message); }
-  const ts = candidates.sort().reverse()[0];
-  if (ts) {
-    const age = snapshotAgeDays(ts);
-    console.log('newest existing snapshot: ' + ts + ' (' + Math.round(age) + 'd old)'
-      + (age > SNAPSHOT_STALE_DAYS ? ' — past the ' + SNAPSHOT_STALE_DAYS + 'd freshness bar' : ''));
-    try {
-      const s = await fetch('https://web.archive.org/web/' + ts + '/' + FATF_URL, { headers, redirect: 'follow' });
-      console.log('fetch snapshot ' + ts + ': ' + s.status);
-      if (s.ok) {
+  const tries = snapshotUrls(candidates, FATF_URL);
+  if (tries.length) {
+    const newest = tries[0].ts, newestAge = snapshotAgeDays(newest);
+    console.log('newest existing snapshot: ' + newest + ' (' + Math.round(newestAge) + 'd old)'
+      + (newestAge > SNAPSHOT_STALE_DAYS ? ' — past the ' + SNAPSHOT_STALE_DAYS + 'd freshness bar' : ''));
+    for (const { ts, url } of tries) {
+      const s = await fetchRetrying(url, { headers, redirect: 'follow' });
+      if (s) {
+        const age = snapshotAgeDays(ts);
         return { html: await s.text(), source: 'fatf-gafi.org via web.archive.org snapshot ' + ts,
                  stale: age > SNAPSHOT_STALE_DAYS, ageDays: age };
       }
-    } catch (e) { console.log('snapshot fetch error: ' + e.message); }
+    }
   } else {
     console.log('no existing snapshot found by either endpoint');
   }

@@ -10,6 +10,20 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **GDELT recovers during the run instead of staying off.** On 3 Oct 2026 GDELT returned HTTP 429 in the first two minutes. The breaker opened at 00:07 UTC, and GDELT then reached 0 of 996 subjects for the rest of the 28-minute run. The GDELT breaker is now half-open like Google News: one probe query every `GDELT_PROBE_SECONDS` (default 300 s), and a success closes the circuit.
+
+- **FATF Watchdog and Regulatory Watch recover archived pages instead of skipping.** Both read archive.org captures when the official site blocks the GitHub runner. On 3 Oct 2026 a capture existed for each, but its single read got HTTP 429, so the FATF lists went unverified for an 8th run in a row and the UAE NAMLCFTC page for a 3rd.
+  - Capture reads now retry 429, 5xx and network errors with backoff and honour Retry-After.
+  - FATF tries the newest three captures, in raw and normal form.
+  - Regulatory Watch also uses a fresh capture that Save Page Now redirects to on a 429.
+  - A 404 is never retried, and no page is ever fabricated.
+
+- **Free official sources first, and a licence-free mode.** OpenSanctions states that businesses must acquire a data licence. The engine now needs none for its core screening.
+  - **Official lists are the primary source.** The Python daily screen reads the UK Sanctions List (official FCDO CSV), EU FSF (official webgate XML), Australia DFAT (official .xlsx) and Switzerland SECO (official XML) directly. On 3 Oct 2026 the JS engine loaded these same files: UK 58,311, EU 31,070, AU 11,413 and CH 44,361 names. The OpenSanctions mirrors are now only fallbacks. The DFAT and SECO parsers are ported from `scripts/sanctions-match.mjs`.
+  - **Free worldwide PEP net.** The Python screen now also runs the repo's own Wikidata PEP harvest, which is CC0. The 2 Oct 2026 harvest holds 423,826 office-holders. The report names its harvest date.
+  - **Licence-free mode.** The repository variable `OPENSANCTIONS_DATA=0` stops every download from `data.opensanctions.org` in both engines. That covers the mirror fallbacks, the PEP/RCA net, the crime watchlist, the extra nets, the worldwide sanctions net, the EOCN cross-check and the 28 OpenSanctions-hosted national lists. Each switched-off net is named OFF in the report. Licence-free mode loses the relatives / close associates (RCA) bulk net and the crime watchlist, and the report says so. Unset = today's behaviour.
+  - **Report fix.** The bulk adverse-source lines in §② now print on every run, not only on days with adverse findings.
+
 - **Optional extra bulk adverse-media nets: OpenSanctions debarment and regulatory.** On 3 Oct 2026 the daily report showed GDELT reaching 0 of 996 subjects and Google News 24, so 972 subjects rested on one news feed. Bulk nets do not depend on news feeds being reachable. Setting the repository variable `ADVERSE_WATCHLIST_EXTRA=debarment,regulatory` now screens every subject, alongside the crime watchlist, against the OpenSanctions **debarment** collection (61 sources, 197,914 targets on 3 Oct) and the **regulatory** collection (37 sources, 163,209 targets on 2 Oct). It uses the same matcher, and each hit is titled and linked to its dataset.
   - **Off by default:** the data is CC-BY-NC 4.0, and a commercial deployment needs an OpenSanctions licence first (`docs/aims/third-party-register.md` updated).
   - **Reporting:** a failed download is shown as UNAVAILABLE in §② and never reads as clear. Crime-list findings keep their exact titles, so delta fingerprints are unchanged.

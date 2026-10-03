@@ -175,6 +175,9 @@ jobs:
             ofsistorage.blob.core.windows.net:443
             webgate.ec.europa.eu:443
             ecas.ec.europa.eu:443
+            sanctionslist.fcdo.gov.uk:443
+            www.dfat.gov.au:443
+            www.sesam.search.admin.ch:443
             data.opensanctions.org:443
             www.international.gc.ca:443
             news.google.com:443
@@ -199,6 +202,19 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
+
+      - name: Overlay the worldwide PEP list (Wikidata, CC0)
+        run: |
+          # Free worldwide PEP net for screen.py: the weekly Wikidata harvest
+          # lives on the pep-worldwide-state branch (public-officials data,
+          # unencrypted). Absent branch = the committed copy in data/ is used,
+          # and the report names the harvest date it screened against.
+          if git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
+            echo "worldwide PEP list overlaid from pep-worldwide-state"
+          else
+            echo "no pep-worldwide-state branch — using the committed data/pep-worldwide.json"
+          fi
 
       - name: Install dependencies
         run: pip install --quiet --require-hashes -r ci/requirements.txt
@@ -382,6 +398,10 @@ jobs:
           # committed. Unset = those feeds keep failing, but the failure now
           # names the reason instead of a bare 403.
           REGULATOR_UA_CONTACT: ${{ vars.REGULATOR_UA_CONTACT }}
+          # Licence-free mode: set the repository variable OPENSANCTIONS_DATA=0 to
+          # download nothing from data.opensanctions.org (its data needs a
+          # commercial licence). Unset = on. See docs/aims/third-party-register.md.
+          OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}
           RUN_MODE: unified   # ONE report: sanctions (all candidates) + adverse media (with links) + PEP
           # Optional extra bulk adverse nets (OpenSanctions debarment / regulatory).
           # OFF unless the repository variable is set — CC-BY-NC data, see

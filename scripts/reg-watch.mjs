@@ -413,6 +413,24 @@ async function spnAuthenticatedCapture(url, auth) {
   return null;
 }
 
+/* Capture reads retry 429 / 5xx / network errors with linear backoff. On
+   3 Oct 2026 archive.org held a capture of the NAMLCFTC page taken that same
+   minute, but its one read got HTTP 429, so the source stayed "unreachable"
+   for a 3rd run. Injectable sleep keeps the unit tests instant. */
+export async function fetchCaptureRetrying(fetchFn, url, { attempts = 3, baseMs = 10000,
+  sleep = (ms) => new Promise(r => setTimeout(r, ms)) } = {}) {
+  let snap;
+  for (let a = 1; a <= attempts; a++) {
+    snap = await fetchFn(url);
+    if (snap && snap.ok && snap.body) return snap;
+    const st = snap && snap.status;
+    const retryable = st === 429 || st === 'error' || (typeof st === 'number' && st >= 500);
+    if (!retryable || a === attempts) return snap;
+    await sleep(baseMs * a);
+  }
+  return snap;
+}
+
 /* Direct fetch with one retry on transient network failure, then the same
    two-stage Wayback fallback the FATF Watchdog uses for sources whose bot
    protection 403/418s the runner outright:
@@ -441,7 +459,7 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
   if (auth) {
     const ts = await enqueueSpn(() => spnAuthenticatedCapture(url, auth));
     if (ts && captureAcceptable(ts, notBefore)) {
-      const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+      const snap = await fetchCaptureRetrying(fetchFn, 'https://web.archive.org/web/' + ts + 'id_/' + url, opts.retry);
       console.log('spn2 capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
       if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts, snapshotTs: ts };
     }
@@ -461,8 +479,10 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
       });
       const ts = (/\/web\/(\d{14})/.exec(r.url || '') || [])[1] || '';
       console.log('save-page-now ' + url + ' (attempt ' + attempt + '): HTTP ' + r.status + ' -> ' + (r.url || '(no url)'));
-      if (r.ok && ts && captureAcceptable(ts, notBefore)) {
-        const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+      /* A 429 from SPN can still redirect to a capture it just made (3 Oct:
+         HTTP 429 -> /web/20261003010455/…) — a fresh capture is usable either way. */
+      if (ts && captureAcceptable(ts, notBefore)) {
+        const snap = await fetchCaptureRetrying(fetchFn, 'https://web.archive.org/web/' + ts + 'id_/' + url, opts.retry);
         console.log('save-page-now capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
         if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts, snapshotTs: ts };
       }
@@ -480,7 +500,7 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
   /* 3. Most recent existing capture, if acceptable as a baseline. */
   const ts = await waybackLatestTs(url);
   if (ts && captureAcceptable(ts, notBefore)) {
-    const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+    const snap = await fetchCaptureRetrying(fetchFn, 'https://web.archive.org/web/' + ts + 'id_/' + url, opts.retry);
     console.log('wayback capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
     if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts, snapshotTs: ts };
   } else if (ts) {
