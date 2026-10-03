@@ -1785,10 +1785,16 @@
       "detectedAt": "2026-10-03T01:04:15.196Z",
       "prevCount": 19484,
       "newCount": 19489,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 37084659081,
+        "startedAt": "2026-10-03T01:04:19Z"
+      },
+      "status": "complete",
       "chainPrev": "2ec157abea0aa9bc27ace56192cf9fa9e0c2ab6a1d91bd626ae3fed15892b13c",
-      "chainHash": "a313c63de33e3d59e680c1052aa4db5f37ae5f4767234a4bbb4b5087bc023161"
+      "chainHash": "a313c63de33e3d59e680c1052aa4db5f37ae5f4767234a4bbb4b5087bc023161",
+      "latencyHours": 0,
+      "resolutionHash": "904f479547cb908da674049147c4f9ad8248d260318c45f918e2c4ed8909e227"
     },
     {
       "id": "ofac-sdn-alt",
@@ -1798,10 +1804,16 @@
       "detectedAt": "2026-10-03T01:04:15.196Z",
       "prevCount": 20234,
       "newCount": 20237,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 37084659081,
+        "startedAt": "2026-10-03T01:04:19Z"
+      },
+      "status": "complete",
       "chainPrev": "a313c63de33e3d59e680c1052aa4db5f37ae5f4767234a4bbb4b5087bc023161",
-      "chainHash": "9d1f7c32b474f0363101c21de26ca2be4c6cfb26fc19494764321193f014d574"
+      "chainHash": "9d1f7c32b474f0363101c21de26ca2be4c6cfb26fc19494764321193f014d574",
+      "latencyHours": 0,
+      "resolutionHash": "d8e329d99e71c549d1b4ba0f6f2456cec773dd0ff50e8c3aeae28a04f913e7a4"
     }
   ]
 }
