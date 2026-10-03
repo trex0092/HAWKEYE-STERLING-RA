@@ -217,7 +217,7 @@ async function probeOne(s, timeoutMs = 90000) {
      GKG files (every 15 min, all countries, 65 languages, no per-query
      limit) are reachable and parse as documented. Queries use a PUBLIC
      FIGURE's name only — never a customer or employee name. */
-export const SUITES = ['opensanctions-catalogue', 'news-feeds'];
+export const SUITES = ['opensanctions-catalogue', 'news-feeds', 'news-editions'];
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 async function get(url, timeoutMs = 60000) {
   const ctrl = new AbortController();
@@ -350,12 +350,87 @@ async function suiteNewsFeeds() {
   return L.join('\n');
 }
 
+/* news-editions: does a Bing country edition (cc + setlang) return that
+   country's own press? Each market is queried with a PUBLIC FIGURE of that
+   country (head of state / government) in the default and the local edition;
+   low title overlap + local source names = a genuinely local edition. Also
+   GDELT GKG theme frequencies (to choose adverse themes from observed codes,
+   not memory) and the translated-stream file availability one hour back. */
+const EDITION_TESTS = [
+  ['AE', 'ar', 'Mohammed bin Rashid'], ['AE', 'en', 'Mohammed bin Rashid'], ['SA', 'ar', 'Mohammed bin Salman'],
+  ['EG', 'ar', 'Abdel Fattah el-Sisi'], ['IQ', 'ar', 'Mohammed Shia al-Sudani'], ['LB', 'ar', 'Joseph Aoun'],
+  ['IN', 'en', 'Narendra Modi'], ['IN', 'hi', 'Narendra Modi'], ['PK', 'en', 'Shehbaz Sharif'], ['PK', 'ur', 'Shehbaz Sharif'],
+  ['BD', 'bn', 'Muhammad Yunus'], ['IR', 'fa', 'Masoud Pezeshkian'], ['RU', 'ru', 'Vladimir Putin'], ['DE', 'de', 'Friedrich Merz'],
+  ['BR', 'pt', 'Luiz Inácio Lula da Silva'], ['MX', 'es', 'Claudia Sheinbaum'], ['CN', 'zh-hans', 'Xi Jinping'], ['NG', 'en', 'Bola Tinubu'],
+  ['KE', 'en', 'William Ruto'], ['ID', 'id', 'Prabowo Subianto'],
+];
+function bingItems(xml) {
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1]);
+  return items.map(i => ({
+    t: ((/<title>([\s\S]*?)<\/title>/i.exec(i) || [])[1] || '').trim(),
+    s: ((/<News:Source>([\s\S]*?)<\/News:Source>/i.exec(i) || [])[1] || '').trim(),
+  }));
+}
+async function suiteNewsEditions() {
+  const L = ['## Bing country editions — local press or global index?', '',
+    '| market | query | default items | local items | shared titles | local sources (first 6) |', '| --- | --- | --- | --- | --- | --- |'];
+  const defCache = {};
+  for (const [cc, lang, who] of EDITION_TESTS) {
+    const q = encodeURIComponent('"' + who + '"');
+    if (!defCache[who]) {
+      const d = await get('https://www.bing.com/news/search?q=' + q + '&format=rss', 30000);
+      defCache[who] = bingItems(d.buf.toString('utf8'));
+      await new Promise(r => setTimeout(r, 700));
+    }
+    const r = await get('https://www.bing.com/news/search?q=' + q + '&format=rss&cc=' + cc + '&setlang=' + lang, 30000);
+    const loc = bingItems(r.buf.toString('utf8'));
+    const def = new Set(defCache[who].map(x => x.t));
+    const shared = loc.filter(x => def.has(x.t)).length;
+    L.push('| ' + [cc + ':' + lang + ' (HTTP ' + r.status + ')', who, defCache[who].length, loc.length, shared,
+      loc.slice(0, 6).map(x => x.s).join('; ')].map(cell).join(' | ') + ' |');
+    await new Promise(r => setTimeout(r, 700));
+  }
+  L.push('', '## GDELT GKG themes and translated stream', '');
+  const lu = await get('https://data.gdeltproject.org/gdeltv2/lastupdate.txt', 30000);
+  const enUrl = (lu.buf.toString('utf8').split('\n').map(l => l.trim().split(/\s+/)[2]).filter(Boolean).find(u => /gkg\.csv\.zip$/.test(u)) || '');
+  const ts = (/(\d{14})\.gkg/.exec(enUrl) || [])[1];
+  if (ts) {
+    const d = new Date(Date.UTC(+ts.slice(0, 4), +ts.slice(4, 6) - 1, +ts.slice(6, 8), +ts.slice(8, 10), +ts.slice(10, 12)));
+    const stamp = x => x.toISOString().replace(/[-:T]/g, '').slice(0, 12) + '00';
+    const themes = {};
+    for (const back of [0, 60]) {
+      const t2 = stamp(new Date(d.getTime() - back * 60000));
+      for (const kind of ['gkg', 'translation.gkg']) {
+        const url = 'https://data.gdeltproject.org/gdeltv2/' + t2 + '.' + kind + '.csv.zip';
+        const z = await get(url, 120000);
+        L.push('- ' + url + ': HTTP ' + z.status + ' · ' + z.buf.length + ' bytes');
+        if (!z.ok) continue;
+        const m = await import('./sanctions-match.mjs');
+        for (const [, content] of m.unzipEntries(z.buf)) {
+          const text = content.toString('utf8');
+          for (const line of gkgStats(text)) L.push('  - ' + line);
+          for (const row of text.split('\n')) {
+            const f = row.split('\t');
+            for (const th of String(f[7] || '').split(';')) if (th) themes[th] = (themes[th] || 0) + 1;
+          }
+        }
+      }
+    }
+    const top = Object.entries(themes).sort((a, b) => b[1] - a[1]);
+    const adverse = top.filter(([k]) => /CRIME|CORRUPT|ARREST|TERROR|LAUNDER|FRAUD|BRIB|SANCTION|TRIAL|CONVICT|SMUGGL|TRAFFICK|EMBEZZL|TAX_EVASION|PROSECUT|INVESTIGAT|POLICE|SEIZE|EXTORT|DRUG/.test(k));
+    L.push('', '- top 40 themes: ' + top.slice(0, 40).map(([k, v]) => k + ':' + v).join(' '));
+    L.push('- risk-related theme codes observed (' + adverse.length + '): ' + adverse.slice(0, 120).map(([k, v]) => k + ':' + v).join(' '));
+  }
+  return L.join('\n');
+}
+
 async function main(argv) {
   const selector = argv[0];
   if (!selector) { console.error('usage: source-probe.mjs <source-id|all-disabled> [outdir]'); return 2; }
   const outdir = argv[1] || '.';
   if (SUITES.includes(selector)) {
-    const md = selector === 'opensanctions-catalogue' ? await suiteOpenSanctionsCatalogue() : await suiteNewsFeeds();
+    const md = selector === 'opensanctions-catalogue' ? await suiteOpenSanctionsCatalogue()
+      : selector === 'news-editions' ? await suiteNewsEditions() : await suiteNewsFeeds();
     mkdirSync(outdir, { recursive: true });
     writeFileSync(join(outdir, 'source-probe-report.md'), md + '\n');
     console.log(md);
