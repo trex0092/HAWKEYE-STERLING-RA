@@ -5681,9 +5681,13 @@ def load_uk_list():
     ConList only if both yield nothing."""
     data = download(UK_OFFICIAL_CSV_URL, "UK Sanctions List (official FCDO CSV)")
     names, date, h = parse_uk(data)
+    m = _DMY_RE.search(date or "")
+    official = (names, (m.group(1) if m else "live (UK Sanctions List, official)"), h, True) if names else None
+    if names and not _below_floor(names, "uk"):
+        return official
     if names:
-        m = _DMY_RE.search(date or "")
-        return names, (m.group(1) if m else "live (UK Sanctions List, official)"), h, True
+        log(f"  UK Sanctions List: official CSV parsed only {len(names):,} names (below its "
+            "coverage floor) — trying the fallbacks before the floor gate refuses the run")
     if opensanctions_allowed("UK Sanctions List OpenSanctions mirror fallback"):
         data = download(UK_SANCTIONS_LIST_URL, "UK Sanctions List (OpenSanctions gb_fcdo_sanctions)")
         names = parse_simple_csv(data, "UK Sanctions List")
@@ -5694,6 +5698,8 @@ def load_uk_list():
         "(closed 28 Jan 2026; its own date will be flagged as stale)")
     con = download(UK_CONLIST_URL, "UK OFSI (retired ConList)")
     names, date, h = parse_uk(con)
+    if official and len(official[0]) >= len(names):
+        return official   # a partial official list beats a smaller retired one; the floor gate decides
     return names, date, h, bool(con)
 
 # ── AU / CH official sources (free) ──────────────────────────────────────────
@@ -5806,7 +5812,14 @@ def parse_dfat_xlsx(data):
                     names.add(v)
     return names
 
-def _official_then_mirror(label, official_url, parser, mirror_dataset):
+def _below_floor(names, floor_key):
+    """An official file that parsed but sits under its static coverage floor
+    (truncated download, re-layout). Used to try the mirror BEFORE the floor
+    gate would refuse the whole run — a refused run delivers nothing to Asana."""
+    floor = CORE_LIST_FLOORS.get(floor_key, 0) if LIST_FLOORS_ENFORCE else 0
+    return bool(names) and len(names) < floor
+
+def _official_then_mirror(label, official_url, parser, mirror_dataset, floor_key=None):
     """(names, date, hash, fetched): the official publisher's file first, its
     OpenSanctions mirror only when the official file yields nothing AND the
     licence switch allows it. An official file that downloads but parses to
@@ -5814,20 +5827,25 @@ def _official_then_mirror(label, official_url, parser, mirror_dataset):
     degrades the list loudly instead of refusing the whole run."""
     data = download(official_url, f"{label} (official)")
     names = parser(data)
-    if names:
+    if names and not _below_floor(names, floor_key):
         return names, f"live ({label}, official)", sha256_of(data), True
-    if data:
+    if names:
+        log(f"  {label}: official file parsed only {len(names):,} names (below its coverage "
+            "floor) — trying the mirror before the floor gate refuses the run")
+    elif data:
         log(f"  {label}: official file downloaded but parsed to no names — treated as unavailable")
     fb = _mirror_fallback(set(), mirror_dataset, label)
     if fb:
         return fb[0], fb[1], fb[2], True
+    if names:   # no second source: the floor gate decides (corrupt data never screens as clear)
+        return names, f"live ({label}, official)", sha256_of(data), True
     return set(), "unavailable", "", False
 
 def load_au_list():
-    return _official_then_mirror("Australia DFAT", AU_OFFICIAL_XLSX_URL, parse_dfat_xlsx, "au_dfat_sanctions")
+    return _official_then_mirror("Australia DFAT", AU_OFFICIAL_XLSX_URL, parse_dfat_xlsx, "au_dfat_sanctions", "au")
 
 def load_ch_list():
-    return _official_then_mirror("Switzerland SECO", CH_OFFICIAL_XML_URL, parse_seco_xml, "ch_seco_sanctions")
+    return _official_then_mirror("Switzerland SECO", CH_OFFICIAL_XML_URL, parse_seco_xml, "ch_seco_sanctions", "ch")
 
 # Staleness of a core list. Only a date the list itself declares counts; a
 # provenance string such as "live" or "unavailable" carries no claim.
@@ -5926,9 +5944,13 @@ def load_eu_list():
     (degrade loudly), never a loaded list."""
     data = download(eu_official_xml_url(), "EU FSF (official webgate XML)")
     names = parse_eu_official_xml(data)
-    if names:
+    if names and not _below_floor(names, "eu"):
         return names, "live (EU official XML)", sha256_of(data), True
-    if data:
+    official = (names, "live (EU official XML)", sha256_of(data), True) if names else None
+    if names:
+        log(f"  EU FSF: official XML parsed only {len(names):,} names (below its coverage floor) "
+            "— trying the mirror before the floor gate refuses the run")
+    elif data:
         log("  EU FSF: official XML returned no names (EU Login sign-in page? check the "
             "EU_FSF_TOKEN secret) — treated as unavailable")
     if opensanctions_allowed("EU FSF OpenSanctions mirror fallback"):
@@ -5937,7 +5959,7 @@ def load_eu_list():
         if names:
             log("  EU FSF: official XML unavailable — screened via OpenSanctions mirror")
             return names, "live (EU FSF, OpenSanctions mirror)", h, True
-    return set(), "unavailable", "", False
+    return official or (set(), "unavailable", "", False)
 
 # ── Core-list coverage floors (zero/partial-load hard-fail) ──────────────────
 # A core list that loads ZERO names (parse failure, the PR #128 bug class) or a

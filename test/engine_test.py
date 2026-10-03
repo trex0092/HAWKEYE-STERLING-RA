@@ -2233,6 +2233,10 @@ _FSF_XML = (b'<?xml version="1.0" encoding="UTF-8"?><export generationDate="2026
             b'</export>')
 check("FSF official XML parses wholeName attributes (entities + aliases, unescaped)",
       screen.parse_eu_official_xml(_FSF_XML) == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+# Tiny fixtures sit below the real coverage floors; zero them for the loader
+# tests (the below-floor path has its own checks further down).
+_floors_real = dict(screen.CORE_LIST_FLOORS)
+screen.CORE_LIST_FLOORS.update({k: 0 for k in screen.CORE_LIST_FLOORS})
 _dl_urls.clear()
 screen.download = lambda url, label: (_dl_urls.append(url) or (_FSF_XML if "webgate" in url else _SIMPLE))
 _eu = screen.load_eu_list()
@@ -2328,6 +2332,37 @@ try:
 finally:
     screen.OPENSANCTIONS_DATA = _os_saved
 screen.download = _orig_download
+_floor_saved = dict(screen.CORE_LIST_FLOORS)
+try:
+    screen.CORE_LIST_FLOORS["au"] = 5   # the 2-name official fixture is now "truncated"
+    _dl_urls.clear()
+    screen.download = lambda url, label: (_dl_urls.append(url) or (_dfat if "dfat.gov.au" in url else _SIMPLE))
+    _au2 = screen.load_au_list()
+    check("AU: an official file below its floor falls back to the mirror instead of refusing the run (delivery protected)",
+          _au2[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _au2[1] and len(_dl_urls) == 2)
+    screen.download = lambda url, label: (_dfat if "dfat.gov.au" in url else None)
+    _au3 = screen.load_au_list()
+    check("AU: below floor with no mirror -> the official names stay 'obtained' so the floor gate still refuses corrupt data",
+          _au3[0] == {"EXAMPLE DESIGNEE & CO", "ISLAMIC REVOLUTIONARY GUARD CORPS"} and _au3[3] is True)
+finally:
+    screen.CORE_LIST_FLOORS.clear(); screen.CORE_LIST_FLOORS.update(_floor_saved)
+    screen.download = _orig_download
+try:
+    screen.CORE_LIST_FLOORS["eu"] = 5; screen.CORE_LIST_FLOORS["uk"] = 5
+    screen.download = lambda url, label: (_FSF_XML if "webgate" in url else _SIMPLE)
+    _eu_bf = screen.load_eu_list()
+    check("EU: an official XML below its floor falls back to the mirror (delivery protected)",
+          _eu_bf[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _eu_bf[1])
+    screen.download = lambda url, label: (_FSF_XML if "webgate" in url else None)
+    check("EU: below floor with no mirror -> official names kept as obtained (floor gate decides)",
+          screen.load_eu_list()[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"} and screen.load_eu_list()[3] is True)
+    screen.download = lambda url, label: (b"Name 6,Name 1\nEXAMPLE,ONE\n" if "fcdo.gov.uk" in url else _SIMPLE)
+    _uk_bf = screen.load_uk_list()
+    check("UK: an official CSV below its floor falls back to the mirror (delivery protected)",
+          _uk_bf[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _uk_bf[1])
+finally:
+    screen.download = _orig_download
+screen.CORE_LIST_FLOORS.clear(); screen.CORE_LIST_FLOORS.update(_floors_real)
 check("CH: the slow SESAM endpoint gets its longer timeout",
       screen.DOWNLOAD_TIMEOUTS.get(screen.CH_OFFICIAL_XML_URL) == 150)
 
@@ -5093,6 +5128,8 @@ _uksl_csv = (b'Report Date: 02/10/2026\n'
              b'01/10/2026,EXAMPLE HOLDINGS LLC,,,,,,Primary Name\n')
 _uk_calls = []
 _orig_dl_uk, _orig_parse_uk = screen.download, screen.parse_uk
+_uk_floor = screen.CORE_LIST_FLOORS["uk"]
+screen.CORE_LIST_FLOORS["uk"] = 0
 try:
     def _dl_ok(url, label):
         _uk_calls.append(url)
@@ -5145,6 +5182,7 @@ try:
           not _n3 and _f3 is False)
 finally:
     screen.download, screen.parse_uk = _orig_dl_uk, _orig_parse_uk
+    screen.CORE_LIST_FLOORS["uk"] = _uk_floor
 
 _run_dt = _dt.datetime(2026, 9, 21, 5, 0)
 _meta_fresh = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},
