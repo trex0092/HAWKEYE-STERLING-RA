@@ -1752,10 +1752,16 @@
       "detectedAt": "2026-10-02T11:01:45.288Z",
       "prevCount": 58500,
       "newCount": 58503,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 36998745391,
+        "startedAt": "2026-10-02T11:01:51Z"
+      },
+      "status": "complete",
       "chainPrev": "948bc43cd87f36bc394b7e4c617af6458aab724462281cff5e764d93aada20b7",
-      "chainHash": "556d6734efce4d0f3e73097838cd741496ab3cead2ab9c4bd11ed9fab97fa476"
+      "chainHash": "556d6734efce4d0f3e73097838cd741496ab3cead2ab9c4bd11ed9fab97fa476",
+      "latencyHours": 0,
+      "resolutionHash": "47ae63c6ef96aabf379cb831cedb506fb441d48547981202ae7255d41d34f27a"
     },
     {
       "id": "fr-dgt",
@@ -1770,6 +1776,32 @@
       "chainPrev": "556d6734efce4d0f3e73097838cd741496ab3cead2ab9c4bd11ed9fab97fa476",
       "chainHash": "2ec157abea0aa9bc27ace56192cf9fa9e0c2ab6a1d91bd626ae3fed15892b13c",
       "resolutionHash": "ad38cb9bd1ab0f7d3e257452de4b8839ac13720115bbaf0b06a62b76f6fc46a6"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-03T01:04:15.196Z",
+      "prevCount": 19484,
+      "newCount": 19489,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "2ec157abea0aa9bc27ace56192cf9fa9e0c2ab6a1d91bd626ae3fed15892b13c",
+      "chainHash": "a313c63de33e3d59e680c1052aa4db5f37ae5f4767234a4bbb4b5087bc023161"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-03T01:04:15.196Z",
+      "prevCount": 20234,
+      "newCount": 20237,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "a313c63de33e3d59e680c1052aa4db5f37ae5f4767234a4bbb4b5087bc023161",
+      "chainHash": "9d1f7c32b474f0363101c21de26ca2be4c6cfb26fc19494764321193f014d574"
     }
   ]
 }
