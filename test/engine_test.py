@@ -1446,6 +1446,19 @@ check("Wikidata PEP net: an alias matches; a stranger does not; a sub-5-char key
       screen.pep_wikidata_lookup(_wd_idx, "E. Minister Person").get("hit")
       and not screen.pep_wikidata_lookup(_wd_idx, "Unrelated Person").get("hit")
       and not screen.pep_wikidata_lookup(_wd_idx, "Ng W").get("hit"))
+_old_ds = dict(_wd_ds, harvested="2026-08-06T06:22:05Z")
+with _tf.NamedTemporaryFile(suffix=".json", delete=False) as _wf_tmp3:
+    _wf_tmp3.write(json.dumps(_old_ds).encode())
+_old_idx, _old_meta = screen.load_pep_wikidata_net(_wf_tmp3.name)
+os.unlink(_wf_tmp3.name)
+check("Wikidata PEP net: an old harvest is marked STALE (the net still screens)",
+      _old_meta["stale"] is True and _old_idx is not None and len(_old_idx) > 0)
+_fresh_ds = dict(_wd_ds, harvested=_dt.date.today().isoformat() + "T00:00:00Z")
+with _tf.NamedTemporaryFile(suffix=".json", delete=False) as _wf_tmp2:
+    _wf_tmp2.write(json.dumps(_fresh_ds).encode())
+check("Wikidata PEP net: a this-week harvest is not stale",
+      screen.load_pep_wikidata_net(_wf_tmp2.name)[1]["stale"] is False)
+os.unlink(_wf_tmp2.name)
 check("Wikidata PEP net: a missing file is unavailable (logged), never a silent clear",
       screen.load_pep_wikidata_net("/nonexistent/pep.json") == (None, {"count": 0, "date": "unavailable"}))
 _pn_stats = {"subjects_total": 2, "companies_screened": 1, "individuals_screened": 1, "am_errors": 0,
@@ -1457,6 +1470,9 @@ check("report: each PEP net is named with its state (Wikidata count + harvest da
       "Wikidata worldwide PEP list (CC0) · 423,826 office-holders, harvested 2026-10-02" in _pn_n
       and "OpenSanctions PEP/RCA dataset · OFF — licence-free mode" in _pn_n
       and "relatives / close associates (RCA) are NOT bulk-screened" in _pn_n)
+_pn_stale = dict(_pn_stats, pep_nets={screen.PEP_WIKIDATA_LABEL: {"count": 5, "date": "2026-08-01", "stale": True}})
+check("report: a stale Wikidata harvest is flagged in §③",
+      "⚠ STALE harvest" in screen.build_unified_narrative([], [], [], [], _meta_deg, _pn_stale, _dt.datetime(2026, 10, 3)))
 check("report: licence-free mode says the crime watchlist is OFF and the news feeds are the only adverse nets",
       "OpenSanctions crime watchlist · OFF — licence-free mode" in _pn_n)
 _meta_lo = {**_meta_deg, "worldwide": {"count": 0, "date": "licence-off", "tier": "supplementary"}}
@@ -4433,6 +4449,23 @@ check("news coverage lost today → sweep with honest count",
 _p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 0, "pep_errors": 3}}], open(_p, "w"))
 check("PEP-only loss also sweeps",
       monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
+_p = _mk(); json.dump([{"date": "2026-10-03", "counts": {"subjects": 996, "am_errors": 0, "pep_errors": 0,
+                                                        "feed_single": 972, "feed_none": 0}}], open(_p, "w"))
+d = monitoring.makeup_decision("2026-10-03", path=_p)
+check("thin coverage (3 Oct: 972 of 996 on one feed) → sweep, with the count stated",
+      d["sweep"] is True and d["uncovered"] == 972 and "one news feed or none" in d["reason"])
+_p = _mk(); json.dump([{"date": "2026-10-03", "counts": {"subjects": 996, "am_errors": 0, "pep_errors": 0,
+                                                        "feed_single": 972, "makeup": 1}}], open(_p, "w"))
+check("a make-up run never re-triggers on thin coverage alone (bounded, once a day)",
+      monitoring.makeup_decision("2026-10-03", path=_p)["sweep"] is False)
+_p = _mk(); json.dump([{"date": "2026-10-03", "counts": {"subjects": 996, "am_errors": 0, "pep_errors": 0,
+                                                        "feed_single": 100, "feed_none": 0}}], open(_p, "w"))
+check("mostly multi-feed coverage → no sweep",
+      monitoring.makeup_decision("2026-10-03", path=_p)["sweep"] is False)
+_ssrc_mk = __import__("inspect").getsource(screen.screen_subject_set)
+check("run metrics persist feed reach (single / none) and the make-up flag, counts only",
+      '"feed_single": int(feed_coverage_snapshot().get("single", 0))' in _ssrc_mk
+      and '"makeup": int(mode == "makeup")' in _ssrc_mk)
 _p = _mk(); json.dump({"not": "a list"}, open(_p, "w"))
 check("malformed history → sweep, never a silent all-clear",
       monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)

@@ -82,6 +82,7 @@ jobs:
             webgate.ec.europa.eu:443
             ecas.ec.europa.eu:443
             ofsistorage.blob.core.windows.net:443
+            sanctionslist.fcdo.gov.uk:443
             data.opensanctions.org:443
             app.asana.com:443
             *.githubapp.com:443
@@ -161,10 +162,14 @@ jobs:
             rm -f /tmp/eu_sanctions.xml
           fi
 
-      - name: Download UK OFSI Consolidated list
+      # The OFSI Consolidated List (ConList.csv) closed on 28 Jan 2026 and its
+      # file has been frozen since 3 Jun 2026; the UK Sanctions List is now the
+      # only UK source (GOV.UK). Same Name 1..Name 6 layout, which the run
+      # script's header-scanning parser already reads.
+      - name: Download UK Sanctions List (FCDO)
         run: |
           if curl -sfL \
-            "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv" \
+            "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv" \
             -o /tmp/uk_ofsi.csv; then
             echo "UK_HASH=$(sha256sum /tmp/uk_ofsi.csv | cut -d' ' -f1)" \
               >> "$GITHUB_ENV"
