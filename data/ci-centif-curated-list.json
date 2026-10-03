@@ -1,0 +1,517 @@
+{
+  "_README": "Côte d'Ivoire national list of persons designated as affiliated with terrorism (targeted financial sanctions under UNSCR 1373), published by CENTIF (Cellule Nationale de Traitement des Informations Financières) on its page \"Liste des Sanctions Financières Ciblées (SFC)\" (centif.ci/liste-des-sanctions/, section \"Au plan National\"). Designations are made by order of the Minister of Finance and Budget on the advice of the Commission Consultative de Gel Administratif (Ordonnance n° 2023-875 of 23 November 2023; Décret n° 2024-216 as amended by Décret n° 2024-997). Transcribed from the consolidated PDF \"Liste des personnes désignées comme affiliées au terrorisme\", whose heading states that the update of 4 July 2025 replaces all earlier versions. Names are kept as printed (SURNAME first). Aliases introduced by \"alias\" or \"dit\" are kept; single-word aliases are recorded in aka_unscreened and are not screened alone. Dates of birth are given only where the list states a date or year (several entries give an age only). To refresh: check centif.ci/liste-des-sanctions/ for a newer consolidated list or a further arrêté, and update lastReviewed.",
+  "sourceUrl": "https://www.centif.ci/wp-content/uploads/2025/02/listenationale1373.pdf",
+  "listDate": "2025-07-04",
+  "relatedOrder": {
+    "ref": "Arrêté n° 0540/MFB/CAB of 4 July 2025 (entries 1-10)",
+    "url": "https://www.centif.ci/wp-content/uploads/2025/04/arrete_inscription_sur_liste1373.pdf"
+  },
+  "lastReviewed": "2026-10-03",
+  "count": 78,
+  "verificationNote": "Consolidated PDF (30 pages) fetched 2026-10-03 through an external fetcher and read in full: 78 entries numbered 1 to 78 with no gap. Entries 1-10 were also compared with the separate arrêté n° 0540/MFB/CAB of 4 July 2025 (names identical). Every name and alias below is checked by script to occur verbatim in the extracted text.",
+  "entries": [
+    {
+      "ref": "CI-1373/1",
+      "name": "DIALLO IBRAHIM",
+      "aliases": [],
+      "dob": "2002-01-01"
+    },
+    {
+      "ref": "CI-1373/2",
+      "name": "DIALLO ABOUDRAMANE",
+      "aliases": [],
+      "dob": "2002-09-20"
+    },
+    {
+      "ref": "CI-1373/3",
+      "name": "OUEDRAOGO BRAHIMA",
+      "aliases": [],
+      "dob": "1996-01-01"
+    },
+    {
+      "ref": "CI-1373/4",
+      "name": "SAWADOGO ELIE",
+      "aliases": [],
+      "dob": "1990-01-01"
+    },
+    {
+      "ref": "CI-1373/5",
+      "name": "BATIANGA MOUSSA",
+      "aliases": [],
+      "dob": "1990-01-01"
+    },
+    {
+      "ref": "CI-1373/6",
+      "name": "SOGODOGO IBRAHIM",
+      "aliases": [],
+      "dob": "1995-01-01"
+    },
+    {
+      "ref": "CI-1373/7",
+      "name": "KAMBOU HOUDITE",
+      "aliases": [],
+      "dob": "1988-01-01"
+    },
+    {
+      "ref": "CI-1373/8",
+      "name": "SAWADOGO SALAM",
+      "aliases": [],
+      "dob": "2001-01-01"
+    },
+    {
+      "ref": "CI-1373/9",
+      "name": "OUEDRAOGO AMIDOU",
+      "aliases": [],
+      "dob": "2004-01-01"
+    },
+    {
+      "ref": "CI-1373/10",
+      "name": "CAMARA ISSA",
+      "aliases": [],
+      "dob": "2002-01-01"
+    },
+    {
+      "ref": "CI-1373/11",
+      "name": "BOLY ABDOURAHAMANE",
+      "aliases": [
+        "ABOU Houreira",
+        "YO RÔ"
+      ],
+      "aka_unscreened": [
+        "YERO"
+      ],
+      "dob": "1998"
+    },
+    {
+      "ref": "CI-1373/12",
+      "name": "OUATTARA YAYA",
+      "aliases": [],
+      "dob": "1991-12-30"
+    },
+    {
+      "ref": "CI-1373/13",
+      "name": "OUATTARA TIEOULE",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/14",
+      "name": "OUATTARA IBRAHIM",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/15",
+      "name": "NOUFE GNINFI",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/16",
+      "name": "DIALLO ISSA",
+      "aliases": [],
+      "dob": "1996"
+    },
+    {
+      "ref": "CI-1373/17",
+      "name": "OUATTARA SEYDOU",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/18",
+      "name": "OUATTARA AROUNA",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/19",
+      "name": "SANGARE PATER",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/20",
+      "name": "SANGARE MOUSSA",
+      "aliases": [
+        "Petit Moussa"
+      ]
+    },
+    {
+      "ref": "CI-1373/21",
+      "name": "SANGARE AROUNA",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/22",
+      "name": "SANKARE SAHALI",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/23",
+      "name": "GUINDO ADOU",
+      "aliases": [],
+      "dob": "1985"
+    },
+    {
+      "ref": "CI-1373/24",
+      "name": "GUINDO BEIDARI",
+      "aliases": [],
+      "dob": "1966-12-31"
+    },
+    {
+      "ref": "CI-1373/25",
+      "name": "GUINDO BOUREIMA",
+      "aliases": [],
+      "aka_unscreened": [
+        "SORY"
+      ],
+      "dob": "1963-12-31"
+    },
+    {
+      "ref": "CI-1373/26",
+      "name": "BAH Aladou",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/27",
+      "name": "SIDAT MOUCTARR FAAL",
+      "aliases": [],
+      "aka_unscreened": [
+        "DADDYFALL"
+      ],
+      "dob": "1970-12-14"
+    },
+    {
+      "ref": "CI-1373/28",
+      "name": "DIALLO OUSMANE",
+      "aliases": [],
+      "dob": "2003-01-01"
+    },
+    {
+      "ref": "CI-1373/29",
+      "name": "PALE TIMON",
+      "aliases": [],
+      "dob": "1990-04-18"
+    },
+    {
+      "ref": "CI-1373/30",
+      "name": "YEO PEGNANCHIERE",
+      "aliases": [],
+      "dob": "1983-01-01"
+    },
+    {
+      "ref": "CI-1373/31",
+      "name": "SANGARE MOUSSA",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/32",
+      "name": "DIALLO ADAMA",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/33",
+      "name": "BAMBA DAOUDA",
+      "aliases": [],
+      "dob": "1987-01-01"
+    },
+    {
+      "ref": "CI-1373/34",
+      "name": "SIDIBE OUSMANE",
+      "aliases": [],
+      "dob": "1988-01-01"
+    },
+    {
+      "ref": "CI-1373/35",
+      "name": "SIDIBE IDRISSA",
+      "aliases": [],
+      "dob": "1988-01-01"
+    },
+    {
+      "ref": "CI-1373/36",
+      "name": "SIDIBE HAMIDOU",
+      "aliases": [],
+      "dob": "1985-01-01"
+    },
+    {
+      "ref": "CI-1373/37",
+      "name": "SIDIBE ADAMA",
+      "aliases": [],
+      "dob": "1998-01-01"
+    },
+    {
+      "ref": "CI-1373/38",
+      "name": "SIDIBE AMADOU",
+      "aliases": [],
+      "dob": "1971-01-01"
+    },
+    {
+      "ref": "CI-1373/39",
+      "name": "SOW ALASSANE",
+      "aliases": [],
+      "dob": "1980-01-30"
+    },
+    {
+      "ref": "CI-1373/40",
+      "name": "SIDIBE OUSMANE",
+      "aliases": [],
+      "dob": "1963-01-01"
+    },
+    {
+      "ref": "CI-1373/41",
+      "name": "SIDIBE ISSIAKA",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/42",
+      "name": "ROAMBA OUSMANE",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/43",
+      "name": "DIALLO DAOUDA",
+      "aliases": [],
+      "dob": "1980-03-02"
+    },
+    {
+      "ref": "CI-1373/44",
+      "name": "DIALLO ALLAYE",
+      "aliases": [],
+      "dob": "1963-01-01"
+    },
+    {
+      "ref": "CI-1373/45",
+      "name": "TALL DRISSA ADAMA",
+      "aliases": [],
+      "dob": "1986-01-01"
+    },
+    {
+      "ref": "CI-1373/46",
+      "name": "SANGARE PATHE",
+      "aliases": [],
+      "dob": "1987-05-18"
+    },
+    {
+      "ref": "CI-1373/47",
+      "name": "DICKO ABOUBACAR",
+      "aliases": [],
+      "aka_unscreened": [
+        "BOUBA"
+      ]
+    },
+    {
+      "ref": "CI-1373/48",
+      "name": "SOW AMADOU",
+      "aliases": [],
+      "dob": "1975-01-01"
+    },
+    {
+      "ref": "CI-1373/49",
+      "name": "DIALLO IBRAHIMA SOMBO",
+      "aliases": [],
+      "dob": "1963-01-01"
+    },
+    {
+      "ref": "CI-1373/50",
+      "name": "BARRY ALAYE",
+      "aliases": [],
+      "dob": "1982-01-01"
+    },
+    {
+      "ref": "CI-1373/51",
+      "name": "DIALLO BOUKARY",
+      "aliases": [],
+      "dob": "2000-07-07"
+    },
+    {
+      "ref": "CI-1373/52",
+      "name": "SIDIBE HASSAN",
+      "aliases": [
+        "HAMA KOURI"
+      ],
+      "dob": "1989-12-31"
+    },
+    {
+      "ref": "CI-1373/53",
+      "name": "BARRY AROUNA",
+      "aliases": [],
+      "dob": "1987-01-01"
+    },
+    {
+      "ref": "CI-1373/54",
+      "name": "SIDIBE OUSSIENI",
+      "aliases": [],
+      "aka_unscreened": [
+        "HAMAAR"
+      ],
+      "dob": "1989-12-31"
+    },
+    {
+      "ref": "CI-1373/55",
+      "name": "SIDIBE ALI",
+      "aliases": [],
+      "aka_unscreened": [
+        "BADARA"
+      ],
+      "dob": "2002-01-01"
+    },
+    {
+      "ref": "CI-1373/56",
+      "name": "DIALLO OUMAR",
+      "aliases": [],
+      "dob": "1982-01-07"
+    },
+    {
+      "ref": "CI-1373/57",
+      "name": "DIALLO ALI",
+      "aliases": [],
+      "dob": "1995-01-02"
+    },
+    {
+      "ref": "CI-1373/58",
+      "name": "BARRY ABDOULAYE",
+      "aliases": [],
+      "dob": "1989-12-31"
+    },
+    {
+      "ref": "CI-1373/59",
+      "name": "SIDIBE ADAMA",
+      "aliases": [],
+      "dob": "1986-01-01"
+    },
+    {
+      "ref": "CI-1373/60",
+      "name": "BARRY SEYDOU",
+      "aliases": [],
+      "dob": "1982-01-01"
+    },
+    {
+      "ref": "CI-1373/61",
+      "name": "BARRY MODI",
+      "aliases": [],
+      "dob": "2006-01-01"
+    },
+    {
+      "ref": "CI-1373/62",
+      "name": "ZALE YASSIA",
+      "aliases": [
+        "YAYA SINARE"
+      ],
+      "aka_unscreened": [
+        "RIFHADA"
+      ],
+      "dob": "2000-01-01"
+    },
+    {
+      "ref": "CI-1373/63",
+      "name": "TALL OUSMANE",
+      "aliases": [],
+      "dob": "1999-01-01"
+    },
+    {
+      "ref": "CI-1373/64",
+      "name": "TALL SITA",
+      "aliases": [],
+      "aka_unscreened": [
+        "SAMARATA"
+      ],
+      "dob": "1996-01-01"
+    },
+    {
+      "ref": "CI-1373/65",
+      "name": "BAKAYOKO MOUSSA MORY",
+      "aliases": [],
+      "dob": "1998"
+    },
+    {
+      "ref": "CI-1373/66",
+      "name": "TALL SALIF",
+      "aliases": [],
+      "dob": "2000-01-01"
+    },
+    {
+      "ref": "CI-1373/67",
+      "name": "DICK ABDOUL KARIM",
+      "aliases": [],
+      "aka_unscreened": [
+        "DJELGO"
+      ],
+      "dob": "1984-01-01"
+    },
+    {
+      "ref": "CI-1373/68",
+      "name": "TALL AMADOU",
+      "aliases": [],
+      "aka_unscreened": [
+        "MODIBO"
+      ],
+      "dob": "1984-01-01"
+    },
+    {
+      "ref": "CI-1373/69",
+      "name": "DIALLO DJODOMAN",
+      "aliases": [],
+      "aka_unscreened": [
+        "Alaye"
+      ],
+      "dob": "1982-01-01"
+    },
+    {
+      "ref": "CI-1373/70",
+      "name": "BOUARE SEYDOU",
+      "aliases": [],
+      "aka_unscreened": [
+        "TANGARA"
+      ],
+      "dob": "1976-12-31"
+    },
+    {
+      "ref": "CI-1373/71",
+      "name": "BARRY YACOUBA",
+      "aliases": [],
+      "dob": "1989-05-31"
+    },
+    {
+      "ref": "CI-1373/72",
+      "name": "BARRY OUMAR",
+      "aliases": []
+    },
+    {
+      "ref": "CI-1373/73",
+      "name": "TOUMARA OUSSIENI",
+      "aliases": [],
+      "dob": "1991"
+    },
+    {
+      "ref": "CI-1373/74",
+      "name": "DIALLO ABDOUL SALAM",
+      "aliases": [],
+      "dob": "2000-12-31"
+    },
+    {
+      "ref": "CI-1373/75",
+      "name": "BARRY MAMADY",
+      "aliases": [],
+      "aka_unscreened": [
+        "RAZA"
+      ],
+      "dob": "2001-01-01"
+    },
+    {
+      "ref": "CI-1373/76",
+      "name": "DIALLO AROUNA",
+      "aliases": [],
+      "dob": "2000-01-01"
+    },
+    {
+      "ref": "CI-1373/77",
+      "name": "TALL ABOUBACAR",
+      "aliases": [],
+      "aka_unscreened": [
+        "IMRANA"
+      ],
+      "dob": "1998-01-01"
+    },
+    {
+      "ref": "CI-1373/78",
+      "name": "TALL IBRAHIM",
+      "aliases": [],
+      "dob": "1971-01-01"
+    }
+  ]
+}

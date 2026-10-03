@@ -861,6 +861,45 @@
       "enabled": true,
       "minNames": 3,
       "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36392452572 (GitHub runner, main) fetched HTTP 200 text/html and parseNumberedNameList read 5 names (minNames 3, met) — 3 numbered designations plus spelling variants. Regulation of the Government of 13 March 2025 No 18; measures: funds frozen, no funds made available, entry prohibited. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); the list is published only as a web page of numbered lines."
+    },
+    {
+      "id": "lb-isf-ntfl",
+      "name": "Lebanon — ISF National Terrorism Financial List (Law No. 44/2015, UNSCR 1373)",
+      "jurisdiction": "Lebanon",
+      "url": "https://isf.gov.lb/wp-content/uploads/2025/04/en_file.xls",
+      "type": "xls",
+      "parser": "lbisf",
+      "discover": {
+        "page": "https://isf.gov.lb/national-terrorism-financial-list/",
+        "fileStem": "en_file",
+        "linkMatch": ".xls"
+      },
+      "browserHeaders": true,
+      "enabled": true,
+      "minNames": 250,
+      "_note": "ADDED 2026-10-03. Official page isf.gov.lb/national-terrorism-financial-list/ links \"Click here to download the list updated on 15/04/2025\" -> wp-content/uploads/2025/04/en_file.xls; the link is resolved from that page on every run (discover, stem en_file), so a re-upload under a new month folder is followed. The file is a legacy Excel 97-2003 workbook (OLE2 compound file, BIFF8), read by the stdlib reader parseXlsSheets / parser lbisf. Source-probe run 37128209902 (GitHub runner, 2026-10-03) confirmed the format: HTTP 200, application/vnd.ms-excel, 137,216 bytes, D0 CF 11 E0 signature. Source-probe run 37128512274 (same day, branch claude/stoic-ride-ms3hyp @ 8cc77c8) parsed it with lbisf: 286 names, minNames met. Cross-check: an independent external fetch of the same file read 261 rows (serials 1-262, 206 absent; 240 natural persons, 19 entities, 2 untyped) under the header Serial # | First Name and Family Name | ... | Group Type | Alias Type | Regime | Listed on | ...; applying the same name/alias rules to that copy gives 286 unique names, with the same first eight names in the same order as the runner read. minNames 250 floors a parse drift without tripping on a few de-listings."
+    },
+    {
+      "id": "so-namlc",
+      "name": "Somalia: NAMLC national targeted financial sanctions lists (Al-Shabaab; TFS Act 2023 art. 6)",
+      "jurisdiction": "Somalia",
+      "file": "data/so-namlc-curated-list.json",
+      "type": "curated",
+      "parser": "curated",
+      "enabled": true,
+      "minNames": 15,
+      "_note": "ADDED 2026-10-03. The two lists issued by the National Anti-Money Laundering and Countering the Financing of Terrorism Committee (NAMLC/001/24 of 13/04/2024, 9 persons; NAMLC/002/24 of 18/07/2024, 8 persons), transcribed from the primary NAMLC PDFs. The NAMLC page namlc.gov.so/targeted-financial-sanction-list/ (read 2026-10-03) states that two lists have been issued. Curated because the lists are PDF only. Refresh procedure and verification in the file's _README / verificationNote."
+    },
+    {
+      "id": "ci-centif-1373",
+      "name": "Côte d'Ivoire: CENTIF national list of persons designated as affiliated with terrorism (UNSCR 1373)",
+      "jurisdiction": "Côte d'Ivoire",
+      "file": "data/ci-centif-curated-list.json",
+      "type": "curated",
+      "parser": "curated",
+      "enabled": true,
+      "minNames": 70,
+      "_note": "ADDED 2026-10-03. 78 persons designated by order of the Minister of Finance and Budget (Ordonnance n° 2023-875; Décret n° 2024-216 as amended), transcribed from CENTIF's consolidated PDF (centif.ci/wp-content/uploads/2025/02/listenationale1373.pdf, update of 4 July 2025, which replaces earlier versions), linked from centif.ci/liste-des-sanctions/. Curated because the list is PDF only. Every name and alias is checked to occur verbatim in the extracted text; refresh procedure in the file's _README."
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "_README": "Sanctions coverage by country, all 195 (193 UN member states + the Holy See + Palestine). status: screened = at least one national list from this issuer is loaded by the screen today (test/board-figures.test.mjs ties this to data/sanctions-*.json); pending = a candidate exists and is recorded, not yet loaded (see note); identified = a national list is known to exist, official machine-readable file not yet verified; assessed-not-loadable = researched, cannot be loaded (see note); not-researched = no research recorded yet. NEVER mark a country as having no national list without evidence. Independently of this table, the UN Security Council Consolidated List is screened daily and binds every UN member state; the EU list is screened too. baseline: the multilateral lists the screen loads every day that already apply to the country regardless of its own status here — UN = UN Security Council Consolidated List (binding on every UN member state under Chapter VII; the Holy See and Palestine are observers, not members); EU = EU consolidated financial-sanctions list (directly applicable in the 27 EU member states). US OFAC and the UK list are screened too and reach many designees worldwide, but they are those issuers' lists, not the country's own, so they are not recorded as baseline. `fatf` marks a country on the FATF black or grey list (June 2026 plenary); the assessment behind it is in data/fatf-assessments.json.",
-  "updated": "2026-09-28",
+  "updated": "2026-10-03",
   "countries": [
     {
       "country": "Afghanistan",
@@ -66,7 +66,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the Central Bank of Armenia \"Applicable Lists\" page (cba.am/en/applicable-lists/) links the \"List of Designated Persons Pursuant to the United Nations Security Council Resolution 1373\" as a PDF (cba.am/file_manager/FMC/FMC%20en/Regulations/20211021%20-%20National%20Designations%20List.pdf). PDF parse and name count not yet verified; www.cba.am is not reachable from this sandbox, so a runner probe is needed Reconciliation: this supersedes the registry's 2026-09-26 verdict (data/sanctions-extra.json, CIS/Caucasus cluster) that found \"no evidence of an active distinct national designation list\" — the CBA page links a 2021-10-21 national designations PDF."
+      "note": "researched 2026-09-28: a national list exists — the Central Bank of Armenia \"Applicable Lists\" page (cba.am/en/applicable-lists/) links the \"List of Designated Persons Pursuant to the United Nations Security Council Resolution 1373\" as a PDF (cba.am/file_manager/FMC/FMC%20en/Regulations/20211021%20-%20National%20Designations%20List.pdf). PDF parse and name count not yet verified; www.cba.am is not reachable from this sandbox, so a runner probe is needed Reconciliation: this supersedes the registry's 2026-09-26 verdict (data/sanctions-extra.json, CIS/Caucasus cluster) that found \"no evidence of an active distinct national designation list\" — the CBA page links a 2021-10-21 national designations PDF. Update 2026-10-03: the PDF linked from cba.am/en/applicable-lists/ (still the only domestic list there) was read through an external fetcher: approved 18 October 2021 by the Interagency Committee, 341 individuals (DI-001 to DI-341) and 13 entities (DE-001 to DE-013). Not loaded yet: the PDF text layer garbles the Arabic-script names and splits one entry (DI-049) mid-word, so a second independent extraction is needed before the names can be screened as verified."
     },
     {
       "country": "Australia",
@@ -346,12 +346,15 @@
     },
     {
       "country": "Côte d'Ivoire",
-      "status": "identified",
+      "status": "screened",
+      "sources": [
+        "ci-centif-1373"
+      ],
       "baseline": [
         "UN"
       ],
       "fatf": "grey",
-      "note": "researched 2026-09-28: a national list exists — the CENTIF page \"Liste des Sanctions Financières Ciblées (SFC)\" (centif.ci/liste-des-sanctions/) publishes the list of persons designated under UNSCR 1373 (national designations), made by ministerial arrêté (e.g. the arrêté of 22 August 2024 entering 29 persons on the national list with asset freezing, energie.gouv.ci); the list is published as a PDF, \"Liste des personnes désignées comme affiliées au terrorisme\" (centif.ci/wp-content/uploads/2025/02/listenationale1373.pdf, 30 pages); parse and name count not yet verified by a runner probe"
+      "note": "screened from 2026-10-03: CENTIF's consolidated national UNSCR 1373 list (update of 4 July 2025, 78 persons) is screened from data/ci-centif-curated-list.json, transcribed from the primary PDF."
     },
     {
       "country": "Croatia",
@@ -513,11 +516,11 @@
     },
     {
       "country": "Fiji",
-      "status": "identified",
+      "status": "assessed-not-loadable",
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list is referenced — the Fiji FIU \"Targeted Financial Sanctions\" page (fijifiu.gov.fj/FTR-Act-You/Targeted-Financial-Sanctions) links a \"Fiji Sanctions - Local List\" alongside the UNSC consolidated list (per the search index; the scraper could not read the link target). Legal basis, format and entries not yet verified"
+      "note": "researched 2026-09-28 and 2026-10-03: the Fiji FIU page \"Fiji Sanctions - Local List\" (fijifiu.gov.fj/FTR-Act-You/Targeted-Financial-Sanctions/Local-List, read 2026-10-03) states that under the Public Order Act Fiji may designate persons or entities through the Courts and that \"There are currently no local designation of persons or entities for targeted financial sanctions\". Nothing to load while that holds; re-check the page for new designations."
     },
     {
       "country": "Finland",
@@ -829,12 +832,15 @@
     },
     {
       "country": "Lebanon",
-      "status": "identified",
+      "status": "screened",
+      "sources": [
+        "lb-isf-ntfl"
+      ],
       "baseline": [
         "UN"
       ],
       "fatf": "grey",
-      "note": "researched 2026-09-28: the Internal Security Forces page \"National Terrorism Financial List\" (isf.gov.lb/national-terrorism-financial-list/; Law No. 44 of 24/11/2015) publishes the national UNSCR 1373 list, updated 15/04/2025, as a legacy Excel file (isf.gov.lb/wp-content/uploads/2025/04/en_file.xls). Not staged: the registry has no reader for legacy .xls (BIFF) files (xlsx and ods only), and isf.gov.lb is not reachable from this sandbox, so the file layout is not yet verified"
+      "note": "screened from 2026-10-03: the ISF National Terrorism Financial List (Law No. 44 of 24/11/2015) is fetched live from isf.gov.lb on every run and read by the legacy-Excel reader (source-probe runs 37128209902 and 37128512274: 286 names). Supersedes the 2026-09-28 note that no .xls reader existed."
     },
     {
       "country": "Lesotho",
@@ -1399,11 +1405,14 @@
     },
     {
       "country": "Somalia",
-      "status": "identified",
+      "status": "screened",
+      "sources": [
+        "so-namlc"
+      ],
       "baseline": [
         "UN"
       ],
-      "note": "researched 2026-09-28: a national list exists — the National Anti-Money Laundering Committee \"Targeted Financial Sanction List\" pages (namlc.gov.so/targeted-financial-sanction-list/…, namlc.gov.so/list-of-financial-sanction-targets/…) and the Financial Reporting Center page \"Targeted Financial Sanction List\" (frc.gov.so/list-of-financial-sanction-targets-copy/) publish national designations of al-Shabaab financiers under Article 6 of the Targeted Financial Sanctions Act 2023. Page format and name count not yet verified by a runner probe"
+      "note": "screened from 2026-10-03: both NAMLC national lists (NAMLC/001/24 and NAMLC/002/24; 17 Al-Shabaab financiers and leaders) are screened from data/so-namlc-curated-list.json, transcribed from the primary NAMLC PDFs."
     },
     {
       "country": "South Africa",
