@@ -203,10 +203,162 @@ async function probeOne(s, timeoutMs = 90000) {
   return r;
 }
 
+
+/* ── Fixed diagnostic suites (no registry id; URLs are FIXED in code, never
+   taken from the dispatch input) ──
+   opensanctions-catalogue: which national lists the daily engine's worldwide
+     net (OpenSanctions `sanctions` collection) actually carries, with each
+     list's publisher country — the evidence needed before a country is
+     counted as screened.
+   news-feeds: whether Bing News honours a country edition (cc/setlang/mkt),
+     how GDELT's DOC API rate-limits a runner, and whether GDELT's free bulk
+     GKG files (every 15 min, all countries, 65 languages, no per-query
+     limit) are reachable and parse as documented. Queries use a PUBLIC
+     FIGURE's name only — never a customer or employee name. */
+export const SUITES = ['opensanctions-catalogue', 'news-feeds'];
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+async function get(url, timeoutMs = 60000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'user-agent': UA, 'accept-language': 'en-US,en;q=0.9' } });
+    const buf = Buffer.from(await res.arrayBuffer());
+    return { status: res.status, ok: res.ok, buf, ms: Date.now() - t0, headers: res.headers, finalUrl: res.url };
+  } catch (e) {
+    return { status: 'error', ok: false, buf: Buffer.alloc(0), ms: Date.now() - t0, error: String(e && e.message || e).slice(0, 160) };
+  } finally { clearTimeout(t); }
+}
+const cell = v => String(v == null ? '' : v).replace(/\|/g, '/').replace(/\s+/g, ' ').trim();
+
+async function suiteOpenSanctionsCatalogue() {
+  const L = ['## OpenSanctions `sanctions` collection — member lists and publisher countries', ''];
+  const base = 'https://data.opensanctions.org/datasets/latest/';
+  const coll = await get(base + 'sanctions/index.json');
+  L.push('collection index: HTTP ' + coll.status + ', ' + coll.buf.length + ' bytes');
+  let members = [];
+  try {
+    const j = JSON.parse(coll.buf.toString('utf8'));
+    members = j.datasets || j.children || j.sources || [];
+    if (!Array.isArray(members)) members = [];
+    members = members.map(m => typeof m === 'string' ? m : (m && m.name)).filter(Boolean);
+    if (!members.length) L.push('unexpected shape — key paths: ' + jsonKeyPaths(coll.buf).slice(0, 30).join(', '));
+  } catch (e) { L.push('collection index did not parse: ' + e.message); }
+  L.push('member datasets: ' + members.length, '');
+  L.push('| dataset | title | publisher country | publisher | official | targets | last change | source url |');
+  L.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
+  for (const name of members) {
+    const r = await get(base + encodeURIComponent(name) + '/index.json', 30000);
+    try {
+      const d = JSON.parse(r.buf.toString('utf8'));
+      const pub = d.publisher || {};
+      const stats = d.stats || d.target_stats || {};
+      const targets = d.target_count ?? (stats.targets && stats.targets.total) ?? stats.total ?? '';
+      L.push('| ' + [name, d.title, pub.country || pub.country_label, pub.name, pub.official, targets, d.last_change || d.updated_at, (d.url || (d.resources && '') || '')].map(cell).join(' | ') + ' |');
+    } catch {
+      L.push('| ' + cell(name) + ' | (index HTTP ' + r.status + ') | | | | | | |');
+    }
+  }
+  return L.join('\n');
+}
+
+function gkgStats(text, maxRows = 200000) {
+  const rows = text.split('\n').filter(Boolean);
+  const cols = {};
+  let persons = 0, titles = 0, trans = 0;
+  const langs = {};
+  const sample = [];
+  for (const line of rows.slice(0, maxRows)) {
+    const f = line.split('\t');
+    cols[f.length] = (cols[f.length] || 0) + 1;
+    if (f[12] && f[12].trim()) persons++;
+    if (f[26] && /<PAGE_TITLE>/i.test(f[26])) titles++;
+    if (f[25] && f[25].trim()) { trans++; const m = /srclc:([a-z]{2,3})/i.exec(f[25]); if (m) langs[m[1]] = (langs[m[1]] || 0) + 1; }
+    if (sample.length < 3 && f[12] && f[26]) {
+      const t = (/<PAGE_TITLE>([\s\S]*?)<\/PAGE_TITLE>/i.exec(f[26]) || [])[1] || '';
+      sample.push('source=' + cell(f[3]).slice(0, 40) + ' · persons(sample)=' + cell(f[12]).slice(0, 80) + ' · title=' + cell(t).slice(0, 90));
+    }
+  }
+  const topLangs = Object.entries(langs).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => k + ':' + v).join(' ');
+  return ['rows ' + rows.length + ' · column counts ' + JSON.stringify(cols) + ' · with persons ' + persons + ' · with PAGE_TITLE ' + titles
+    + ' · translated ' + trans + (topLangs ? ' · source languages ' + topLangs : ''), ...sample.map(x => '  e.g. ' + x)];
+}
+
+async function suiteNewsFeeds() {
+  const L = ['## News-feed reachability from the runner', ''];
+  const who = '"Recep Tayyip Erdoğan"';
+  const q = encodeURIComponent(who);
+  const bingVariants = [
+    ['bing (default)', 'https://www.bing.com/news/search?q=' + q + '&format=rss'],
+    ['bing cc=TR setlang=tr', 'https://www.bing.com/news/search?q=' + q + '&format=rss&cc=TR&setlang=tr'],
+    ['bing mkt=tr-TR', 'https://www.bing.com/news/search?q=' + q + '&format=rss&mkt=tr-TR'],
+    ['bing cc=FR setlang=fr', 'https://www.bing.com/news/search?q=' + q + '&format=rss&cc=FR&setlang=fr'],
+    ['bing mkt=ar-SA', 'https://www.bing.com/news/search?q=' + q + '&format=rss&mkt=ar-SA'],
+    ['bing cc=IN', 'https://www.bing.com/news/search?q=' + q + '&format=rss&cc=IN'],
+  ];
+  const seen = {};
+  for (const [label, url] of bingVariants) {
+    const r = await get(url, 30000);
+    const xml = r.buf.toString('utf8');
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1]);
+    const srcs = items.map(i => ((/<News:Source>([\s\S]*?)<\/News:Source>/i.exec(i) || /<source[^>]*>([\s\S]*?)<\/source>/i.exec(i) || [])[1] || '').trim());
+    const titles = items.map(i => ((/<title>([\s\S]*?)<\/title>/i.exec(i) || [])[1] || '').trim());
+    seen[label] = new Set(titles);
+    L.push('- **' + label + '**: HTTP ' + r.status + ' · ' + r.ms + ' ms · ' + items.length + ' items · sources: ' + cell(srcs.slice(0, 8).join('; ')).slice(0, 220));
+    L.push('  - first titles: ' + cell(titles.slice(0, 3).join(' || ')).slice(0, 300));
+  }
+  const def = seen['bing (default)'] || new Set();
+  for (const [label] of bingVariants.slice(1)) {
+    const s = seen[label] || new Set();
+    const overlap = [...s].filter(x => def.has(x)).length;
+    L.push('- overlap with default edition — ' + label + ': ' + overlap + ' of ' + s.size + ' titles shared');
+  }
+  L.push('');
+  const gn = await get('https://news.google.com/rss/search?q=' + q + '&hl=tr&gl=TR&ceid=TR:tr', 30000);
+  L.push('- google news TR:tr: HTTP ' + gn.status + ' · ' + gn.ms + ' ms · ' + (gn.buf.toString('utf8').match(/<item>/g) || []).length + ' items');
+  for (let i = 1; i <= 3; i++) {
+    const g = await get('https://api.gdeltproject.org/api/v2/doc/doc?query=' + q + '&mode=artlist&format=json&maxrecords=10&timespan=7d', 30000);
+    L.push('- gdelt doc call ' + i + ': HTTP ' + g.status + ' · ' + g.ms + ' ms · retry-after=' + ((g.headers && g.headers.get && g.headers.get('retry-after')) || '-')
+      + ' · body: ' + cell(g.buf.toString('utf8').slice(0, 140)));
+    if (i < 3) await new Promise(r => setTimeout(r, 6000));
+  }
+  L.push('');
+  for (const which of ['lastupdate.txt', 'lastupdate-translation.txt']) {
+    for (const scheme of ['https', 'http']) {
+      const lu = await get(scheme + '://data.gdeltproject.org/gdeltv2/' + which, 30000);
+      L.push('- gdelt ' + scheme + ' ' + which + ': HTTP ' + lu.status + ' · ' + cell(lu.buf.toString('utf8')).slice(0, 400));
+      if (!lu.ok) continue;
+      const gkgUrl = (lu.buf.toString('utf8').split('\n').map(l => l.trim().split(/\s+/)[2]).filter(Boolean).find(u => /gkg\.csv\.zip$/.test(u)));
+      if (!gkgUrl) break;
+      const z = await get(gkgUrl.replace(/^https?:/, scheme + ':'), 120000);
+      L.push('  - ' + gkgUrl + ': HTTP ' + z.status + ' · ' + z.buf.length + ' bytes · ' + z.ms + ' ms');
+      if (z.ok) {
+        try {
+          const m = await import('./sanctions-match.mjs');
+          const files = m.unzipEntries(z.buf);
+          for (const [fname, content] of files) {
+            L.push('  - entry ' + fname + ': ' + content.length + ' bytes');
+            for (const line of gkgStats(content.toString('utf8'))) L.push('    - ' + line);
+          }
+        } catch (e) { L.push('  - unzip failed: ' + e.message); }
+      }
+      break;
+    }
+  }
+  return L.join('\n');
+}
+
 async function main(argv) {
   const selector = argv[0];
   if (!selector) { console.error('usage: source-probe.mjs <source-id|all-disabled> [outdir]'); return 2; }
   const outdir = argv[1] || '.';
+  if (SUITES.includes(selector)) {
+    const md = selector === 'opensanctions-catalogue' ? await suiteOpenSanctionsCatalogue() : await suiteNewsFeeds();
+    mkdirSync(outdir, { recursive: true });
+    writeFileSync(join(outdir, 'source-probe-report.md'), md + '\n');
+    console.log(md);
+    return 0;
+  }
   const targets = probeTargets(loadRegistry(), selector);
   if (!targets.length) { console.error('source-probe: no probeable source matches "' + selector + '"'); return 2; }
   const results = [];
