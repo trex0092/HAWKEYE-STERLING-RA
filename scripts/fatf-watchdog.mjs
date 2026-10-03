@@ -278,7 +278,9 @@ export async function fetchRetrying(url, opts = {}, { attempts = 3, fetchImpl = 
     try { r = await fetchImpl(url, opts); }
     catch (e) { console.log('archive fetch error (attempt ' + attempt + '): ' + e.message); }
     if (r) {
-      console.log('archive fetch ' + url.replace(/^https:\/\/web\.archive\.org/, '') + ' (attempt ' + attempt + '): ' + r.status);
+      let shown = url;
+      try { const u = new URL(url); shown = u.pathname + u.search; } catch { /* not a URL — log as given */ }
+      console.log('archive fetch ' + shown + ' (attempt ' + attempt + '): ' + r.status);
       if (r.ok) return r;
       if (r.status !== 429 && r.status < 500) return null;   /* a 404/403 will not heal on retry */
     }
