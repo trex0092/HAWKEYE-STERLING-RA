@@ -10,6 +10,11 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Screening hardening.**
+  - **Thin news coverage now earns a same-day make-up sweep.** On 3 Oct 2026, 972 of 996 subjects were reached by Bing alone. That counted as covered, so the 03:07 make-up firing exited in 40 s. Run metrics now record feed reach as counts only. When at least `MAKEUP_THIN_FEED_PCT` (default 50%) of the book had one feed or none, a fresh runner re-sweeps. A make-up run never re-triggers on this ground, so it runs at most once a day.
+  - **The Wikidata PEP net reports a stale harvest.** If the weekly harvest is older than `PEP_WIKIDATA_MAX_AGE_DAYS` (default 14) or undated, the run logs it and §③ says STALE. The net still screens.
+  - **The manual Daily Sanctions Screening workflow downloads the UK Sanctions List.** It was still fetching the OFSI ConList, which closed on 28 Jan 2026 and has been frozen since 3 Jun. The run script's header-scanning parser already reads the new file's Name 1..6 layout.
+
 - **GDELT recovers during the run instead of staying off.** On 3 Oct 2026 GDELT returned HTTP 429 in the first two minutes. The breaker opened at 00:07 UTC, and GDELT then reached 0 of 996 subjects for the rest of the 28-minute run. The GDELT breaker is now half-open like Google News: one probe query every `GDELT_PROBE_SECONDS` (default 300 s), and a success closes the circuit.
 
 - **FATF Watchdog and Regulatory Watch recover archived pages instead of skipping.** Both read archive.org captures when the official site blocks the GitHub runner. On 3 Oct 2026 a capture existed for each, but its single read got HTTP 429, so the FATF lists went unverified for an 8th run in a row and the UAE NAMLCFTC page for a 3rd.

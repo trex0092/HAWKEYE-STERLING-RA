@@ -2870,6 +2870,9 @@ def pep_mirror_lookup(index, name):
 PEP_WIKIDATA_NET = os.environ.get("PEP_WIKIDATA_NET", "1") == "1"
 PEP_WORLDWIDE_FILE = os.environ.get("PEP_WORLDWIDE_FILE", "data/pep-worldwide.json")
 PEP_WIKIDATA_LABEL = "Wikidata worldwide PEP list (CC0)"
+# The harvest is weekly (pep-worldwide.yml). Older than this, the net still
+# screens but the report says STALE: a broken harvest must not age silently.
+PEP_WIKIDATA_MAX_AGE_DAYS = int(os.environ.get("PEP_WIKIDATA_MAX_AGE_DAYS", "14"))
 
 def load_pep_wikidata_net(path=None):
     """(index, meta). index = {normalized name or token-sorted name:
@@ -2913,6 +2916,11 @@ def load_pep_wikidata_net(path=None):
     meta = {"count": len(entries), "date": str(dataset.get("harvested") or "")[:10] or "unknown",
             "partial": bool(dataset.get("partial"))}
     del dataset, entries
+    age = list_age_days(meta["date"])
+    meta["stale"] = bool(PEP_WIKIDATA_MAX_AGE_DAYS > 0 and (age is None or age > PEP_WIKIDATA_MAX_AGE_DAYS))
+    if meta["stale"]:
+        log(f"  {PEP_WIKIDATA_LABEL}: STALE — harvested {meta['date']} "
+            f"(over {PEP_WIKIDATA_MAX_AGE_DAYS} days or undated); check the PEP Worldwide Harvest workflow")
     if meta["partial"]:
         log(f"  {PEP_WIKIDATA_LABEL}: PARTIAL harvest — a PEP not yet harvested produces no hit")
     log(f"  {PEP_WIKIDATA_LABEL}: {meta['count']:,} office-holders, {len(index):,} name keys "
@@ -6738,7 +6746,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
         if _m.get("count"):
             _state = f"{_m['count']:,} " + ("office-holders" if "Wikidata" in _net else "name keys") \
                      + (f", harvested {_m['date']}" if "Wikidata" in _net else "") \
-                     + (" — PARTIAL harvest" if _m.get("partial") else "")
+                     + (" — PARTIAL harvest" if _m.get("partial") else "") \
+                     + (" — ⚠ STALE harvest (check the PEP Worldwide Harvest workflow)" if _m.get("stale") else "")
         elif _m.get("date") == "licence-off":
             _state = OPENSANCTIONS_OFF_NOTE + " — relatives / close associates (RCA) are NOT bulk-screened"
         elif _m.get("date") == "disabled":
@@ -8141,7 +8150,12 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                 "pep_errors": pep_errors, "pep_mirror": counts["pep_mirror"],
                 "watchlist": counts["watchlist"],
                 "flagged": len(possible_matches), "adverse": len(adverse_findings),
-                "pep": len(pep_findings)},
+                "pep": len(pep_findings),
+                # News-feed reach (counts only, no names): drives the same-day
+                # make-up decision when most of the book had one feed or none.
+                "feed_single": int(feed_coverage_snapshot().get("single", 0)),
+                "feed_none": int(feed_coverage_snapshot().get("none", 0)),
+                "makeup": int(mode == "makeup")},
         timings=timings, llm_calls=dict(ai.LLM_CALLS),
         # A make-up sweep persists too: it is a full-book run, and its snapshot
         # REPLACING today's degraded one (persist_run dedups by date) is exactly

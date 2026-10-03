@@ -292,6 +292,15 @@ def monitor_run(today, counts, timings=None, llm_calls=None, path=None, persist=
     return {"snapshot": snap, **res}
 
 
+# Thin news coverage also earns a make-up sweep. On 3 Oct 2026 GDELT reached 0
+# subjects and Google News 24, so 972 of 996 subjects were reached by Bing
+# alone; am_errors stayed 0 (one feed counts as covered) and the 03:07 make-up
+# firing exited in 40 s. A subject reached by ONE feed or NONE counts as thin;
+# when they are at least this share of the book, a fresh runner re-sweeps.
+# A make-up run never re-triggers on thin coverage alone (bounded: at most one
+# thin-coverage make-up per day). 0 disables.
+MAKEUP_THIN_FEED_PCT = float(os.environ.get("MAKEUP_THIN_FEED_PCT", "0.5"))
+
 def makeup_decision(today, path=None):
     """Should a same-day coverage MAKE-UP sweep run? Consulted by the retry
     firings of the daily screening on days that already have a successful run:
@@ -324,6 +333,13 @@ def makeup_decision(today, path=None):
             bits.append(f"{pep} individual(s) lost PEP coverage")
         return {"sweep": True, "uncovered": am + pep,
                 "reason": " and ".join(bits) + " in today's earlier run"}
+    subjects = int(counts.get("subjects") or 0)
+    thin = int(counts.get("feed_single") or 0) + int(counts.get("feed_none") or 0)
+    if (MAKEUP_THIN_FEED_PCT > 0 and subjects and not counts.get("makeup")
+            and thin / subjects >= MAKEUP_THIN_FEED_PCT):
+        return {"sweep": True, "uncovered": thin,
+                "reason": (f"{thin} of {subjects} subject(s) were reached by one news feed or none "
+                           "in today's earlier run — re-sweeping from a fresh runner for multi-feed coverage")}
     return {"sweep": False, "uncovered": 0,
             "reason": "today's earlier run had full news + PEP coverage — make-up sweep not needed"}
 
