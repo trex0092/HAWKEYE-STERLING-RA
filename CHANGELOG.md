@@ -10,6 +10,13 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Regulatory Watch: change cards name the exact publication, link to it, and say what it means.**
+  - **Before.** A card showed long lowercased runs of page text (OFAC on 3 Oct: "department of the treasury read the latest treasury news … menu about ofac history …"), with HTML codes left raw ("treasury&#39;s", "page 3 &hellip;"), and no link to the item that was issued. The AI analysis was written to a file and never reached the card.
+  - **New and withdrawn items.** Every good fetch also snapshots the page's titled links (`data/reg-watch-snapshots/<id>.links.json`). A change lists each new item and each item no longer listed, by its title as printed (original case) and linked to the instrument, e.g. "🆕 New item: Counter Terrorism Designations; Iran-related Designations and Designations Updates". Generic link texts ("Read more", "اقرأ المزيد", page numbers) and tracking/session parameters are ignored. A new item's title also counts toward severity. The first item snapshot of each source is persisted on its first run, so items are listed from the next change.
+  - **Plain text.** HTML character references are decoded in the card's excerpts. Decoding is for display only: fingerprints are unchanged, because Sanctions Watch shares them and every list containing `&amp;` would otherwise fire one false "list changed" alert.
+  - **Provenance.** Each change states which two versions were compared and how each was obtained, e.g. "version of 2026-10-02 (direct fetch) → version of 2026-10-03 (web.archive.org snapshot …)".
+  - **AI analysis on the card.** When the AI step runs, it is given the new and withdrawn items and returns five labelled lines that appear on the card: what changed, impact on a UAE DPMS, action to consider, instrument (number, date, authority) and effective date. A line the text does not support reads "not stated"; a line the model omits stays absent. The card marks it "verify against the source before acting".
+
 - **Regulatory Watch: archive.org reads wait their turn and back off longer, so a rate-limited capture is not reported as an outage.**
   - **Cause.** On 3 Oct 2026 (run 37145525927) the OECD responsible-business-conduct page answered HTTP 403 directly. archive.org held a capture from 2 Oct, but all three reads of it got HTTP 429 within about 30 s while other sources' archive reads ran in parallel. The source was reported "persistently unreachable" for a 3rd run, opening an Asana monitoring-gap card.
   - **Fix.** Capture reads are serialized (one archive.org read at a time across all sources), get a 4th attempt on a 15 s linear base, and honour `Retry-After` up to 30 s. A failure that persists is still returned as the failure; no page is ever assumed.

@@ -38,7 +38,7 @@ Actions from the URLs in `sanctions-sources.json`.
 |---|---|
 | `sanctions-state.json` | `sanctions-watch.yml` (daily): per-source content fingerprints; `updated` moves only when a list actually changes |
 | `fatf-state.json` | `fatf-watchdog.yml`: last-seen FATF black/grey lists |
-| `reg-watch-state.json` + `reg-watch-snapshots/` | `regulatory-watch.yml`: content fingerprints + dated text snapshots of ~22 regulator sources |
+| `reg-watch-state.json` + `reg-watch-snapshots/` | `regulatory-watch.yml`: content fingerprints + dated text snapshots (`<id>.txt`) and titled-link item snapshots (`<id>.links.json`) of ~22 regulator sources |
 | `sanctions-screen-state.json`(`.enc`) | Screening runs: last-seen matches (no re-alert spam) |
 | `screen-delta-state.json`(`.enc`) · `screening-cases-state.json.enc` · `source-coverage-state.json`(`.enc`) · `adverse-media-evidence.json`(`.enc`) · `run-metrics.json`(`.enc`) | The daily screen's delta, case, coverage, evidence and metrics state |
 | `tfs-update-log.json` | TFS list-update timeline (detection → rescreen; MLRO completes publication dates) |
