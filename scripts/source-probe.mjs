@@ -35,7 +35,9 @@ export function probeTargets(registry, selector) {
   if (selector === 'all-disabled') {
     return registry.filter(s => s.enabled === false && typeof s.url === 'string' && /^https?:/.test(s.url));
   }
-  return registry.filter(s => s.id === selector && typeof s.url === 'string' && /^https?:/.test(s.url));
+  /* One id, or several comma-separated ids — still registry ids only. */
+  const ids = new Set(String(selector || '').split(',').map(x => x.trim()).filter(Boolean));
+  return registry.filter(s => ids.has(s.id) && typeof s.url === 'string' && /^https?:/.test(s.url));
 }
 
 /* Bounded, printable body sample: control bytes hex-escaped so a WAF's
