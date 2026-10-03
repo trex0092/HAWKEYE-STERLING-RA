@@ -23,8 +23,31 @@ import { readFileSync } from 'node:fs';
    Arabic- or Cyrillic-script subject must keep its letters, or it folds to the
    empty key and silently screens clear. The single source of truth —
    sanctions-screen.mjs re-exports this. */
-export function normalizeName(s) {
+/* Apostrophe variants and HTML entities, folded BEFORE anything else — kept
+   byte-identical with screen.py's _fold_apostrophe_variants. A name reaching
+   the matcher as "OʼBrien" (U+02BC, the usual apostrophe of transliterated
+   Ukrainian/Arabic names), "O’Brien", "O&#39;Brien" or "Smith &amp; Co" used
+   to key as "oʼbrien" (one letter-token, routed to MANUAL REVIEW as lost
+   script), "o 39 brien" or "smith amp co" — never meeting the plain spelling.
+   The FATF watchdog dropped two grey-listed countries for exactly this reason
+   on 3 Oct 2026. Every variant now becomes the ASCII apostrophe the pipeline
+   already treats as a separator, so plain-apostrophe names keep the exact key
+   they had and every variant meets them. Numeric entities and a closed set of
+   named ones are decoded; anything else is left as it was. */
+const NAMED_ENT = { amp: '&', apos: "'", quot: '"', nbsp: ' ', rsquo: "'", lsquo: "'", ndash: '-', mdash: '-' };
+export function foldApostropheVariants(s) {
   return String(s == null ? '' : s)
+    .replace(/&#(x[0-9a-fA-F]+|[0-9]+);/g, (m, n) => {
+      const cp = n[0] === 'x' || n[0] === 'X' ? parseInt(n.slice(1), 16) : parseInt(n, 10);
+      return cp > 0 && cp < 0x110000 ? String.fromCodePoint(cp) : ' ';
+    })
+    .replace(/&([A-Za-z])(acute|grave|circ|uml|tilde|cedil|ring);/g, '$1')
+    .replace(/&([A-Za-z]+);/g, (m, n) => (Object.hasOwn(NAMED_ENT, n.toLowerCase()) ? NAMED_ENT[n.toLowerCase()] : m))
+    .replace(/[\u2018\u2019\u201B\u02BC\u02BB\u2032\u0060\u00B4]/g, "'");
+}
+
+export function normalizeName(s) {
+  return foldApostropheVariants(s)
     /* BEFORE NFKD — й and ё are PRECOMPOSED (и+breve, е+diaeresis), so the
        mark-strip below turns them into и/е and the Cyrillic table then renders
        "Сергей" as "sergei" and "Ёлка" as "elka". screen.py romanizes on the
@@ -1784,7 +1807,7 @@ export function lostScriptLetters(name) {
     if (/\p{L}/u.test(c) && (c < 'A' || c > 'Z')) return true;
   }
   /* Latin-script letters fold deterministically; anything else was romanised. */
-  return [...String(name == null ? '' : name)]
+  return [...foldApostropheVariants(name)]
     .some(c => /\p{L}/u.test(c) && !/\p{Script=Latin}/u.test(c));
 }
 

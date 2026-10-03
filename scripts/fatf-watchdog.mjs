@@ -104,11 +104,31 @@ export function extractCountries(segment, baseline) {
    recently precedes it in the page; the first classified occurrence of a
    name decides its list. Occurrences before any heading (nav links) are
    ignored. Works on a lowercased copy, which preserves string positions. */
+/* HTML entities and typographic apostrophes, folded to the plain characters
+   the country dictionary is keyed on. On 3 Oct 2026 an archived capture of the
+   FATF page spelt "Côte d’Ivoire" / "Lao People’s Democratic Republic" with a
+   non-ASCII apostrophe or an entity; the dictionary (plain "'") matched
+   neither, both names silently dropped out of the grey list, and the watchdog
+   alerted a removal that the FATF never made (the 19 June 2026 statement still
+   lists both). Every position below is taken on the folded string itself, so a
+   multi-character entity collapsing to one character cannot skew anything. */
+const NAMED_ENTITIES = { amp: '&', apos: "'", quot: '"', nbsp: ' ', rsquo: "'", lsquo: "'", rsaquo: "'", lsaquo: "'", prime: "'" };
+export function foldEntities(html) {
+  return String(html || '')
+    .replace(/&#(x[0-9a-f]+|\d+);?/gi, (m, n) => {
+      const cp = n[0] === 'x' || n[0] === 'X' ? parseInt(n.slice(1), 16) : parseInt(n, 10);
+      return Number.isFinite(cp) && cp > 0 && cp < 0x110000 ? String.fromCodePoint(cp) : ' ';
+    })
+    .replace(/&([a-z])(acute|grave|circ|uml|tilde|cedil|ring|slash);/gi, '$1')
+    .replace(/&([a-z]+);/gi, (m, n) => NAMED_ENTITIES[n.toLowerCase()] ?? m)
+    .replace(/[\u2018\u2019\u201b\u02bc\u2032\u00b4`]/g, "'");
+}
+
 export function classifyCountries(html, baseline) {
   /* lowercase + accent fold + 1:1 hyphen/whitespace fold; headings and
      matches use the SAME folded string, and every fold maps one character
      to one character, so positions stay mutually consistent */
-  const lower = String(html || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  const lower = foldEntities(html).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[\u2010\u2011\u2012\u2013\u2014-]/g, ' ').replace(/\s/g, ' ');
   const positions = (needle) => {
     const out = []; let i = 0;
@@ -209,6 +229,36 @@ export function snapshotDate(source) {
    reshuffle must not read as a move. Used for STALE-capture corroboration — see
    the `stale` branch in main() for why an equality test is safe there and a diff
    is not. A missing/garbled side is never "identical". */
+/* The FATF lists as recorded from the last plenary's public statements
+   (data/fatf-assessments.json, verbatim from fatf-gafi.org, keyed on the same
+   canonical names). The FATF changes its lists only at plenaries, so a page
+   that agrees with this record means the lists did not move — whatever a
+   stored state from an earlier, defective parse says. */
+export function recordedPlenary(path = 'data/fatf-assessments.json') {
+  try {
+    const d = JSON.parse(readFileSync(path, 'utf8'));
+    const rows = Array.isArray(d.jurisdictions) ? d.jurisdictions : [];
+    const pick = (l) => rows.filter(r => r && r.list === l && r.riskName).map(r => r.riskName).sort();
+    const out = { date: String(d.plenary || ''), black: pick('black'), grey: pick('grey') };
+    return out.black.length && out.grey.length ? out : null;
+  } catch { return null; }
+}
+
+/* A REMOVAL must be corroborated: the removed name may not still be spelt
+   inside the list region of the page under a looser, letters-only comparison
+   (which ignores apostrophes, entities, accents and spacing entirely). If it
+   is, the parser lost it — a drift to report, never a delisting to announce. */
+export function removalsStillNamed(html, removed, aliases = ALIASES) {
+  const letters = (x) => foldEntities(x).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/<[^>]*>/g, ' ').replace(/[^a-z]/g, '');
+  const page = letters(html);
+  const out = [];
+  for (const name of removed || []) {
+    const forms = [name, ...Object.entries(aliases).filter(([, c]) => c === name).map(([a]) => a)].map(letters).filter(f => f.length >= 4);
+    if (forms.some(f => page.includes(f))) out.push(name);
+  }
+  return out;
+}
+
 export function listsIdentical(a, b) {
   const same = (x, y) => Array.isArray(x) && Array.isArray(y)
     && x.length === y.length
@@ -573,7 +623,7 @@ export async function main(mode) {
       writeFileSync(STATE_FILE, JSON.stringify(st, null, 2) + '\n');
       if (st.skipStreak >= FATF_SKIP_ALERT && REG_PROJECT_GID) {
         const url = await createTask(
-          '⚠ FATF monitoring GAP — list source unreachable ' + st.skipStreak + ' consecutive run(s)',
+          '⚠ FATF monitoring GAP — lists not verified ' + st.skipStreak + ' consecutive run(s)',
           'The FATF black/grey-list watchdog could not verify the lists against an authoritative capture for '
           + st.skipStreak + ' consecutive runs. FATF list moves may be UNDETECTED.\n\nThis run: ' + why
           + '\n\nVerify manually on ' + FATF_URL + ' and check the source endpoints.',
@@ -608,6 +658,17 @@ export async function main(mode) {
       assertPlausible(staleLists);   /* a garbled capture must not "corroborate" anything */
     } catch (e) {
       await recordGap('only a stale capture (' + age + 'd old) and it did not parse: ' + e.message);
+      return;
+    }
+    /* The stored state itself can be the odd one out (an earlier defective
+       parse): a capture that matches the recorded plenary statements exactly
+       is authoritative for "no move", so the state is repaired from it. */
+    const plenaryRec = recordedPlenary();
+    if (!listsIdentical(prevState, staleLists) && plenaryRec && listsIdentical(staleLists, plenaryRec)) {
+      console.log('stale capture (' + age + 'd old) matches the recorded ' + plenaryRec.date
+        + ' plenary lists exactly; stored state differed — state repaired, lists unchanged');
+      writeFileSync(STATE_FILE, JSON.stringify({ ...staleLists, updated: new Date().toISOString().slice(0, 10),
+        repairedFrom: 'recorded plenary ' + plenaryRec.date, lastCorroboratedSnapshot: snapshotDate(fetched.source) }, null, 2) + '\n');
       return;
     }
     if (!listsIdentical(prevState, staleLists)) {
@@ -658,6 +719,25 @@ export async function main(mode) {
   const diff = diffLists(prev, current);
   const changed = [...diff.blackAdded, ...diff.blackRemoved, ...diff.greyAdded, ...diff.greyRemoved];
   if (!changed.length) { console.log('no FATF list changes — staying silent'); return; }
+
+  /* The page agrees exactly with the recorded plenary statements: the lists
+     have not moved, so the difference is in the STORED state (written by an
+     earlier defective parse). Repair the state; no list-change alert. */
+  const plenary = recordedPlenary();
+  if (plenary && listsIdentical(current, plenary)) {
+    console.log('page matches the recorded ' + plenary.date + ' plenary lists exactly; stored state differed ('
+      + changed.join(', ') + ') — state repaired, no list-change alert');
+    writeFileSync(STATE_FILE, JSON.stringify({ ...current, updated: new Date().toISOString().slice(0, 10), repairedFrom: 'recorded plenary ' + plenary.date }, null, 2) + '\n');
+    return;
+  }
+  /* A removal whose name is still spelt in the page is a parse loss, not a
+     delisting: report the drift loudly, keep the stored state, never alert a move. */
+  const lost = removalsStillNamed(fetched.html, [...diff.blackRemoved, ...diff.greyRemoved]);
+  if (lost.length) {
+    await recordGap('the parser lost ' + lost.join(', ') + ' — still named on the page (' + source
+      + ') but not read into either list. Treated as parser drift, not a delisting; stored lists kept');
+    return;
+  }
 
   const today = new Date().toISOString().slice(0, 10).split('-').reverse().join('/');
   const affected = await findAffected(changed);

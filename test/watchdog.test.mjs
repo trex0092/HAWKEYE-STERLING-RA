@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical, snapshotDate, fetchRetrying, snapshotUrls } from '../scripts/fatf-watchdog.mjs';
+import { foldEntities, recordedPlenary, removalsStillNamed, loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical, snapshotDate, fetchRetrying, snapshotUrls } from '../scripts/fatf-watchdog.mjs';
 
 function throws(fn) { try { fn(); return false; } catch { return true; } }
 
@@ -185,6 +185,39 @@ check('injected text around a stamp cannot reach the file',
     urls.length === 6 && urls[0].url === 'https://web.archive.org/web/20261002020916id_/https://p/x'
     && urls[1].url === 'https://web.archive.org/web/20261002020916/https://p/x'
     && urls[2].ts === '20261001000000' && urls[4].ts === '20260930000000');
+}
+
+/* ── 3 Oct 2026 false delisting: apostrophes / entities in the page ──
+   An archived capture spelt the names with a typographic apostrophe or an HTML
+   entity; both dropped out of the grey list and a removal the FATF never made
+   was alerted. Every spelling must classify identically. */
+{
+  const page = (ci, lao) => '<h2>High-risk jurisdictions subject to a call for action</h2><ul><li>Iran</li><li>Myanmar</li><li>North Korea</li></ul>'
+    + '<h2>Jurisdictions under increased monitoring</h2><ul><li>Angola</li><li>' + ci + '</li><li>' + lao + '</li><li>Kenya</li></ul>';
+  const want = JSON.stringify(['Angola', "Cote D'Ivoire", 'Kenya', "Lao People's Democratic Republic"]);
+  const variants = [
+    ["Côte d'Ivoire", 'Lao PDR'],
+    ['Côte d’Ivoire', 'Lao People’s Democratic Republic'],
+    ['C&ocirc;te d&#39;Ivoire', 'Lao People&#39;s Democratic Republic'],
+    ['Côte d&rsquo;Ivoire', 'Lao People&#x2019;s Democratic Republic'],
+  ];
+  check('FATF: plain, typographic and entity apostrophes all classify Côte d\'Ivoire and Lao PDR as grey',
+    variants.every(([ci, lao]) => JSON.stringify(classifyCountries(page(ci, lao), baseline).grey) === want));
+  check('foldEntities: numeric, named and accented entities fold to plain characters',
+    foldEntities('d&#8217;I &#x2019; &rsquo; &amp; C&ocirc;te') === "d'I ' ' & Cote");
+  const rec = recordedPlenary();
+  check('recordedPlenary: the 19 June 2026 statements give 3 black and 22 grey under the watchdog\'s own names',
+    rec && rec.date === '2026-06-19' && rec.black.length === 3 && rec.grey.length === 22
+    && rec.grey.includes("Cote D'Ivoire") && rec.grey.includes("Lao People's Democratic Republic"));
+  check('removalsStillNamed: a "removed" name still spelt on the page is caught as parser loss; an absent one is not',
+    JSON.stringify(removalsStillNamed('<li>Côte d&rsquo;Ivoire</li><li>Lao PDR</li>', ["Cote D'Ivoire", "Lao People's Democratic Republic", 'Algeria']))
+      === JSON.stringify(["Cote D'Ivoire", "Lao People's Democratic Republic"]));
+  const src = readFileSync(new URL('../scripts/fatf-watchdog.mjs', import.meta.url), 'utf8');
+  const main = src.slice(src.indexOf('const diff = diffLists(prev, current);'));
+  check('FATF main: a page equal to the recorded plenary repairs the state before any list-change alert',
+    main.indexOf('listsIdentical(current, plenary)') > 0 && main.indexOf('listsIdentical(current, plenary)') < main.indexOf("createTask('FATF list change: '"));
+  check('FATF main: an uncorroborated removal is recorded as parser drift, never alerted as a delisting',
+    main.indexOf('removalsStillNamed(') > 0 && main.indexOf('removalsStillNamed(') < main.indexOf("createTask('FATF list change: '"));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

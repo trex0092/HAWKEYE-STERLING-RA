@@ -320,8 +320,16 @@ def prop_ascii_latin_names_keep_their_historic_key():
     no longer describes the whole design and asserting it would be false.
 
     What must still hold — and covers the overwhelming majority of the book — is
-    that a name written in plain ASCII Latin is untouched by any of it."""
+    that a name written in plain ASCII Latin is untouched by any of it.
+
+    One class is excluded on purpose, and pinned by its own property below: an
+    ASCII string carrying an HTML character reference ("Smith &amp; Co",
+    "O&#39;Brien") is markup, not a name written in ASCII. The original
+    pipeline keyed those as "SMITH AMP CO" / "O 39 BRIEN" — junk tokens that
+    never met the real spelling — and the apostrophe/entity fold (3 Oct 2026)
+    repairs exactly them."""
     import unicodedata as _ud, re as _re
+    _entity = _re.compile(r"&(#x[0-9a-f]+|#[0-9]+|[a-z]+);", _re.I)
 
     def original(name):
         if not name:
@@ -334,12 +342,25 @@ def prop_ascii_latin_names_keep_their_historic_key():
 
     moved = []
     for name in _corpus_names():
-        if not name.isascii():
+        if not name.isascii() or _entity.search(name):
             continue
         if screen.normalize(name) != original(name):
             moved.append((name, original(name), screen.normalize(name)))
     assert not moved, f"ASCII-Latin key MOVED: {moved[:3]}"
     return "ASCII-Latin keys unchanged"
+
+
+def prop_entity_encoded_names_key_as_decoded():
+    """An HTML-entity-encoded name must key exactly like its decoded spelling,
+    and every apostrophe variant exactly like the plain apostrophe — the
+    stricter replacement for the exclusion in the property above."""
+    cases = [("Smith &amp; Co", "Smith & Co"), ("O&#39;Brien Trading", "O'Brien Trading"),
+             ("O&rsquo;Brien Trading", "O'Brien Trading"), ("Mar&#x2019;yana", "Mar'yana"),
+             ("C&ocirc;te d&#39;Ivoire", "Côte d'Ivoire"), ("O\u2019Brien", "O'Brien"),
+             ("O\u02bcBrien", "O'Brien"), ("O\u2018Brien", "O'Brien"), ("Ha\u02bbiku", "Ha'iku")]
+    bad = [(a, screen.normalize(a), screen.normalize(b)) for a, b in cases if screen.normalize(a) != screen.normalize(b)]
+    assert not bad, f"entity/apostrophe variant keyed apart from its plain form: {bad}"
+    return f"{len(cases)} entity/apostrophe variants key as their plain forms"
 
 
 def prop_engines_key_identically():
@@ -376,6 +397,7 @@ check("the measured lowered-threshold divergences stay fixed (deterministic pair
       prop_blocking_equivalence_known_sensitive_pairs)
 check("match blocking stays result-identical after in-place list growth", prop_blocking_survives_inplace_list_growth)
 check("a pure-ASCII-Latin name keeps its historic key", prop_ascii_latin_names_keep_their_historic_key)
+check("an entity-encoded or variant-apostrophe name keys as its plain form", prop_entity_encoded_names_key_as_decoded)
 check("both engines key every corpus name identically", prop_engines_key_identically)
 
 print("\n%d passed, %d failed" % (passed, failed))
