@@ -202,6 +202,10 @@ jobs:
         id: screen
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          # Licence-free mode: set the repository variable OPENSANCTIONS_DATA=0 to
+          # download nothing from data.opensanctions.org (its data needs a
+          # commercial licence). Unset = on. See docs/aims/third-party-register.md.
+          OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
           ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID || '1216239131596624' }}

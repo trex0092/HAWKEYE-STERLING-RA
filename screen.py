@@ -10,6 +10,7 @@ Modes:
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time, html
 import threading
+import zipfile
 import functools
 # The one call site (safe_xml_fromstring, below) refuses any DTD/ENTITY
 # declaration before ET.fromstring ever runs, which is the same protection
@@ -2710,6 +2711,25 @@ def check_pep(name):
 # their licence) — registered, with kill-switches and provenance rules, in
 # docs/aims/third-party-register.md. Wikidata (CC0) stays the PRIMARY PEP source;
 # the bulk PEP file is a FALLBACK for individuals the live lookup could not screen.
+#
+# LICENCE-FREE MODE: OpenSanctions states that businesses must buy a data licence.
+# OPENSANCTIONS_DATA=0 (repository variable) makes the engine download NOTHING
+# from data.opensanctions.org: core lists come from their official publishers
+# only, the worldwide PEP net is the repo's Wikidata (CC0) harvest, and the
+# OpenSanctions-only nets (PEP/RCA mirror, crime watchlist, extra watchlists,
+# worldwide sanctions net, EOCN cross-check, mirror fallbacks) are switched off
+# and reported OFF by name — never silently absent. Unset/empty = on (today's
+# behaviour), so a missing variable never quietly changes coverage.
+OPENSANCTIONS_DATA = (os.environ.get("OPENSANCTIONS_DATA", "").strip() or "1") == "1"
+OPENSANCTIONS_OFF_NOTE = "OFF — licence-free mode (OPENSANCTIONS_DATA=0)"
+
+def opensanctions_allowed(what):
+    """True when OpenSanctions data may be used; logs the skip otherwise."""
+    if OPENSANCTIONS_DATA:
+        return True
+    log(f"  {what}: skipped — licence-free mode (OPENSANCTIONS_DATA=0), no OpenSanctions download")
+    return False
+
 PEP_MIRROR_FALLBACK = os.environ.get("PEP_MIRROR_FALLBACK", "1") == "1"
 PEP_MIRROR_URL = "https://data.opensanctions.org/datasets/latest/peps/targets.simple.csv"
 
@@ -2773,6 +2793,8 @@ def load_pep_mirror():
     if not PEP_MIRROR_FALLBACK:
         log("  worldwide PEP/RCA net disabled (PEP_MIRROR_FALLBACK=0) — Wikidata only")
         return None
+    if not opensanctions_allowed("OpenSanctions PEP/RCA net"):
+        return None
     data = download(PEP_MIRROR_URL, "OpenSanctions PEPs + RCAs (worldwide net)")
     index = parse_pep_index(data)
     if not index:
@@ -2801,6 +2823,85 @@ def pep_mirror_lookup(index, name):
                             "duty to an RCA as to the PEP they derive from."),
             "source_url": (f"https://www.opensanctions.org/entities/{entry['id']}/"
                            if entry["id"] else ""),
+            "via_mirror": True}
+
+# ── WIKIDATA WORLDWIDE PEP NET (free, CC0) ───────────────────────────────────
+# The repo's own weekly Wikidata harvest (scripts/pep-worldwide.mjs →
+# data/pep-worldwide.json, overlaid from the pep-worldwide-state branch): every
+# holder of a PEP-grade office Wikidata records — heads of state/government,
+# ministers, legislators, governors, supreme-court judges, central bankers,
+# ambassadors — with labels and aliases in every language. Wikidata's
+# structured data is CC0 (public domain), so this net needs no licence. The JS
+# engine has screened it since 2026-08; the Python daily screen now runs it as
+# a standing net next to (or, in licence-free mode, instead of) the
+# OpenSanctions PEP/RCA mirror. It does NOT carry relatives / close associates
+# (RCA): in licence-free mode the report says so. Kill-switch: PEP_WIKIDATA_NET=0.
+PEP_WIKIDATA_NET = os.environ.get("PEP_WIKIDATA_NET", "1") == "1"
+PEP_WORLDWIDE_FILE = os.environ.get("PEP_WORLDWIDE_FILE", "data/pep-worldwide.json")
+PEP_WIKIDATA_LABEL = "Wikidata worldwide PEP list (CC0)"
+
+def load_pep_wikidata_net(path=None):
+    """(index, meta). index = {normalized name or token-sorted name:
+    (qid, name, position, country)}; the same exact-normalized shape and
+    5-char screenability floor as the OpenSanctions PEP index. A missing or
+    unreadable file returns (None, meta) with the reason — never a silent
+    'no PEP'. The raw dataset is dropped once indexed (it is ~0.7 GB parsed)."""
+    if not PEP_WIKIDATA_NET:
+        return None, {"count": 0, "date": "disabled"}
+    path = path or PEP_WORLDWIDE_FILE
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+        if raw[:2] == b"\x1f\x8b":
+            import gzip
+            raw = gzip.decompress(raw)
+        dataset = json.loads(raw.decode("utf-8"))
+        del raw
+    except FileNotFoundError:
+        log(f"  {PEP_WIKIDATA_LABEL}: file not found ({path}) — net not loaded this run")
+        return None, {"count": 0, "date": "unavailable"}
+    except Exception as e:
+        log(f"  {PEP_WIKIDATA_LABEL}: unreadable ({type(e).__name__}) — net not loaded this run")
+        return None, {"count": 0, "date": "unavailable"}
+    entries = dataset.get("entries") if isinstance(dataset, dict) else None
+    if not isinstance(entries, list) or not entries:
+        log(f"  {PEP_WIKIDATA_LABEL}: no entries — net not loaded this run")
+        return None, {"count": 0, "date": "unavailable"}
+    index = {}
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        rec = (str(e.get("qid") or ""), str(e.get("name") or ""),
+               str(e.get("position") or ""), str(e.get("country") or ""))
+        for n in [e.get("name")] + list(e.get("aliases") or []):
+            k = _norm_lower(n) if n else ""
+            if len(k) < 5:
+                continue
+            index.setdefault(k, rec)
+            index.setdefault(" ".join(sorted(k.split())), rec)
+    meta = {"count": len(entries), "date": str(dataset.get("harvested") or "")[:10] or "unknown",
+            "partial": bool(dataset.get("partial"))}
+    del dataset, entries
+    if meta["partial"]:
+        log(f"  {PEP_WIKIDATA_LABEL}: PARTIAL harvest — a PEP not yet harvested produces no hit")
+    log(f"  {PEP_WIKIDATA_LABEL}: {meta['count']:,} office-holders, {len(index):,} name keys "
+        f"(harvested {meta['date']})")
+    return index, meta
+
+def pep_wikidata_lookup(index, name):
+    """Exact-normalized (+ token-sorted) lookup against the Wikidata PEP net.
+    Hit ⇒ 'holds/held a PEP-grade office per Wikidata — verify'."""
+    key = _norm_lower(name)
+    rec = (index.get(key) or index.get(" ".join(sorted(key.split())))) if key else None
+    if not rec:
+        return {"hit": False, "via_mirror": True}
+    qid, label, position, country = rec
+    office = ", ".join(x for x in (position, country) if x) or "PEP-grade public office"
+    return {"hit": True, "id": qid, "label": label,
+            "category": f"PEP ({office}) — Wikidata worldwide PEP list",
+            "description": (f"holds or held a PEP-grade public office per Wikidata ({office}). "
+                            "Name-only match: verify identity (DOB, nationality) before EDD."),
+            "source_url": f"https://www.wikidata.org/wiki/{qid}" if qid else "",
             "via_mirror": True}
 
 # ── ADVERSE-EXPOSURE WATCHLIST (OpenSanctions crime dataset, bulk) ────────────
@@ -2870,6 +2971,10 @@ def load_adverse_watchlist_extra(datasets=None):
     unknown name or a failed download is logged loudly and loads nothing —
     never a silent all-clear (the label then reads UNAVAILABLE in §②)."""
     out = {}
+    if not OPENSANCTIONS_DATA:
+        if ADVERSE_WATCHLIST_EXTRA if datasets is None else datasets:
+            opensanctions_allowed("ADVERSE_WATCHLIST_EXTRA")
+        return out
     for ds in (ADVERSE_WATCHLIST_EXTRA if datasets is None else datasets):
         label = WATCHLIST_EXTRA_DATASETS.get(ds)
         if not label:
@@ -2894,6 +2999,8 @@ def load_adverse_watchlist():
     if not ADVERSE_WATCHLIST:
         log("  adverse-exposure watchlist disabled (ADVERSE_WATCHLIST=0)")
         return None, {}, {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+    if not opensanctions_allowed(WATCHLIST_LABEL):
+        return None, {}, {"count": 0, "date": "licence-off", "hash": "", "tier": "supplementary"}
     data = download(WATCHLIST_URL, WATCHLIST_LABEL)
     entries, ids = parse_watchlist(data)
     if not entries:
@@ -3131,7 +3238,7 @@ def download(url, label):
         if attempt:
             time.sleep(2 * attempt)   # 2s, 4s: transient-blip scale, not outage scale
         try:
-            r = requests.get(url, timeout=90,
+            r = requests.get(url, timeout=DOWNLOAD_TIMEOUTS.get(url, 90),
                              headers={"User-Agent": "HawkeyeSterlingCompliance/3.0"})
             r.raise_for_status()
             log(f"  {label}: {len(r.content):,} bytes")
@@ -3464,6 +3571,9 @@ def load_worldwide_sanctions(all_lists, list_meta):
     supplementary block and can never refuse or redden a run. Purely additive."""
     if not WORLDWIDE_SANCTIONS:
         list_meta["worldwide"] = {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+        return 0
+    if not opensanctions_allowed(WORLDWIDE_LABEL):
+        list_meta["worldwide"] = {"count": 0, "date": "licence-off", "hash": "", "tier": "supplementary"}
         return 0
     data = download(WORLDWIDE_SANCTIONS_URL, WORLDWIDE_LABEL)
     covered = {k for lst in all_lists.values() for k, _ in lst}
@@ -5027,8 +5137,8 @@ LISTS SCREENED
 {list_line("un","UN Consolidated List — UN Security Council",
            "https://scsanctions.un.org/resources/xml/en/consolidated.xml")}
 
-{list_line("eu","EU Financial Sanctions — OpenSanctions / EU FSF",
-           "https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv")}
+{list_line("eu","EU Financial Sanctions — EU FSF (official; mirror only if allowed)",
+           "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content")}
 
 {list_line("uk","UK Sanctions List -- FCDO / OFSI (the OFSI Consolidated List closed 28 Jan 2026)",
            "https://www.gov.uk/government/publications/the-uk-sanctions-list")}
@@ -5475,6 +5585,8 @@ def load_eocn_mirror():
     if not EOCN_MIRROR_CROSSCHECK:
         log("  EOCN mirror cross-check disabled (EOCN_MIRROR_CROSSCHECK=0)")
         return set(), {"count": 0, "date": "disabled", "hash": "", "tier": "supplementary"}
+    if not opensanctions_allowed("EOCN mirror cross-check"):
+        return set(), {"count": 0, "date": "licence-off", "hash": "", "tier": "supplementary"}
     data = download(EOCN_MIRROR_URL, "EOCN mirror (OpenSanctions ae_local_terrorists)")
     names = parse_simple_csv(data, "EOCN mirror")
     if not names:
@@ -5533,7 +5645,7 @@ def _mirror_fallback(names, dataset, label):
     provenance is kept honest: the list's 'date' field says MIRROR so the report
     and audit trail show which source actually screened. Returns (names, date,
     hash) — unchanged inputs when the primary already loaded."""
-    if names:
+    if names or not opensanctions_allowed(f"{label} OpenSanctions mirror fallback"):
         return None
     data = download(f"https://data.opensanctions.org/datasets/latest/{dataset}/targets.simple.csv",
                     f"{label} (OpenSanctions mirror)")
@@ -5554,21 +5666,168 @@ def _mirror_fallback(names, dataset, label):
 # targets.simple.csv shape as EU / AU / CH, already egress-allowed); the retired
 # ConList is kept only as a last-resort fallback and its stale date is flagged
 # by stale_core_lists below, never presented as current.
+# Since 2026-10-03 the PRIMARY is the official FCDO file (free; the JS engine
+# has read it since 2026-09-22 and loaded 58,311 names on 3 Oct); the
+# OpenSanctions mirror is a fallback only when OPENSANCTIONS_DATA allows it.
+UK_OFFICIAL_CSV_URL = "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv"
 UK_SANCTIONS_LIST_URL = "https://data.opensanctions.org/datasets/latest/gb_fcdo_sanctions/targets.simple.csv"
 UK_CONLIST_URL = "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv"
+_DMY_RE = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{4})\b")
 
 def load_uk_list():
-    """(names, date, hash, fetched) for the UK core list: UK Sanctions List
-    first, the retired OFSI ConList only if that yields nothing."""
-    data = download(UK_SANCTIONS_LIST_URL, "UK Sanctions List (OpenSanctions gb_fcdo_sanctions)")
-    names = parse_simple_csv(data, "UK Sanctions List")
+    """(names, date, hash, fetched) for the UK core list: the official UK
+    Sanctions List CSV first (same Name 1..Name 6 layout parse_uk reads), then
+    its OpenSanctions mirror (licence permitting), then the retired OFSI
+    ConList only if both yield nothing."""
+    data = download(UK_OFFICIAL_CSV_URL, "UK Sanctions List (official FCDO CSV)")
+    names, date, h = parse_uk(data)
     if names:
-        return names, "live (UK Sanctions List)", sha256_of(data), True
-    log("  UK Sanctions List mirror unavailable -- falling back to the RETIRED OFSI ConList "
+        m = _DMY_RE.search(date or "")
+        return names, (m.group(1) if m else "live (UK Sanctions List, official)"), h, True
+    if opensanctions_allowed("UK Sanctions List OpenSanctions mirror fallback"):
+        data = download(UK_SANCTIONS_LIST_URL, "UK Sanctions List (OpenSanctions gb_fcdo_sanctions)")
+        names = parse_simple_csv(data, "UK Sanctions List")
+        if names:
+            log("  UK Sanctions List: official CSV unavailable — screened via OpenSanctions mirror")
+            return names, "live (UK Sanctions List, OpenSanctions mirror)", sha256_of(data), True
+    log("  UK Sanctions List unavailable -- falling back to the RETIRED OFSI ConList "
         "(closed 28 Jan 2026; its own date will be flagged as stale)")
     con = download(UK_CONLIST_URL, "UK OFSI (retired ConList)")
     names, date, h = parse_uk(con)
     return names, date, h, bool(con)
+
+# ── AU / CH official sources (free) ──────────────────────────────────────────
+# Both were read from OpenSanctions mirrors, whose data needs a commercial
+# licence. The official files are free and the JS engine has loaded them
+# directly since 2026-08-05 (3 Oct: DFAT 11,413 names, SECO 44,361 names —
+# more than the mirrors' 11,321 / 20,724). Ported parsers below mirror
+# parseDfatXlsx / parseSecoXml in scripts/sanctions-match.mjs.
+AU_OFFICIAL_XLSX_URL = "https://www.dfat.gov.au/sites/default/files/Australian_Sanctions_Consolidated_List.xlsx"
+CH_OFFICIAL_XML_URL = ("https://www.sesam.search.admin.ch/sesam-search-web/pages/"
+                       "downloadXmlGesamtliste.xhtml?action=downloadXmlGesamtlisteAction")
+# SESAM builds the full-list XML server-side and needs well over 90 s
+# (data/sanctions-extra.json ch-seco: timeoutMs 150000).
+DOWNLOAD_TIMEOUTS = {CH_OFFICIAL_XML_URL: 150}
+
+_XML_VALUE_RE = re.compile(r"<value\b[^>]*>([\s\S]*?)</value>", re.I)
+_XML_NAME_RE = re.compile(r"<name\b[^>]*>([\s\S]*?)</name>", re.I)
+_CDATA_RE = re.compile(r"<!\[CDATA\[([\s\S]*?)\]\]>")
+
+def parse_seco_xml(data):
+    """SECO Gesamtliste XML → set of names. Every <name> block (primary name
+    and aliases) is assembled from its nested <value> parts; <value> may carry
+    attributes and CDATA, and missing either would drop a designated name."""
+    if not data:
+        return set()
+    text = data.decode("utf-8", "replace") if isinstance(data, bytes) else str(data)
+    names = set()
+    for block in _XML_NAME_RE.findall(text):
+        parts = []
+        for raw in _XML_VALUE_RE.findall(block):
+            t = re.sub(r"\s+", " ", html.unescape(_CDATA_RE.sub(r"\1", raw))).strip()
+            if t:
+                parts.append(t)
+        full = re.sub(r"\s+", " ", " ".join(parts)).strip()
+        if full:
+            names.add(full)
+    return names
+
+def _xlsx_shared_strings(xml):
+    out = []
+    for si in re.findall(r"<si\b[^>]*>([\s\S]*?)</si>", xml, re.I):
+        out.append(re.sub(r"\s+", " ", "".join(html.unescape(t) for t in
+                   re.findall(r"<t\b[^>]*>([\s\S]*?)</t>", si, re.I))).strip())
+    return out
+
+def _xlsx_col(letters):
+    n = 0
+    for ch in letters:
+        n = n * 26 + (ord(ch) - 64)
+    return n - 1
+
+def _xlsx_rows(xml, shared):
+    rows = []
+    for row in re.findall(r"<row\b[^>]*>([\s\S]*?)</row>", xml, re.I):
+        cells = {}
+        for attrs, inner in re.findall(r"<c\b([^>]*?)(?:/>|>([\s\S]*?)</c>)", row, re.I):
+            ref = re.search(r'r="([A-Z]+)\d+"', attrs)
+            col = _xlsx_col(ref.group(1)) if ref else len(cells)
+            typ = re.search(r't="([^"]+)"', attrs)
+            typ = typ.group(1) if typ else ""
+            v = re.search(r"<v\b[^>]*>([\s\S]*?)</v>", inner or "", re.I)
+            if typ == "s":
+                try:
+                    val = shared[int(v.group(1))] if v else ""
+                except (ValueError, IndexError):
+                    val = ""
+            elif typ == "inlineStr":
+                val = "".join(html.unescape(t) for t in re.findall(r"<t\b[^>]*>([\s\S]*?)</t>", inner or "", re.I))
+            else:
+                val = html.unescape(v.group(1)) if v else ""
+            cells[col] = re.sub(r"\s+", " ", str(val)).strip()
+        rows.append([cells.get(i, "") for i in range(max(cells) + 1)] if cells else [])
+    return rows
+
+def parse_dfat_xlsx(data):
+    """DFAT Consolidated List .xlsx → set of names. Every worksheet; the header
+    row is found in the first 8 rows by a name-bearing column ("Name of
+    Individual or Entity" …), skipping "Name Type". Each alias is its own row,
+    so primary names and aliases are both captured. A corrupt or re-laid-out
+    file yields fewer/zero names (degrades loudly), never a fabricated list."""
+    if not data:
+        return set()
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except Exception as e:
+        log(f"  Australia DFAT: not a readable .xlsx ({e})")
+        return set()
+    def part(name):
+        try:
+            return zf.read(name).decode("utf-8", "replace")
+        except KeyError:
+            return ""
+    shared = _xlsx_shared_strings(part("xl/sharedStrings.xml"))
+    names = set()
+    for sheet in sorted(n for n in zf.namelist() if re.match(r"^xl/worksheets/[^/]+\.xml$", n, re.I)):
+        rows = _xlsx_rows(part(sheet), shared)
+        header = -1
+        for i, r in enumerate(rows[:8]):
+            if any(re.search(r"name", c, re.I) and not re.search(r"name\s*type", c, re.I) for c in r):
+                header = i
+                break
+        if header < 0:
+            continue
+        cols = [i for i, c in enumerate(rows[header])
+                if re.search(r"name", c, re.I) and not re.search(r"name\s*type", c, re.I)]
+        for r in rows[header + 1:]:
+            for ci in cols:
+                v = (r[ci] if ci < len(r) else "").strip()
+                if v and not re.fullmatch(r"-+", v):
+                    names.add(v)
+    return names
+
+def _official_then_mirror(label, official_url, parser, mirror_dataset):
+    """(names, date, hash, fetched): the official publisher's file first, its
+    OpenSanctions mirror only when the official file yields nothing AND the
+    licence switch allows it. An official file that downloads but parses to
+    nothing (bot gate, sign-in page, re-layout) counts as NOT obtained, so it
+    degrades the list loudly instead of refusing the whole run."""
+    data = download(official_url, f"{label} (official)")
+    names = parser(data)
+    if names:
+        return names, f"live ({label}, official)", sha256_of(data), True
+    if data:
+        log(f"  {label}: official file downloaded but parsed to no names — treated as unavailable")
+    fb = _mirror_fallback(set(), mirror_dataset, label)
+    if fb:
+        return fb[0], fb[1], fb[2], True
+    return set(), "unavailable", "", False
+
+def load_au_list():
+    return _official_then_mirror("Australia DFAT", AU_OFFICIAL_XLSX_URL, parse_dfat_xlsx, "au_dfat_sanctions")
+
+def load_ch_list():
+    return _official_then_mirror("Switzerland SECO", CH_OFFICIAL_XML_URL, parse_seco_xml, "ch_seco_sanctions")
 
 # Staleness of a core list. Only a date the list itself declares counts; a
 # provenance string such as "live" or "unavailable" carries no claim.
@@ -5656,20 +5915,29 @@ def parse_eu_official_xml(data):
     names = {html.unescape(m).strip() for m in re.findall(r'wholeName="([^"]*)"', text)}
     return {n for n in names if len(n) >= 3}
 
-def _eu_official_fallback(names):
-    """When the OpenSanctions eu_fsf mirror yields nothing, screen via the
-    official webgate XML instead. Same contract as _mirror_fallback: None when
-    the primary already loaded or the fallback is also down (the degrade-loudly
-    paths take over); provenance in the date field so the report and audit
-    trail show which source actually screened."""
-    if names:
-        return None
+EU_MIRROR_URL = "https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv"
+
+def load_eu_list():
+    """(names, date, hash, fetched) for EU FSF. Since 2026-10-03 the official
+    webgate XML is the PRIMARY (free; EU_FSF_TOKEN supplies the personal
+    crawler token the FSF platform requires since 1 Oct 2026) and the
+    OpenSanctions mirror is a fallback only when the licence switch allows it.
+    A sign-in page instead of the list parses to no names: that is an outage
+    (degrade loudly), never a loaded list."""
     data = download(eu_official_xml_url(), "EU FSF (official webgate XML)")
-    xml_names = parse_eu_official_xml(data)
-    if not xml_names:
-        return None
-    log("  EU FSF: OpenSanctions mirror unavailable — screened via official webgate XML")
-    return xml_names, "live (EU official XML)", sha256_of(data)
+    names = parse_eu_official_xml(data)
+    if names:
+        return names, "live (EU official XML)", sha256_of(data), True
+    if data:
+        log("  EU FSF: official XML returned no names (EU Login sign-in page? check the "
+            "EU_FSF_TOKEN secret) — treated as unavailable")
+    if opensanctions_allowed("EU FSF OpenSanctions mirror fallback"):
+        mirror = download(EU_MIRROR_URL, "EU FSF (OpenSanctions mirror)")
+        names, _date, h = parse_eu(mirror)
+        if names:
+            log("  EU FSF: official XML unavailable — screened via OpenSanctions mirror")
+            return names, "live (EU FSF, OpenSanctions mirror)", h, True
+    return set(), "unavailable", "", False
 
 # ── Core-list coverage floors (zero/partial-load hard-fail) ──────────────────
 # A core list that loads ZERO names (parse failure, the PR #128 bug class) or a
@@ -5686,10 +5954,11 @@ def _eu_official_fallback(names):
 #     run AFTER delivery so the outage still goes red and cannot become
 #     routine. (Treating outages as breaches killed the whole run, report and
 #     Asana delivery included, on any transient source outage.)
-# OFAC, UN and UK fall back to their OpenSanctions mirrors and EU to the
-# official webgate XML (both load paths, since 2026-07-29); AU/CH and the
-# local EOCN file have no second source, so outages there are real
-# single-list gaps no fallback can absorb.
+# Every core list reads its official publisher first (UK/EU/AU/CH since
+# 2026-10-03); OFAC, UN, UK, EU, AU and CH fall back to their OpenSanctions
+# mirrors only while OPENSANCTIONS_DATA allows it (both load paths). In
+# licence-free mode, and for the local EOCN file, an outage is a real
+# single-list gap no fallback can absorb — the outage gate makes it loud.
 # Floors are ~50% of the verified 2026-07-02 baseline counts (OFAC 19,129 /
 # UN 1,002 / UK 19,762 / EU 42,347 / EOCN 312): generous enough for real
 # de-listings, tight enough to catch a broken parse.
@@ -5701,8 +5970,8 @@ CORE_LIST_FLOORS = {
     "uk":   int(os.environ.get("LIST_FLOOR_UK",   "9000")),
     "eu":   int(os.environ.get("LIST_FLOOR_EU",   "20000")),
     "eocn": int(os.environ.get("LIST_FLOOR_EOCN", "150")),
-    # AU/CH (added 2026-07-29, OpenSanctions mirrors of DFAT Regulation 8 and
-    # SECO's consolidated list): floors are PROVISIONAL and deliberately low —
+    # AU/CH (added 2026-07-29; official DFAT .xlsx / SECO XML since 2026-10-03,
+    # OpenSanctions mirrors before): floors are PROVISIONAL and deliberately low —
     # no verified baseline count existed at introduction, and a too-tight
     # provisional floor would refuse whole runs. Tighten toward ~50% of the
     # observed baseline once the first runs have logged real counts.
@@ -5881,13 +6150,6 @@ def load_all_lists():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
-    eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
-    # AU + CH core lists via the OpenSanctions mirrors (same host, same
-    # targets.simple.csv shape as the EU list): DFAT bot-gates its .xlsx and
-    # SECO's XML needs its own endpoint, so the mirror is the reliable daily
-    # path — exactly the arrangement the EU list has always used.
-    au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
-    ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
     # Track whether SOURCE MATERIAL was obtained per list (primary bytes, or a
     # mirror that answered): the floor check uses it to tell corruption (data
     # present but tiny: refuse) from an outage (nothing obtained: degrade).
@@ -5911,18 +6173,12 @@ def load_all_lists():
     if fb:
         un_names, un_date, un_hash = fb
         un_fetched = True
-    eu_fetched = bool(eu_data)
+    # UK / EU / AU / CH: the official publisher's file first (free), the
+    # OpenSanctions mirror only as a fallback the licence switch allows.
     uk_names,   uk_date,   uk_hash,   uk_fetched = load_uk_list()
-    eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
-    fb = _eu_official_fallback(eu_names)
-    if fb:
-        eu_names, eu_date, eu_hash = fb
-        eu_fetched = True
-    au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
-    ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
-    # AU + CH have no second origin: DFAT bot-gates its .xlsx and SECO's own XML
-    # is a different schema again, so an OpenSanctions outage takes both down —
-    # that surfaces as the usual outage-gate DEGRADED, never a silent gap.
+    eu_names,   eu_date,   eu_hash,   eu_fetched = load_eu_list()
+    au_names,   au_date,   au_hash,   au_fetched = load_au_list()
+    ch_names,   ch_date,   ch_hash,   ch_fetched = load_ch_list()
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
     ofac_names, un_names, uk_names, eu_names, au_names, ch_names, eocn_names = (
         drop_junk_names(label, names) for label, names in (
@@ -5977,7 +6233,7 @@ def load_all_lists():
     enforce_core_list_floors(list_meta, fetched={
         "ofac": ofac_fetched, "un": un_fetched,
         "uk": uk_fetched, "eu": eu_fetched,
-        "au": bool(au_data), "ch": bool(ch_data),
+        "au": au_fetched, "ch": ch_fetched,
         "eocn": EOCN_SOURCE_STATE["obtained"],
     })
     all_lists = {
@@ -6257,6 +6513,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A(f"      {label}: screened  ({m_['count']:,} names · {m_.get('date','?')})")
             elif k == "worldwide" and m_.get("date") == "disabled":
                 A(f"      {label}: DISABLED (WORLDWIDE_SANCTIONS=0) - only the core lists above were screened")
+            elif m_.get("date") == "licence-off":
+                A(f"      {label}: {OPENSANCTIONS_OFF_NOTE} - not screened")
             elif k == "internal":
                 # Optional firm list: empty means "no internal designations",
                 # a valid state — not an unreached source.
@@ -6404,12 +6662,17 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 else:
                     A(f"   Rotation ledger: warming up — full-cycle verification available once the ledger is older than "
                       f"{rotation_overdue_limit_days()} day(s); no market is overdue so far.")
-        if stats.get("watchlist_loaded"):
-            A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
-              f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
-        for _lbl, _cnt in (stats.get("watchlist_extra") or {}).items():
-            A(f"   Source: {_lbl} (bulk, deterministic) · "
-              + (f"{_cnt:,} names screened" if _cnt else "⚠ UNAVAILABLE this run — not screened"))
+    # Bulk adverse sources print on EVERY run (with or without findings): an
+    # unavailable or licence-off net must be visible on a quiet day too.
+    if stats.get("watchlist_loaded"):
+        A(f"   Source: {WATCHLIST_LABEL} (bulk, deterministic — national wanted lists / enforcement actions; "
+          f"immune to news-feed rate limits) · {stats.get('watchlist_findings', 0)} subject(s) listed · standing exposure, not headlines.")
+    elif stats.get("opensanctions_data") is False:
+        A(f"   Source: {WATCHLIST_LABEL} · {OPENSANCTIONS_OFF_NOTE} — the news feeds above are the only "
+          "adverse-media nets this run.")
+    for _lbl, _cnt in (stats.get("watchlist_extra") or {}).items():
+        A(f"   Source: {_lbl} (bulk, deterministic) · "
+          + (f"{_cnt:,} names screened" if _cnt else "⚠ UNAVAILABLE this run — not screened"))
     A("")
 
     A("━" * 70)
@@ -6417,8 +6680,19 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A("━" * 70)
     A("   Source: Wikidata (free) — politicians, ministers, MPs, judges, military / SOE chiefs,")
     A("           state-owned-enterprise heads + their relatives & close associates (RCA).")
-    A("           Fallback: OpenSanctions consolidated PEP dataset (bulk mirror) covers any")
-    A("           individual the live lookup could not screen — hits are provenance-marked.")
+    for _net, _m in (stats.get("pep_nets") or {}).items():
+        _m = _m or {}
+        if _m.get("count"):
+            _state = f"{_m['count']:,} " + ("office-holders" if "Wikidata" in _net else "name keys") \
+                     + (f", harvested {_m['date']}" if "Wikidata" in _net else "") \
+                     + (" — PARTIAL harvest" if _m.get("partial") else "")
+        elif _m.get("date") == "licence-off":
+            _state = OPENSANCTIONS_OFF_NOTE + " — relatives / close associates (RCA) are NOT bulk-screened"
+        elif _m.get("date") == "disabled":
+            _state = "OFF (kill-switch)"
+        else:
+            _state = "⚠ UNAVAILABLE this run — not screened"
+        A(f"           Worldwide net: {_net} · {_state}")
     A(f"   Scope:  {stats['individuals_screened']} individuals auto-screened across the full database "
       f"(companies are not natural persons → not PEP-screened, but ARE sanctions + adverse-media screened).")
     A("   Action class (R.12): PEP status is PERMISSIBLE WITH CONTROLS — a confirmed PEP/RCA")
@@ -6427,10 +6701,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     if pep_degraded:
         A(f"   Status: DEGRADED this run ({stats.get('pep_errors',0)} individual(s) unscreened on BOTH sources) — treat 'no PEP' as provisional; re-run.")
     elif pep_mirror:
-        A(f"   Status: {pep_mirror} individual(s) resolved by the WORLDWIDE PEP/RCA net (OpenSanctions")
-        A("   consolidated PEP dataset — politically exposed persons AND their relatives / close associates,")
-        A("   FATF R.12). The net screens every individual each run, so a domestic PEP or an RCA with no")
-        A("   English encyclopaedia entry is no longer filed as 'no PEP'. A hit means VERIFY; a miss is still provisional.")
+        A(f"   Status: {pep_mirror} individual(s) resolved by the WORLDWIDE PEP net(s) listed above")
+        A("   (FATF R.12). The nets screen every individual each run, so a domestic PEP with no English")
+        A("   encyclopaedia entry is no longer filed as 'no PEP'. A hit means VERIFY; a miss is still provisional.")
     if not pep_findings:
         A("   No PEP matches identified." + ("  (provisional — see status above)" if pep_degraded else ""))
     else:
@@ -7596,23 +7869,44 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     _pep_clear = [r for r in _pep_individuals
                   if not (r.get("pep") or {}).get("errored")
                   and not (r.get("pep") or {}).get("hit")]
+    # Bulk nets, in order: the OpenSanctions PEP/RCA mirror (licence
+    # permitting), then the free Wikidata PEP list. First hit wins.
+    pep_nets = {}
     if _pep_individuals:
         if _pep_errored:
             log(f"  PEP: {len(_pep_errored)} live lookup(s) failed — the worldwide net re-covers them")
+        _nets = []
         pep_index = load_pep_mirror()
+        pep_nets["OpenSanctions PEP/RCA dataset"] = (
+            {"count": len(pep_index), "date": "live"} if pep_index is not None else
+            {"count": 0, "date": "licence-off" if not OPENSANCTIONS_DATA else
+             ("disabled" if not PEP_MIRROR_FALLBACK else "unavailable")})
         if pep_index is not None:
+            _nets.append((pep_index, pep_mirror_lookup))
+        wd_index, pep_nets[PEP_WIKIDATA_LABEL] = load_pep_wikidata_net()
+        if wd_index is not None:
+            _nets.append((wd_index, pep_wikidata_lookup))
+        if _nets:
             _net_new = 0
             for r in _pep_errored:
-                r["pep"] = pep_mirror_lookup(pep_index, r["name"])
+                _res = None
+                for _idx, _fn in _nets:
+                    _res = _fn(_idx, r["name"])
+                    if _res.get("hit"):
+                        break
+                r["pep"] = _res
             for r in _pep_clear:
-                _found = pep_mirror_lookup(pep_index, r["name"])
-                if _found.get("hit"):
-                    r["pep"] = _found
-                    _net_new += 1
-            log(f"  worldwide PEP/RCA net: screened {len(_pep_clear):,} individual(s) Wikidata "
+                for _idx, _fn in _nets:
+                    _found = _fn(_idx, r["name"])
+                    if _found.get("hit"):
+                        r["pep"] = _found
+                        _net_new += 1
+                        break
+            log(f"  worldwide PEP nets: screened {len(_pep_clear):,} individual(s) Wikidata "
                 f"reported clear — {_net_new} further PEP/RCA listing(s) found")
         elif _pep_errored:
-            log("  PEP: worldwide net unavailable — errored lookups stay errored (loud, provisional)")
+            log("  PEP: no worldwide net available — errored lookups stay errored (loud, provisional)")
+        del _nets
 
     # Pure tally — honest denominators (every subject counts, errors once per
     # subject) + findings merged across the news and watchlist nets.
@@ -7889,7 +8183,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
              # so every report silently lost its coverage disclosure and asserted GDELT reaches
              # every subject. test/engine_test.py now fails if a report-read key has no writer.
              "news_feed_coverage": feed_coverage_snapshot(),
-             "pep_mirror": counts["pep_mirror"],
+             "pep_mirror": counts["pep_mirror"], "pep_nets": pep_nets,
+             "opensanctions_data": OPENSANCTIONS_DATA,
              "watchlist_findings": counts["watchlist"], "watchlist_loaded": wl_entries is not None,
              "watchlist_extra": {k: v[2]["count"] for k, v in wl_extra.items()},
              "bulletin_failures": rb_failures,
@@ -8125,15 +8420,11 @@ def main():
     ofac_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv","OFAC SDN")
     ofac_alt_data = download("https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/alt.csv","OFAC SDN a.k.a.")
     un_data   = download("https://scsanctions.un.org/resources/xml/en/consolidated.xml","UN Consolidated")
-    eu_data   = download("https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv","EU FSF")
-    au_data   = download("https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv","Australia DFAT")
-    ch_data   = download("https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv","Switzerland SECO")
 
     # Same fallback ladder as load_all_lists — the legacy manual path must not
     # be the one place a single-origin outage still bites. Fetched flags track
     # "source material obtained" (primary bytes OR a fallback that answered).
     ofac_fetched, un_fetched = bool(ofac_data), bool(un_data)
-    eu_fetched = bool(eu_data)
     ofac_names, ofac_date, ofac_hash = parse_ofac(ofac_data)
     # Fallback BEFORE the alias fold, or an alias-only load defeats the mirror
     # (same trap load_all_lists documents at its own fold).
@@ -8148,14 +8439,12 @@ def main():
     if fb:
         un_names, un_date, un_hash = fb
         un_fetched = True
+    # UK / EU / AU / CH: the official publisher's file first (free), the
+    # OpenSanctions mirror only as a fallback the licence switch allows.
     uk_names,   uk_date,   uk_hash,   uk_fetched = load_uk_list()
-    eu_names,   eu_date,   eu_hash   = parse_eu(eu_data)
-    fb = _eu_official_fallback(eu_names)
-    if fb:
-        eu_names, eu_date, eu_hash = fb
-        eu_fetched = True
-    au_names,   au_date,   au_hash   = parse_eu(au_data)   # same targets.simple.csv shape
-    ch_names,   ch_date,   ch_hash   = parse_eu(ch_data)
+    eu_names,   eu_date,   eu_hash,   eu_fetched = load_eu_list()
+    au_names,   au_date,   au_hash,   au_fetched = load_au_list()
+    ch_names,   ch_date,   ch_hash,   ch_fetched = load_ch_list()
     eocn_names, eocn_date, eocn_hash = parse_eocn(EOCN_PDF_PATH)
     ofac_names, un_names, uk_names, eu_names, au_names, ch_names, eocn_names = (
         drop_junk_names(label, names) for label, names in (
@@ -8187,7 +8476,7 @@ def main():
     enforce_core_list_floors(list_meta, fetched={
         "ofac": ofac_fetched, "un": un_fetched,
         "uk": uk_fetched, "eu": eu_fetched,
-        "au": bool(au_data), "ch": bool(ch_data),
+        "au": au_fetched, "ch": ch_fetched,
         "eocn": EOCN_SOURCE_STATE["obtained"],
     })
 

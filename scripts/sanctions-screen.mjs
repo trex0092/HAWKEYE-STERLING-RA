@@ -1728,6 +1728,19 @@ export function belowFloor(source, names) {
   return (names ? names.length : 0) < (Number(source && source.minNames) || 0);
 }
 
+/* Licence-free mode (OPENSANCTIONS_DATA=0): OpenSanctions data needs a
+   commercial licence, so every source served from data.opensanctions.org is
+   skipped — named in the run notes, never silently dropped. Unset/empty = on.
+   Mirrors OPENSANCTIONS_DATA in screen.py. Pure for the test suite. */
+export function licenceFreeFilter(sources, env = process.env) {
+  const off = String((env && env.OPENSANCTIONS_DATA) || '').trim() === '0';
+  if (!off) return { kept: sources, skipped: [] };
+  const isOs = (s) => {
+    try { return new URL(String(s.url || '')).hostname.endsWith('opensanctions.org'); } catch { return false; }
+  };
+  return { kept: sources.filter(s => !isOs(s)), skipped: sources.filter(isOs) };
+}
+
 /* Fetch + parse every enabled source into [{ id, name, names[] }]. A source that
    fails to fetch or yields zero names degrades coverage (reported, never a silent
    all-clear); a curated list with no entries degrades too. */
@@ -1753,6 +1766,13 @@ export async function loadSanctionsLists(cfg) {
   }
 
   const lists = [], notes = [], failures = [];
+  const licence = licenceFreeFilter(sources);
+  if (licence.skipped.length) {
+    sources = licence.kept;
+    notes.push('Licence-free mode (OPENSANCTIONS_DATA=0): ' + licence.skipped.length
+      + ' OpenSanctions-hosted source(s) not screened - ' + licence.skipped.map(x => x.id).join(', '));
+    console.warn('sanctions-screen: licence-free mode - skipped ' + licence.skipped.map(x => x.id).join(', '));
+  }
   let fetched = 0;
   await Promise.all(sources.map(async (s) => {
     try {

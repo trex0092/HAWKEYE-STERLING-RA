@@ -2156,5 +2156,26 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order') && /deadlineMs: enrichDeadline/.test(src));
 }
 
+/* ── licence-free mode (OPENSANCTIONS_DATA=0) ── */
+{
+  const srcs = [
+    { id: 'ch-seco', url: 'https://www.sesam.search.admin.ch/x.xml' },
+    { id: 'ch-seco-opensanctions', url: 'https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv' },
+    { id: 'internal', file: 'data/internal.json' },
+  ];
+  const on = scr.licenceFreeFilter(srcs, {});
+  check('licence-free filter: unset OPENSANCTIONS_DATA keeps every source', on.kept.length === 3 && on.skipped.length === 0);
+  check('licence-free filter: "1" keeps every source', scr.licenceFreeFilter(srcs, { OPENSANCTIONS_DATA: '1' }).skipped.length === 0);
+  const off = scr.licenceFreeFilter(srcs, { OPENSANCTIONS_DATA: '0' });
+  check('licence-free filter: "0" skips only OpenSanctions-hosted sources (official + file sources kept)',
+    off.skipped.map(x => x.id).join() === 'ch-seco-opensanctions' && off.kept.map(x => x.id).join() === 'ch-seco,internal');
+  const loaderSrc = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('licence-free filter: the loader applies it and names the skipped sources in the run notes',
+    /const licence = licenceFreeFilter\(sources\);/.test(loaderSrc) && /not screened - ' \+ licence\.skipped\.map/.test(loaderSrc));
+  const wf = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');
+  check('licence-free filter: Sanctions Screen passes the repository variable with no default',
+    /OPENSANCTIONS_DATA: \$\{\{ vars\.OPENSANCTIONS_DATA \}\}\n/.test(wf));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
