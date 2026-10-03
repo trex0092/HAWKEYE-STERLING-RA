@@ -5626,6 +5626,83 @@ check("safe_err: no news-feed failure line logs the raw exception text",
       and "unavailable for this subject ({str(e)" not in _src_se
       and "retry failed ({str(e)" not in _src_se)
 
+
+# ── GDELT GKG 24-hour worldwide stream (bulk; offline, synthetic names) ──────
+import datetime as _dt, io as _io
+def _gkg_row(stamp, source, url, persons, orgs, title, srclc=""):
+    f = [""] * 27
+    f[0] = stamp + "-1"; f[1] = stamp; f[3] = source; f[4] = url
+    f[12] = ";".join(f"{p},{i * 10}" for i, p in enumerate(persons))
+    f[14] = ";".join(f"{o},{i * 10}" for i, o in enumerate(orgs))
+    f[25] = (f"srclc:{srclc};eng:GT-{srclc}" if srclc else "")
+    f[26] = f"<PAGE_TITLE>{title}</PAGE_TITLE>"
+    return "\t".join(f)
+_st = screen.gkg_file_stamps(_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), 24, lag_slots=1)
+check("gkg: 24 hours → 96 fifteen-minute stamps ending one slot back",
+      len(_st) == 96 and _st[0] == "20261003190000" and _st[1] == "20261003184500" and _st[-1] == "20261002191500")
+_st4 = screen.gkg_file_stamps(_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), 24)
+check("gkg: the default window ends one hour back (the translated stream publishes late)",
+      len(_st4) == 96 and _st4[0] == "20261003181500")
+_ta = screen.gkg_article({"title": "ZZ Example Metals opens a new branch", "themes": ["CORRUPTION", "KILL", "ARREST"],
+                          "date": "20261003", "stamp": "20261003180000", "source": "example.com", "url": "u", "lang": "en"})
+check("gkg: an AML theme on the article body flags a neutral headline as tier 'weak', with the theme named",
+      _ta["flagged"] and _ta["tier"] == "weak" and "Bribery / Corruption" in _ta["categories"]
+      and "theme(s): corruption" in _ta["evidence"])
+_tg = screen.gkg_article({"title": "ZZ Example Metals opens a new branch", "themes": ["ARREST", "TRIAL", "TERROR", "KILL"],
+                          "date": "20261003", "stamp": "20261003180000", "source": "example.com", "url": "u", "lang": "en"})
+check("gkg: generic crime themes (ARREST/TRIAL/TERROR/KILL) never flag on their own", not _tg["flagged"])
+_rows, _bad = screen.parse_gkg_rows("\n".join([
+    _gkg_row("20261003190000", "example.com", "https://example.com/a", ["Zara Quill Example"], [],
+             "Zara Quill Example arrested in fraud probe"),
+    "too\tfew\tcolumns",
+    _gkg_row("20261003190000", "exemple.fr", "https://exemple.fr/b", ["Zara Example"], ["ZZ Example Metals Trading"],
+             "Enquête pour blanchiment d&#39;argent", "fra"),
+]))
+check("gkg: rows parse to persons / orgs / unescaped title / source language; a short row is counted, not parsed",
+      len(_rows) == 2 and _bad == 1 and _rows[0]["persons"] == ["Zara Quill Example"]
+      and _rows[1]["title"] == "Enquête pour blanchiment d'argent" and _rows[1]["lang"] == "fra" and _rows[0]["lang"] == "en")
+_idx = screen.gkg_subject_index([("k1", "Zara Quill Example", "person"), ("k2", "ZZ Example Metals Trading LLC", "org"),
+                                 ("k3", "Mononym", "person")])
+check("gkg: full name and first+last-name form both match the person; single tokens never index",
+      screen.gkg_match(_rows[0], _idx) == {"k1"} and "k1" in screen.gkg_match(_rows[1], _idx))
+check("gkg: a different person with the same first and last token but an extra token does not match",
+      screen.gkg_match({"persons": ["Zara Other Example"], "orgs": []}, _idx) == set())
+check("gkg: an organisation matches on its full distinctive-token set",
+      "k2" in screen.gkg_match({"persons": [], "orgs": ["ZZ Example Metals Trading"]}, _idx))
+def _zip(text):
+    b = _io.BytesIO()
+    with _zf.ZipFile(b, "w") as z:
+        z.writestr("x.gkg.csv", text)
+    return b.getvalue()
+_payload = _zip("\n".join([
+    _gkg_row("20261003190000", "example.com", "https://example.com/a", ["Zara Quill Example"], [], "Zara Quill Example arrested in fraud probe"),
+    _gkg_row("20261003190000", "example.com", "https://example.com/c", ["Zara Quill Example"], [], "Zara Quill Example opens a new store"),
+]))
+_calls = {"n": 0}
+def _fake_fetch(url):
+    _calls["n"] += 1
+    if _calls["n"] == 1:
+        return _payload
+    if _calls["n"] == 2:
+        raise RuntimeError("boom")
+    return None
+_old_hours = screen.GKG_HOURS
+screen.GKG_HOURS = 1
+_hits = screen.gkg_sweep([("k1", "Zara Quill Example", "person")],
+                         end_utc=_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), fetch=_fake_fetch)
+screen.GKG_HOURS = _old_hours
+_gs = screen.gkg_stats_snapshot()
+check("gkg sweep: only the ADVERSE story is returned, with GKG provenance and body-mention evidence",
+      list(_hits) == ["k1"] and len(_hits["k1"]) == 1 and _hits["k1"][0]["flagged"]
+      and "GDELT GKG" in _hits["k1"][0]["source"] and "article body" in _hits["k1"][0]["evidence"])
+check("gkg sweep: expected / read / missing / failed are counted (a partial stream is never silent)",
+      _gs["expected"] == 8 and _gs["read"] == 1 and _gs["failed"] == 1 and _gs["missing"] == 6
+      and not screen.gkg_complete(_gs) and screen.gkg_complete({"ran": True, "expected": 10, "read": 9}))
+_src_gk = open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read()
+check("gkg: findings are merged additively (dedupe by title/url) and the stream is disclosed in §②",
+      "_gkg_hits.get(normalize(r[\"name\"]))" in _src_gk and "GDELT 24-hour worldwide stream" in _src_gk
+      and "GDELT 24-hour stream INCOMPLETE" in _src_gk)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

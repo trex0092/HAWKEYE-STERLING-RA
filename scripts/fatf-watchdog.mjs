@@ -26,6 +26,10 @@ const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
    (scripts/asana-sections.mjs). The old "FATF list moves" and "Assessment
    Report" sections no longer exist in HAWKEYE STERLING APP. */
 const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1218451992088222';
+/* A monitoring GAP (the lists could not be verified) is a platform-health
+   alert, filed under "AI & Platform Governance"; a list CHANGE stays under
+   "Regulatory Changes". */
+const FATF_GAP_SECTION_GID = process.env.ASANA_FATF_GAP_SECTION_GID || '1218985347982681';
 const FATF_SKIP_ALERT = Number(process.env.FATF_SKIP_ALERT) || 2; /* consecutive unreachable runs before a monitoring-gap alert */
 
 /* FATF naming → the app's baseline naming */
@@ -627,7 +631,7 @@ export async function main(mode) {
           'The FATF black/grey-list watchdog could not verify the lists against an authoritative capture for '
           + st.skipStreak + ' consecutive runs. FATF list moves may be UNDETECTED.\n\nThis run: ' + why
           + '\n\nVerify manually on ' + FATF_URL + ' and check the source endpoints.',
-          undefined, REG_PROJECT_GID, REG_FATF_SECTION_GID);
+          undefined, REG_PROJECT_GID, FATF_GAP_SECTION_GID);
         console.log('FATF monitoring-gap alert filed (skipStreak=' + st.skipStreak + '): ' + url);
       }
     } catch (e) { console.error('FATF skip-streak bookkeeping failed: ' + e.message); }

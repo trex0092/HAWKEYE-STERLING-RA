@@ -83,6 +83,7 @@ jobs:
             news.google.com:443
             www.bing.com:443
             api.gdeltproject.org:443
+            data.gdeltproject.org:443
             www.wikidata.org:443
             query.wikidata.org:443
             www.sec.gov:443

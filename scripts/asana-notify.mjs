@@ -106,8 +106,8 @@ export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6, dedupPr
    idempotent (an existing name is reused), shared by the schedulers that file
    under a named column. */
 export async function ensureSection(projectGid, name) {
-  /* The monitoring project is intentionally restricted to four approved
-     sections. Never recreate retired lifecycle or legacy sections there. */
+  /* The monitoring project is intentionally restricted to the approved
+     sections in asana-sections.mjs. Never recreate retired lifecycle or legacy sections there. */
   if (String(projectGid) === MONITORING_PROJECT) {
     const approved = approvedSectionByName(name);
     if (!approved) throw new Error('Asana routing: refusing unapproved monitoring section: ' + name);
@@ -431,23 +431,46 @@ export function buildHtmlBody({ heading, summary, changes = [], runLink, reviewN
     const sev = badge ? badge + (c.severityReason ? ' (' + esc(c.severityReason) + ')' : '') + ' — ' : '';
     const what = c.status === 'new' ? 'first snapshot recorded'
       : c.status === 'unreachable' ? ('UNREACHABLE — ' + esc(c.detail || 'fetch failing repeatedly') + ' — monitoring gap, investigate')
-      : c.diff ? (sev + 'content changed — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segment(s)')
-      : sev + 'content changed';
+      : sev + 'content changed'
+        + (c.items ? ' — ' + c.items.addedCount + ' new / ' + c.items.removedCount + ' removed item(s)' : '')
+        + (c.diff ? ' — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed text segment(s)' : '');
     const link = c.url ? ' — <a href="' + esc(c.url) + '">open source</a>' : '';
     const juris = c.jurisdiction ? ' (' + esc(c.jurisdiction) + ')' : '';
     /* Detailed delivery: itemise the actual additions/deletions on the card
        (nested list), so the reviewer sees WHAT moved without opening the page. */
     let detail = '';
+    const rows = [];
+    /* Which versions were compared (date + direct / archive capture). */
+    if (c.status === 'changed' && (c.prevAsOf || c.asOf)) {
+      const how = v => v ? ' (' + esc(v) + ')' : ' (direct fetch)';
+      rows.push('<li><em>Compared:</em> version of ' + esc(c.prevAsOf || 'an earlier run') + how(c.prevVia)
+        + ' → version of ' + esc(c.asOf || 'today') + how(c.via) + '</li>');
+    }
+    /* Itemised publications: the title as printed, linked to the instrument. */
+    if (c.items) {
+      for (const l of c.items.added) rows.push('<li>🆕 <strong>New item:</strong> <a href="' + esc(l.h) + '">' + esc(l.t) + '</a></li>');
+      for (const l of c.items.removed) rows.push('<li>🗑 <strong>No longer listed:</strong> <a href="' + esc(l.h) + '">' + esc(l.t) + '</a></li>');
+      const moreItems = (c.items.addedCount - c.items.added.length) + (c.items.removedCount - c.items.removed.length);
+      if (moreItems > 0) rows.push('<li>… ' + moreItems + ' more item(s) — listed in the workflow run log</li>');
+    } else if (c.itemsNote) {
+      rows.push('<li>' + esc(c.itemsNote) + '</li>');
+    }
+    /* AI analysis (when the draft step ran): labelled fields, never a verdict. */
+    if (c.analysis && typeof c.analysis === 'object') {
+      const A = [['changed', 'What changed'], ['impact', 'Impact on a UAE DPMS'], ['action', 'Action to consider'],
+        ['instrument', 'Instrument'], ['effective', 'Effective date']];
+      const li = A.filter(([k]) => c.analysis[k]).map(([k, label]) => '<li><strong>' + label + ':</strong> ' + esc(c.analysis[k]) + '</li>');
+      if (li.length) rows.push('<li><em>AI analysis — verify against the source before acting:</em><ul>' + li.join('') + '</ul></li>');
+    }
     if (c.diff) {
-      const rows = [];
       for (const s of c.diff.added) rows.push('<li>➕ added: “' + esc(s) + '”</li>');
       for (const s of c.diff.removed) rows.push('<li>➖ removed: “' + esc(s) + '”</li>');
       const more = (c.diff.addedCount - c.diff.added.length) + (c.diff.removedCount - c.diff.removed.length);
       if (more > 0) rows.push('<li>… ' + more + ' more segment(s) — full excerpts in the workflow run log</li>');
-      if (rows.length) detail = '<ul>' + rows.join('') + '</ul>';
     } else if (c.diffNote) {
-      detail = '<ul><li>' + esc(c.diffNote) + '</li></ul>';
+      rows.push('<li>' + esc(c.diffNote) + '</li>');
     }
+    if (rows.length) detail = '<ul>' + rows.join('') + '</ul>';
     return '<li><strong>' + esc(c.name) + '</strong>' + juris + ' — ' + what + link + detail + '</li>';
   }).join('');
   const parts = ['<body>'];

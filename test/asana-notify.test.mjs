@@ -541,5 +541,40 @@ check('a sectionless mirror still joins the project',
   check('the Transaction Monitoring section is refused to the JS notifiers', refused);
 }
 
+
+/* ── AI / platform cards go to "AI & Platform Governance", not "Regulatory Changes" ── */
+{
+  const { SECTIONS: S, alertSection } = await import('../scripts/asana-sections.mjs');
+  check('"AI & Platform Governance" is an approved section with its live gid',
+    S.governance && S.governance.gid === '1218985347982681' && S.governance.name === 'AI & Platform Governance');
+  check('platform alerts route to AI & Platform Governance',
+    ['PRODUCTION DRIFT: the live site is serving an older build than main', 'WORKFLOW RECOVERY BLOCKED: a registered control needs intervention',
+      'CONTROL STALE: a mandatory scheduled compliance control missed its cadence window', 'FUNCTION DOWN: Netlify functions failed health check',
+      'ADVISOR DEPENDENCY DOWN: upstream model unavailable', 'SITE DOWN: hawkeye-sterling-ra.netlify.app failed its health check',
+      'CODE SCAN FAILED: HAWKEYE STERLING CodeQL run could not complete', 'DAILY SCREENING NOT FULLY DELIVERED BY 09:00 UAE (2026-10-03)',
+      'MORNING SCREENING DISPATCH FAILED: today\'s screening may reach Asana after 09:00 UAE'].every(t => alertSection(t) === S.governance.gid));
+  check('screening, document and list/law alerts keep their own sections',
+    alertSection('SCREENING ASSURANCE DEGRADED: worldwide sanctions / adverse media / PEP evidence failed') === S.media.gid
+    && alertSection('DAILY SCREENING REPORT NOT FULLY DELIVERED FOR A DUE DAY -- mandatory sanctions/PEP/adverse-media obligation') === S.media.gid
+    && alertSection('Sanctions list source down') === S.sanctions.gid
+    && alertSection('Passport expiring') === S.documents.gid
+    && alertSection('EOCN weekly review prepared — one click to sign off') === S.regulatory.gid);
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const gov = readFileSync(join(root, 'scripts/governance-report.mjs'), 'utf8');
+  check('the AI Governance & Platform Report files under AI & Platform Governance',
+    /const section = GOV_SECTION_GID \|\| SECTIONS\.governance\.gid;/.test(gov) && /GOV_SECTION_NAME = SECTIONS\.governance\.name/.test(gov));
+  check('Advisor Eval files under AI & Platform Governance',
+    readFileSync(join(root, '.github/workflows/advisor-eval.yml'), 'utf8').includes("ASANA_SECTION_GID: '" + S.governance.gid + "'"));
+  const fatf = readFileSync(join(root, 'scripts/fatf-watchdog.mjs'), 'utf8');
+  check('FATF monitoring GAP → AI & Platform Governance; FATF list change → Regulatory Changes',
+    fatf.includes("ASANA_FATF_GAP_SECTION_GID || '" + S.governance.gid + "'")
+    && /monitoring GAP[\s\S]{0,800}FATF_GAP_SECTION_GID\)/.test(fatf)
+    && /'FATF list change: '[^\n]*REG_FATF_SECTION_GID\)/.test(fatf));
+  const wn = readFileSync(join(root, 'scripts/watch-notify.mjs'), 'utf8');
+  check('a Regulatory Watch card with only unreachable sources is a monitoring gap (governance section, not mirrored)',
+    /changes\.every\(c => c\.status === 'unreachable'\)/.test(wn) && /gapOnly \? SECTIONS\.governance\.gid/.test(wn)
+    && /ASANA_MIRROR_PROJECT_GID && !gapOnly/.test(wn));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

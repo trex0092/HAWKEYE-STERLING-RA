@@ -112,7 +112,10 @@ jobs:
           # from a repo variable: a stale variable cannot misroute an approved
           # destination, and test/asana-notify.test.mjs fails CI on any
           # unapproved section literal.
-          ASANA_WEEKLY_SECTION_GID: '1218451992088222'
+          # RESTORED 2026-10-03: "AI & Platform Governance" is an approved section
+          # again (1218985347982681, asana-sections.mjs), so the weekly summary
+          # returns to it instead of sitting among law changes.
+          ASANA_WEEKLY_SECTION_GID: '1218985347982681'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Don't fail the run if Asana is unreachable; the issue fallback covers it.
         continue-on-error: true
