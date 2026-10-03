@@ -861,6 +861,23 @@
       "enabled": true,
       "minNames": 3,
       "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36392452572 (GitHub runner, main) fetched HTTP 200 text/html and parseNumberedNameList read 5 names (minNames 3, met) — 3 numbered designations plus spelling variants. Regulation of the Government of 13 March 2025 No 18; measures: funds frozen, no funds made available, entry prohibited. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); the list is published only as a web page of numbered lines."
+    },
+    {
+      "id": "lb-isf-ntfl",
+      "name": "Lebanon — ISF National Terrorism Financial List (Law No. 44/2015, UNSCR 1373)",
+      "jurisdiction": "Lebanon",
+      "url": "https://isf.gov.lb/wp-content/uploads/2025/04/en_file.xls",
+      "type": "xls",
+      "parser": "lbisf",
+      "discover": {
+        "page": "https://isf.gov.lb/national-terrorism-financial-list/",
+        "fileStem": "en_file",
+        "linkMatch": ".xls"
+      },
+      "browserHeaders": true,
+      "enabled": false,
+      "minNames": 200,
+      "_note": "STAGED 2026-10-03, DISABLED pending a source-probe run. Official page isf.gov.lb/national-terrorism-financial-list/ (read 2026-10-03 via an external fetcher) links \"Click here to download the list updated on 15/04/2025\" -> wp-content/uploads/2025/04/en_file.xls (application/vnd.ms-excel). The external fetcher read 261 rows (serials 1-262, 206 absent; 240 natural persons, 19 entities, 2 untyped) under the header Serial # | First Name and Family Name | ... | Group Type | Alias Type | Regime | Listed on | ... The probe must confirm the byte format (legacy BIFF .xls or an HTML table) before a reader is enabled."
     }
   ]
 }
