@@ -1826,7 +1826,29 @@ GDELT_RISK_TERMS = [
 # still degrades loudly if those fail too). A success resets the count; the
 # breaker re-arms fresh on the next run.
 GDELT_BREAKER_AFTER = int(os.environ.get("GDELT_BREAKER_AFTER", "5"))
-_GDELT_STATE = {"consecutive_failures": 0, "open": False}
+_GDELT_STATE = {"consecutive_failures": 0, "open": False, "last_probe": 0.0}
+# Half-open recovery, same contract as Google News (GNEWS_PROBE_SECONDS): while
+# the circuit is open, one subject per GDELT_PROBE_SECONDS sends ONE GDELT
+# query; a success closes the circuit for the rest of the run. On 3 Oct 2026
+# GDELT 429'd in the first two minutes, the breaker opened at 00:07 and GDELT
+# then reached 0 of 996 subjects for the remaining 26 minutes of the run.
+# 0 disables (the breaker then stays open for the run, as before).
+GDELT_PROBE_SECONDS = float(os.environ.get("GDELT_PROBE_SECONDS", "300"))
+_GDELT_PROBE_LOCK = threading.Lock()
+
+def _gdelt_should_probe(now=None):
+    """While the GDELT circuit is open: True for exactly one caller per
+    GDELT_PROBE_SECONDS (stamped at the trip, so the first probe waits a full
+    interval). Thread-safe; never probes when the circuit is closed."""
+    if not _GDELT_STATE["open"] or GDELT_PROBE_SECONDS <= 0:
+        return False
+    with _GDELT_PROBE_LOCK:
+        now = time.monotonic() if now is None else now
+        last = _GDELT_STATE.get("last_probe", 0.0)
+        if last > 0 and now - last >= GDELT_PROBE_SECONDS:
+            _GDELT_STATE["last_probe"] = now
+            return True
+    return False
 
 
 # ── Cross-worker feed pacing ──────────────────────────────────────────────────
@@ -2295,7 +2317,8 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
     # The run-level breaker (see GDELT_BREAKER_AFTER) stops a hard-down feed from
     # costing every remaining subject a 20-second connect timeout.
     gdelt_ok = False
-    if not _GDELT_STATE["open"]:
+    gdelt_probe = _gdelt_should_probe()
+    if not _GDELT_STATE["open"] or gdelt_probe:
         try:
             for a in search_gdelt(name, max_results):
                 if a["title"] not in seen_titles:
@@ -2303,13 +2326,21 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                     articles.append(a)
             gdelt_ok = True
             _GDELT_STATE["consecutive_failures"] = 0
+            if gdelt_probe and _GDELT_STATE["open"]:
+                _GDELT_STATE["open"] = False
+                log("  GDELT recovered (probe succeeded) — circuit CLOSED, GDELT coverage resumes")
         except Exception as e:
             _GDELT_STATE["consecutive_failures"] += 1
-            if _GDELT_STATE["consecutive_failures"] >= GDELT_BREAKER_AFTER:
+            if gdelt_probe:
+                log(f"  GDELT recovery probe failed ({safe_err(e, 80)}) — circuit stays OPEN")
+            elif _GDELT_STATE["consecutive_failures"] >= GDELT_BREAKER_AFTER:
                 if not _GDELT_STATE["open"]:
                     _GDELT_STATE["open"] = True
+                    _GDELT_STATE["last_probe"] = time.monotonic()
                     log(f"  GDELT down ({GDELT_BREAKER_AFTER} subjects in a row) — circuit OPEN, "
-                        "skipping GDELT for the rest of the run; Google News coverage stands")
+                        "skipping GDELT; Google News coverage stands"
+                        + (f"; a recovery probe runs every {GDELT_PROBE_SECONDS / 60:g} min"
+                           if GDELT_PROBE_SECONDS > 0 else ""))
             else:
                 log(f"  GDELT unavailable for this subject ({safe_err(e, 80)}) — Google News coverage stands")
 

@@ -1842,6 +1842,7 @@ screen.time.monotonic = lambda: 1000.0
 def _reset_breaker():
     screen._GDELT_STATE["consecutive_failures"] = 0
     screen._GDELT_STATE["open"] = False
+    screen._GDELT_STATE["last_probe"] = 0.0
     screen._GNEWS_STATE["consecutive_zero"] = 0
     screen._GNEWS_STATE["open"] = False
     screen._GNEWS_STATE["zero_since"] = None
@@ -1942,6 +1943,35 @@ screen.search_gdelt = lambda *_a, **_k: []
 screen.search_adverse_media("Acme")
 check("a GDELT success keeps the circuit closed and the streak at zero",
       screen._GDELT_STATE["consecutive_failures"] == 0 and not screen._GDELT_STATE["open"])
+
+# GDELT half-open recovery (3 Oct 2026: GDELT 429'd for 2 minutes, then
+# stayed off for the remaining 26 minutes of the run).
+_reset_breaker(); _calls["gdelt"] = 0
+screen.search_gdelt = _gdelt_down
+for _ in range(screen.GDELT_BREAKER_AFTER):
+    screen.search_adverse_media("Acme")
+_t_trip = screen._GDELT_STATE["last_probe"]
+check("GDELT trip stamps last_probe (probe clock armed)", screen._GDELT_STATE["open"] and _t_trip > 0)
+check("no GDELT probe before GDELT_PROBE_SECONDS have passed",
+      screen._gdelt_should_probe(now=_t_trip + screen.GDELT_PROBE_SECONDS - 1) is False)
+_mono = screen.time.monotonic
+try:
+    screen.time.monotonic = lambda: _t_trip + screen.GDELT_PROBE_SECONDS + 1
+    _calls["gdelt"] = 0
+    screen.search_adverse_media("Acme")
+    check("a failed GDELT probe sends ONE query and leaves the circuit open",
+          _calls["gdelt"] == 1 and screen._GDELT_STATE["open"])
+    _calls["gdelt"] = 0
+    screen.search_adverse_media("Acme")
+    check("the next subject inside the same interval does not probe again", _calls["gdelt"] == 0)
+    screen.time.monotonic = lambda: _t_trip + 2 * screen.GDELT_PROBE_SECONDS + 2
+    screen.search_gdelt = lambda *_a, **_k: []
+    screen.search_adverse_media("Acme")
+    check("a successful GDELT probe closes the circuit — GDELT coverage resumes",
+          not screen._GDELT_STATE["open"] and screen._GDELT_STATE["consecutive_failures"] == 0)
+finally:
+    screen.time.monotonic = _mono
+_reset_breaker()
 
 # ── run-global rate gate + Google News circuit breaker (13 Jul regression) ────
 # Per-worker pacing was not enough: 8 workers each sleeping 0.4s still burst

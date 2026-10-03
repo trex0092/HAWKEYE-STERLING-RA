@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **GDELT recovers during the run instead of staying off.** On 3 Oct 2026 GDELT returned HTTP 429 in the first two minutes. The breaker opened at 00:07 UTC, and GDELT then reached 0 of 996 subjects for the rest of the 28-minute run. The GDELT breaker is now half-open like Google News: one probe query every `GDELT_PROBE_SECONDS` (default 300 s), and a success closes the circuit.
+
 - **FATF Watchdog and Regulatory Watch recover archived pages instead of skipping.** Both read archive.org captures when the official site blocks the GitHub runner. On 3 Oct 2026 a capture existed for each, but its single read got HTTP 429, so the FATF lists went unverified for an 8th run in a row and the UAE NAMLCFTC page for a 3rd.
   - Capture reads now retry 429, 5xx and network errors with backoff and honour Retry-After.
   - FATF tries the newest three captures, in raw and normal form.
