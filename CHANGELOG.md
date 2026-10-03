@@ -10,6 +10,10 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Regulatory Watch: archive.org reads wait their turn and back off longer, so a rate-limited capture is not reported as an outage.**
+  - **Cause.** On 3 Oct 2026 (run 37145525927) the OECD responsible-business-conduct page answered HTTP 403 directly. archive.org held a capture from 2 Oct, but all three reads of it got HTTP 429 within about 30 s while other sources' archive reads ran in parallel. The source was reported "persistently unreachable" for a 3rd run, opening an Asana monitoring-gap card.
+  - **Fix.** Capture reads are serialized (one archive.org read at a time across all sources), get a 4th attempt on a 15 s linear base, and honour `Retry-After` up to 30 s. A failure that persists is still returned as the failure; no page is ever assumed.
+
 - **Regulatory Watch: no more daily false alerts from re-stamped footers, and change cards show the exact words that moved.**
   - **Cause.** The UAE Ministry of Economy homepage ends with "آخر تحديث للمحتوى بتاريخ: 02 اكتوبر 2026" ("content last updated: …"). That date changes every day, and the noise filter stripped only numeric dates. So the page was filed as a source change on both 3 Oct 2026 runs, with identical-looking excerpts on each side.
   - **Stamp filter.** "Last updated" stamps written with a month name, in English or Arabic, are now stripped. The filter is scoped to the stamp phrase, so a dated entry in a list of actions (e.g. OFAC's "october 02, 2026 - sanctions list updates") remains content.

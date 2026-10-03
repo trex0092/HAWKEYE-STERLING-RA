@@ -420,7 +420,11 @@ async function fetchDirect(url, timeoutMs = 25000) {
   try {
     const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: BROWSER_HEADERS });
     const body = await res.text();
-    return { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
+    const out = { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
+    /* Retry-After (seconds form) lets a capture read wait as long as archive.org asks. */
+    const ra = res.ok ? NaN : Number(res.headers?.get?.('retry-after'));
+    if (Number.isFinite(ra) && ra > 0) out.retryAfter = ra;
+    return out;
   } catch (e) {
     /* undici hides the real network failure (TLS, DNS, reset) in e.cause —
        surface it, or "fetch failed" is all the state ever records. */
@@ -487,17 +491,35 @@ async function spnAuthenticatedCapture(url, auth) {
 /* Capture reads retry 429 / 5xx / network errors with linear backoff. On
    3 Oct 2026 archive.org held a capture of the NAMLCFTC page taken that same
    minute, but its one read got HTTP 429, so the source stayed "unreachable"
-   for a 3rd run. Injectable sleep keeps the unit tests instant. */
-export async function fetchCaptureRetrying(fetchFn, url, { attempts = 3, baseMs = 10000,
+   for a 3rd run. Later that day the OECD capture read got 429 on all three
+   reads inside ~30 s while other sources' reads ran in parallel, so the
+   source stayed "unreachable" for a 3rd run too. Reads are therefore
+   serialized (one archive.org read at a time across all sources), get a 4th
+   attempt with a longer base, and honour Retry-After up to 30 s. A persistent
+   failure is still returned as the failure — never a fabricated page.
+   Injectable sleep keeps the unit tests instant. */
+let archiveReadChain = Promise.resolve();
+function serializeArchiveRead(fn) {
+  const run = archiveReadChain.then(fn, fn);
+  archiveReadChain = run.then(() => {}, () => {});
+  return run;
+}
+
+export const CAPTURE_READ_ATTEMPTS = 4;
+export const CAPTURE_READ_BASE_MS = 15000;
+export const CAPTURE_RETRY_AFTER_CAP_S = 30;
+
+export async function fetchCaptureRetrying(fetchFn, url, { attempts = CAPTURE_READ_ATTEMPTS, baseMs = CAPTURE_READ_BASE_MS,
   sleep = (ms) => new Promise(r => setTimeout(r, ms)) } = {}) {
   let snap;
   for (let a = 1; a <= attempts; a++) {
-    snap = await fetchFn(url);
+    snap = await serializeArchiveRead(() => fetchFn(url));
     if (snap && snap.ok && snap.body) return snap;
     const st = snap && snap.status;
     const retryable = st === 429 || st === 'error' || (typeof st === 'number' && st >= 500);
     if (!retryable || a === attempts) return snap;
-    await sleep(baseMs * a);
+    const ra = Math.min(CAPTURE_RETRY_AFTER_CAP_S, Number(snap && snap.retryAfter) || 0) * 1000;
+    await sleep(Math.max(baseMs * a, ra));
   }
   return snap;
 }

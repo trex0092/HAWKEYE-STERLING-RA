@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
   persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback, fetchCaptureRetrying,
+  CAPTURE_READ_ATTEMPTS, CAPTURE_RETRY_AFTER_CAP_S,
   captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, changeContext, FP_VERSION, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS,
   REG_REVIEW_CHECKLIST,
 } from '../scripts/reg-watch.mjs';
@@ -228,7 +229,22 @@ check('capture reads: a 404 is not retried; persistent 429 returns the failure (
     const a = await fetchCaptureRetrying(async () => { n++; return { ok: false, status: 404, body: '' }; }, 'u', { sleep: async () => {} });
     let m = 0;
     const b = await fetchCaptureRetrying(async () => { m++; return { ok: false, status: 429, body: '' }; }, 'u', { sleep: async () => {} });
-    return a.status === 404 && n === 1 && b.status === 429 && !b.ok && m === 3;
+    return a.status === 404 && n === 1 && b.status === 429 && !b.ok && m === CAPTURE_READ_ATTEMPTS && m === 4;
+  })());
+check('capture reads honour Retry-After (capped) when it asks for longer than the linear backoff',
+  await (async () => {
+    const seq = [{ ok: false, status: 429, body: '', retryAfter: 20 }, { ok: false, status: 429, body: '', retryAfter: 600 },
+      { ok: false, status: 429, body: '' }, { ok: true, status: 200, body: 'page' }];
+    let i = 0; const waits = [];
+    const r = await fetchCaptureRetrying(async () => seq[i++], 'u', { sleep: async (ms) => { waits.push(ms); }, baseMs: 5 });
+    return r.body === 'page' && waits.join() === [20000, CAPTURE_RETRY_AFTER_CAP_S * 1000, 15].join();
+  })());
+check('capture reads are serialized: two sources never read archive.org at the same time',
+  await (async () => {
+    let inFlight = 0, peak = 0;
+    const slow = async () => { inFlight++; peak = Math.max(peak, inFlight); await new Promise(r => setTimeout(r, 5)); inFlight--; return { ok: true, status: 200, body: 'x' }; };
+    const out = await Promise.all([1, 2, 3].map(() => fetchCaptureRetrying(slow, 'u', { sleep: async () => {} })));
+    return peak === 1 && out.every(o => o.body === 'x');
   })());
 check('fetchWithFallback reads captures through the retrying helper, and accepts an SPN redirect to a fresh capture even on 429',
   (() => {
