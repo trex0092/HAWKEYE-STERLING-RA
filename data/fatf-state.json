@@ -11,12 +11,10 @@
     "British Virgin Islands",
     "Bulgaria",
     "Cameroon",
-    "Cote D'Ivoire",
     "Haiti",
     "Iraq",
     "Kenya",
     "Kuwait",
-    "Lao People's Democratic Republic",
     "Lebanon",
     "Monaco",
     "Nepal",
@@ -28,9 +26,5 @@
     "Vietnam",
     "Yemen"
   ],
-  "updated": "2026-06-20",
-  "skipStreak": 8,
-  "lastSkip": "2026-10-03",
-  "lastCorroborated": "2026-09-29",
-  "lastCorroboratedSnapshot": "2026-09-14"
+  "updated": "2026-10-03"
 }
