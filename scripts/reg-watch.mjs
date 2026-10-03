@@ -63,8 +63,26 @@ export function extractText(raw) {
    nonces and cache-busters don't shift the fingerprint on every fetch and open
    a spurious PR. Tuned to leave real regulatory figures intact: only digit runs
    of 8+ are removed, so thresholds like 55,000 / 60,000 still register. */
+/* "Last updated" stamps written with a MONTH NAME. The numeric-date rules
+   below never matched them, so a page that re-stamps its footer every day
+   alerted every day: the UAE Ministry of Economy homepage ("آخر تحديث للمحتوى
+   بتاريخ: 02 اكتوبر 2026" → "03 اكتوبر 2026") was filed as a source change on
+   every run of 3 Oct 2026, its only difference that date. Scoped to the stamp
+   phrase on purpose — a dated entry in a list of actions (OFAC "october 02,
+   2026 - sanctions list updates") is content and is left alone. */
+const MONTHS_EN = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+const MONTHS_AR = '(?:يناير|فبراير|مارس|أبريل|ابريل|إبريل|مايو|يونيو|يونيه|يوليو|يوليه|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر|كانون الثاني|شباط|آذار|نيسان|أيار|حزيران|تموز|آب|أيلول|تشرين الأول|تشرين الثاني|كانون الأول)';
+const WORDY_DATE = '(?:\\d{1,2}(?:st|nd|rd|th)?\\s+(?:' + MONTHS_EN + '|' + MONTHS_AR + ')\\.?,?\\s+\\d{4}|' + MONTHS_EN + '\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4})';
+const UPDATE_STAMP_RE = new RegExp('(?:(?:page\\s+)?last\\s+(?:updated|modified|reviewed)(?:\\s+on)?|updated\\s+on|آخر\\s+تحديث[^:：]{0,30}|تاريخ\\s+آخر\\s+تحديث|تم\\s+التحديث(?:\\s+في)?)\\s*[:：]?\\s*' + WORDY_DATE, 'g');
+/* Bumped whenever denoise() changes what it strips: stored hashes from an
+   older version are re-checked against the stored snapshot (see main) instead
+   of being diffed blindly, so a filter upgrade never fires a wave of false
+   "changed" alerts. */
+export const FP_VERSION = 2;
+
 export function denoise(text) {
   return text
+    .replace(UPDATE_STAMP_RE, ' ')                                        // "last updated: 2 october 2026" / آخر تحديث … 02 اكتوبر 2026
     .replace(/\d{4}-\d{2}-\d{2}t\d{2}:\d{2}(:\d{2})?(\.\d+)?z?/g, ' ')   // ISO datetimes
     .replace(/\d{4}-\d{2}-\d{2}/g, ' ')                                   // ISO dates
     .replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, ' ')                           // d/m/y dates
@@ -130,6 +148,25 @@ export function captureAcceptable(ts, notBefore, now = Date.now()) {
    membership diffing (not LCS) is deliberate: it is order-insensitive, cheap,
    and a modification simply shows as one removal plus one addition. Excerpts
    are capped so a full page rewrite cannot blow up the card. */
+/* Where two versions of one segment actually differ, at word granularity.
+   A page with little sentence punctuation (much Arabic text) is ONE segment,
+   so a one-word edit used to show as a 220-char excerpt of identical leading
+   text on both sides ("added and removed are identical"), and the severity
+   heuristic scanned the whole segment for keywords that never changed. */
+export function changeContext(oldSeg, newSeg, ctxWords = 12) {
+  const a = String(oldSeg || '').split(/\s+/).filter(Boolean);
+  const b = String(newSeg || '').split(/\s+/).filter(Boolean);
+  let p = 0;
+  while (p < a.length && p < b.length && a[p] === b[p]) p++;
+  let q = 0;
+  while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+  const removedWords = a.slice(p, a.length - q), addedWords = b.slice(p, b.length - q);
+  const before = (p > ctxWords ? '… ' : '') + a.slice(Math.max(0, p - ctxWords), p).join(' ');
+  const after = a.slice(a.length - q, a.length - q + ctxWords).join(' ') + (q > ctxWords ? ' …' : '');
+  const show = ws => [before, '⟦' + ws.join(' ') + '⟧', after].filter(Boolean).join(' ');
+  return { removedWords, addedWords, removedExcerpt: show(removedWords), addedExcerpt: show(addedWords) };
+}
+
 export function diffTexts(oldText, newText, { maxExcerpts = 4, maxLen = 220 } = {}) {
   const seg = t => String(t || '')
     .split(/(?<=[.!?;])\s+/)
@@ -139,8 +176,31 @@ export function diffTexts(oldText, newText, { maxExcerpts = 4, maxLen = 220 } = 
   const aSet = new Set(a), bSet = new Set(b);
   const added = b.filter(s => !aSet.has(s));
   const removed = a.filter(s => !bSet.has(s));
+  /* Pair each removed segment with the added segment sharing the most leading
+     + trailing words (a modification), so the card shows the changed words in
+     context. Unpaired segments are genuine additions / deletions, kept whole. */
+  const shared = (x, y) => { const c = changeContext(x, y); return x.split(/\s+/).length - c.removedWords.length; };
+  const usedAdded = new Set();
+  const pairs = [];
+  for (const r of removed) {
+    let best = -1, bestScore = 0;
+    added.forEach((ad, i) => { if (usedAdded.has(i)) return; const sc = shared(r, ad); if (sc > bestScore) { bestScore = sc; best = i; } });
+    if (best >= 0 && bestScore >= 3) { usedAdded.add(best); pairs.push([r, added[best]]); }
+  }
+  const pairedRemoved = new Set(pairs.map(([r]) => r)), pairedAdded = new Set(pairs.map(([, ad]) => ad));
+  const ctx = pairs.map(([r, ad]) => changeContext(r, ad));
+  const addedEx = [...ctx.map(c => c.addedExcerpt), ...added.filter(x => !pairedAdded.has(x))];
+  const removedEx = [...ctx.map(c => c.removedExcerpt), ...removed.filter(x => !pairedRemoved.has(x))];
+  /* The text that actually changed: the differing words of each modified
+     segment plus every wholly added / removed segment. Severity reads this. */
+  const changedText = [...ctx.flatMap(c => [c.addedWords.join(' '), c.removedWords.join(' ')]),
+    ...added.filter(x => !pairedAdded.has(x)), ...removed.filter(x => !pairedRemoved.has(x))].filter(Boolean);
+  /* Same words, only reordered or re-segmented → not a content change. */
+  const bag = arr => arr.join(' ').split(/\s+/).filter(Boolean).sort().join(' ');
+  const cosmetic = (added.length + removed.length) > 0 && bag(added) === bag(removed);
   const clip = arr => arr.slice(0, maxExcerpts).map(s => s.length > maxLen ? s.slice(0, maxLen - 1) + '…' : s);
-  return { addedCount: added.length, removedCount: removed.length, added: clip(added), removed: clip(removed) };
+  return { addedCount: added.length, removedCount: removed.length, added: clip(addedEx), removed: clip(removedEx),
+    changedText: changedText.slice(0, 20), cosmetic };
 }
 
 /* ── Change-severity triage ──
@@ -152,7 +212,9 @@ export function diffTexts(oldText, newText, { maxExcerpts = 4, maxLen = 220 } = 
 const SEVERITY_HIGH_RE = /(threshold|circular|regulation|decree|resolution|directive|deadline|penalt|prohibit|obligat|must|shall|licen[cs]|freez|sanction|designat|guidance|standard|amendment|article \d)/i;
 export function classifySeverity(diff) {
   if (!diff) return { severity: 'MEDIUM', reason: 'content changed — no itemised delta available yet, review the page' };
-  const texts = [...(diff.added || []), ...(diff.removed || [])];
+  /* Only the words that changed can make a change HIGH — a keyword in the
+     unchanged remainder of a long segment says nothing about this edit. */
+  const texts = Array.isArray(diff.changedText) ? diff.changedText : [...(diff.added || []), ...(diff.removed || [])];
   const hit = texts.find(t => SEVERITY_HIGH_RE.test(t));
   if (hit) {
     const term = (hit.match(SEVERITY_HIGH_RE) || [])[0];
@@ -206,21 +268,21 @@ export function computeChanges(sources, prevState, fetched, today) {
        next run (its ts predates our recording day) and flip-flops to error. */
     const asOf = (f.snapshotTs && tsToIsoDate(f.snapshotTs)) || today;
     if (!old) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, ...via };
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, fp: FP_VERSION, ...via };
       changes.push({ ...base(s), status: 'new', newHash: hash, ...via });
     } else if (old.hash == null) {
       /* first good snapshot after a prior error — record silently, no PR */
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, ...via };
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, fp: FP_VERSION, ...via };
       changes.push({ ...base(s), status: 'recovered', newHash: hash, ...via });
     } else if (old.hash !== hash) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, prevHash: old.hash, ...via };
-      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes, ...via });
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, prevHash: old.hash, fp: FP_VERSION, ...via };
+      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes, prevFp: old.fp || 1, ...via });
     } else {
       /* Rebuild rather than spread so a stale error/errorStreak from a past
          failed run is cleared the moment the source fetches clean again.
          contentAsOf only moves forward (same content, newest confirmation). */
       const prevAsOf = old.contentAsOf || old.changedAt || '';
-      stateSources[s.id] = { hash: old.hash, bytes: old.bytes, checkedAt: today, changedAt: old.changedAt, contentAsOf: asOf > prevAsOf ? asOf : prevAsOf, status: f.status || 200, ...(old.prevHash ? { prevHash: old.prevHash } : {}), ...via };
+      stateSources[s.id] = { hash: old.hash, bytes: old.bytes, checkedAt: today, changedAt: old.changedAt, contentAsOf: asOf > prevAsOf ? asOf : prevAsOf, status: f.status || 200, ...(old.prevHash ? { prevHash: old.prevHash } : {}), ...(old.fp ? { fp: old.fp } : {}), ...via };
       changes.push({ ...base(s), status: 'unchanged' });
     }
   }
@@ -304,6 +366,15 @@ export function buildReport(changes, today, mode) {
         }
       }
     }
+  }
+  /* Demoted changes are stated, never hidden: what moved the fingerprint
+     without being content, and why it was not alerted. */
+  const quiet = changes.filter(c => c.status === 'rebaselined' || c.status === 'cosmetic');
+  if (quiet.length) {
+    lines.push('');
+    lines.push('Not alerted (' + quiet.length + '): ' + quiet.map(c => c.name + ' — ' + (c.status === 'rebaselined'
+      ? 'fingerprint filter upgraded to v' + FP_VERSION + ', stored content re-checked and unchanged'
+      : 'same words re-ordered / re-segmented, no content change')).join('; ') + '.');
   }
   const stuck = errors.filter(e => (e.errorStreak || 0) >= ERROR_STREAK_ALERT);
   if (stuck.length) {
@@ -594,9 +665,26 @@ async function main() {
     if (c.status === 'changed') {
       let oldText = '';
       try { oldText = readFileSync(snapFile, 'utf8'); } catch {}
+      /* Stored hash from an older denoise(): re-filter the stored snapshot
+         with today's rules. Equal to today's text → the content did not move,
+         only the filter did; re-baseline silently. Different → a real change,
+         reported as usual (the safe direction). */
+      if (oldText && (c.prevFp || 1) < FP_VERSION
+          && denoise(oldText.trim()).replace(/\s+/g, ' ').trim() === newText) {
+        c.status = 'rebaselined';
+        console.log(c.id + ': fingerprint v' + (c.prevFp || 1) + ' → v' + FP_VERSION + ' re-baselined, content unchanged');
+        writeFileSync(snapFile, newText + '\n');
+        continue;
+      }
       if (oldText) {
         c.diff = diffTexts(oldText, newText);
         console.log(c.id + ': diff +' + c.diff.addedCount + ' / -' + c.diff.removedCount + ' segment(s)');
+        if (c.diff.cosmetic) {
+          c.status = 'cosmetic';
+          console.log(c.id + ': same words re-ordered / re-segmented — not a content change');
+          writeFileSync(snapFile, newText + '\n');
+          continue;
+        }
       } else {
         c.diffNote = 'first detailed snapshot recorded — additions/deletions will be itemised from the next change';
       }
@@ -608,6 +696,8 @@ async function main() {
     writeFileSync(snapFile, newText + '\n');
   }
 
+  /* rebaselined / cosmetic sources were demoted above; recount. */
+  moved.splice(0, moved.length, ...contentChanges(changes));
   const report = buildReport(changes, today, mode);
 
   mkdirSync('data', { recursive: true });

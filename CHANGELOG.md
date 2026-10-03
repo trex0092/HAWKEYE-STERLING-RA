@@ -10,6 +10,14 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Regulatory Watch: no more daily false alerts from re-stamped footers, and change cards show the exact words that moved.**
+  - **Cause.** The UAE Ministry of Economy homepage ends with "آخر تحديث للمحتوى بتاريخ: 02 اكتوبر 2026" ("content last updated: …"). That date changes every day, and the noise filter stripped only numeric dates. So the page was filed as a source change on both 3 Oct 2026 runs, with identical-looking excerpts on each side.
+  - **Stamp filter.** "Last updated" stamps written with a month name, in English or Arabic, are now stripped. The filter is scoped to the stamp phrase, so a dated entry in a list of actions (e.g. OFAC's "october 02, 2026 - sanctions list updates") remains content.
+  - **No false wave on upgrade.** Fingerprints carry a version (`FP_VERSION` = 2). A stored hash from the old filter is re-checked against its stored snapshot re-filtered with the new rules. It is re-baselined only if the content is identical; otherwise it is reported as a change, which is the safe direction.
+  - **Word-level comparison.** Modified segments are paired, and the card shows the changed words in context, e.g. `⟦launches⟧` → `⟦launched⟧`. Pure re-ordering or re-segmenting is not a content change.
+  - **Severity on changed words only.** The 3 Oct EU AI Act edit had been rated 🔴 HIGH because the unchanged text contained "standard"; it now rates 🟢 LOW. OFAC's real 2 Oct designations entry still rates 🔴 HIGH.
+  - **Nothing hidden.** Changes that were not alerted are listed in the report with the reason.
+
 - **Report: a confidence tier that rests on the distinctive name now says so.** The 3 Oct 2026 report showed a line of the form "<list>: \"<short designation>\" 8% · STRONG". The percentage is the conservative min(full, core) score. The tier is the distinctive-name (core) score, here 100%, because the short-designation rule must still catch "Hamas General Trading LLC" against "HAMAS". Such lines now read "8% · STRONG on the distinctive name (100%; full name 8%)". This changes the display only; matching, scoring, tiers and recall are unchanged.
 
 - **FATF watchdog: a false grey-list "removal" of Côte d'Ivoire and Lao PDR is fixed, and the stored lists self-repair.**

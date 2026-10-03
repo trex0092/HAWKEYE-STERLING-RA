@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
   persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback, fetchCaptureRetrying,
-  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS,
+  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, changeContext, FP_VERSION, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS,
   REG_REVIEW_CHECKLIST,
 } from '../scripts/reg-watch.mjs';
 
@@ -288,6 +288,48 @@ check('report shouts about persistently unreachable sources',
   && loudRep.includes('failing ' + ERROR_STREAK_ALERT + ' consecutive runs'));
 check('report keeps one-off blips in the folded no-action note',
   loudRep.includes('could not be fetched') && loudRep.includes('Blip'));
+
+/* ── 3 Oct 2026: daily false alerts from re-stamped footers / one-segment pages ── */
+{
+  const ar = (d) => 'وزارة الاقتصاد الإعلانات الهامة آخر تحديث للمحتوى بتاريخ: ' + d + ' اكتوبر 2026 حقوق النشر';
+  check('denoise: an Arabic "last updated" stamp with a month name no longer moves the text',
+    denoise(ar('02')).replace(/\s+/g, ' ').trim() === denoise(ar('03')).replace(/\s+/g, ' ').trim());
+  check('denoise: English "last updated" stamps (day-month and month-day forms) are stripped',
+    denoise('page last updated: 2 october 2026 body').replace(/\s+/g, ' ').trim() === 'body'
+    && denoise('last modified on october 3, 2026 body').replace(/\s+/g, ' ').trim() === 'body');
+  check('denoise: a dated ENTRY in a list of actions is content and is kept (OFAC recent actions)',
+    denoise('counter terrorism designations october 02, 2026 - sanctions list updates').includes('october 02, 2026'));
+  const cc = changeContext('edic for agri-food launches to support digital innovation across europe', 'edic for agri-food launched to support digital innovation across europe', 3);
+  check('changeContext isolates the changed words with context',
+    cc.removedWords.join(' ') === 'launches' && cc.addedWords.join(' ') === 'launched'
+    && cc.addedExcerpt.includes('⟦launched⟧') && cc.removedExcerpt.includes('⟦launches⟧'));
+  const longOld = 'answers on the ai act european ai office governance and enforcement of the ai act overview of the guidelines on the ai act standardisation of the ai act latest news edic for agri-food launches to support innovation';
+  const d1 = diffTexts(longOld, longOld.replace('launches', 'launched'));
+  check('severity reads only the changed words: a keyword in the unchanged text ("standard") no longer makes it HIGH',
+    classifySeverity(d1).severity === 'LOW' && d1.changedText.join(' ') === 'launched launches');
+  const d2 = diffTexts('recent actions list. iran-related designations updates follow here.', 'recent actions list. counter terrorism designations october 02, 2026 - iran-related designations updates follow here.');
+  check('a genuine new designation entry is still HIGH, quoted by its changed words',
+    classifySeverity(d2).severity === 'HIGH' && d2.added.some(x => x.includes('counter terrorism designations')));
+  const d3 = diffTexts('alpha beta gamma delta epsilon zeta. eta theta iota kappa lambda mu nu.', 'eta theta iota kappa lambda mu nu. alpha beta gamma delta epsilon zeta.');
+  check('re-ordered / re-segmented identical words are cosmetic, not a content change',
+    d3.addedCount === 0 || d3.cosmetic === true);
+  const d4 = diffTexts('the main text block of the regulator page carries several words here and there', 'the main text block of the regulator page words carries several here and there');
+  check('the same words in a different order within a segment are flagged cosmetic', d4.cosmetic === true);
+  const st = computeChanges([{ id: 'x', name: 'X', url: 'https://x.example' }], { sources: {} }, { x: { ok: true, status: 200, body: '<p>hello regulator page text</p>' } }, '2026-10-03');
+  check('computeChanges records the fingerprint version on every new hash', st.state.sources.x.fp === FP_VERSION && FP_VERSION >= 2);
+  const st2 = computeChanges([{ id: 'x', name: 'X', url: 'https://x.example' }], { sources: { x: { hash: 'old', bytes: 1, changedAt: '2026-10-01' } } },
+    { x: { ok: true, status: 200, body: '<p>hello regulator page text</p>' } }, '2026-10-03');
+  check('a changed source carries the stored fingerprint version (v1 when unrecorded) for the re-baseline check',
+    st2.changes[0].status === 'changed' && st2.changes[0].prevFp === 1);
+  const src = readFileSync(new URL('../scripts/reg-watch.mjs', import.meta.url), 'utf8');
+  check('main: an old-version hash is re-checked against the re-filtered stored snapshot before any change is reported',
+    /c\.prevFp \|\| 1\) < FP_VERSION/.test(src) && src.indexOf("c.status = 'rebaselined'") < src.indexOf('c.diff = diffTexts(oldText, newText)'));
+  const rq = buildReport([{ id: 'm', name: 'UAE MoE', url: 'https://m', status: 'rebaselined' }, { id: 'n', name: 'N', url: 'https://n', status: 'cosmetic' }], '2026-10-04', 'check');
+  check('report: demoted changes are stated with their reason, never hidden',
+    rq.includes('Not alerted (2)') && rq.includes('UAE MoE') && rq.includes('re-checked and unchanged') && rq.includes('No regulatory content changes'));
+  check('main: rebaselined / cosmetic sources are dropped from the alert count',
+    src.includes('moved.splice(0, moved.length, ...contentChanges(changes))'));
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
