@@ -6533,6 +6533,16 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             shown = _unscreened + sorted(_scored, key=lambda h: -h["score"])[:_cand_n]
             for h in shown:
                 conf = f" · {h.get('confidence','')}" if h.get("confidence") else ""
+                # The tier is read off the DISTINCTIVE-name (core) score, the
+                # percentage off the conservative min(full, core). When the two
+                # diverge — a short designation equal to the customer's whole
+                # distinctive name, the rest being legal-form boilerplate — the
+                # line read "8% · STRONG" (3 Oct 2026), which explains nothing.
+                # Say which score the tier rests on. Display only.
+                _core = h.get("core_score")
+                if conf and isinstance(_core, (int, float)) and _core - float(h.get("score") or 0) >= 20:
+                    conf += (f" on the distinctive name ({_pct(_core)}; full name "
+                             f"{_pct(h.get('name_score', h.get('score', 0)))})")
                 nflag = " 🆕" if h.get("is_new") else ""
                 link = " · owner/UBO → 50%/control rule" if h.get("control_linkage") else ""
                 A(f"   -> [{h['subject_type']}] {h['subject_name']}  —  {h['list']}: "

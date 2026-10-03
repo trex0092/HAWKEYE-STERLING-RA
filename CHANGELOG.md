@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Report: a confidence tier that rests on the distinctive name now says so.** The 3 Oct 2026 report showed a line of the form "<list>: \"<short designation>\" 8% · STRONG". The percentage is the conservative min(full, core) score. The tier is the distinctive-name (core) score, here 100%, because the short-designation rule must still catch "Hamas General Trading LLC" against "HAMAS". Such lines now read "8% · STRONG on the distinctive name (100%; full name 8%)". This changes the display only; matching, scoring, tiers and recall are unchanged.
+
 - **FATF watchdog: a false grey-list "removal" of Côte d'Ivoire and Lao PDR is fixed, and the stored lists self-repair.**
   - **What happened.** On 3 Oct 2026 the watchdog read an archived FATF page (web.archive.org snapshot 20261002051513) that wrote "Côte d'Ivoire" and "Lao People's Democratic Republic" with a typographic apostrophe or an HTML entity. Its dictionary matched only the plain apostrophe, so both names dropped out of the grey list. It alerted that the FATF had removed them, and it overwrote the stored state with 20 jurisdictions instead of 22.
   - **What is true.** The FATF statement of 19 June 2026 still lists both, and there has been no plenary since; the next is 26–30 October 2026.
