@@ -32,13 +32,13 @@ import { asana } from './asana-notify.mjs';
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
 /* Section resolved BY NAME at runtime (created if missing); GID overrides it. */
-/* Governance reports file under the approved "Regulatory Changes" section of
-   HAWKEYE STERLING APP (scripts/asana-sections.mjs, #701/#703), like the other
-   governance reports. This used to resolve "AI & Platform Governance" by name
-   and CREATE it when absent, which re-provisioned a fifth, unapproved section
-   in the monitoring project (new gid each time) and left every alert routed
-   there by gid refused. */
-export const GOV_SECTION_NAME = SECTIONS.regulatory.name;
+/* Governance reports file under the approved "AI & Platform Governance"
+   section of HAWKEYE STERLING APP (scripts/asana-sections.mjs). It is pinned
+   by gid and never resolved by name or created: an earlier version created the
+   section by name when absent, which re-provisioned it under a new gid each
+   time; while no live gid was registered (#701/#703) these reports were filed
+   under "Regulatory Changes". */
+export const GOV_SECTION_NAME = SECTIONS.governance.name;
 const GOV_SECTION_GID = process.env.ASANA_GOV_SECTION_GID || '';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -322,7 +322,7 @@ async function listTaskNames(projectGid) {
    unapproved override is refused (the caller logs it; the task itself is still
    created) instead of being honoured or recreated. */
 async function ensureSection(projectGid) {
-  const section = GOV_SECTION_GID || SECTIONS.regulatory.gid;
+  const section = GOV_SECTION_GID || SECTIONS.governance.gid;
   return requireApprovedSection(projectGid, section);
 }
 

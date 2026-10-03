@@ -189,7 +189,7 @@ async function main() {
     process.exit(3);
   }
   try {
-    const section = process.env.ASANA_WEEKLY_SECTION_GID || '1218451992088222';
+    const section = process.env.ASANA_WEEKLY_SECTION_GID || '1218985347982681'; /* AI & Platform Governance */
     const url = await notifyAsana(title, plain, { project: REG_PROJECT_GID, html, section });
     console.log('weekly-summary: Asana card created' + (url ? ' — ' + url : ''));
   } catch (e) {

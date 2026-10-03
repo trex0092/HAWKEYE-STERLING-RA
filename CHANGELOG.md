@@ -10,6 +10,15 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Asana: AI and platform cards file under "AI & Platform Governance", not "Regulatory Changes".**
+  - **Cause.** Earlier gids of the "AI & Platform Governance" section had been deleted, so #701/#703 pinned the AI Governance & Platform Report, Advisor Eval, the weekly summary and every fallback platform alert to "Regulatory Changes", where they sat among law changes. The section now exists in the live project (gid 1218985347982681) and is registered as an approved destination in `scripts/asana-sections.mjs`, pinned by gid and never created by name.
+  - **Now filed there:**
+    - the daily AI Governance & Platform Report, Advisor Eval and the weekly summary;
+    - platform-health alerts: production drift, workflow recovery blocked, control stale, function/site down, code scan failed, and morning dispatch / 09:00 delivery guard;
+    - the FATF monitoring-gap alert and the RA ↔ Asana reconciliation;
+    - a Regulatory Watch card that reports only unreachable sources (it is not mirrored to the law-change queue).
+  - **Unchanged.** Law and list changes (Regulatory Watch content changes, FATF list changes, EOCN reviews), screening findings and document follow-ups keep their sections.
+
 - **Regulatory Watch: change cards name the exact publication, link to it, and say what it means.**
   - **Before.** A card showed long lowercased runs of page text (OFAC on 3 Oct: "department of the treasury read the latest treasury news … menu about ofac history …"), with HTML codes left raw ("treasury&#39;s", "page 3 &hellip;"), and no link to the item that was issued. The AI analysis was written to a file and never reached the card.
   - **New and withdrawn items.** Every good fetch also snapshots the page's titled links (`data/reg-watch-snapshots/<id>.links.json`). A change lists each new item and each item no longer listed, by its title as printed (original case) and linked to the instrument, e.g. "🆕 New item: Counter Terrorism Designations; Iran-related Designations and Designations Updates". Generic link texts ("Read more", "اقرأ المزيد", page numbers) and tracking/session parameters are ignored. A new item's title also counts toward severity. The first item snapshot of each source is persisted on its first run, so items are listed from the next change.

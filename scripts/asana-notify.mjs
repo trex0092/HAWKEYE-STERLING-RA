@@ -106,8 +106,8 @@ export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6, dedupPr
    idempotent (an existing name is reused), shared by the schedulers that file
    under a named column. */
 export async function ensureSection(projectGid, name) {
-  /* The monitoring project is intentionally restricted to four approved
-     sections. Never recreate retired lifecycle or legacy sections there. */
+  /* The monitoring project is intentionally restricted to the approved
+     sections in asana-sections.mjs. Never recreate retired lifecycle or legacy sections there. */
   if (String(projectGid) === MONITORING_PROJECT) {
     const approved = approvedSectionByName(name);
     if (!approved) throw new Error('Asana routing: refusing unapproved monitoring section: ' + name);
