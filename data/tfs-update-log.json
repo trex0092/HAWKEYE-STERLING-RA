@@ -1814,6 +1814,45 @@
       "chainHash": "9d1f7c32b474f0363101c21de26ca2be4c6cfb26fc19494764321193f014d574",
       "latencyHours": 0,
       "resolutionHash": "d8e329d99e71c549d1b4ba0f6f2456cec773dd0ff50e8c3aeae28a04f913e7a4"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-06T01:52:49.952Z",
+      "prevCount": 19489,
+      "newCount": 19364,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "9d1f7c32b474f0363101c21de26ca2be4c6cfb26fc19494764321193f014d574",
+      "chainHash": "58b2fda32af3e64bf702562e4aae08d23324d19a5b3318b80c69daacef8324ee"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-06T01:52:49.952Z",
+      "prevCount": 20237,
+      "newCount": 20180,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "58b2fda32af3e64bf702562e4aae08d23324d19a5b3318b80c69daacef8324ee",
+      "chainHash": "98256f05428ece00b0526eb6d815512092ccd34bacec117ab50409b51563db01"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-06T01:52:49.952Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "98256f05428ece00b0526eb6d815512092ccd34bacec117ab50409b51563db01",
+      "chainHash": "7c314be47a7d936a3191bf7b5e71a256c95be167ba8327eeed079c9ae9f4491e"
     }
   ]
 }
