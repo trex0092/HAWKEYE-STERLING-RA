@@ -1823,10 +1823,16 @@
       "detectedAt": "2026-10-06T01:52:49.952Z",
       "prevCount": 19489,
       "newCount": 19364,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 37401390427,
+        "startedAt": "2026-10-06T01:52:54Z"
+      },
+      "status": "complete",
       "chainPrev": "9d1f7c32b474f0363101c21de26ca2be4c6cfb26fc19494764321193f014d574",
-      "chainHash": "58b2fda32af3e64bf702562e4aae08d23324d19a5b3318b80c69daacef8324ee"
+      "chainHash": "58b2fda32af3e64bf702562e4aae08d23324d19a5b3318b80c69daacef8324ee",
+      "latencyHours": 0,
+      "resolutionHash": "6c1b9e01d569f5b6de1e848e273624f60f4871f569717fa26fd51d669053790f"
     },
     {
       "id": "ofac-sdn-alt",
@@ -1836,10 +1842,16 @@
       "detectedAt": "2026-10-06T01:52:49.952Z",
       "prevCount": 20237,
       "newCount": 20180,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 37401390427,
+        "startedAt": "2026-10-06T01:52:54Z"
+      },
+      "status": "complete",
       "chainPrev": "58b2fda32af3e64bf702562e4aae08d23324d19a5b3318b80c69daacef8324ee",
-      "chainHash": "98256f05428ece00b0526eb6d815512092ccd34bacec117ab50409b51563db01"
+      "chainHash": "98256f05428ece00b0526eb6d815512092ccd34bacec117ab50409b51563db01",
+      "latencyHours": 0,
+      "resolutionHash": "e1371380659a4ca4b6aba55ccc4e31dd8f5ee0e80a739120fa71af9e8ce551c2"
     },
     {
       "id": "ofac-consolidated",
@@ -1849,10 +1861,29 @@
       "detectedAt": "2026-10-06T01:52:49.952Z",
       "prevCount": 442,
       "newCount": null,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 37401390427,
+        "startedAt": "2026-10-06T01:52:54Z"
+      },
+      "status": "complete",
+      "chainPrev": "98256f05428ece00b0526eb6d815512092ccd34bacec117ab50409b51563db01",
+      "chainHash": "7c314be47a7d936a3191bf7b5e71a256c95be167ba8327eeed079c9ae9f4491e",
+      "latencyHours": 0,
+      "resolutionHash": "4783eed63b1d48422c12bb00412063327a1f348459073626bf2bbd52b09fa0e7"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-06T11:57:44.926Z",
+      "prevCount": 58503,
+      "newCount": 58491,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "98256f05428ece00b0526eb6d815512092ccd34bacec117ab50409b51563db01",
-      "chainHash": "7c314be47a7d936a3191bf7b5e71a256c95be167ba8327eeed079c9ae9f4491e"
+      "chainPrev": "7c314be47a7d936a3191bf7b5e71a256c95be167ba8327eeed079c9ae9f4491e",
+      "chainHash": "aaa48908669ec6fa72e8d4ec7784ddeea337042e7e891a4573196076797266b6"
     }
   ]
 }

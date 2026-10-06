@@ -49,14 +49,15 @@
       "errStreak": 0
     },
     "uk-ofsi": {
-      "hash": "b8a2bdd104c71b923e32bb0d952cdf58fbccede349aaeae1544817a15fe91b16",
-      "bytes": 47834566,
+      "hash": "2895e3e9903d2b966d346a389b3caa3c00f0ad014b97749a5bfcf5a7e842c54d",
+      "bytes": 47826172,
       "checkedAt": "2026-10-06",
-      "changedAt": "2026-10-02",
+      "changedAt": "2026-10-06",
       "contentAsOf": "2026-10-06",
       "status": 200,
-      "prevHash": "17aa423fff7800ec74be03fb044f5002665679371fe3efc3ff5735f6f8502a2a",
-      "count": 58503,
+      "prevHash": "b8a2bdd104c71b923e32bb0d952cdf58fbccede349aaeae1544817a15fe91b16",
+      "fp": 2,
+      "count": 58491,
       "errStreak": 0
     },
     "eu-fsf": {
