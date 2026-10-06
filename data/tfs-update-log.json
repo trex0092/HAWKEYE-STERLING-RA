@@ -1884,6 +1884,19 @@
       "status": "pending-rescreen",
       "chainPrev": "7c314be47a7d936a3191bf7b5e71a256c95be167ba8327eeed079c9ae9f4491e",
       "chainHash": "aaa48908669ec6fa72e8d4ec7784ddeea337042e7e891a4573196076797266b6"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-10-06",
+      "detectedAt": "2026-10-06T19:01:25.856Z",
+      "prevCount": 1011,
+      "newCount": 1010,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "aaa48908669ec6fa72e8d4ec7784ddeea337042e7e891a4573196076797266b6",
+      "chainHash": "1bb5ec1de1fa16d6c564ddd31437b911625905f4b70c4e83672257dacd78e0f6"
     }
   ]
 }
