@@ -4,7 +4,7 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 
 ## How to read this
 
-- **Sanctions status** is the register's own status. `not-researched` = no outcome recorded (61). `identified` = list known, file not verified (32). `pending` = candidate recorded, not loaded (1). `assessed-not-loadable` = researched, cannot be loaded (45). `screened` = national list loaded (56).
+- **Sanctions status** is the register's own status. `not-researched` = no outcome recorded (61). `identified` = list known, file not verified (32). `pending` = candidate recorded, not loaded (1). `assessed-not-loadable` = researched, cannot be loaded (47). `screened` = national list loaded (54).
 - **AM edition** = whether a dedicated Google News country edition exists in the adverse-media matrix. `no` does not mean zero adverse-media coverage: GDELT and Bing News sweeps are global and name-scoped.
 - **Partial note** = a not-researched country that already has a partial research note in the register.
 - **PEP** is intentionally omitted per country because the current PEP artifact's country field is not reliable enough for a defensible country-by-country statement.
