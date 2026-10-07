@@ -31,7 +31,7 @@
 | `EAI-AUD-01` | L6 | Control-to-evidence assurance map | MLRO / Internal Audit | Compliance Engineering | Continuous; review at internal audit | effective |
 | `EAI-AUD-02` | L6 | Internal audit programme | Internal Audit | Internal Audit | At least annual | partial |
 | `EAI-AUD-03` | L6 | Management review and governance decisions | Board / MLRO | AI Governance Committee | Quarterly and on material decision | partial |
-| `EAI-AUD-04` | L6 | Preservation of decisions and audit evidence | MLRO | Compliance Engineering | Continuous | effective |
+| `EAI-AUD-04` | L6 | Preservation of decisions and audit evidence | MLRO | Compliance Engineering | Continuous | partial |
 | `EAI-AUD-05` | L6 | Remediation tracking and closure | MLRO / Internal Audit | Compliance Engineering | Continuous with quarterly review | effective |
 | `EAI-AUD-06` | L6 | Independent external assurance | Board / MLRO | External assessor when commissioned | Optional / Board decision | open |
 | `EAI-AUD-07` | L6 | Regular control testing and review currency | MLRO / Internal Audit | Compliance Engineering / control owners | Continuous automation; quarterly and annual human review cycles | partial |
