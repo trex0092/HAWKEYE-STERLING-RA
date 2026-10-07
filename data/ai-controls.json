@@ -372,7 +372,9 @@
       "closure_actions": [
         5,
         11,
-        29
+        29,
+        35,
+        36
       ]
     },
     {
@@ -590,7 +592,8 @@
       "tests": [],
       "note": "No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned.",
       "closure_actions": [
-        10
+        10,
+        37
       ]
     }
   ]
