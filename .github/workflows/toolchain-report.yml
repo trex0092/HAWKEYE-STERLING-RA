@@ -6,6 +6,7 @@ on:
     paths:
       - 'app.js'
       - 'screen.py'
+      - 'screen_gkg.py'
       - 'ai.py'
       - 'agents.py'
       - 'kyc.py'
@@ -24,6 +25,7 @@ on:
     paths:
       - 'app.js'
       - 'screen.py'
+      - 'screen_gkg.py'
       - 'ai.py'
       - 'agents.py'
       - 'kyc.py'
@@ -104,7 +106,7 @@ jobs:
       - name: Python line coverage with coverage.py 7.16.2
         run: |
           set +e
-          python -m coverage run --source=screen,ai,agents,kyc,txn_monitor,payment_screen,monitoring,str_dossier,mcp_tools,mcp_server test/engine_test.py > artifacts/python-coverage/test-output.txt 2>&1
+          python -m coverage run --source=screen,screen_gkg,ai,agents,kyc,txn_monitor,payment_screen,monitoring,str_dossier,mcp_tools,mcp_server test/engine_test.py > artifacts/python-coverage/test-output.txt 2>&1
           run_code=$?
           python -m coverage report -m > artifacts/python-coverage/coverage.txt 2>&1
           report_code=$?
@@ -117,7 +119,7 @@ jobs:
       - name: Python type-check report with mypy 2.4.0
         run: |
           set +e
-          python -m mypy --ignore-missing-imports --follow-imports=skip screen.py ai.py agents.py kyc.py txn_monitor.py payment_screen.py monitoring.py str_dossier.py mcp_tools.py mcp_server.py > artifacts/mypy.txt 2>&1
+          python -m mypy --ignore-missing-imports --follow-imports=skip screen.py screen_gkg.py ai.py agents.py kyc.py txn_monitor.py payment_screen.py monitoring.py str_dossier.py mcp_tools.py mcp_server.py > artifacts/mypy.txt 2>&1
           code=$?
           set -e
           cat artifacts/mypy.txt

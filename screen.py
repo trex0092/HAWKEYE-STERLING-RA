@@ -34,6 +34,7 @@ import kyc      # KYC/identity layer — FATF R.10 (CDD) + R.25 (legal arrangeme
 import txn_monitor  # FATF R.16 transaction-monitoring engine (inert until a feed is configured)
 import payment_screen  # payment-party screening (inert until a feed is configured)
 import monitoring   # Runtime metrics + source-coverage drift detection
+import screen_gkg  # Pure GDELT GKG window/parser/index helpers (ADR-005 decomposition)
 
 try:
     from rapidfuzz import fuzz
@@ -2148,7 +2149,6 @@ GKG_STREAMS = ("gkg", "translation.gkg")     # English stream + machine-translat
 GKG_WORKERS = max(1, int(os.environ.get("GKG_WORKERS", "6") or 6))
 GKG_DEADLINE_SEC = float(os.environ.get("GKG_DEADLINE_SEC", "900") or 900)
 GKG_LABEL = "GDELT GKG (24-hour worldwide news stream)"
-_GKG_TITLE_RE = re.compile(r"<PAGE_TITLE>(.*?)</PAGE_TITLE>", re.S | re.I)
 # GKG theme codes that mark an AML-relevant story even when its headline is
 # neutral. Chosen from codes OBSERVED in live files (source-probe run
 # 37148079938: ECON_MONEYLAUNDERING, WB_2076_MONEY_LAUNDERING, CORRUPTION,
@@ -2166,7 +2166,6 @@ GKG_RISK_THEMES = {
     "ORGANIZED_CRIME": "organized crime", "WB_2453_ORGANIZED_CRIME": "organized crime",
     "CRIME_CARTELS": "cartel", "DRUG_TRADE": "drug trafficking",
 }
-_GKG_SRCLC_RE = re.compile(r"srclc:([a-z]{2,3})", re.I)
 
 # The translated stream publishes later than the English one: source-probe run
 # 37148079938 found the newest translated file 404 while the file one hour
@@ -2175,88 +2174,20 @@ _GKG_SRCLC_RE = re.compile(r"srclc:([a-z]{2,3})", re.I)
 GKG_LAG_SLOTS = max(1, int(os.environ.get("GKG_LAG_SLOTS", "4") or 4))
 
 def gkg_file_stamps(end_utc, hours, lag_slots=None):
-    """15-minute GKG stamps (YYYYMMDDHHMMSS) for `hours` ending lag_slots
-    slots before end_utc (default GKG_LAG_SLOTS = one hour), newest first —
-    the window is complete, not the bleeding edge."""
+    """Compatibility wrapper around the extracted pure GKG window helper."""
     lag = GKG_LAG_SLOTS if lag_slots is None else lag_slots
-    end = end_utc.replace(second=0, microsecond=0)
-    end = end - datetime.timedelta(minutes=end.minute % 15 + 15 * lag)
-    n = hours * 4
-    return [(end - datetime.timedelta(minutes=15 * i)).strftime("%Y%m%d%H%M00") for i in range(n)]
+    return screen_gkg.gkg_file_stamps(end_utc, hours, lag)
 
-def _gkg_names(field):
-    """'Name,offset;Name,offset' (V2.1 enhanced persons/organisations) →
-    unique names in order."""
-    out, seen = [], set()
-    for part in (field or "").split(";"):
-        name = part.rsplit(",", 1)[0].strip() if "," in part else part.strip()
-        if name and name not in seen:
-            seen.add(name)
-            out.append(name)
-    return out
-
-def parse_gkg_rows(text):
-    """GKG 2.1 tab-separated rows → dicts. A row without the documented 27
-    columns is skipped and counted (format drift is visible, never silent)."""
-    rows, bad = [], 0
-    for line in (text or "").split("\n"):
-        if not line:
-            continue
-        f = line.split("\t")
-        if len(f) < 27:
-            bad += 1
-            continue
-        tm = _GKG_TITLE_RE.search(f[26] or "")
-        lm = _GKG_SRCLC_RE.search(f[25] or "")
-        rows.append({
-            "date": f[1][:8], "stamp": f[1], "source": f[3], "url": f[4],
-            "persons": _gkg_names(f[12]), "orgs": _gkg_names(f[14]),
-            "themes": [t for t in (f[7] or "").split(";") if t],
-            "title": html.unescape(tm.group(1)).strip() if tm else "",
-            "lang": (lm.group(1).lower() if lm else "en"),
-        })
-    return rows, bad
+# Preserve the historical screen.py callable surface while the implementation
+# moves into a dependency-light module.
+_gkg_names = screen_gkg._gkg_names
+parse_gkg_rows = screen_gkg.parse_gkg_rows
 
 def gkg_subject_index(subjects):
-    """subjects: iterable of (key, name, kind) with kind 'person' | 'org'.
-    Persons index by their full token set and by (first, last) token; orgs by
-    their distinctive (core) token set, only when it has ≥ 2 tokens — a
-    one-word company core ('aims') would match unrelated press."""
-    full, fl, org = {}, {}, {}
-    for key, name, kind in subjects:
-        toks = [t for t in normalize(name).split() if t]
-        if kind == "person":
-            if len(toks) < 2:
-                continue
-            full.setdefault(frozenset(toks), set()).add(key)
-            fl.setdefault((toks[0], toks[-1]), []).append((key, frozenset(toks)))
-        else:
-            core = core_tokens(normalize(name))
-            if len(core) >= 2:
-                org.setdefault(frozenset(core), set()).add(key)
-    return {"full": full, "fl": fl, "org": org}
+    return screen_gkg.gkg_subject_index(subjects, normalize, core_tokens)
 
 def gkg_match(row, idx):
-    """Subject keys a GKG row names. A person matches when the article names
-    the subject's full name (any order), or the subject's first and last name
-    with nothing the subject's name does not contain ('Mohamed Alhammadi' for
-    'Mohamed Ibrahim Mohamed Ismail Alhammadi'). Single-token names never
-    match. An organisation matches on its full distinctive-token set."""
-    keys = set()
-    for p in row["persons"]:
-        toks = [t for t in normalize(p).split() if t]
-        if len(toks) < 2:
-            continue
-        s = frozenset(toks)
-        keys |= idx["full"].get(s, set())
-        for key, subj in idx["fl"].get((toks[0], toks[-1]), ()):
-            if s <= subj:
-                keys.add(key)
-    for o in row["orgs"]:
-        core = core_tokens(normalize(o))
-        if len(core) >= 2:
-            keys |= idx["org"].get(frozenset(core), set())
-    return keys
+    return screen_gkg.gkg_match(row, idx, normalize, core_tokens)
 
 def gkg_article(row):
     """A matched GKG row in the shape every other feed emits. Flagged by the
