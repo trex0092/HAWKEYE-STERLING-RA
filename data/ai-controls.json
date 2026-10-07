@@ -657,17 +657,21 @@
       "owner": "MLRO / Counsel",
       "operator": "Compliance Engineering",
       "cadence": "Continuous on legal change; formal review at least quarterly",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "data/obligations.json",
         "docs/governance/obligation-register.md",
-        "docs/regulatory-watch.md"
+        "docs/regulatory-watch.md",
+        "data/grc-metrics.json"
       ],
       "tests": [
         "test/obligations.test.mjs",
         "test/legal-citations.test.mjs"
       ],
-      "note": "The obligation register maps each applicable or monitored requirement to its instrument, owner, controls, evidence, regulatory-watch source and current status. CI validates path reachability, citation currency and live closure references for partial obligations."
+      "note": "The obligation register maps all 21 current obligations to an instrument, owner, controls, evidence, regulatory-watch source and status, but all 21 still carry source_citation.basis = needs-source. Open action 5 is the human legal-sourcing path; CI prevents unsourced article numbers or drafted text from masquerading as law.",
+      "closure_actions": [
+        5
+      ]
     }
   ]
 }
