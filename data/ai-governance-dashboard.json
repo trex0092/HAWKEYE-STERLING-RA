@@ -86,7 +86,7 @@
     "audit_finding_closure_rate": 95.2,
     "governance_drift_count": 0,
     "residual_above_appetite": 2,
-    "open_actions_without_target_date": 23
+    "open_actions_without_target_date": 26
   },
   "interpretation": [
     "Layer status is derived from control-register status plus repository evidence-path validation.",
