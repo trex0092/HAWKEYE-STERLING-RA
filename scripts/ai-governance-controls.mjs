@@ -174,6 +174,7 @@ export function buildDashboard(reg, grc) {
     interpretation: [
       'Layer status is derived from control-register status plus repository evidence-path validation.',
       'GRC signals are copied from the separately generated data/grc-metrics.json snapshot.',
+      'The GRC control-effectiveness metric measures automated proof-path coverage in the assurance matrix, not the share of enterprise AI controls rated effective.',
       'Green repository evidence does not imply external certification or completion of human approvals.'
     ]
   };
