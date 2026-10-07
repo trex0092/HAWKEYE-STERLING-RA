@@ -10,9 +10,9 @@ bump merged to `main`.
 
 ## [Unreleased]
 
-- **Sanctions: national-source depth 48 → 56 / 195. Eight official national lists added, each from its official publisher, verified on the runner.**
-  - **How they were found.** A new fixed probe suite (`opensanctions-catalogue`, run 37147223927) read the OpenSanctions `sanctions` collection that the daily engine's worldwide net already screens: 95 member datasets, each with its publisher. Eight of them are official lists of countries the coverage file did not yet count.
-  - **Added.** Each list now has its own registry entry, so the JS Sanctions Screen reads it with a coverage floor and the badge counts it. A second probe (run 37147471222) parsed each one; floors are about 85% of the count.
+- **Sanctions: national-source depth 48 → 54 / 195. Six national sanctions lists added, plus two supplementary proscription feeds, verified on the runner.**
+  - **How they were found.** A new fixed probe suite (`opensanctions-catalogue`, run 37147223927) read the OpenSanctions `sanctions` collection that the daily engine's worldwide net already screens: 95 member datasets, each with its publisher. Six are national sanctions or terrorist-financing lists that increase national-source depth. Two others, Germany and Ireland, are supplementary proscription feeds and do not count as national financial-sanctions coverage.
+  - **Added.** Each list now has its own registry entry, so the JS Sanctions Screen reads it with a coverage floor. The national-source badge counts only the six qualifying national sanctions sources. A second probe (run 37147471222) parsed each one; floors are about 85% of the count.
 
     | Country | Registry id | Publisher | Names |
     | --- | --- | --- | --- |
