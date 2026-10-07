@@ -5,9 +5,9 @@
   "source_register": "data/ai-controls.json",
   "review_by": "2027-01-07",
   "summary": {
-    "controls": 30,
+    "controls": 31,
     "effective": 16,
-    "partial": 13,
+    "partial": 14,
     "open": 1,
     "not_applicable": 0,
     "overall_status": "partial"
@@ -72,9 +72,9 @@
       "id": "L6",
       "name": "Audit & Assurance",
       "purpose": "Preserve evidence, test controls, audit governance, track remediation and support independent assurance.",
-      "controls": 6,
+      "controls": 7,
       "effective": 3,
-      "partial": 2,
+      "partial": 3,
       "open": 1,
       "not_applicable": 0,
       "status": "partial"
@@ -86,7 +86,7 @@
     "audit_finding_closure_rate": 95.2,
     "governance_drift_count": 0,
     "residual_above_appetite": 2,
-    "open_actions_without_target_date": 28
+    "open_actions_without_target_date": 29
   },
   "interpretation": [
     "Layer status is derived from control-register status plus repository evidence-path validation.",
