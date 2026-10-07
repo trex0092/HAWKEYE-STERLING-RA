@@ -13,7 +13,7 @@ target date — the register is the tracking record; this page is the horizon vi
 | Model cards (6) | done | High | ✅ |
 | Architecture diagram set (context · data-flow · trust boundary) | done | High | ✅ delivered — [`../architecture/diagrams.md`](../architecture/diagrams.md) |
 | Risk-register L×I formatting + key-person row | done | Medium | ✅ delivered — R-17 in [`../aims/ai-risk-register.md`](../aims/ai-risk-register.md) |
-| Sign Anthropic DPA → enable AI triage + advisor bias cycle | signature | High | ⬜ firm |
+| Reconcile Anthropic DPA execution + live triage state (items 36/42); do not infer legal completion from runtime or bias-eval evidence | legal/runtime evidence | High | ⬜ firm |
 | Create 4 Asana custom fields + first live assessment (TEST-000) | 0.5 d | High | ⬜ firm → verify |
 
 ## Medium term (1–3 months)
