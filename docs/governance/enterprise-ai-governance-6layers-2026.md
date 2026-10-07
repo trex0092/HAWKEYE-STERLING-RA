@@ -52,7 +52,7 @@ Both views point to the same underlying controls. A control should be implemente
 |---|---|
 | Identify AI risks | [AIMS AI Risk Register](../aims/ai-risk-register.md) |
 | Classify use cases | [AI use-case intake](ai-use-case-intake.md) plus AI asset risk tier |
-| Assess impact and likelihood | 5×5 inherent/residual scoring, DPIA, stakeholder impact assessment |
+| Assess impact and likelihood | 5×5 inherent/residual scoring, DPIA, stakeholder impact assessment; `EAI-RSK-03` remains partial while item 42 reconciles the adverse-media LLM-triage go-live prerequisites and live configuration |
 | Design mitigations | Control mappings, CAPA and open-actions process |
 | Approve residual risk | [Residual-risk acceptance register](residual-risk-acceptance-register.md); no acceptance is inferred from silence |
 
