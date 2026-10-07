@@ -171,9 +171,10 @@
       "tests": [
         "test/policies.test.mjs"
       ],
-      "note": "The charter exists, while the repository's open-actions register still records human ratification actions.",
+      "note": "The AI Governance Committee charter and legal-oversight model exist, but formal committee/Board adoption remains open under item 4 and the deploying entity's DPO designation determination remains unminuted under item 13.",
       "closure_actions": [
-        4
+        4,
+        13
       ]
     },
     {
@@ -365,9 +366,10 @@
         "test/advisor-assurance.test.js",
         "test/advisor-bias-eval.test.mjs"
       ],
-      "note": "Validation and bias controls exist; the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors, but the recorded 2026 Q3 model-validation sign-off is overdue; independent review remains routed to item 8.",
+      "note": "Validation and bias controls exist and the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors. However, the MRM framework still awaits ratification under item 16, the 2026 Q3 model-validation sign-off is overdue under item 38, and independent review remains routed to item 8.",
       "closure_actions": [
         8,
+        16,
         38
       ],
       "review_by": "2026-09-30"
