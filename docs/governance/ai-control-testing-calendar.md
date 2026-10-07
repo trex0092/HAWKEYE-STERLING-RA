@@ -55,7 +55,7 @@ This calendar consolidates the existing test cadences. It does not invent eviden
 | AI Policy and AUP review | Policy register + ratification record if changed |
 | Internal audit programme execution | `docs/aims/internal-audit.md` audit record |
 | AI incident tabletop / runbook exercise | Incident-runbook exercise record and any CAPA |
-| BCP/vendor-exit exercise | AIMS BCP evidence |
+| BCP/vendor-exit exercise | AIMS BCP evidence; first cycle and second-operator drill remain open under item 44 |
 | Enterprise framework review | Six-layer crosswalk, NIST/ISO/UAE mappings |
 | External assurance decision | Board/MLRO decision whether to commission independent review/certification |
 

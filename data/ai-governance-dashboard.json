@@ -6,8 +6,8 @@
   "review_by": "2027-01-07",
   "summary": {
     "controls": 32,
-    "effective": 14,
-    "partial": 17,
+    "effective": 13,
+    "partial": 18,
     "open": 1,
     "not_applicable": 0,
     "overall_status": "partial"
@@ -29,8 +29,8 @@
       "name": "Roles & Accountability",
       "purpose": "Assign accountable owners, decision rights, legal oversight and escalation.",
       "controls": 4,
-      "effective": 2,
-      "partial": 2,
+      "effective": 1,
+      "partial": 3,
       "open": 0,
       "not_applicable": 0,
       "status": "partial"
@@ -86,7 +86,7 @@
     "audit_finding_closure_rate": 95.2,
     "governance_drift_count": 0,
     "residual_above_appetite": 2,
-    "open_actions_without_target_date": 31
+    "open_actions_without_target_date": 32
   },
   "interpretation": [
     "Layer status is derived from control-register status plus repository evidence-path validation.",

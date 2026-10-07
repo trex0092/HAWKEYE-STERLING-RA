@@ -23,8 +23,9 @@ maintainer is unavailable:
    [`CLAUDE.md`](CLAUDE.md) for the enforced invariants before touching code.
 3. Credentials are never in this tree: secrets live in GitHub Actions and
    Netlify environment settings, inventoried by group in
-   [`.env.example`](.env.example). Rotation on takeover is step one — the BCP
-   drill (R-17's closing mitigation) rehearses exactly that.
+   [`.env.example`](.env.example). Rotation on takeover is step one. The BCP
+   drill is R-17's closing mitigation; its first recorded second-operator cycle
+   remains open under governance item 44.
 
 Adding a maintainer is a change to this file plus CODEOWNERS, via PR, under
 [`GOVERNANCE.md`](GOVERNANCE.md)'s amendment rule.

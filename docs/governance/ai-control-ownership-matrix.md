@@ -11,7 +11,7 @@
 | `EAI-ROL-01` | L2 | Named accountable owner for every AI asset | MLRO | Compliance Engineering | Quarterly and on asset change | partial |
 | `EAI-ROL-02` | L2 | Business ownership and operating RACI | MLRO | Compliance Engineering | Annual and on organizational change | effective |
 | `EAI-ROL-03` | L2 | AI governance committee and legal oversight | Board / MLRO | AI Governance Committee | Quarterly and on material governance decision | partial |
-| `EAI-ROL-04` | L2 | Escalation paths and human decision authority | MLRO | Compliance Engineering / operators | Continuous; exercise at least annually | effective |
+| `EAI-ROL-04` | L2 | Escalation paths and human decision authority | MLRO | Compliance Engineering / operators | Continuous; exercise at least annually | partial |
 | `EAI-RSK-01` | L3 | AI risk identification and scoring | MLRO | Compliance Engineering | Quarterly and on significant change | effective |
 | `EAI-RSK-02` | L3 | Risk appetite and residual-risk treatment | MLRO / Board | Compliance Engineering | Quarterly and on appetite change | partial |
 | `EAI-RSK-03` | L3 | Impact and privacy assessment | MLRO / DPO | Compliance Engineering | On new use case, new data flow, new provider and material change | partial |

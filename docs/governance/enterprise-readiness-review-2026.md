@@ -314,7 +314,12 @@ Sanctions Screen and Daily Screening, so results land before 09:00 UAE; each scr
 stays the backstop. An accepted dispatch is never reported as delivery. Timing change only — no
 scored control changed.*
 
-Verified at HEAD: 70 workflows · 195 markdown documents under docs/ (162 excluding docs/research/auto).
+*Estate re-verification · 7 October 2026 — the BCP/vendor-exit assurance pass added one
+curated evidence template, `docs/aims/bcp-exercise-record.md`, and linked the first recorded
+second-operator drill to open action 44. This records the missing human exercise; it does not claim
+that the drill has occurred or change any residual-risk score.*
+
+Verified at HEAD: 70 workflows · 196 markdown documents under docs/ (163 excluding docs/research/auto).
 
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days

@@ -184,15 +184,19 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering / operators",
       "cadence": "Continuous; exercise at least annually",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/ai-incident-runbook.md",
-        "docs/governance/operating-model.md"
+        "docs/governance/operating-model.md",
+        "docs/governance/open-actions-register.md"
       ],
       "tests": [
         "test/advisor-assurance.test.js"
       ],
-      "note": "AI remains advisory; escalation and override authority remain human."
+      "note": "Escalation paths, override authority and human decision rights are documented and AI remains advisory, but the first annual incident-response exercise is still open under item 31.",
+      "closure_actions": [
+        31
+      ]
     },
     {
       "id": "EAI-RSK-01",
@@ -669,9 +673,10 @@
         32,
         38,
         41,
-        43
+        43,
+        44
       ],
-      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, TFS/watchlist review cycle, and the first annual manual penetration test."
+      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, TFS/watchlist review cycle, first annual manual penetration test, and the BCP/vendor-exit exercise with a second trained operator."
     },
     {
       "id": "EAI-AUD-08",
