@@ -5692,6 +5692,20 @@ _hits = screen.gkg_sweep([("k1", "Zara Quill Example", "person")],
                          end_utc=_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), fetch=_fake_fetch)
 screen.GKG_HOURS = _old_hours
 _gs = screen.gkg_stats_snapshot()
+# A second sweep in the same process must start with fresh counters and language buckets.
+_calls2 = {"n": 0}
+def _fake_fetch2(url):
+    _calls2["n"] += 1
+    return _payload if _calls2["n"] == 1 else None
+_old_hours2 = screen.GKG_HOURS
+screen.GKG_HOURS = 1
+screen.gkg_sweep([("k1", "Zara Quill Example", "person")],
+                 end_utc=_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), fetch=_fake_fetch2)
+screen.GKG_HOURS = _old_hours2
+_gs2 = screen.gkg_stats_snapshot()
+check("gkg sweep: per-run statistics reset before each invocation",
+      _gs2["expected"] == 8 and _gs2["read"] == 1 and _gs2["failed"] == 0 and _gs2["missing"] == 7
+      and _gs2["rows"] == 2 and _gs2["subjects"] == 1)
 check("gkg sweep: only the ADVERSE story is returned, with GKG provenance and body-mention evidence",
       list(_hits) == ["k1"] and len(_hits["k1"]) == 1 and _hits["k1"][0]["flagged"]
       and "GDELT GKG" in _hits["k1"][0]["source"] and "article body" in _hits["k1"][0]["evidence"])
