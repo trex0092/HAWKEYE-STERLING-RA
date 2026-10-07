@@ -432,6 +432,10 @@ async function main(argv) {
     const md = selector === 'opensanctions-catalogue' ? await suiteOpenSanctionsCatalogue()
       : selector === 'news-editions' ? await suiteNewsEditions() : await suiteNewsFeeds();
     mkdirSync(outdir, { recursive: true });
+    // codeql[js/http-to-file-access]: reviewed 2026-10-07, intended diagnostic persistence.
+    // Suite URLs are fixed in code, the workflow selector cannot supply an arbitrary URL, and network
+    // bytes never control the pathname: the report filename is the fixed source-probe-report.md under
+    // the caller-selected artifact directory. Persisting this public diagnostic response is the feature.
     writeFileSync(join(outdir, 'source-probe-report.md'), md + '\n');
     console.log(md);
     return 0;
