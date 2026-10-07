@@ -14,7 +14,7 @@
 | `EAI-ROL-04` | L2 | Escalation paths and human decision authority | MLRO | Compliance Engineering / operators | Continuous; exercise at least annually | effective |
 | `EAI-RSK-01` | L3 | AI risk identification and scoring | MLRO | Compliance Engineering | Quarterly and on significant change | effective |
 | `EAI-RSK-02` | L3 | Risk appetite and residual-risk treatment | MLRO / Board | Compliance Engineering | Quarterly and on appetite change | partial |
-| `EAI-RSK-03` | L3 | Impact and privacy assessment | MLRO / DPO | Compliance Engineering | On new use case, new data flow, new provider and material change | effective |
+| `EAI-RSK-03` | L3 | Impact and privacy assessment | MLRO / DPO | Compliance Engineering | On new use case, new data flow, new provider and material change | partial |
 | `EAI-RSK-04` | L3 | Mitigation and corrective-action tracking | MLRO | Compliance Engineering | Continuous | effective |
 | `EAI-RSK-05` | L3 | Use-case classification before deployment | MLRO | Compliance Engineering | Per new or materially changed AI use case | partial |
 | `EAI-DMG-01` | L4 | AI inventory and system boundary | MLRO | Compliance Engineering | Quarterly and on asset change | partial |
