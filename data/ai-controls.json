@@ -645,10 +645,11 @@
         14,
         15,
         31,
+        32,
         38,
         41
       ],
-      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle."
+      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle."
     },
     {
       "id": "EAI-AUD-08",
