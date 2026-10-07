@@ -29,6 +29,17 @@ for (const source of domains.sanctions?.sources || []) {
   }
   if (found.enabled === false) fail("sanctions: required source disabled: " + source.id);
   if (!found.url && !found.file) fail("sanctions: required source has no load target: " + source.id);
+  /* The contract's fallback must be the one the loader honours (the
+     registry entry's fallbackSourceId) and must itself be loadable. */
+  const fb = source.fallbackSourceId || "";
+  if (fb !== (found.fallbackSourceId || "")) {
+    fail("sanctions: fallback for " + source.id + " differs between the contract (" + (fb || "none") + ") and the registry (" + (found.fallbackSourceId || "none") + ")");
+  }
+  if (fb) {
+    const f = sanctionsCore.find((s) => s.id === fb) || sanctionsExtra.find((s) => s.id === fb);
+    if (!f || f.enabled === false || (!f.url && !f.file)) fail("sanctions: declared fallback " + fb + " for " + source.id + " is missing, disabled or has no load target");
+    else if (!(Number(f.minNames) > 0)) fail("sanctions: declared fallback " + fb + " for " + source.id + " has no minNames floor");
+  }
 }
 
 const adverseNeedles = [

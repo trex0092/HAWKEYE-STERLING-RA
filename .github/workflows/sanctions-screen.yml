@@ -44,9 +44,9 @@ on:
   # (05:00 UTC). GitHub delivers this repo's scheduled events 4-6h late (the
   # 05:37 slot started 09:41-11:57 UTC over 19-30 Sep) and drops most of a
   # frequent cron (control-retry's 36 daily slots produced 1-3 runs a day), so
-  # no cron here can promise 09:00. The on-time trigger is an external
-  # workflow_dispatch shortly after 00:00 UTC (~95 min run, in Asana ~06:00
-  # UAE). This slot is the BACKSTOP: the earliest same-UTC-day start (a run on
+  # no cron here can promise 09:00. The on-time trigger is
+  # screening-morning-dispatch.yml's workflow_dispatch at 00:05 UTC (~95 min
+  # run, in Asana ~06:00 UAE). This slot is the BACKSTOP: the earliest same-UTC-day start (a run on
   # the previous UTC day would break freshness-check's maxAgeDays 0 window),
   # so a missed dispatch still lands ~08:00-10:00 UAE, not mid-afternoon.
   schedule:
@@ -117,6 +117,7 @@ jobs:
             umsaszjsdz5c04wqdhbq.blob.core.windows.net:443
             umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
             webgate.ec.europa.eu:443
+            ecas.ec.europa.eu:443
             ofsistorage.blob.core.windows.net:443
             news.google.com:443
             api.gdeltproject.org:443
@@ -140,6 +141,7 @@ jobs:
             portal.moi.gov.qa:443
             api.fbi.gov:443
             repet.jus.gob.ar:443
+            isf.gov.lb:443
             www.migracija.lt:443
             mzv.gov.cz:443
             antiteror.sis.md:443
@@ -201,6 +203,10 @@ jobs:
         id: screen
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          # Licence-free mode: set the repository variable OPENSANCTIONS_DATA=0 to
+          # download nothing from data.opensanctions.org (its data needs a
+          # commercial licence). Unset = on. See docs/aims/third-party-register.md.
+          OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
           ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID || '1216239131596624' }}
@@ -222,6 +228,9 @@ jobs:
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
           SCREEN_ENRICH_BUDGET_MS: '6000000'
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
+          # Personal EU FSF crawler token (optional): the shared public token now
+          # redirects to EU Login. Unset = public token, and the EU list fails loudly.
+          EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           # Google News locales swept per subject (pinned core + daily rotation).
           # 8 is the empirical per-IP ceiling from a GitHub runner — the Python

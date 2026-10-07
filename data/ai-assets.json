@@ -15,16 +15,35 @@
       "ui": "advisor.html",
       "provider": "Anthropic (API, server-held ANTHROPIC_API_KEY; key never reaches the browser)",
       "models": [
-        { "mode": "speed", "model": "claude-haiku-4-5-20251001", "max_tokens": 1024 },
-        { "mode": "balanced", "model": "claude-sonnet-5", "max_tokens": 4096 },
-        { "mode": "deep", "model": "claude-opus-5", "max_tokens": 8192 }
+        {
+          "mode": "speed",
+          "model": "claude-haiku-4-5-20251001",
+          "max_tokens": 1024
+        },
+        {
+          "mode": "balanced",
+          "model": "claude-sonnet-5",
+          "max_tokens": 4096
+        },
+        {
+          "mode": "deep",
+          "model": "claude-opus-5",
+          "max_tokens": 8192
+        }
       ],
       "personas": 16,
       "risk_tier": "MEDIUM",
       "risk_tier_rationale": "Decision-support only; never auto-decides, files, or freezes. Outputs are advisory and gated behind MLRO review. Failure mode is a misleading suggestion, mitigated by human sign-off and the SOUL_CHARTER guardrails.",
       "eu_ai_act_class": "Limited risk (transparency obligations). Not a high-risk system: it does not make or automate the compliance decision; the human MLRO does.",
-      "inputs": ["Officer question (<=4000 chars)", "Optional pasted context (<=2000 chars)", "Persona + mode selection"],
-      "outputs": ["Cited advisory text", "Audit line (timestamp, model, mode, elapsed, hash, disclaimer)"],
+      "inputs": [
+        "Officer question (<=4000 chars)",
+        "Optional pasted context (<=2000 chars)",
+        "Persona + mode selection"
+      ],
+      "outputs": [
+        "Cited advisory text",
+        "Audit line (timestamp, model, mode, elapsed, hash, disclaimer)"
+      ],
       "controls": [
         "SOUL_CHARTER system prompt: 10 absolute prohibitions (P1-P10)",
         "Refusal protocol + prompt-injection resistance",
@@ -60,8 +79,12 @@
       "risk_tier": "LOW",
       "risk_tier_rationale": "Optional, off by default, output is a reviewed draft committed for human ratification. No customer data; reads public regulatory sources only.",
       "eu_ai_act_class": "Minimal risk. Internal drafting aid; output is reviewed before any use.",
-      "inputs": ["Detected regulatory-source change (public text)"],
-      "outputs": ["Draft update proposal (markdown) for human review"],
+      "inputs": [
+        "Detected regulatory-source change (public text)"
+      ],
+      "outputs": [
+        "Draft update proposal (markdown) for human review"
+      ],
       "controls": [
         "Detection is automatic; wording change stays a reviewed decision (no auto-publish)",
         "Runs only if ANTHROPIC_API_KEY is set (steps in .github/workflows/regulatory-watch.yml)",
@@ -81,16 +104,24 @@
       "ui": "Screening run reports (labelled [AI] output with the raw headline and link always attached)",
       "provider": "Anthropic (API, ANTHROPIC_API_KEY GitHub Actions secret; fail-closed without it)",
       "models": [
-        { "mode": "grounded-classification", "model": "claude-haiku-4-5-20251001", "note": "AI_MODEL env default; classification calls only" }
+        {
+          "mode": "grounded-classification",
+          "model": "claude-haiku-4-5-20251001",
+          "note": "AI_MODEL env default; classification calls only"
+        }
       ],
       "personas": 0,
       "risk_tier": "MEDIUM",
-      "risk_tier_rationale": "When enabled it sends a subject's name plus one public adverse-media headline to the processor, a cross-border transfer of personal data, so it is fail-closed OFF (LLM_TRIAGE=0) until the Anthropic DPA is executed. It judges provided text only, never invents facts, and every output is labelled and carries the raw evidence for mandatory human review.",
+      "risk_tier_rationale": "When enabled it sends a subject's name plus one public adverse-media headline to the processor, a cross-border transfer of personal data. Code is fail-closed by default and requires explicit LLM_TRIAGE=1 plus the API key. The repository cannot read the live repo-variable value from this control record; the third-party register contains an owner attestation that it was enabled on 2026-07-16 while the formal DPA execution block remains unresolved under open action 36.",
       "eu_ai_act_class": "Minimal risk. Internal decision-support classification; the raw evidence is always shown and the human MLRO makes the decision.",
-      "inputs": ["Subject name + one public adverse-media headline (minimised payload; no full record, no ID numbers, no DOB, no contact or financial data)"],
-      "outputs": ["Relevance/severity label, marked as AI-generated, with the raw headline and link attached"],
+      "inputs": [
+        "Subject name + one public adverse-media headline (minimised payload; no full record, no ID numbers, no DOB, no contact or financial data)"
+      ],
+      "outputs": [
+        "Relevance/severity label, marked as AI-generated, with the raw headline and link attached"
+      ],
       "controls": [
-        "Fail-closed gate: requires LLM_TRIAGE=1 in addition to the API key; production workflows keep LLM_TRIAGE=0 until the Anthropic DPA is executed (ai.py)",
+        "Fail-closed gate: requires explicit LLM_TRIAGE=1 in addition to the API key; code/workflow default is 0, while the actual production variable state must be verified separately from the repository record (ai.py / screening workflows)",
         "REPORT_ALLOW_LLM=0: no generative prose is admitted into filed reports (hard anti-hallucination rule, ai.py)",
         "GROUNDING_SYSTEM prompt-security contract: use only facts in the input; ignore instructions embedded in third-party text",
         "Data minimisation enforced in code: name + single headline only (docs/aims/anthropic-dpa-execution-pack.md Schedule A)",
@@ -99,7 +130,7 @@
       ],
       "human_oversight": "Human-in-the-loop. Labels are decision support attached to raw evidence; the MLRO reviews and records every screening decision.",
       "data_retention": "Transient API inference; the surface persists nothing server-side. See docs/aims/anthropic-dpa-execution-pack.md Schedule A and docs/governance/data-retention.md.",
-      "status": "dormant (fail-closed: LLM_TRIAGE=0 until the Anthropic DPA is executed; see docs/aims/anthropic-dpa-execution-pack.md)"
+      "status": "runtime configuration unverified from repository; default is OFF, while the third-party register records an owner attestation that LLM_TRIAGE=1 was enabled on 2026-07-16; DPA/runtime reconciliation remains open under item 36"
     }
   ],
   "shadow_ai_note": "No AI surfaces exist in the suite beyond the three registered above (advisor, reg-draft, ai-triage). The RA scoring engine (index.html), the operations console (console.html), and all watcher scripts (fatf-watchdog, sanctions-watch/screen, regulatory-watch detection, daily-brief, expiry notifier) are deterministic and rules-based, not AI. The eval harnesses (scripts/advisor-eval.mjs, scripts/advisor-bias-eval.mjs) call the model API as assurance controls over the advisor surface and are listed in its controls, not as separate surfaces. Any new AI surface MUST be added to this register before deployment; test/ai-assets.test.js scans the codebase for model-API callers and fails CI on an unregistered surface."

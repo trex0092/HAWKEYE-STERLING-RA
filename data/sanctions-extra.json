@@ -100,8 +100,8 @@
       "type": "json",
       "parser": "json",
       "enabled": true,
-      "_note": "France DGT national freeze register (Registre national des gels). Re-enabled 2026-07-08 with the documented ApiPublic base path (the previous path 404'd); the generic JSON parser assembles Nom/Prenom + aliases. A failed fetch or 0-name parse degrades coverage loudly, never silently.",
-      "minNames": 500
+      "_note": "France DGT national freeze register (Registre national des gels). Re-enabled 2026-07-08 with the documented ApiPublic base path (the previous path 404'd); the generic JSON parser assembles Nom/Prenom + aliases. A failed fetch or 0-name parse degrades coverage loudly, never silently. Declared fallback for eu-fsf (the register includes every EU freeze), so its floor is ~50% of the 19,627 names loaded on 2026-10-02: a truncated register must not stand in for the EU list.",
+      "minNames": 9800
     },
     {
       "id": "nz-terror",
@@ -861,6 +861,156 @@
       "enabled": true,
       "minNames": 3,
       "_note": "ENABLED 2026-09-28 on runner evidence: source-probe run 36392452572 (GitHub runner, main) fetched HTTP 200 text/html and parseNumberedNameList read 5 names (minNames 3, met) — 3 numbered designations plus spelling variants. Regulation of the Government of 13 March 2025 No 18; measures: funds frozen, no funds made available, entry prohibited. Official Estonian Ministry of Foreign Affairs page (International Sanctions Act, § 27); the list is published only as a web page of numbered lines."
+    },
+    {
+      "id": "lb-isf-ntfl",
+      "name": "Lebanon — ISF National Terrorism Financial List (Law No. 44/2015, UNSCR 1373)",
+      "jurisdiction": "Lebanon",
+      "url": "https://isf.gov.lb/wp-content/uploads/2025/04/en_file.xls",
+      "type": "xls",
+      "parser": "lbisf",
+      "discover": {
+        "page": "https://isf.gov.lb/national-terrorism-financial-list/",
+        "fileStem": "en_file",
+        "linkMatch": ".xls"
+      },
+      "browserHeaders": true,
+      "enabled": true,
+      "minNames": 250,
+      "_note": "ADDED 2026-10-03. Official page isf.gov.lb/national-terrorism-financial-list/ links \"Click here to download the list updated on 15/04/2025\" -> wp-content/uploads/2025/04/en_file.xls; the link is resolved from that page on every run (discover, stem en_file), so a re-upload under a new month folder is followed. The file is a legacy Excel 97-2003 workbook (OLE2 compound file, BIFF8), read by the stdlib reader parseXlsSheets / parser lbisf. Source-probe run 37128209902 (GitHub runner, 2026-10-03) confirmed the format: HTTP 200, application/vnd.ms-excel, 137,216 bytes, D0 CF 11 E0 signature. Source-probe run 37128512274 (same day, branch claude/stoic-ride-ms3hyp @ 8cc77c8) parsed it with lbisf: 286 names, minNames met. Cross-check: an independent external fetch of the same file read 261 rows (serials 1-262, 206 absent; 240 natural persons, 19 entities, 2 untyped) under the header Serial # | First Name and Family Name | ... | Group Type | Alias Type | Regime | Listed on | ...; applying the same name/alias rules to that copy gives 286 unique names, with the same first eight names in the same order as the runner read. minNames 250 floors a parse drift without tripping on a few de-listings."
+    },
+    {
+      "id": "so-namlc",
+      "name": "Somalia: NAMLC national targeted financial sanctions lists (Al-Shabaab; TFS Act 2023 art. 6)",
+      "jurisdiction": "Somalia",
+      "file": "data/so-namlc-curated-list.json",
+      "type": "curated",
+      "parser": "curated",
+      "enabled": true,
+      "minNames": 15,
+      "_note": "ADDED 2026-10-03. The two lists issued by the National Anti-Money Laundering and Countering the Financing of Terrorism Committee (NAMLC/001/24 of 13/04/2024, 9 persons; NAMLC/002/24 of 18/07/2024, 8 persons), transcribed from the primary NAMLC PDFs. The NAMLC page namlc.gov.so/targeted-financial-sanction-list/ (read 2026-10-03) states that two lists have been issued. Curated because the lists are PDF only. Refresh procedure and verification in the file's _README / verificationNote."
+    },
+    {
+      "id": "ci-centif-1373",
+      "name": "Côte d'Ivoire: CENTIF national list of persons designated as affiliated with terrorism (UNSCR 1373)",
+      "jurisdiction": "Côte d'Ivoire",
+      "file": "data/ci-centif-curated-list.json",
+      "type": "curated",
+      "parser": "curated",
+      "enabled": true,
+      "minNames": 70,
+      "_note": "ADDED 2026-10-03. 78 persons designated by order of the Minister of Finance and Budget (Ordonnance n° 2023-875; Décret n° 2024-216 as amended), transcribed from CENTIF's consolidated PDF (centif.ci/wp-content/uploads/2025/02/listenationale1373.pdf, update of 4 July 2025, which replaces earlier versions), linked from centif.ci/liste-des-sanctions/. Curated because the list is PDF only. Every name and alias is checked to occur verbatim in the extracted text; refresh procedure in the file's _README."
+    },
+    {
+      "id": "tt-fiu-hco",
+      "name": "Trinidad and Tobago — FIUTT TFS Search Tool (Consolidated List of High Court Orders, ATA s.22AA)",
+      "jurisdiction": "Trinidad and Tobago",
+      "url": "https://fiu.sanctionslist.gov.tt/unsanctionsportal/initilize",
+      "type": "html",
+      "parser": "htmltable",
+      "browserHeaders": true,
+      "enabled": false,
+      "minNames": 5,
+      "_note": "DIAGNOSTIC, DISABLED. Source-probe run 37129541443 (GitHub runner, 2026-10-03): the portal page answers HTTP 200 (text/html, 38,885 bytes) with a search form (POST to /unsanctionsportal/initialsubmit with a session id in the URL) and exposes no direct data-file link, so the Excel export described on fiu.gov.tt/tfs-search-tool/tfs-search-tool-2/ cannot be fetched with the single keyless GET the screen uses. Kept as a probe target; not a screening source."
+    },
+    {
+      "id": "bg-bnb-lmft",
+      "name": "Bulgaria — BNB consolidated list under the Law on Measures against the Financing of Terrorism (art. 4b)",
+      "jurisdiction": "Bulgaria",
+      "url": "https://www.bnb.bg/BankSupervision/BSAnti-moneyLaundering/BSAMLListInAccordanceWithTheLMFT/index.htm",
+      "type": "html",
+      "parser": "htmltable",
+      "enabled": false,
+      "minNames": 5,
+      "_note": "DIAGNOSTIC, DISABLED. Bulgaria's national list is the annex to Council of Ministers Decision No 265 of 2003 (State Gazette No 64/2003), adopted under art. 5(1) of the Law on Measures against the Financing of Terrorism and amended many times (State Gazette Nos 86/2003, 34, 61 and 87/2004, 16/2006, 44 and 66/2016, 73/2022, 47/2023; latest Decision No 606 of 16 August 2024, State Gazette No 70 of 20 August 2024, which repeals section III item 16 — read 2026-10-03 from the BNB PDF eu_lf_eu_list_lmst_2024_bg.pdf). The BNB page publishes a consolidated PDF plus separate amendment PDFs; loading it correctly requires reconciling the consolidated text with every later amendment, which is not done yet. Not a screening source."
+    },
+    {
+      "id": "at-oenb-terror",
+      "name": "Austria — OeNB regulations on terrorism-financing restrictions (Sanktionengesetz 2010)",
+      "jurisdiction": "Austria",
+      "url": "https://data.opensanctions.org/datasets/latest/at_nbter_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 69,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Austrian National Bank\" (official: true), 48 targets, last change 2026-01-06, source page oenb.at \"Verordnungen nach dem Sanktionengesetz\". Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 81 names (primary names plus aliases); minNames 69 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
+    },
+    {
+      "id": "bg-dans-mft",
+      "name": "Bulgaria — National Terrorism Financing List (Law on Measures against the Financing of Terrorism)",
+      "jurisdiction": "Bulgaria",
+      "url": "https://data.opensanctions.org/datasets/latest/bg_mft_national/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 25,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"State Agency for National Security\" (official: true), 19 targets, last change 2026-08-13, source page dans.bg/bg/28. This is the list kept current by DANS; it replaces the need to reconcile the BNB consolidated PDF with its amendments (bg-bnb-lmft stays disabled). Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 30 names (primary names plus aliases); minNames 25 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
+    },
+    {
+      "id": "rs-apml-domestic",
+      "name": "Serbia — APML Domestic List of Designated Persons",
+      "jurisdiction": "Serbia",
+      "url": "https://data.opensanctions.org/datasets/latest/rs_apml_domestic/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 18,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Administration for the Prevention of Money Laundering\" (official: true), 7 targets, last change 2026-01-13, source page apml.gov.rs targeted financial sanctions. 7 matches the 7 persons in Government decision 05 No 337-12096/2018-1 read 2026-10-03, whose scanned PDF could not be read cleanly. Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 21 names (primary names plus aliases); minNames 18 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
+    },
+    {
+      "id": "ro-onpcsb-terror",
+      "name": "Romania — Government Decision No. 1.272/2005: List of Suspected Terrorists (ONPCSB)",
+      "jurisdiction": "Romania",
+      "url": "https://data.opensanctions.org/datasets/latest/ro_onpcsb_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 390,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"The National Office for the Prevention and Combating of Money Laundering of Romania\" (official: true), 251 targets, last change 2024-08-30. Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 458 names (primary names plus aliases); minNames 390 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
+    },
+    {
+      "id": "np-moha-prohibited",
+      "name": "Nepal — MoHA Prohibited Persons or Groups (National Strategy and Action Plan 2076-2081)",
+      "jurisdiction": "Nepal",
+      "url": "https://data.opensanctions.org/datasets/latest/np_mha_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 15,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Ministry of Home Affairs, Government of Nepal\" (official: true), 10 targets, last change 2024-10-22, source page moha.gov.np. Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 18 names (primary names plus aliases); minNames 15 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
+    },
+    {
+      "id": "iq-aml-freeze",
+      "name": "Iraq — AML/CFT Office Terrorist Fund Freezing Lists",
+      "jurisdiction": "Iraq",
+      "url": "https://data.opensanctions.org/datasets/latest/iq_aml_list/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": true,
+      "minNames": 12500,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Republic of Iraq Anti-Money Laundering and Countering Financing of Terrorism Office\" (official: true), 5,678 targets, last change 2026-10-03, source aml.iq. The direct API (api.aml.iq) is Arabic-only, which the matcher cannot compare with Latin-script customer names; this dataset carries Latin-script names, and production screening already attributes Latin-script candidates to it. Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 14,801 names (primary names plus aliases); minNames 12500 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
+    },
+    {
+      "id": "de-bfv-banned-orgs",
+      "name": "Germany — BfV: banned organisations involved in foreign-related extremism (association bans)",
+      "jurisdiction": "Germany",
+      "url": "https://data.opensanctions.org/datasets/latest/de_bfv_extremism/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": false,
+      "minNames": 26,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Bundesamt für Verfassungsschutz\" (official: true), 13 targets, last change 2026-09-19. These are association bans (Vereinsverbote) of foreign-related extremist organisations, i.e. national proscriptions, not financial sanctions; Germany's financial sanctions remain UN/EU (screened via those lists). Recorded 2026-10-03 as a supplementary proscription source. Disabled for sanctions screening because this is a national proscription / association-ban feed, not a financial-sanctions list; keeping it enabled would overstate national sanctions-source depth."
+    },
+    {
+      "id": "ie-unlawful-orgs",
+      "name": "Ireland — Unlawful Organisation (Suppression) Orders",
+      "jurisdiction": "Ireland",
+      "url": "https://data.opensanctions.org/datasets/latest/ie_unlawful_organizations/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": false,
+      "minNames": 4,
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"electronic Irish Statute Book\" (official: true), 2 targets, last change 2024-07-11. Proscriptions under the Offences Against the State Acts, not financial sanctions; Ireland imposes no unilateral financial sanctions (UN/EU screened via those lists). Recorded 2026-10-03 as a supplementary proscription source. Disabled for sanctions screening because this is a national proscription / association-ban feed, not a financial-sanctions list; keeping it enabled would overstate national sanctions-source depth."
     }
   ]
 }

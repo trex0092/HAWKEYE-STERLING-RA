@@ -13,6 +13,8 @@ Asana automation layer (GitHub Actions watchers + assessment delivery).
 > operational-stack view of the same territory (visibility → monitoring → controls → evidence →
 > continuous governance) is scored separately in
 > [`operational-ai-governance-stack-2026.md`](operational-ai-governance-stack-2026.md).
+>
+> The organization-wide companion view, using the separate Policy → Roles → Risk → Data/Model → Monitoring → Audit taxonomy, is [`enterprise-ai-governance-6layers-2026.md`](enterprise-ai-governance-6layers-2026.md).
 
 ---
 

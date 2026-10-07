@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
   fitAsanaText, fitAsanaName } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
-import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST } from './sanctions-match.mjs';
+import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName } from './sanctions-match.mjs';
 import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
@@ -1124,6 +1124,70 @@ async function withTimeout(promiseFactory, timeoutMs) {
   finally { clearTimeout(t); }
 }
 
+/* Node's fetch reports every network-level failure as the bare message
+   "fetch failed"; the actual reason (a TLS certificate error, a connection
+   reset, a DNS or connect timeout) is only on error.cause. Logging the bare
+   message hid why the EU consolidated list stopped loading on 1 Oct 2026, so
+   every source failure now carries its cause chain. Source URLs are public
+   list endpoints, never subject data. Pure — unit-tested. */
+export function describeFetchError(e) {
+  if (e == null) return 'unknown error';
+  const parts = [String((e && e.message) || e)];
+  let c = e && e.cause;
+  for (let depth = 0; c && depth < 3; depth++, c = c.cause) {
+    const bit = [c.code, c.message || (typeof c === 'string' ? c : '')].filter(Boolean).join(': ');
+    if (bit && !parts.includes(bit)) parts.push(bit);
+  }
+  return parts.join(' <- ').slice(0, 300);
+}
+
+/* Redirect-loop recovery. Node's fetch keeps no cookies, so an endpoint that
+   sets a cookie and redirects (a WAF / session gate) loops until undici gives
+   up with "redirect count exceeded" — the EU consolidated list from 1 Oct 2026
+   17:54 UTC, after loading on every earlier run. A browser (or Python's
+   requests) carries the cookie and gets through. This follows redirects by
+   hand with a cookie jar, bounded, and records each hop (status + host +
+   path, never the query) so a loop that persists names itself in the log.
+   Only used after the normal fetch has failed with exactly that error.
+   fetchImpl is injectable for the offline tests. */
+export const REDIRECT_MAX_HOPS = 10;
+export async function fetchFollowingCookies(url, options = {}, { fetchImpl = fetch, maxHops = REDIRECT_MAX_HOPS } = {}) {
+  const jar = new Map();
+  const chain = [];
+  let href = url;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    const headers = { ...(options.headers || {}) };
+    if (jar.size) headers.cookie = [...jar].map(([k, v]) => k + '=' + v).join('; ');
+    // codeql[js/file-access-to-http]: reviewed 2026-10-02, intended design, not a leak.
+    // The URL is a public sanctions-list endpoint from the reviewed in-repo source
+    // config (data/sanctions-sources.json), scheme-validated by fetchListBody before
+    // this call and re-validated as http(s) on every redirect hop below. The request
+    // carries no subject data: only fixed headers and cookies the server itself set.
+    const r = await fetchImpl(href, { ...options, headers, redirect: 'manual' });
+    const setCookies = (r.headers && typeof r.headers.getSetCookie === 'function') ? r.headers.getSetCookie() : [];
+    for (const c of setCookies) {
+      const pair = String(c).split(';')[0];
+      const eq = pair.indexOf('=');
+      if (eq > 0) jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+    }
+    let where;
+    try { const u = new URL(href); where = u.host + u.pathname; } catch { where = '?'; }
+    chain.push(r.status + ' ' + where + (setCookies.length ? ' (+' + setCookies.length + ' cookie)' : ''));
+    const loc = r.headers && r.headers.get && r.headers.get('location');
+    if (r.status < 300 || r.status > 399 || !loc) {
+      if (hop > 0 && /\/(cas\/)?login\b/i.test(where)) {
+        throw new Error('the endpoint requires a sign-in: redirected to the login page ' + where + ' (' + chain.join(' -> ') + ')');
+      }
+      return Object.assign(r, { redirectChain: chain });
+    }
+    let next;
+    try { next = new URL(loc, href); } catch { throw new Error('redirect to an invalid location after: ' + chain.join(' -> ')); }
+    if (next.protocol !== 'https:' && next.protocol !== 'http:') throw new Error('redirect to unsupported scheme ' + next.protocol);
+    href = next.href;
+  }
+  throw new Error('redirect loop not resolved by carrying cookies (' + maxHops + ' hops): ' + chain.slice(0, 6).join(' -> '));
+}
+
 /* National sanctions endpoints are materially less reliable than Asana.
    Retry transient transport failures and 429/5xx responses before declaring
    coverage degraded. Each attempt gets its own timeout. AbortError means the
@@ -1145,9 +1209,15 @@ async function fetchSourceResponse(url, options = {}, timeoutMs = 60000, attempt
     } catch (e) {
       lastErr = e;
       if (e && e.name === 'AbortError') throw e;
+      if (/redirect count exceeded/i.test(describeFetchError(e))) {
+        console.warn('sanctions-screen: ' + label + ' redirect loop — retrying with cookies carried across redirects');
+        const r = await withTimeout(signal => fetchFollowingCookies(url, { ...options, signal }), timeoutMs);
+        console.warn('sanctions-screen: ' + label + ' redirect chain: ' + r.redirectChain.join(' -> '));
+        return r;
+      }
       if (attempt === max - 1) throw e;
       const delay = Math.min(4000, 750 * (2 ** attempt));
-      console.warn('sanctions-screen: ' + label + ' transport failure — retry in ' + delay + 'ms: ' + String(e && e.message || e).slice(0, 120));
+      console.warn('sanctions-screen: ' + label + ' transport failure — retry in ' + delay + 'ms: ' + describeFetchError(e));
       await asanaSleep(delay);
     }
   }
@@ -1500,6 +1570,23 @@ export function discoverDatedLink(html, pageUrl, fileStem, linkMatch) {
 
 /* Fetch one consolidated list — a remote URL, or an in-repo curated file
    (source.file, e.g. the UAE EOCN list). Returns the raw body or throws. */
+/* Personal download token for sources that need one. Since 1 Oct 2026 the EU
+   Financial Sanctions Files platform sends the shared public token
+   (token=dG9rZW4tMjAxNw) to the EU Login sign-in page; its documented machine
+   route is the personal "crawler/robot" URL of an FSF account. A source opts in
+   with tokenEnv (e.g. "EU_FSF_TOKEN"): when that secret is set, its value
+   replaces the URL's token parameter for the request only. The personal URL is
+   never stored (reports keep the config URL) and GitHub masks the secret in
+   logs. Unset / malformed values leave the config URL unchanged. Pure. */
+export function applySourceToken(url, tokenEnv, env = process.env) {
+  const raw = tokenEnv ? String(env[tokenEnv] || '').trim() : '';
+  if (!raw || !/^[A-Za-z0-9._~+/=-]{1,256}$/.test(raw)) return { href: url, personal: false };
+  let u;
+  try { u = new URL(url); } catch { return { href: url, personal: false }; }
+  u.searchParams.set('token', raw);
+  return { href: u.href, personal: true };
+}
+
 async function fetchListBody(source, timeoutMs = 60000) {
   if (source.file) {
     if (!existsSync(source.file)) throw new Error('curated file missing: ' + source.file);
@@ -1508,7 +1595,7 @@ async function fetchListBody(source, timeoutMs = 60000) {
   /* The URL comes from the in-repo sources config; still validate the scheme so a
      tampered/extra source can only ever trigger an ordinary http(s) GET (never
      file:, ftp:, etc.) before it reaches fetch. */
-  let href = source.url;
+  let href = applySourceToken(source.url, source.tokenEnv).href;
   if (source.discover && source.discover.page) {
     const page = String(source.discover.page);
     if (!/^https:\/\//.test(page)) throw new Error('discover.page must be https');
@@ -1537,7 +1624,7 @@ async function fetchListBody(source, timeoutMs = 60000) {
   /* XLSX sources (e.g. Australia DFAT) are binary ZIP containers — read the raw
      bytes as a Buffer; reading them as text would corrupt the archive. Text lists
      (CSV/XML) stay on the string path the parsers expect. */
-  const binary = /^(xlsx|dfat|ods)$/.test(String(source.parser || '').toLowerCase())
+  const binary = /^(xlsx|dfat|ods|lbisf)$/.test(String(source.parser || '').toLowerCase())
     || /^(xlsx|ods)$/.test(String(source.type || '').toLowerCase())
     || /\.(xlsx|ods)(\?|$)/i.test(parsed.href);
   /* Per-source browser headers: several national endpoints answer the plain
@@ -1641,6 +1728,22 @@ export function belowFloor(source, names) {
   return (names ? names.length : 0) < (Number(source && source.minNames) || 0);
 }
 
+/* Licence-free mode (OPENSANCTIONS_DATA=0): OpenSanctions data needs a
+   commercial licence, so every source served from data.opensanctions.org is
+   skipped — named in the run notes, never silently dropped. Unset/empty = on.
+   Mirrors OPENSANCTIONS_DATA in screen.py. Pure for the test suite. */
+export function licenceFreeFilter(sources, env = process.env) {
+  const off = String((env && env.OPENSANCTIONS_DATA) || '').trim() === '0';
+  if (!off) return { kept: sources, skipped: [] };
+  const isOs = (s) => {
+    try {
+      const host = new URL(String(s.url || '')).hostname.toLowerCase();
+      return host === 'opensanctions.org' || host.endsWith('.opensanctions.org');
+    } catch { return false; }
+  };
+  return { kept: sources.filter(s => !isOs(s)), skipped: sources.filter(isOs) };
+}
+
 /* Fetch + parse every enabled source into [{ id, name, names[] }]. A source that
    fails to fetch or yields zero names degrades coverage (reported, never a silent
    all-clear); a curated list with no entries degrades too. */
@@ -1651,23 +1754,43 @@ export async function loadSanctionsLists(cfg) {
   try { sources = loadSources(readFileSync(cfg.sourcesFile, 'utf8')).filter(s => s.enabled !== false); }
   catch (e) { return { lists: [], degraded: true, fetched: 0, total: 0, notes: ['sources file unreadable: ' + (e && e.message || e)] }; }
 
-  if (Array.isArray(cfg.sourceIds) && cfg.sourceIds.length) {
-    const wanted = new Set(cfg.sourceIds.map(String));
-    sources = sources.filter(s => wanted.has(String(s.id || '')));
-  }
-  if (existsSync(cfg.extraFile) && !(Array.isArray(cfg.sourceIds) && cfg.sourceIds.length)) {
+  /* sourceIds selects from BOTH files, so a selective load (the sanctions
+     runtime assurance) can include a core source's declared fallback that
+     lives in the extra file (eu-fsf -> fr-dgt). */
+  const wanted = Array.isArray(cfg.sourceIds) && cfg.sourceIds.length ? new Set(cfg.sourceIds.map(String)) : null;
+  if (wanted) sources = sources.filter(s => wanted.has(String(s.id || '')));
+  if (existsSync(cfg.extraFile)) {
     try {
       const extra = JSON.parse(readFileSync(cfg.extraFile, 'utf8'));
-      for (const s of ((extra && extra.sources) || [])) if (s && s.enabled !== false && (s.url || s.file)) sources.push(s);
+      for (const s of ((extra && extra.sources) || [])) {
+        if (s && s.enabled !== false && (s.url || s.file) && (!wanted || wanted.has(String(s.id || '')))) sources.push(s);
+      }
     } catch (e) { console.error('sanctions-screen: extra sources unreadable (' + (e && e.message || e) + ')'); }
   }
 
   const lists = [], notes = [], failures = [];
+  const licence = licenceFreeFilter(sources);
+  if (licence.skipped.length) {
+    sources = licence.kept;
+    notes.push('Licence-free mode (OPENSANCTIONS_DATA=0): ' + licence.skipped.length
+      + ' OpenSanctions-hosted source(s) not screened - ' + licence.skipped.map(x => x.id).join(', '));
+    console.warn('sanctions-screen: licence-free mode - skipped ' + licence.skipped.map(x => x.id).join(', '));
+  }
   let fetched = 0;
   await Promise.all(sources.map(async (s) => {
     try {
       const body = await fetchListBody(s, Number(s.timeoutMs) || cfg.listTimeoutMs);
-      const names = parseList(s, body);
+      const parsed = parseList(s, body);
+      const junk = screenableNames(parsed);
+      if (junk.drifted) {
+        failures.push({ source: s, reason: 'format drift - ' + junk.dropped + ' of ' + parsed.length
+          + ' parsed value(s) are not names (dates / serials / schedule references)' });
+        console.error('sanctions-screen: ' + s.id + ' FORMAT DRIFT - ' + junk.dropped + ' of '
+          + parsed.length + ' parsed values are not names; source not screened');
+        return;
+      }
+      if (junk.dropped) console.warn('sanctions-screen: ' + s.id + ' dropped ' + junk.dropped + ' non-name value(s)');
+      const names = junk.kept;
       if (!names.length) {
         if (s.optional) {
           fetched++;
@@ -1689,8 +1812,11 @@ export async function loadSanctionsLists(cfg) {
       fetched++;
       console.log('sanctions-screen: loaded ' + s.name + ' (' + names.length + ' designated names)');
     } catch (e) {
-      failures.push({ source: s, reason: 'could not be loaded (' + (e && e.message || e) + ')' });
-      console.error('sanctions-screen: ' + s.id + ' failed - ' + (e && e.message || e));
+      const hint = (s.tokenEnv && /sign-in|login page/.test(describeFetchError(e)) && !process.env[s.tokenEnv])
+        ? ' - this source now needs a personal download token: set the ' + s.tokenEnv + ' repository secret'
+        : '';
+      failures.push({ source: s, reason: 'could not be loaded (' + describeFetchError(e) + ')' + hint });
+      console.error('sanctions-screen: ' + s.id + ' failed - ' + describeFetchError(e));
     }
   }));
 
@@ -1722,6 +1848,21 @@ export async function loadSanctionsLists(cfg) {
   };
 }
 
+/* Format-drift guard for EVERY list, not just generic XML: a parser pointed at
+   a feed whose layout changed can return dates, serials or schedule numbers
+   as "names" (Canada SEMA, 1 Oct 2026: 11,087 values, zero names, reported
+   loaded). Non-name values are dropped and counted; when they are the
+   MAJORITY of what a source parsed, the source is treated as drifted — a
+   failure that marks the screen degraded with the reason — instead of
+   screening junk under a "loaded" label. Pure — unit-tested. */
+export const JUNK_DRIFT_RATIO = 0.5;
+export function screenableNames(names) {
+  const kept = [], dropped = [];
+  for (const n of names || []) (isScreenableName(typeof n === 'string' ? n : n && n.name) ? kept : dropped).push(n);
+  const total = kept.length + dropped.length;
+  return { kept, dropped: dropped.length, drifted: total > 0 && dropped.length / total > JUNK_DRIFT_RATIO };
+}
+
 /* Enrichment fairness: rotate an array by a day-derived offset. The enrichment
    phase processes subjects in order under a wall-clock budget, so a stable
    order would starve the SAME tail subjects of adverse-media/PEP on every
@@ -1744,6 +1885,37 @@ async function mapLimit(items, limit, fn) {
   });
   await Promise.all(workers);
   return out;
+}
+
+/* Adverse-media SECOND PASS. The per-subject last-resort retry runs while the
+   whole book is still being swept, so the providers are under peak pressure:
+   on 2 Oct 2026 it recovered 275 of 286 subjects and left 11 with ZERO
+   backbone coverage. After the sweep, once pressure has eased, re-check only
+   those zero-coverage subjects once — bounded by the enrichment deadline, a
+   cool-down, a cap (a mass failure means the providers are down globally and
+   re-querying the whole book only adds load) and low concurrency. Each queue
+   item's retry() resolves true when its subject recovered. A subject that
+   still fails stays a counted error: degrade loudly, never a false clear.
+   Pure orchestration (clock / sleep injectable) — unit-tested. */
+export const AM_SECOND_PASS_MAX = 100;
+export async function runAmSecondPass(queue, {
+  deadlineMs, delayMs = 60000, max = AM_SECOND_PASS_MAX, concurrency = 2,
+  now = Date.now, sleep = ms => new Promise(res => setTimeout(res, ms)),
+} = {}) {
+  const items = Array.isArray(queue) ? queue : [];
+  if (!items.length) return { attempted: 0, recovered: 0, skipped: '' };
+  if (items.length > max) return { attempted: 0, recovered: 0, skipped: items.length + ' zero-coverage subjects exceed the second-pass cap of ' + max + ' (providers down globally)' };
+  if (!Number.isFinite(deadlineMs) || now() + delayMs >= deadlineMs) return { attempted: 0, recovered: 0, skipped: 'enrichment time budget exhausted' };
+  if (delayMs > 0) await sleep(delayMs);
+  let recovered = 0, attempted = 0;
+  await mapLimit(items, Math.max(1, concurrency), async item => {
+    if (now() >= deadlineMs) return;
+    attempted++;
+    let ok = false;
+    try { ok = (await item.retry()) === true; } catch { ok = false; }
+    if (ok) recovered++;
+  });
+  return { attempted, recovered, skipped: attempted < items.length ? 'enrichment deadline reached mid-pass' : '' };
 }
 
 const BAND_RANK = { critical: 4, high: 3, medium: 2, low: 1, '': 0 };
@@ -1778,6 +1950,7 @@ export async function screenLocally(subjects, cfg) {
      "no match" result. Keeping the degraded flag sanctions-only keeps it meaningful. */
   const degraded = loaded.degraded;
   let amErrors = 0, amPartial = 0, amRetryAttempted = 0, amRetryRecovered = 0;
+  const amSecondPassQueue = [];
   let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0 };
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
@@ -1839,6 +2012,7 @@ export async function screenLocally(subjects, cfg) {
     // run (errored or budget-skipped) so diffState won't silently clear a standing
     // enrichment-only match it couldn't re-verify.
     let enrichmentIncomplete = false;
+    let amIncomplete = false;   // the adverse-media part, recoverable by the second pass
     /* Per-SIGNAL "not re-verified this run" set — finer than the coarse
        enrichmentIncomplete flag. Adverse media sweeps a budgeted locale
        rotation by default, so on a day its originating regional edition was
@@ -1848,25 +2022,17 @@ export async function screenLocally(subjects, cfg) {
     const unverified = new Set();
     if (!enrich && (cfg.adverseMedia || cfg.pep || cfg.interpol || cfg.fbi)) { enrichSkipped++; enrichmentIncomplete = true; }
 
-    if (cfg.adverseMedia && enrich) {
-      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
-      if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
-      if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
-      if (!am.backbones?.bing) amBackboneFailures.bing++;
-      if (am.retryAttempted) amRetryAttempted++;
-      if (am.retryRecovered) amRetryRecovered++;
-      if (am.partial) amPartial++;   // narrowed redundancy — disclosed, never silent
-      if (am.errored) { amErrors++; enrichmentIncomplete = true; }
-      else {
-        /* A disclosed-partial sweep (a queried edition failed) OR a budgeted
-           sweep that did not cover the full matrix did NOT re-verify a standing
-           adverse-media match — the originating edition may not have been
-           queried. Mark the signal unverified so diffState carries a standing
-           adverse-media hit forward instead of clearing it off coverage that
-           never looked. Recall-safe: carry-forward only, never suppresses. */
-        if (am.partial || am.fullMatrix === false) unverified.add('Adverse media (Google News)');
-      }
-      if (!am.errored && am.hit) {
+    /* Applies a NON-errored adverse-media result to this subject's lists. Used
+       by the sweep and, for a subject that errored, by the second pass. */
+    const applyAm = (am) => {
+      /* A disclosed-partial sweep (a queried edition failed) OR a budgeted
+         sweep that did not cover the full matrix did NOT re-verify a standing
+         adverse-media match — the originating edition may not have been
+         queried. Mark the signal unverified so diffState carries a standing
+         adverse-media hit forward instead of clearing it off coverage that
+         never looked. Recall-safe: carry-forward only, never suppresses. */
+      if (am.partial || am.fullMatrix === false) unverified.add('Adverse media (Google News)');
+      if (am.hit) {
         const identity = corroborateArticleIdentity(s, am.top || {});
         lists.push({
           list: 'Adverse media (Google News)',
@@ -1883,6 +2049,29 @@ export async function screenLocally(subjects, cfg) {
         });
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
+    };
+    if (cfg.adverseMedia && enrich) {
+      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
+      if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
+      if (!am.backbones?.bing) amBackboneFailures.bing++;
+      if (am.retryAttempted) amRetryAttempted++;
+      if (am.retryRecovered) amRetryRecovered++;
+      if (am.partial) amPartial++;   // narrowed redundancy — disclosed, never silent
+      if (am.errored) {
+        amErrors++; amIncomplete = true;
+        amSecondPassQueue.push({ key: s.key, retry: async () => {
+          const again = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+          if (again.errored) return false;
+          amErrors--; amIncomplete = false;
+          if (again.partial) amPartial++;
+          applyAm(again);
+          const rebuilt = finalize();
+          const at = results.findIndex(r => r && r.key === rebuilt.key);
+          if (at >= 0) results[at] = rebuilt;
+          return true;
+        } });
+      } else applyAm(am);
     }
     if (cfg.pep && enrich) {
       const pp = await checkPep(s.name, { timeoutMs: cfg.checkTimeoutMs });
@@ -1944,24 +2133,35 @@ export async function screenLocally(subjects, cfg) {
        and flag the record so the case engine opens no fresh case. A single
        non-whitelisted hit (incl. any enrichment finding) restores full
        severity — demote-never-suppress, pair-level only. */
-    const whitelistedOnly = lists.length > 0 && lists.every(h => h.whitelisted);
-    const hasSanctions = raw.recommendation === 'sanctions-match' && !whitelistedOnly;
-    const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
-    const merged = {
-      name: s.name,
-      topScore: lists.length ? topScore : raw.topScore,
-      band: lists.length ? (whitelistedOnly ? 'medium' : band) : 'low',
-      recommendation,
-      hitCount: lists.length,
-      lists
-    };
-    const nr = normalizeResult(merged, s);
-    nr.enrichmentIncomplete = enrichmentIncomplete;
-    if (unverified.size) nr.unverified = [...unverified];
-    if (whitelistedOnly) nr.whitelistedOnly = true;
+    function finalize() {
+      const whitelistedOnly = lists.length > 0 && lists.every(h => h.whitelisted);
+      const hasSanctions = raw.recommendation === 'sanctions-match' && !whitelistedOnly;
+      const recommendation = hasSanctions ? 'sanctions-match' : (lists.length ? 'review' : 'clear');
+      const merged = {
+        name: s.name,
+        topScore: lists.length ? topScore : raw.topScore,
+        band: lists.length ? (whitelistedOnly ? 'medium' : band) : 'low',
+        recommendation,
+        hitCount: lists.length,
+        lists
+      };
+      const nr = normalizeResult(merged, s);
+      nr.enrichmentIncomplete = enrichmentIncomplete || amIncomplete;
+      if (unverified.size) nr.unverified = [...unverified];
+      if (whitelistedOnly) nr.whitelistedOnly = true;
+      return nr;
+    }
     heartbeat();
-    return nr;
+    return finalize();
   });
+  const amSecondPass = await runAmSecondPass(amSecondPassQueue, {
+    deadlineMs: enrichDeadline,
+    delayMs: Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0),
+  });
+  if (amSecondPassQueue.length) {
+    console.log('sanctions-screen: adverse-media second pass — ' + amSecondPassQueue.length + ' zero-coverage subject(s) after the sweep; re-checked '
+      + amSecondPass.attempted + ', recovered ' + amSecondPass.recovered + (amSecondPass.skipped ? ' (' + amSecondPass.skipped + ')' : ''));
+  }
   /* Restore the input order — the rotation exists only for enrichment fairness,
      and every downstream consumer (reports, state diff) sees a stable order. */
   {
@@ -1976,7 +2176,7 @@ export async function screenLocally(subjects, cfg) {
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 function loadState() {
@@ -2238,6 +2438,7 @@ async function main() {
     failures: screen.notes || [],
     enrichment: { amErrors: screen.amErrors || 0, amPartial: screen.amPartial || 0,
       amRetryAttempted: screen.amRetryAttempted || 0, amRetryRecovered: screen.amRetryRecovered || 0,
+      amSecondPassAttempted: screen.amSecondPassAttempted || 0, amSecondPassRecovered: screen.amSecondPassRecovered || 0,
       pepErrors: screen.pepErrors || 0,
       skipped: screen.enrichSkipped || 0,
       pepLookupEnabled: !!cfg.pep,

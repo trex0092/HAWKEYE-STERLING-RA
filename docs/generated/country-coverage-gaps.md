@@ -1,10 +1,10 @@
 # HAWKEYE-STERLING-RA: country coverage gaps (195 countries)
 
-Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix in `scripts/adverse-media.mjs`. Register updated: 2026-09-28.
+Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix in `scripts/adverse-media.mjs`. Register updated: 2026-10-03.
 
 ## How to read this
 
-- **Sanctions status** is the register's own status. `not-researched` = no outcome recorded (62). `identified` = list known, file not verified (40). `pending` = candidate recorded, not loaded (2). `assessed-not-loadable` = researched, cannot be loaded (46). `screened` = national list loaded (45).
+- **Sanctions status** is the register's own status. `not-researched` = no outcome recorded (61). `identified` = list known, file not verified (32). `pending` = candidate recorded, not loaded (1). `assessed-not-loadable` = researched, cannot be loaded (47). `screened` = national list loaded (54).
 - **AM edition** = whether a dedicated Google News country edition exists in the adverse-media matrix. `no` does not mean zero adverse-media coverage: GDELT and Bing News sweeps are global and name-scoped.
 - **Partial note** = a not-researched country that already has a partial research note in the register.
 - **PEP** is intentionally omitted per country because the current PEP artifact's country field is not reliable enough for a defensible country-by-country statement.
@@ -27,19 +27,19 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 | Syria | grey | not-researched | no | yes |
 | Venezuela | grey | not-researched | no |  |
 | Yemen | grey | not-researched | no |  |
-| Iraq | grey | pending | yes |  |
-| Bulgaria | grey | identified | yes |  |
-| Côte d'Ivoire | grey | identified | no |  |
-| Lebanon | grey | identified | yes |  |
 | Myanmar | black | identified | no |  |
-| Nepal | grey | identified | no |  |
 | Vietnam | grey | identified | yes |  |
 | Bolivia | grey | assessed-not-loadable | no |  |
 | Papua New Guinea | grey | assessed-not-loadable | no |  |
+| Bulgaria | grey | screened | yes |  |
+| Côte d'Ivoire | grey | screened | no |  |
+| Iraq | grey | screened | yes |  |
 | Kenya | grey | screened | yes |  |
+| Lebanon | grey | screened | yes |  |
 | Monaco | grey | screened | no |  |
+| Nepal | grey | screened | no |  |
 
-## Sanctions: 62 not researched (not FATF-flagged first)
+## Sanctions: 61 not researched (not FATF-flagged first)
 
 | Country | AM edition | Partial note |
 |---|---|---|
@@ -79,7 +79,6 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 | Mongolia | no | yes |
 | Nauru | no |  |
 | Palau | no |  |
-| Romania | yes |  |
 | Saint Kitts and Nevis | no |  |
 | Saint Lucia | no |  |
 | Saint Vincent and the Grenadines | no |  |
@@ -93,7 +92,7 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 | Vanuatu | no | yes |
 | Zimbabwe | no | yes |
 
-## Sanctions: list known but file not verified (40) and pending (2)
+## Sanctions: list known but file not verified (32) and pending (1)
 
 | Country | Status | AM edition |
 |---|---|---|
@@ -101,7 +100,6 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 | Albania | identified | no |
 | Algeria | identified | no |
 | Armenia | identified | no |
-| Austria | identified | yes |
 | Bangladesh | identified | yes |
 | Belarus | identified | no |
 | Burkina Faso | identified | no |
@@ -109,7 +107,6 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 | Cuba | identified | no |
 | Ecuador | identified | no |
 | Ethiopia | identified | no |
-| Fiji | identified | no |
 | Greece | identified | yes |
 | Guyana | identified | no |
 | Holy See | identified | no |
@@ -123,8 +120,6 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 | Republic of Korea | identified | yes |
 | Russia | identified | yes |
 | Rwanda | identified | no |
-| Serbia | identified | yes |
-| Somalia | identified | no |
 | Suriname | identified | no |
 | Tajikistan | identified | no |
 | Tanzania | identified | no |

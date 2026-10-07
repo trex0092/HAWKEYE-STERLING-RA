@@ -79,6 +79,49 @@ export function validateEvidence(results, assurance, state, { runId, nowMs = Dat
   return operational;
 }
 
+/* Human-readable findings table, attached to each daily results card. The JSON
+   evidence pages stay the complete machine record; this CSV is the same
+   findings one row per hit, so the MLRO can filter and sort them without
+   reconstructing JSON. Formula injection is neutralised (a cell opening with
+   = + - @ runs as a formula in Excel/Sheets) and a BOM keeps non-Latin names
+   intact when Excel opens the file. */
+export const FINDINGS_COLUMNS = ['status', 'subject', 'entity_type', 'customer', 'role', 'jurisdiction',
+  'nationality', 'band', 'top_score', 'recommendation', 'list', 'matched_name', 'hit_score',
+  'mechanism', 'confidence', 'source_url', 'first_seen', 'last_seen', 'case_priority', 'record_key'];
+export function csvCell(value) {
+  let text = Array.isArray(value) ? value.join('; ') : String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
+  return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+}
+export function findingsAttachmentName(domain, date, runId) {
+  return 'screening-findings-' + domain + '-' + date + '-run' + String(runId) + '.csv';
+}
+export const FINDINGS_ATTACHMENT_RE = /^screening-findings-(?:sanctions|media)-\d{4}-\d{2}-\d{2}-run\d+\.csv$/;
+export function buildFindingsCsv(domain, standing, alerts, cleared) {
+  const changed = new Set(alerts.map(row => row?.key).filter(Boolean));
+  const lines = [FINDINGS_COLUMNS.join(',')];
+  const push = cells => lines.push(FINDINGS_COLUMNS.map(column => csvCell(cells[column])).join(','));
+  for (const [key, row] of standing) {
+    const base = { status: changed.has(key) ? 'NEW/CHANGED' : 'STANDING', subject: row?.name,
+      entity_type: row?.entityType, customer: row?.parent, role: row?.role,
+      jurisdiction: row?.jurisdiction, nationality: row?.nationality, band: row?.band,
+      top_score: row?.topScore, recommendation: row?.recommendation, first_seen: row?.firstSeen,
+      last_seen: row?.lastSeen, case_priority: row?.decisionSupport?.casePriority?.priority,
+      record_key: key };
+    const hits = (Array.isArray(row?.hits) ? row.hits : [])
+      .filter(hit => hit?.list && (domain === 'media') === isMedia(hit.list));
+    if (!hits.length) { push({ ...base, list: row?.lists }); continue; }
+    for (const hit of hits) {
+      push({ ...base, list: hit.list, matched_name: hit.hitName, hit_score: hit.score,
+        mechanism: hit.mechanism, confidence: hit.confidence, source_url: hit.provenance?.sourceUrl });
+    }
+  }
+  for (const name of Array.isArray(cleared) ? cleared : []) {
+    push({ status: 'CLEARED THIS RUN', subject: name });
+  }
+  return '\ufeff' + lines.join('\n') + '\n';
+}
+
 function isMedia(list) { return /^(?:adverse media|pep(?:\s|\()|interpol|fbi)/i.test(String(list)); }
 function rowDomains(row) {
   const hits = Array.isArray(row?.hits) ? row.hits.filter(hit => hit?.list) : [];
@@ -109,8 +152,10 @@ export function buildReports(results, assurance, state, context) {
       'Matches require analyst identity verification. This delivery does not clear or disposition any case.');
     const standing = Object.entries(state.subjects).filter(([, row]) => rowDomains(row).includes(domain));
     const alerts = results.alerts.filter(row => rowDomains(row).includes(domain));
+    const attachment = findingsAttachmentName(domain, results.date, context.runId);
     summary.push('New or changed findings in this report: ' + alerts.length,
       'Stored finding records in this report (including retained/unverified records): ' + standing.length,
+      'Readable findings table (one row per hit) is attached: ' + attachment,
       'Complete evidence is in the numbered subtasks. Join the text between BEGIN/END SCREENING EVIDENCE markers in page order to reconstruct the JSON.');
     // Preserve original records and timestamps, including unverified/carry-forward
     // flags. A mixed-domain record appears in both reports with its full evidence.
@@ -127,7 +172,9 @@ export function buildReports(results, assurance, state, context) {
     const pages = splitEvidence(evidence, PAGE_BUDGET - 128);
     if (pages.length > MAX_PAGES) throw new Error('Evidence exceeds the bounded delivery page count; nothing was truncated');
     return { domain, section, title, marker: 'HAWKEYE-SCREENING-V1:' + domain + ':' + results.date,
-      summary: summary.join('\n'), pages };
+      summary: summary.join('\n'), pages,
+      attachment: { name: attachment,
+        csv: buildFindingsCsv(domain, standing, alerts, domain === 'sanctions' ? results.cleared : []) } };
   });
 }
 
@@ -161,7 +208,24 @@ async function verifyTask(request, task, expected, section = null, parent = null
   return value;
 }
 
-async function deliverReport(request, report, projectTasks, assignee) {
+/* Attach the findings table, prove it is there, and retire superseded
+   machine-owned tables (only exact publisher names are ever deleted). */
+async function deliverAttachment(request, upload, taskId, attachment) {
+  const uploaded = gid(await upload(taskId, attachment.name, attachment.csv, 'text/csv; charset=utf-8'));
+  const listed = await collection(request, '/attachments?parent=' + taskId + '&limit=100&opt_fields=name');
+  if (!listed.some(item => String(item?.gid) === uploaded && item?.name === attachment.name)) {
+    throw new Error('Asana read-back did not confirm the findings attachment ' + attachment.name);
+  }
+  // Keep exactly the table just uploaded: older runs' tables AND a same-run
+  // re-attempt's copy (same name) are retired.
+  for (const item of listed) {
+    if (String(item?.gid) !== uploaded && FINDINGS_ATTACHMENT_RE.test(item?.name || '')) {
+      await request('/attachments/' + gid(item.gid), { method: 'DELETE' });
+    }
+  }
+}
+
+async function deliverReport(request, report, projectTasks, assignee, upload = null) {
   const duplicates = projectTasks.filter(task => task.name === report.title);
   if (duplicates.length > 1) throw new Error('Multiple daily result cards require reconciliation: ' + report.title);
   const pending = { name: report.title, notes: 'DELIVERY INCOMPLETE. Do not treat this card as a complete report.\n' + report.marker + '\n\n' + report.summary };
@@ -209,6 +273,9 @@ async function deliverReport(request, report, projectTasks, assignee) {
     await request('/tasks/' + gid(child.gid), { method: 'PUT', body: body(content) });
     await verifyTask(request, child.gid, content, null, taskId);
   }
+  // The card says the table is attached, so it is never marked verified without it.
+  if (upload) await deliverAttachment(request, upload, taskId, report.attachment);
+  else throw new Error('No attachment uploader: the findings table cannot be delivered');
   const final = { name: report.title, notes: 'DELIVERY VERIFIED: ' + report.pages.length
     + ' current evidence page(s). Delivery status is separate from screening coverage.\n' + report.marker + '\n\n' + report.summary };
   await request('/tasks/' + taskId, { method: 'PUT', body: body(final) });
@@ -218,7 +285,7 @@ async function deliverReport(request, report, projectTasks, assignee) {
 }
 
 export async function publishDailyScreening({ results, assurance, state, request, runId,
-  nowMs = Date.now(), assignee = '1213645083721304' }) {
+  nowMs = Date.now(), assignee = '1213645083721304', upload = null }) {
   if (typeof request !== 'function') throw new Error('Asana client is required');
   const reports = buildReports(results, assurance, state, { runId, nowMs });
   const tasks = await collection(request, '/projects/' + PROJECT + '/tasks?limit=100&opt_fields=name');
@@ -227,7 +294,7 @@ export async function publishDailyScreening({ results, assurance, state, request
     try {
       const section = (await request('/sections/' + report.section + '?opt_fields=project.gid'))?.data;
       if (String(section?.project?.gid) !== PROJECT) throw new Error('Screening section is not in the approved project');
-      delivered.push(await deliverReport(request, report, tasks, assignee));
+      delivered.push(await deliverReport(request, report, tasks, assignee, upload));
     } catch (error) {
       errors.push(new Error(report.domain + ' delivery failed: ' + error.message));
     }
@@ -235,6 +302,21 @@ export async function publishDailyScreening({ results, assurance, state, request
   if (errors.length) throw new AggregateError(errors, errors.map(error => error.message).join('; '));
   return { version: 1, runId: String(runId), screeningDate: results.date, projectGid: PROJECT,
     verifiedAt: new Date(nowMs).toISOString(), operational: assurance.operational, reports: delivered };
+}
+
+/* Multipart upload (Node's built-in FormData/Blob — no dependency). The JSON
+   client cannot send files, so this is the one direct call to Asana here. */
+async function uploadAttachment(parent, name, text, type) {
+  const form = new globalThis.FormData();
+  form.append('parent', parent);
+  form.append('file', new globalThis.Blob([text], { type }), name);
+  const response = await fetch('https://app.asana.com/api/1.0/attachments', {
+    method: 'POST', body: form, signal: globalThis.AbortSignal.timeout(60000),
+    headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error('Asana attachment upload ' + response.status);
+  return data?.data?.gid;
 }
 
 async function main() {
@@ -248,6 +330,7 @@ async function main() {
     runId: process.env.GITHUB_RUN_ID,
     assignee: process.env.ASANA_CASE_ASSIGNEE_GID || '1213645083721304',
     request: (path, options = {}) => asana(path, { ...options, signal: globalThis.AbortSignal.timeout(30000) }),
+    upload: uploadAttachment,
   });
   writeFileSync('screening-delivery-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
   for (const report of receipt.reports) console.log('screening-delivery: verified ' + report.domain + ' task ' + report.taskGid);

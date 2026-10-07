@@ -89,7 +89,7 @@ for (const p of reg.instruments) {
     /* An instrument that is IN FORCE with no approval date must say, in a fixed
        vocabulary, what put it in force — otherwise its next-review date is
        anchored to nothing and the register asserts a review clock it cannot
-       justify. Fifteen of the sixteen in-force instruments are in this position;
+       justify. Most in-force instruments are in this position;
        the prose note alone was not machine-checkable, so the basis is now a
        field. Drafts are exempt: they name the open action that will approve
        them instead (checked below). */
@@ -112,6 +112,14 @@ const register = read('docs/governance/open-actions-register.md');
 const items = new Set([...register.matchAll(/^\|\s*(\d+)\s*\|/gm)].map((m) => Number(m[1])));
 for (const p of reg.instruments.filter((x) => Number.isInteger(x.open_action))) {
   check('instrument "' + p.id + '" references a live open-actions item (' + p.open_action + ')', items.has(p.open_action));
+}
+/* Review currency is a control, not metadata decoration. Once an in-force
+   instrument's next_review date passes, the gap must have an explicit live
+   closure action until the human review actually occurs and the date advances. */
+const today = new Date().toISOString().slice(0, 10);
+for (const p of reg.instruments.filter((x) => x.status === 'in-force' && x.next_review && x.next_review < today)) {
+  check('overdue in-force instrument "' + p.id + '" names a live closure action',
+    Number.isInteger(p.open_action) && items.has(p.open_action));
 }
 const calendar = JSON.parse(read('data/compliance-calendar.json'));
 const duties = new Set((Object.values(calendar).find(Array.isArray) || []).map((d) => d.id));

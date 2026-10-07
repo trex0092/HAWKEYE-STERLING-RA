@@ -1,0 +1,97 @@
+{
+  "schema": "hawkeye-sterling.enterprise-ai-governance-dashboard/v1",
+  "as_of": "2026-10-07",
+  "generated_by": "scripts/ai-governance-controls.mjs --write",
+  "source_register": "data/ai-controls.json",
+  "review_by": "2027-01-07",
+  "summary": {
+    "controls": 32,
+    "effective": 13,
+    "partial": 18,
+    "open": 1,
+    "not_applicable": 0,
+    "overall_status": "partial"
+  },
+  "layers": [
+    {
+      "id": "L1",
+      "name": "Policy",
+      "purpose": "Define principles, permitted use, approval gates and regulatory alignment.",
+      "controls": 4,
+      "effective": 3,
+      "partial": 1,
+      "open": 0,
+      "not_applicable": 0,
+      "status": "partial"
+    },
+    {
+      "id": "L2",
+      "name": "Roles & Accountability",
+      "purpose": "Assign accountable owners, decision rights, legal oversight and escalation.",
+      "controls": 4,
+      "effective": 1,
+      "partial": 3,
+      "open": 0,
+      "not_applicable": 0,
+      "status": "partial"
+    },
+    {
+      "id": "L3",
+      "name": "Risk Management",
+      "purpose": "Identify, classify, assess, mitigate and explicitly treat residual AI risk.",
+      "controls": 5,
+      "effective": 2,
+      "partial": 3,
+      "open": 0,
+      "not_applicable": 0,
+      "status": "partial"
+    },
+    {
+      "id": "L4",
+      "name": "Data & Model Governance",
+      "purpose": "Govern data, prompts, models, providers, lineage, versions, access and retention.",
+      "controls": 6,
+      "effective": 3,
+      "partial": 3,
+      "open": 0,
+      "not_applicable": 0,
+      "status": "partial"
+    },
+    {
+      "id": "L5",
+      "name": "Monitoring & Controls",
+      "purpose": "Monitor performance, bias, drift, security, incidents and continuous control operation.",
+      "controls": 5,
+      "effective": 2,
+      "partial": 3,
+      "open": 0,
+      "not_applicable": 0,
+      "status": "partial"
+    },
+    {
+      "id": "L6",
+      "name": "Audit & Assurance",
+      "purpose": "Preserve evidence, test controls, audit governance, track remediation and support independent assurance.",
+      "controls": 8,
+      "effective": 2,
+      "partial": 5,
+      "open": 1,
+      "not_applicable": 0,
+      "status": "partial"
+    }
+  ],
+  "governance_signals": {
+    "control_effectiveness_rate": 100,
+    "third_party_assessment_coverage": 62.5,
+    "audit_finding_closure_rate": 95.2,
+    "governance_drift_count": 0,
+    "residual_above_appetite": 2,
+    "open_actions_without_target_date": 32
+  },
+  "interpretation": [
+    "Layer status is derived from control-register status plus repository evidence-path validation.",
+    "GRC signals are copied from the separately generated data/grc-metrics.json snapshot.",
+    "The GRC control-effectiveness metric measures automated proof-path coverage in the assurance matrix, not the share of enterprise AI controls rated effective.",
+    "Green repository evidence does not imply external certification or completion of human approvals."
+  ]
+}

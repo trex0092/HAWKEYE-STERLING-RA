@@ -40,7 +40,8 @@
           "name": "EU Consolidated Financial Sanctions List",
           "kind": "official-consolidated",
           "required": true,
-          "registry": "data/sanctions-sources.json"
+          "registry": "data/sanctions-sources.json",
+          "fallbackSourceId": "fr-dgt"
         }
       ],
       "supplements": "data/sanctions-extra.json",

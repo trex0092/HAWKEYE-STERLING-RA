@@ -1,0 +1,12 @@
+{
+  "schema": "hawkeye-sterling.ai-risk-acceptances/v1",
+  "description": "Explicit residual-risk acceptance decisions only. An entry requires a named human approver and evidence. Absence of an entry means no exceptional acceptance is inferred.",
+  "owner_role": "MLRO / Board as required by risk appetite and decision rights",
+  "rules": [
+    "Never create an acceptance from a CI result, generated dashboard, model response or silence.",
+    "Every entry must reference a risk_id in docs/aims/ai-risk-register.md.",
+    "Every entry must include accepted_by, decision_date, review_by or expiry_date, rationale and an evidence path containing the recorded human decision.",
+    "Above-appetite risks without an explicit valid entry remain in the decision/treatment queue."
+  ],
+  "acceptances": []
+}

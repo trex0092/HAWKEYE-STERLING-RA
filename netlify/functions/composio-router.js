@@ -1,4 +1,5 @@
 'use strict';
+const { withFunctionTelemetry } = require('./_telemetry');
 
 const { rateLimit } = require('./_ratelimit');
 const { dataTokenOk } = require('./_auth');
@@ -166,3 +167,6 @@ async function handler(event) {
 
 exports.handler = handler;
 exports.__internals = { originAllowed, requireConfiguredToken, dispatch };
+
+/* Structured 5xx/exception telemetry. The wrapper never logs request bodies. */
+exports.handler = withFunctionTelemetry('composio-router', exports.handler);

@@ -19,6 +19,8 @@
         change is never lost. */
 import { readFileSync } from 'node:fs';
 import { notifyAsana, asanaEnabled, runUrl, buildHtmlBody, REG_PROJECT_GID } from './asana-notify.mjs';
+import { REG_REVIEW_CHECKLIST } from './reg-watch.mjs';
+import { SECTIONS } from './asana-sections.mjs';
 
 const title = process.argv[2];
 const reportFile = process.argv[3];
@@ -59,7 +61,10 @@ if (changes && changes.length) {
     heading: title,
     summary: parts.join(', ') + ' — review and apply any needed updates.',
     changes,
-    runLink: link
+    runLink: link,
+    /* Law-change cards carry the reviewer record; list-change (Sanctions
+       Watch) cards are driven by the re-screen trigger instead. */
+    reviewNote: moved && /^Regulatory Watch/.test(title) ? REG_REVIEW_CHECKLIST : undefined
   });
 }
 
@@ -77,10 +82,15 @@ if (!asanaEnabled()) {
 }
 
 try {
-  const section = process.env.ASANA_SECTION_GID || undefined;
+  /* A Regulatory Watch card that reports ONLY unreachable sources carries no
+     law change: it is a monitoring gap, filed under "AI & Platform Governance".
+     Any card with a content change stays in its configured section. */
+  const gapOnly = /^Regulatory Watch/.test(title) && changes && changes.length
+    && changes.every(c => c.status === 'unreachable');
+  const section = gapOnly ? SECTIONS.governance.gid : (process.env.ASANA_SECTION_GID || undefined);
   /* Also file the law-change card in the queue it is actually worked from (see
      the MIRROR note in asana-notify). Unset ASANA_MIRROR_PROJECT_GID to stop. */
-  const mirror = process.env.ASANA_MIRROR_PROJECT_GID
+  const mirror = process.env.ASANA_MIRROR_PROJECT_GID && !gapOnly
     ? [{ project: process.env.ASANA_MIRROR_PROJECT_GID,
          section: process.env.ASANA_MIRROR_SECTION_GID || undefined }]
     : [];

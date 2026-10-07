@@ -25,7 +25,7 @@ THRESHOLDS (UAE DPMS context — tune in config):
   • AED 15,000  — CDD trigger for occasional transactions.
 No third-party dependencies. Deterministic. Human (MLRO) reviews & files.
 """
-import os, json, datetime
+import os, re, json, datetime
 from collections import defaultdict
 
 CASH_REPORT_THRESHOLD = float(os.environ.get("DPMS_CASH_THRESHOLD", "55000"))
@@ -36,6 +36,41 @@ STRUCTURING_WINDOW_D  = 7      # days
 VELOCITY_FACTOR       = 4.0    # a day > N× the customer's mean daily volume
 PRICE_DEVIATION_PCT   = float(os.environ.get("TXN_PRICE_DEVIATION_PCT", "10"))
 TXN_FEED_PATH         = os.environ.get("TXN_FEED_PATH", "")
+# Profile deviation: a month's volume above N× the customer's DECLARED expected
+# monthly volume (the KYC profile figure, feed field expected_monthly_volume).
+PROFILE_DEVIATION_FACTOR = float(os.environ.get("TXN_PROFILE_DEVIATION_FACTOR", "1.5"))
+CIRCULAR_WINDOW_D     = 30     # days: funds out to X and back from X (or reverse)
+CIRCULAR_AMOUNT_BAND  = 0.10   # within 10% = the same money coming back
+NEW_GEO_MIN_HISTORY   = 5      # prior transactions needed before a country is "new"
+# STR red-flag typologies (data/str-red-flags.json). Defaults pending MLRO
+# confirmation, like every threshold here; each is a constant, not a guess.
+RESALE_WINDOW_D       = 7      # days: gold bought then sold back (or reverse)
+RESALE_WEIGHT_BAND    = 0.10   # within 10% of the weight = the same gold
+RESALE_LOSS_PCT       = 5.0    # a resale this % below cost is called a loss
+FUNNEL_MIN_SOURCES    = 5      # distinct payers feeding one onward payment
+FUNNEL_WINDOW_D       = 14     # days the inbound payments are collected over
+FUNNEL_SHARE          = 0.5    # onward foreign payment ≥ this share of the inflow
+MULTI_JURISDICTION_MIN = 4     # distinct countries in ONE payment chain
+HOME_COUNTRIES        = {"ae", "are", "uae", "united arab emirates"}
+# Payment-reference wording tied to a red flag. Word-bounded, case-insensitive.
+# Deliberately no religious-giving terms: the indicator is an NPO/charity
+# channel, not a faith practice.
+REFERENCE_KEYWORDS = {
+    "commission / consultancy wording (possible concealed bribe or kickback)": (
+        "commission", "consultancy", "consulting fee", "facilitation fee",
+        "success fee", "finder's fee", "finders fee", "introducer fee", "kickback"),
+    "charity / NPO wording (possible TF funnelling through a non-profit)": (
+        "donation", "charity", "charitable", "non-profit", "nonprofit", "npo",
+        "relief fund"),
+    "informal value transfer wording (hawala / underground banking)": (
+        "hawala", "hundi", "informal transfer", "underground banking"),
+}
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+RED_FLAGS_PATH = os.path.join(_DATA_DIR, "str-red-flags.json")      # STR register
+SAR_RED_FLAGS_PATH = os.path.join(_DATA_DIR, "sar-red-flags.json")  # SAR register
+_RED_FLAGS = {}
+# Categories where a recorded flag can mean a TFS event, not only an STR/SAR.
+TFS_FLAG_CATEGORIES = {"STR": {"TF", "PF", "SE"}, "SAR": {"SA", "TF", "PF"}}
 
 
 def feed_configured():
@@ -90,13 +125,49 @@ def _norm(s):
 
 
 # ── RULES ─────────────────────────────────────────────────────────────────────
+def _dpmsr_scope(t):
+    """In DPMSR scope (POL-19 §3): cash, or an INTERNATIONAL wire — a wire whose
+    counterparty country is recorded and is not the UAE."""
+    m = _norm(t.get("method"))
+    if m == "cash":
+        return "cash"
+    c = _norm(t.get("counterparty_country"))
+    if m == "wire" and c and c not in HOME_COUNTRIES:
+        return "international wire"
+    return ""
+
+
 def rule_threshold(txns):
-    """Single transaction at/above the DPMS cash reporting threshold."""
+    """Single transaction at/above the DPMS reporting threshold: cash or an
+    international wire (POL-19 §3). The DPMSR is filed regardless of suspicion."""
     out = []
     for t in txns:
-        if _norm(t.get("method")) == "cash" and _amt(t) >= CASH_REPORT_THRESHOLD:
+        kind = _dpmsr_scope(t)
+        if kind and _amt(t) >= CASH_REPORT_THRESHOLD:
             out.append(_alert("THRESHOLD", "HIGH", t,
-                f"cash {_amt(t):,.0f} AED ≥ reporting threshold {CASH_REPORT_THRESHOLD:,.0f}"))
+                f"{kind} {_amt(t):,.0f} AED ≥ DPMSR threshold {CASH_REPORT_THRESHOLD:,.0f} — "
+                "DPMSR in goAML regardless of suspicion (POL-19 §3)"))
+    return out
+
+
+def rule_linked_threshold(txns):
+    """Cumulative linked dealings (POL-19 §3: 'single or cumulative linked'):
+    two or more in-scope transactions on the SAME calendar day, each below the
+    threshold, that together reach it. Same-day linkage is the minimum the
+    engine can establish from dates alone; wider linkage stays with the
+    STRUCTURING rule and the MLRO."""
+    by_day = defaultdict(list)
+    for t in txns:
+        if _dpmsr_scope(t) and 0 < _amt(t) < CASH_REPORT_THRESHOLD and _d(t.get("date")):
+            by_day[_d(t["date"])].append(t)
+    out = []
+    for d, ts in sorted(by_day.items()):
+        total = sum(_amt(t) for t in ts)
+        if len(ts) >= 2 and total >= CASH_REPORT_THRESHOLD:
+            out.append(_alert("LINKED_THRESHOLD", "HIGH", ts[0],
+                f"{len(ts)} cash/international-wire transactions on {d} total {total:,.0f} AED "
+                f"(each < {CASH_REPORT_THRESHOLD:,.0f}) — DPMSR on the linked series "
+                "(POL-19 §3); assess for structuring"))
     return out
 
 
@@ -303,12 +374,273 @@ def rule_route_mismatch(txns):
             for t in txns if t.get("route_mismatch") is True]
 
 
+def rule_profile_deviation(txns):
+    """Activity inconsistent with the customer's declared profile: a calendar
+    month's total above PROFILE_DEVIATION_FACTOR × the declared expected monthly
+    volume. Fires only when the feed carries expected_monthly_volume — never
+    guesses a profile from the activity it is meant to check."""
+    declared = [float(t["expected_monthly_volume"]) for t in txns
+                if isinstance(t.get("expected_monthly_volume"), (int, float))
+                and t["expected_monthly_volume"] > 0]
+    if not declared:
+        return []
+    expected = declared[-1]
+    months = defaultdict(list)
+    for t in txns:
+        d = _d(t.get("date"))
+        if d:
+            months[(d.year, d.month)].append(t)
+    out = []
+    for (y, m), ts in sorted(months.items()):
+        total = sum(_amt(t) for t in ts)
+        if total > PROFILE_DEVIATION_FACTOR * expected:
+            out.append(_alert("PROFILE_DEVIATION", "HIGH", ts[-1],
+                f"{y}-{m:02d} volume {total:,.0f} AED is {total / expected:.1f}× the declared "
+                f"expected monthly volume {expected:,.0f} AED — refresh the profile / source of funds"))
+    return out
+
+
+def rule_circular_flow(txns):
+    """Round-tripping: money leaves to a counterparty and comes back from the SAME
+    counterparty (or the reverse) within CIRCULAR_WINDOW_D days for a similar
+    amount. Matching is on the recorded counterparty field, never on a guess."""
+    dated = [t for t in txns if _d(t.get("date")) and _norm(t.get("counterparty"))]
+    out = []
+    seen = set()
+    for a in dated:
+        for b in dated:
+            if a is b or _norm(a.get("counterparty")) != _norm(b.get("counterparty")):
+                continue
+            if {_norm(a.get("direction")), _norm(b.get("direction"))} != {"in", "out"}:
+                continue
+            dd = (_d(b["date"]) - _d(a["date"])).days
+            if not (0 <= dd <= CIRCULAR_WINDOW_D) or _amt(a) <= 0:
+                continue
+            if abs(_amt(b) - _amt(a)) <= CIRCULAR_AMOUNT_BAND * _amt(a):
+                key = (id(a), id(b))
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(_alert("CIRCULAR_FLOW", "HIGH", a,
+                    f"{_amt(a):,.0f} AED {_norm(a.get('direction'))} and ~{_amt(b):,.0f} "
+                    f"{_norm(b.get('direction'))} with the same counterparty "
+                    f"{a.get('counterparty')} within {dd}d — possible round-tripping"))
+    return out
+
+
+def rule_new_geography(txns):
+    """Unexpected cross-border activity: a counterparty country never seen in the
+    customer's earlier history (needs NEW_GEO_MIN_HISTORY prior transactions, so
+    a new customer's first payments are not all flagged)."""
+    dated = sorted((t for t in txns if _d(t.get("date"))), key=lambda t: _d(t["date"]))
+    out = []
+    seen = set()
+    for i, t in enumerate(dated):
+        c = _norm(t.get("counterparty_country"))
+        if not c:
+            continue
+        if i >= NEW_GEO_MIN_HISTORY and c not in seen:
+            out.append(_alert("NEW_GEOGRAPHY", "MEDIUM", t,
+                f"first payment involving {t.get('counterparty_country')} after "
+                f"{i} earlier transaction(s) in other countries — confirm the business reason"))
+        seen.add(c)
+    return out
+
+
+def rule_rapid_resale(txns):
+    """Gold bought and sold back (or sold and bought back) within RESALE_WINDOW_D
+    days for about the same weight — layering through the metal, or the same
+    gold churned with no economic exposure. Needs transaction_type buy|sell and
+    weight_g on the records; states the loss when the resale is below cost."""
+    def wt(t):
+        try:
+            return float(t.get("weight_g"))
+        except (TypeError, ValueError):
+            return 0.0
+    legs = [t for t in txns if _norm(t.get("transaction_type")) in ("buy", "sell")
+            and _d(t.get("date")) and wt(t) > 0]
+    out = []
+    for a in legs:
+        for b in legs:
+            if a is b or _norm(a.get("transaction_type")) == _norm(b.get("transaction_type")):
+                continue
+            dd = (_d(b["date"]) - _d(a["date"])).days
+            if not (0 <= dd <= RESALE_WINDOW_D) or (dd == 0 and id(b) < id(a)):
+                continue
+            if abs(wt(b) - wt(a)) > RESALE_WEIGHT_BAND * wt(a):
+                continue
+            buy, sell = (a, b) if _norm(a.get("transaction_type")) == "buy" else (b, a)
+            loss = ""
+            if _amt(buy) > 0 and _amt(sell) > 0:
+                pct = (_amt(buy) - _amt(sell)) / _amt(buy) * 100
+                if pct >= RESALE_LOSS_PCT:
+                    loss = f" at a {pct:.1f}% loss"
+            out.append(_alert("RAPID_RESALE", "HIGH", a,
+                f"{_norm(a.get('transaction_type'))} {wt(a):,.0f} g then "
+                f"{_norm(b.get('transaction_type'))} {wt(b):,.0f} g within {dd}d{loss} — "
+                "possible layering / churning of the same gold"))
+            break
+    return out
+
+
+def rule_funnel(txns):
+    """Many payers, one foreign payee: FUNNEL_MIN_SOURCES or more distinct
+    counterparties pay in within FUNNEL_WINDOW_D days, then a payment of at
+    least FUNNEL_SHARE of that inflow goes to a counterparty abroad (TF
+    collection-and-funnel pattern). Counterparties are taken as recorded."""
+    ins = [t for t in txns if _norm(t.get("direction")) == "in"
+           and _d(t.get("date")) and _norm(t.get("counterparty"))]
+    outs = [t for t in txns if _norm(t.get("direction")) == "out" and _d(t.get("date"))
+            and _norm(t.get("counterparty_country"))
+            and _norm(t.get("counterparty_country")) not in HOME_COUNTRIES]
+    out = []
+    for o in outs:
+        window = [t for t in ins if 0 <= (_d(o["date"]) - _d(t["date"])).days <= FUNNEL_WINDOW_D]
+        sources = {_norm(t.get("counterparty")) for t in window}
+        inflow = sum(_amt(t) for t in window)
+        if len(sources) >= FUNNEL_MIN_SOURCES and inflow > 0 and _amt(o) >= FUNNEL_SHARE * inflow:
+            out.append(_alert("FUNNEL", "HIGH", o,
+                f"{len(sources)} payers sent {inflow:,.0f} AED within {FUNNEL_WINDOW_D}d, then "
+                f"{_amt(o):,.0f} AED went to {o.get('counterparty', '?')} in "
+                f"{o.get('counterparty_country')} — possible collect-and-funnel (TF)"))
+    return out
+
+
+def _party_country(p):
+    c = str(p.get("country") or "").strip().lower()
+    if len(c) == 2:
+        return c
+    bic = str(p.get("bic") or "").strip().upper()
+    if len(bic) in (8, 11) and bic[4:6].isalpha():
+        return bic[4:6].lower()
+    return _norm(p.get("country_name"))
+
+
+def rule_multi_jurisdiction(txns):
+    """One payment whose chain (originator, banks, beneficiary) touches
+    MULTI_JURISDICTION_MIN or more countries — layering or third-country
+    routing to distance a payment from its real origin or destination."""
+    out = []
+    for t in txns:
+        countries = {_party_country(p) for p in (t.get("parties") or [])} - {""}
+        if len(countries) >= MULTI_JURISDICTION_MIN:
+            out.append(_alert("MULTI_JURISDICTION", "MEDIUM", t,
+                f"payment chain spans {len(countries)} countries "
+                f"({', '.join(sorted(c.upper() for c in countries))}) — confirm the commercial "
+                "reason for the routing"))
+    return out
+
+
+def rule_reference_keyword(txns):
+    """Payment reference / purpose wording tied to a red flag (concealed
+    commission, NPO funnelling, informal value transfer). A prompt to check
+    the justification — not a finding of wrongdoing."""
+    out = []
+    for t in txns:
+        text = " ".join(str(t.get(k) or "") for k in ("remittance_info", "purpose")).lower()
+        if not text.strip():
+            continue
+        for label, words in REFERENCE_KEYWORDS.items():
+            hit = next((w for w in words if re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", text)), None)
+            if hit:
+                out.append(_alert("REFERENCE_KEYWORD", "MEDIUM", t,
+                    f"payment reference/purpose says \"{hit}\" — {label}; confirm the "
+                    "justification and the recipient"))
+    return out
+
+
+def rule_personal_account(txns):
+    """Corporate transaction paid from a personal account, as recorded."""
+    return [_alert("PERSONAL_ACCOUNT", "HIGH", t,
+            "corporate transaction funded from a personal account — obtain a legitimate explanation")
+            for t in txns if t.get("personal_account_for_corporate") is True]
+
+
+def rule_cash_no_source_of_funds(txns):
+    """Cash at/above the CDD trigger with the source of funds recorded as NOT
+    verified — cash converted into gold without a credible source."""
+    return [_alert("CASH_NO_SOURCE_OF_FUNDS", "HIGH", t,
+            f"cash {_amt(t):,.0f} AED with source of funds not verified — verify before "
+            "completing; assess STR/SAR if it cannot be")
+            for t in txns if _norm(t.get("method")) == "cash"
+            and _amt(t) >= CDD_TRIGGER_THRESHOLD and t.get("source_of_funds_verified") is False]
+
+
+def rule_customer_not_in_db(txns):
+    """A payment or activity task whose customer matches no Customer Database
+    record (set by the daily run's resolver). No CDD file means no profile to
+    monitor against — the dealing itself is the R.10 gap. Records the resolver
+    never saw (no customer_in_db key, e.g. a file feed) are not judged."""
+    return [_alert("CUSTOMER_NOT_IN_DB", "HIGH", t,
+            "customer is not in the Customer Database — no CDD record on file; identify, verify "
+            "and onboard before completing, or link the task to the correct customer (R.10)")
+            for t in txns if t.get("customer_in_db") is False]
+
+
+def load_red_flags():
+    """code -> flag, from the STR and SAR registers (data/str-red-flags.json,
+    data/sar-red-flags.json). Raises if either is missing or malformed (the
+    rule error is counted, never a silent pass)."""
+    if not _RED_FLAGS:
+        loaded = {}
+        for path in (RED_FLAGS_PATH, SAR_RED_FLAGS_PATH):
+            with open(path, encoding="utf-8") as fh:
+                doc = json.load(fh)
+            cats, reg = doc["categories"], doc["register"]
+            for f in doc["flags"]:
+                loaded[f["code"]] = {**f, "register": reg, "category_label": cats[f["category"]]}
+        _RED_FLAGS.update(loaded)
+    return _RED_FLAGS
+
+
+def normalise_flag_code(code):
+    """'ml-11' / 'STR-ML-11' -> 'STR-ML-11'; 'sar-cb-3' -> 'SAR-CB-03'."""
+    parts = str(code or "").strip().upper().split("-")
+    if len(parts) == 2:
+        parts = ["STR"] + parts            # bare codes are the STR register's
+    if len(parts) != 3 or not parts[2].isdigit():
+        return str(code or "").strip().upper()
+    return f"{parts[0]}-{parts[1]}-{int(parts[2]):02d}"
+
+
+def red_flag_refs(rule):
+    """Codes of the catalogued red flags this rule detects (for the report)."""
+    return [c for c, f in load_red_flags().items() if rule in f.get("detected_by", [])]
+
+
+def rule_red_flag_recorded(txns):
+    """Red flags a person recorded on a payment or activity task ('Red flags:
+    STR-ML-11, SAR-CB-03'; a bare 'ML-11' is the STR register's). STR TF / PF /
+    sanctions-evasion and SAR sanctions / TF / PF flags are CRITICAL: they can
+    be a TFS event, not only an STR/SAR."""
+    catalogue = load_red_flags()
+    out = []
+    for t in txns:
+        for code in t.get("red_flags") or []:
+            f = catalogue.get(normalise_flag_code(code))
+            if f is None:
+                out.append(_alert("RED_FLAG", "HIGH", t,
+                    f"unknown red-flag code '{code}' — correct it (STR-.. / SAR-.. codes in the "
+                    "red-flag registers)"))
+                continue
+            tfs = f["category"] in TFS_FLAG_CATEGORIES.get(f["register"], set())
+            out.append(_alert("RED_FLAG", "CRITICAL" if tfs else "HIGH", t,
+                f"{f['code']} ({f['category_label']}): {f['text']} — "
+                + ("apply POL-07 if a designated party may be involved; assess STR/SAR"
+                   if tfs else "assess STR/SAR")))
+    return out
+
+
 _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_high_risk_counterparty, rule_rapid_passthrough,
           rule_cdd_trigger, rule_round_amount_cash,
           rule_third_party_payment, rule_refund_diversion,
           rule_pricing_deviation, rule_phantom_delivery,
-          rule_invoice_mismatch, rule_route_mismatch]
+          rule_invoice_mismatch, rule_route_mismatch,
+          rule_profile_deviation, rule_circular_flow, rule_new_geography,
+          rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
+          rule_reference_keyword, rule_personal_account, rule_linked_threshold,
+          rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db]
 
 
 def _any_customer(txns):
@@ -321,7 +653,9 @@ def _any_customer(txns):
 def _alert(rule, severity, t, detail):
     return {"rule": rule, "severity": severity,
             "customer": t.get("customer", "?"), "date": t.get("date", ""),
-            "amount": _amt(t) if "amount" in t else None, "detail": detail}
+            "amount": _amt(t) if "amount" in t else None, "detail": detail,
+            # links the alert back to its payment / activity task, when known
+            "transaction_id": t.get("transaction_id", ""), "permalink": t.get("permalink", "")}
 
 
 def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):

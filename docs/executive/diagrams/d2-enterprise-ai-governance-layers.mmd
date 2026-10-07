@@ -1,0 +1,32 @@
+%% Enterprise AI Governance — original Hawkeye Sterling implementation
+%% Conceptual six-layer taxonomy; no third-party artwork reproduced.
+flowchart TB
+  A["L6 · AUDIT & ASSURANCE<br/>Evidence · control testing · internal audit · vendor assurance · remediation · independent review"]
+  M["L5 · MONITORING & CONTROLS<br/>Human oversight · performance · bias · drift · security · incidents · reporting"]
+  D["L4 · DATA & MODEL GOVERNANCE<br/>Lineage · quality · prompts · model validation · versions · access · retention · vendors"]
+  R["L3 · RISK MANAGEMENT<br/>Identify · classify · assess · mitigate · residual-risk decision"]
+  O["L2 · ROLES & ACCOUNTABILITY<br/>AI owner · business owner · legal/governance oversight · escalation"]
+  P["L1 · POLICY<br/>Principles · acceptable use · approval criteria · regulatory alignment"]
+
+  P --> O --> R --> D --> M --> A
+  A -. findings and improvement .-> P
+
+  P1["AI Policy<br/>AUP<br/>use-case intake"]
+  O1["Asset ownership<br/>operating model<br/>committee charter"]
+  R1["AI risk register<br/>risk appetite<br/>DPIA · impact assessment"]
+  D1["AI/prompt/tool registers<br/>model validation<br/>retention · vendor review"]
+  M1["Advisor evals<br/>freshness · security CI<br/>incident response · GRC metrics"]
+  A1["Assurance matrix<br/>obligation traceability<br/>internal/external audit<br/>CAPA · management review"]
+
+  P --- P1
+  O --- O1
+  R --- R1
+  D --- D1
+  M --- M1
+  A --- A1
+
+  classDef layer fill:#f7f8fb,stroke:#26344d,color:#111827,stroke-width:2px;
+  classDef evidence fill:#ffffff,stroke:#718096,color:#1f2937;
+  class P,O,R,D,M,A layer;
+  class P1,O1,R1,D1,M1,A1 evidence;
+

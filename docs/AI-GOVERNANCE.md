@@ -33,8 +33,9 @@ Two precise boundaries:
   with a key (`REPORT_ALLOW_LLM=0`). Enabling it needs `REPORT_ALLOW_LLM=1` **and**
   a key — a separate, documented decision. The `[Auto]` summary is a deterministic
   template filled with the real matched values.
-- **Grounded triage MAY use the LLM** when a key is present (`LLM_TRIAGE=1`,
-  default): it only **classifies** the supplied real headline (is this about the
+- **Grounded triage MAY use the LLM** only when the API key is present and the
+  explicit opt-in `LLM_TRIAGE=1` is set. The code/workflow default is `0`; it only
+  **classifies** the supplied real headline (is this about the
   subject? how severe?) under a hard grounding contract that forbids inventing any
   fact. It generates no new information, the raw headline + link are always shown,
   the result is labelled, and any model failure falls back to deterministic. Set
@@ -46,8 +47,10 @@ Two precise boundaries:
 - **With no key, the system runs fully on-runner with deterministic logic — no
   customer data leaves the GitHub Actions runner, no paid key, no third-party
   model.**
-- Provisioning the key is the firm's **explicit authorisation** for that egress and
-  must be accompanied by a data-processing assessment under UAE PDPL.
+- Provisioning the key alone does **not** authorise triage egress. Triage additionally
+  requires explicit `LLM_TRIAGE=1`, and the legal/vendor prerequisites remain governed
+  by the DPA and PDPL records. The repository cannot infer their completion from runtime
+  configuration; open action 36 reconciles the current Anthropic execution record.
 - Model (when enabled): configurable via `AI_MODEL` (default a hosted Claude model).
 
 ## 4. Explainability & transparency

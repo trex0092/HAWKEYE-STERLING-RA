@@ -60,6 +60,8 @@ jobs:
             umsaszjsdz5c04wqdhbq.blob.core.windows.net:443
             umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
             webgate.ec.europa.eu:443
+            ecas.ec.europa.eu:443
+            gels-avoirs.dgtresor.gouv.fr:443
             ofsistorage.blob.core.windows.net:443
             sanctionslist.fcdo.gov.uk:443
             app.asana.com:443
@@ -102,6 +104,9 @@ jobs:
           # Read-only: the TFS timeline log queries screening-run history
           # (actions:read) to record publication → ingestion → re-screen timing.
           GITHUB_TOKEN: ${{ github.token }}
+          # Personal EU FSF crawler token (optional): the shared public token now
+          # redirects to EU Login; unset = the EU list is reported blind at once.
+          EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
         run: node scripts/sanctions-watch.mjs "$MODE"
 
       - name: Trigger an immediate re-screen (TFS without-delay duty)
@@ -173,19 +178,10 @@ jobs:
           if [ -n "$(git status --porcelain data/ 2>/dev/null)" ]; then
             git config user.name "sanctions-watch"
             git config user.email "actions@github.com"
-            git add data/sanctions-state.json data/retention data/tfs-update-log.json
-            git commit -m "$PR_TITLE [skip ci]"
-            # Persist on the sanctions-watch-state branch (main is protected):
-            # rebuilt as <current main> + one data commit, force-updated.
-            # Auth is the ephemeral env token in the push URL — the checkout
-            # persists no credentials, so nothing lands in .git/config.
-            pushed=
-            for attempt in 1 2 3 4 5; do
-              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/sanctions-watch-state && { pushed=1; break; }
-              echo "push failed (attempt $attempt) — retrying"
-              sleep $((attempt * 3))
-            done
-            [ -n "$pushed" ] || { echo "::error::state push to sanctions-watch-state failed after 5 attempts — state NOT persisted"; exit 1; }
+            # Persist on the sanctions-watch-state branch (main is protected),
+            # built on the branch's own tip (scripts/push-state-branch.sh).
+            scripts/push-state-branch.sh sanctions-watch-state "$PR_TITLE [skip ci]" \
+              data/sanctions-state.json data/retention data/tfs-update-log.json
           else
             echo "state unchanged"
           fi

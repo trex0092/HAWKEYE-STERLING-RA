@@ -1,5 +1,14 @@
 # Arabic legal-text translation — archived reference (NOT in production)
 
+> **UI CHROME UPDATE (2026-10-07):** Console and Advisor navigation, labels,
+> statuses, modes, controls and empty states now render through the shared
+> `i18n.js` dictionary. Persona role captions are localized as UI chrome.
+> Regulatory Q&A answers, tool playbooks, citations, backend answer text and
+> filed-record prose remain English. Open-action item 28 therefore moves to
+> **linguistic QA only**: a qualified Arabic reviewer must review the live chrome
+> before the item can close. This is separate from the archived legal-text blocks
+> below, which remain out of production.
+>
 > **DECISION (2026-06-27): the long-form legal/report text stays English-only.**
 > The firm has chosen to keep the narrative-rationale templates and the printed
 > compliance report in **English** — the authoritative language for filed

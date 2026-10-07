@@ -111,19 +111,10 @@ jobs:
           if [ -n "$(git status --porcelain data/)" ]; then
             git config user.name "fatf-watchdog"
             git config user.email "actions@github.com"
-            git add data/
-            git commit -m "Watchdog: record list state / risk-data backup [skip ci]"
-            # Persist on the fatf-state branch (main is protected): rebuilt as
-            # <current main> + one data commit, force-updated.
-            # Auth is the ephemeral env token in the push URL — the checkout
-            # persists no credentials, so nothing lands in .git/config.
-            pushed=
-            for attempt in 1 2 3 4 5; do
-              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/fatf-state && { pushed=1; break; }
-              echo "push failed (attempt $attempt) — retrying"
-              sleep $((attempt * 3))
-            done
-            [ -n "$pushed" ] || { echo "::error::state push to fatf-state failed after 5 attempts — state NOT persisted"; exit 1; }
+            # Persist the changed data/ files on the fatf-state branch (main is
+            # protected), built on the branch's own tip (scripts/push-state-branch.sh).
+            mapfile -t changed < <(git status --porcelain --untracked-files=all -- data/ | cut -c4-)
+            scripts/push-state-branch.sh fatf-state "Watchdog: record list state / risk-data backup [skip ci]" "${changed[@]}"
           else
             echo "state unchanged"
           fi

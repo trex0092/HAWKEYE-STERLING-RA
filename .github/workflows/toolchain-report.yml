@@ -1,0 +1,164 @@
+name: Toolchain Deepening (report only)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app.js'
+      - 'screen.py'
+      - 'screen_gkg.py'
+      - 'ai.py'
+      - 'agents.py'
+      - 'kyc.py'
+      - 'txn_monitor.py'
+      - 'payment_screen.py'
+      - 'monitoring.py'
+      - 'str_dossier.py'
+      - 'mcp_tools.py'
+      - 'mcp_server.py'
+      - 'test/scoring-golden.test.js'
+      - 'test/engine_test.py'
+      - 'scripts/mutation-spotcheck.mjs'
+      - '.github/workflows/toolchain-report.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app.js'
+      - 'screen.py'
+      - 'screen_gkg.py'
+      - 'ai.py'
+      - 'agents.py'
+      - 'kyc.py'
+      - 'txn_monitor.py'
+      - 'payment_screen.py'
+      - 'monitoring.py'
+      - 'str_dossier.py'
+      - 'mcp_tools.py'
+      - 'mcp_server.py'
+      - 'test/scoring-golden.test.js'
+      - 'test/engine_test.py'
+      - 'scripts/mutation-spotcheck.mjs'
+      - '.github/workflows/toolchain-report.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toolchain-report-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner (report-tool downloads only)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            registry.npmjs.org:443
+            pypi.org:443
+            files.pythonhosted.org:443
+            *.githubapp.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Prepare report directory
+        run: mkdir -p artifacts/js-coverage artifacts/python-coverage
+
+      - name: JavaScript line coverage with c8 12.0.0
+        run: |
+          set +e
+          npm exec --yes --package=c8@12.0.0 -- c8 --reporter=text --reporter=json-summary --reports-dir=artifacts/js-coverage node test/scoring-golden.test.js > artifacts/js-coverage.txt 2>&1
+          code=$?
+          set -e
+          cat artifacts/js-coverage.txt
+          echo "c8_exit_code=$code" >> artifacts/tool-status.txt
+          exit 0
+
+      - name: Install exact-version Python report tools
+        run: |
+          set +e
+          python -m pip install --disable-pip-version-check coverage==7.16.2 mypy==2.4.0 > artifacts/python-tool-install.txt 2>&1
+          code=$?
+          set -e
+          cat artifacts/python-tool-install.txt
+          echo "python_tool_install_exit_code=$code" >> artifacts/tool-status.txt
+          exit 0
+
+      - name: Python line coverage with coverage.py 7.16.2
+        run: |
+          set +e
+          python -m coverage run --source=screen,screen_gkg,ai,agents,kyc,txn_monitor,payment_screen,monitoring,str_dossier,mcp_tools,mcp_server test/engine_test.py > artifacts/python-coverage/test-output.txt 2>&1
+          run_code=$?
+          python -m coverage report -m > artifacts/python-coverage/coverage.txt 2>&1
+          report_code=$?
+          set -e
+          cat artifacts/python-coverage/coverage.txt
+          echo "python_coverage_test_exit_code=$run_code" >> artifacts/tool-status.txt
+          echo "python_coverage_report_exit_code=$report_code" >> artifacts/tool-status.txt
+          exit 0
+
+      - name: Python type-check report with mypy 2.4.0
+        run: |
+          set +e
+          python -m mypy --ignore-missing-imports --follow-imports=skip screen.py screen_gkg.py ai.py agents.py kyc.py txn_monitor.py payment_screen.py monitoring.py str_dossier.py mcp_tools.py mcp_server.py > artifacts/mypy.txt 2>&1
+          code=$?
+          set -e
+          cat artifacts/mypy.txt
+          echo "mypy_exit_code=$code" >> artifacts/tool-status.txt
+          exit 0
+
+      - name: Mutation spot-check of the scoring golden set
+        run: |
+          set +e
+          node scripts/mutation-spotcheck.mjs --json artifacts/mutation-summary.json > artifacts/mutation.txt 2>&1
+          code=$?
+          set -e
+          cat artifacts/mutation.txt
+          echo "mutation_exit_code=$code" >> artifacts/tool-status.txt
+          exit 0
+
+      - name: Publish report summary
+        if: always()
+        run: |
+          {
+            echo "## Toolchain deepening, report only"
+            echo
+            echo '~~~'
+            cat artifacts/tool-status.txt 2>/dev/null || true
+            echo '~~~'
+            echo
+            echo "### Mutation spot-check"
+            echo '~~~json'
+            cat artifacts/mutation-summary.json 2>/dev/null || echo '{"status":"not produced"}'
+            echo '~~~'
+            echo
+            echo "No threshold is enforced by this workflow. Turning any report into a blocking gate requires a separate reviewed PR."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage, mypy and mutation reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: toolchain-deepening-report
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 30

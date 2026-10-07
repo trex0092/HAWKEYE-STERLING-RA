@@ -104,6 +104,76 @@ for (const o of reg.obligations) {
   check('obligation "' + o.id + '" does not cite a repealed instrument as its basis', !REPEALED.test(o.instrument));
 }
 
+/* ── 5. Source citations: quoted law vs the firm's paraphrase ─────────────
+   The obligation text is a paraphrase. Article-level evidence lives in
+   source_citation, in exactly one of two shapes: "needs-source" asserts
+   nothing (every field null, so no drafted article or quote can pass as law),
+   "sourced" carries the verbatim quote, the official URL, a locator and the
+   named human who verified it. Only that human promotes a row to sourced. */
+const CITATION_KEYS = ['basis', 'article', 'quote', 'source_url', 'locator', 'verified_by', 'verified_on'];
+const OFFICIAL_HOSTS = new Set([
+  'uaelegislation.gov.ae', 'www.uaelegislation.gov.ae', 'www.moec.gov.ae', 'www.uaefiu.gov.ae',
+  'www.uaeiec.gov.ae', 'eur-lex.europa.eu', 'www.iso.org', 'www.lbma.org.uk', 'www.oecd.org',
+]);
+const VERIFIERS = ['MLRO', 'Counsel'];
+function citationProblems(c, todayIso = new Date().toISOString().slice(0, 10)) {
+  const p = [];
+  if (!c || typeof c !== 'object') return ['source_citation missing'];
+  const keys = Object.keys(c).sort().join();
+  if (keys !== [...CITATION_KEYS].sort().join()) p.push('source_citation keys must be exactly ' + CITATION_KEYS.join(', '));
+  if (c.basis === 'needs-source') {
+    for (const k of CITATION_KEYS.slice(1)) if (c[k] !== null) p.push('needs-source row asserts ' + k + ' (must be null until a human sources it)');
+    return p;
+  }
+  if (c.basis !== 'sourced') return p.concat('basis must be "needs-source" or "sourced"');
+  if (!/^(Article|Clause|Section|Paragraph|Rule|Step)\s+\S+/i.test(String(c.article || ''))) p.push('sourced row needs an article/clause reference');
+  const q = String(c.quote || '');
+  if (q.trim().length < 20) p.push('sourced row needs the verbatim quote (>= 20 chars)');
+  if (/PROPOSED/i.test(q)) p.push('a PROPOSED (drafted) text cannot be a quote');
+  if (/\.\.\.|\u2026/.test(q)) p.push('quote is elided; copy the full sentence');
+  let host = '';
+  try { const u = new URL(String(c.source_url || '')); host = u.protocol === 'https:' ? u.hostname : ''; } catch { /* invalid */ }
+  if (!OFFICIAL_HOSTS.has(host)) p.push('source_url must be https on an official publisher host (' + (host || 'none') + ')');
+  if (!String(c.locator || '').trim()) p.push('sourced row needs a page/section locator');
+  if (!VERIFIERS.includes(c.verified_by)) p.push('verified_by must be a named human role: ' + VERIFIERS.join(' or '));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(c.verified_on || '')) || !Number.isFinite(Date.parse(c.verified_on)) || c.verified_on > todayIso) {
+    p.push('verified_on must be an ISO date not in the future');
+  }
+  return p;
+}
+
+for (const o of reg.obligations) {
+  const probs = citationProblems(o.source_citation);
+  check('obligation "' + o.id + '" source_citation is well-formed' + (probs.length ? ' (' + probs.join('; ') + ')' : ''), probs.length === 0);
+}
+const sourcedCount = reg.obligations.filter((o) => o.source_citation && o.source_citation.basis === 'sourced').length;
+console.log('  ..  article-level citations sourced: ' + sourcedCount + ' of ' + reg.obligations.length
+  + (sourcedCount < reg.obligations.length ? ' (the rest await counsel/MLRO - open-actions item 5)' : ''));
+check('register states the source-citation standard', /needs-source/.test(reg.source_citation_standard || '') && /sourced/.test(reg.source_citation_standard || ''));
+
+/* The validator itself, on synthetic rows, so the "sourced" path is proven
+   before the first real row is promoted. */
+const goodSourced = {
+  basis: 'sourced', article: 'Article 25', quote: 'A synthetic sentence long enough to count as a quote.',
+  source_url: 'https://uaelegislation.gov.ae/en/legislations/0000', locator: 'p. 12, Article 25(1)',
+  verified_by: 'MLRO', verified_on: '2026-10-01',
+};
+const blank = { basis: 'needs-source', article: null, quote: null, source_url: null, locator: null, verified_by: null, verified_on: null };
+check('validator: a complete human-verified sourced row passes', citationProblems(goodSourced, '2026-10-02').length === 0);
+check('validator: an all-null needs-source row passes', citationProblems(blank).length === 0);
+check('validator: needs-source with a drafted quote fails', citationProblems({ ...blank, quote: 'drafted text' }).length > 0);
+check('validator: needs-source with an asserted article fails', citationProblems({ ...blank, article: 'Article 7' }).length > 0);
+check('validator: sourced without a human verifier fails', citationProblems({ ...goodSourced, verified_by: 'Claude' }, '2026-10-02').length > 0);
+check('validator: sourced from a non-official host fails', citationProblems({ ...goodSourced, source_url: 'https://example.com/law.pdf' }, '2026-10-02').length > 0);
+check('validator: sourced over plain http fails', citationProblems({ ...goodSourced, source_url: 'http://uaelegislation.gov.ae/x' }, '2026-10-02').length > 0);
+check('validator: a PROPOSED text as quote fails', citationProblems({ ...goodSourced, quote: 'PROPOSED-CONTROL: the firm shall screen daily.' }, '2026-10-02').length > 0);
+check('validator: an elided quote fails', citationProblems({ ...goodSourced, quote: 'The entity shall ... report without delay.' }, '2026-10-02').length > 0);
+check('validator: a future verification date fails', citationProblems({ ...goodSourced, verified_on: '2026-12-31' }, '2026-10-02').length > 0);
+check('validator: missing locator fails', citationProblems({ ...goodSourced, locator: '' }, '2026-10-02').length > 0);
+check('validator: an extra or missing key fails', citationProblems({ ...goodSourced, note: 'x' }, '2026-10-02').length > 0
+  && citationProblems({ basis: 'needs-source' }).length > 0);
+check('validator: an unknown basis fails', citationProblems({ ...blank, basis: 'ai-drafted' }).length > 0);
+
 /* Coverage: the register must speak to every jurisdictional watch source that
    exists for a reason — a watched UAE supervisor with no obligation attached
    means the register has a hole. Non-UAE and sector sources are informational. */

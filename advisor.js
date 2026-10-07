@@ -7,6 +7,19 @@
 ══════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const tr = (key, fallback, vars) => {
+  try {
+    if(typeof window!=='undefined' && typeof window.hsT==='function'){
+      const v = window.hsT(key, vars || {});
+      if(v != null) return String(v);
+    }
+  } catch(e){}
+  return fallback;
+};
+const isAr = () => {
+  try { return typeof window!=='undefined' && typeof window.hsGetLang==='function' && window.hsGetLang()==='ar'; }
+  catch(e){ return false; }
+};
 /* Strict-mode shared token (netlify/functions/_auth.js): sends the deploy-time
    <meta name="hsra-app-token"> value as X-App-Token when present. */
 function fnHeaders(){
@@ -35,22 +48,22 @@ const MODES = ['Speed','Balanced','Deep'];
    and expands to its own cited answer inline (see renderRegGroups below). */
 
 const PERSONAS = [
-  {id:'sterling', name:'Sterling', role:'Lead AML advisor',       img:'assets/persona-sterling.webp', accent:'59,229,208',  pos:'36% 24%'},
-  {id:'vale',     name:'Vale',     role:'KYC & onboarding',        img:'assets/persona-vale.webp',     accent:'91,155,216',  pos:'50% 22%'},
-  {id:'ember',    name:'Ember',    role:'PEP & adverse media',     img:'assets/persona-ember.webp',    accent:'255,107,80',  pos:'50% 26%'},
-  {id:'brass',    name:'Brass',    role:'Records & audit',         img:'assets/persona-brass.webp',    accent:'210,166,72',  pos:'46% 28%'},
-  {id:'iris',     name:'Iris',     role:'Typologies & training',   img:'assets/persona-iris.webp',     accent:'180,92,255',  pos:'40% 24%'},
-  {id:'bullion',  name:'Bullion',  role:'Precious Metals & Stones (DPMS)',     img:'assets/persona-bullion.webp',  accent:'255,90,200',  pos:'50% 20%'},
-  {id:'cinder',   name:'Cinder',   role:'Terrorism & Proliferation Financing', img:'assets/persona-cinder.webp',   accent:'70,150,255',  pos:'40% 30%'},
-  {id:'verde',    name:'Verde',    role:'ESG & Human Rights',                  img:'assets/persona-verde.webp',    accent:'60,200,130',  pos:'46% 26%'},
-  {id:'haven',    name:'Haven',    role:'Artificial Intelligence',             img:'assets/persona-haven.webp',    accent:'230,180,70',  pos:'42% 26%'},
-  {id:'cobalt',   name:'Cobalt',   role:'Trade-Based ML & Trade Finance',      img:'assets/persona-cobalt.webp',   accent:'235,190,90',  pos:'55% 22%'},
-  {id:'sentinel', name:'Sentinel', role:'Sanctions Evasion & Watchlists',      img:'assets/persona-sentinel.webp', accent:'255,70,90',   pos:'55% 20%'},
-  {id:'lattice',  name:'Lattice',  role:'Beneficial Ownership & UBO',          img:'assets/persona-lattice.webp',  accent:'90,160,255',  pos:'55% 18%'},
-  {id:'talon',    name:'Talon',    role:'Trade Sanctions & Export Controls',    img:'assets/persona-talon.webp',    accent:'170,90,255',  pos:'55% 20%'},
-  {id:'quartz',   name:'Quartz',   role:'Source of Wealth / Source of Funds',   img:'assets/persona-quartz.webp',   accent:'60,210,120',  pos:'55% 20%'},
-  {id:'beacon',   name:'Beacon',   role:'Whistleblowing & Internal Investigations', img:'assets/persona-beacon.webp', accent:'255,150,40',  pos:'55% 20%'},
-  {id:'warden',   name:'Warden',   role:'Board & MLRO Governance',              img:'assets/persona-warden.webp',   accent:'210,80,200',  pos:'52% 18%'}
+  {id:'sterling', name:'Sterling', role:'Lead AML advisor', roleAr:'مستشار أول لمكافحة غسل الأموال', img:'assets/persona-sterling.webp', accent:'59,229,208', pos:'36% 24%'},
+  {id:'vale', name:'Vale', role:'KYC & onboarding', roleAr:'اعرف عميلك وبدء العلاقة', img:'assets/persona-vale.webp', accent:'91,155,216', pos:'50% 22%'},
+  {id:'ember', name:'Ember', role:'PEP & adverse media', roleAr:'الأشخاص المعرّضون سياسياً والإعلام السلبي', img:'assets/persona-ember.webp', accent:'255,107,80', pos:'50% 26%'},
+  {id:'brass', name:'Brass', role:'Records & audit', roleAr:'السجلات والتدقيق', img:'assets/persona-brass.webp', accent:'210,166,72', pos:'46% 28%'},
+  {id:'iris', name:'Iris', role:'Typologies & training', roleAr:'الأنماط والتدريب', img:'assets/persona-iris.webp', accent:'180,92,255', pos:'40% 24%'},
+  {id:'bullion', name:'Bullion', role:'Precious Metals & Stones (DPMS)', roleAr:'المعادن الثمينة والأحجار الكريمة (DPMS)', img:'assets/persona-bullion.webp', accent:'255,90,200', pos:'50% 20%'},
+  {id:'cinder', name:'Cinder', role:'Terrorism & Proliferation Financing', roleAr:'تمويل الإرهاب وانتشار التسلح', img:'assets/persona-cinder.webp', accent:'70,150,255', pos:'40% 30%'},
+  {id:'verde', name:'Verde', role:'ESG & Human Rights', roleAr:'البيئة والمجتمع والحوكمة وحقوق الإنسان', img:'assets/persona-verde.webp', accent:'60,200,130', pos:'46% 26%'},
+  {id:'haven', name:'Haven', role:'Artificial Intelligence', roleAr:'الذكاء الاصطناعي', img:'assets/persona-haven.webp', accent:'230,180,70', pos:'42% 26%'},
+  {id:'cobalt', name:'Cobalt', role:'Trade-Based ML & Trade Finance', roleAr:'غسل الأموال القائم على التجارة وتمويل التجارة', img:'assets/persona-cobalt.webp', accent:'235,190,90', pos:'55% 22%'},
+  {id:'sentinel', name:'Sentinel', role:'Sanctions Evasion & Watchlists', roleAr:'التهرب من العقوبات وقوائم المراقبة', img:'assets/persona-sentinel.webp', accent:'255,70,90', pos:'55% 20%'},
+  {id:'lattice', name:'Lattice', role:'Beneficial Ownership & UBO', roleAr:'الملكية المستفيدة والمالك المستفيد النهائي', img:'assets/persona-lattice.webp', accent:'90,160,255', pos:'55% 18%'},
+  {id:'talon', name:'Talon', role:'Trade Sanctions & Export Controls', roleAr:'العقوبات التجارية وضوابط التصدير', img:'assets/persona-talon.webp', accent:'170,90,255', pos:'55% 20%'},
+  {id:'quartz', name:'Quartz', role:'Source of Wealth / Source of Funds', roleAr:'مصدر الثروة / مصدر الأموال', img:'assets/persona-quartz.webp', accent:'60,210,120', pos:'55% 20%'},
+  {id:'beacon', name:'Beacon', role:'Whistleblowing & Internal Investigations', roleAr:'الإبلاغ عن المخالفات والتحقيقات الداخلية', img:'assets/persona-beacon.webp', accent:'255,150,40', pos:'55% 20%'},
+  {id:'warden', name:'Warden', role:'Board & MLRO Governance', roleAr:'حوكمة مجلس الإدارة ومسؤول الإبلاغ عن غسل الأموال', img:'assets/persona-warden.webp', accent:'210,80,200', pos:'52% 18%'}
 ];
 
 /* Balanced is the default mode ON PURPOSE, and it must stay so. The backend
@@ -166,7 +179,7 @@ function govStatsHtml(){
   if(!s.calls) return '';
   const item = (lbl,val)=>'<span data-csstext="display:inline-flex;flex-direction:column;line-height:1.3"><b data-csstext="color:#9FB0C8;font-size:12px">'+esc(val)+'</b><span data-csstext="font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#8A94A8">'+esc(lbl)+'</span></span>';
   const failing = s.lastErr && (!s.lastOk || s.lastErr > s.lastOk);
-  const health = failing ? '⚠ last call failed' : (s.lastOk ? 'healthy' : '—');
+  const health = failing ? tr('advisor.lastFailed','⚠ last call failed') : (s.lastOk ? tr('advisor.healthy','healthy') : '—');
   /* The reason sits under the strip, full width — a bare "last call failed" is
      not an operable signal, and the backend has already made this text safe to
      show (status code + next step, never the provider's error body). */
@@ -174,12 +187,12 @@ function govStatsHtml(){
     ? '<div data-csstext="margin-top:8px;padding:9px 12px;border-radius:8px;background:#180E12;border:1px solid rgba(255,120,120,0.22);color:#E9B7B7;font-size:11.5px;line-height:1.45">'
       + esc(s.lastErrWhy) + '</div>'
     : '';
-  return '<div class="sec-lbl" data-csstext="margin:18px 0 9px"><span>Advisor telemetry (on-device)</span><i></i></div>'
+  return '<div class="sec-lbl" data-csstext="margin:18px 0 9px"><span>'+esc(tr('advisor.telemetry','Advisor telemetry (on-device)'))+'</span><i></i></div>'
     + '<div data-csstext="display:flex;gap:18px;flex-wrap:wrap;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)">'
-    +   item('calls', s.calls) + item('today', s.today)
-    +   item('latency p50', s.p50!=null ? Math.round(s.p50)+'ms' : '—')
-    +   item('latency p95', s.p95!=null ? Math.round(s.p95)+'ms' : '—')
-    +   item('health', health)
+    +   item(tr('advisor.calls','calls'), s.calls) + item(tr('advisor.today','today'), s.today)
+    +   item(tr('advisor.latencyP50','latency p50'), s.p50!=null ? Math.round(s.p50)+'ms' : '—')
+    +   item(tr('advisor.latencyP95','latency p95'), s.p95!=null ? Math.round(s.p95)+'ms' : '—')
+    +   item(tr('advisor.health','health'), health)
     + '</div>'
     + why;
 }
@@ -215,9 +228,9 @@ function applyCssText(root){
 }
 function renderTabs(){
   $('tabs').innerHTML =
-    '<button class="tab'+(state.tab==='ask'?' active':'')+'" data-tab="ask">Ask the advisor</button>'+
-    '<button class="tab'+(state.tab==='qa'?' active':'')+'" data-tab="qa">Regulatory Q&amp;A</button>'+
-    '<button class="tab'+(state.tab==='tools'?' active':'')+'" data-tab="tools">Super Tools</button>';
+    '<button class="tab'+(state.tab==='ask'?' active':'')+'" data-tab="ask">'+esc(tr('advisor.tab.ask','Ask the advisor'))+'</button>'+
+    '<button class="tab'+(state.tab==='qa'?' active':'')+'" data-tab="qa">'+esc(tr('advisor.tab.qa','Regulatory Q&A'))+'</button>'+
+    '<button class="tab'+(state.tab==='tools'?' active':'')+'" data-tab="tools">'+esc(tr('advisor.tab.tools','Super Tools'))+'</button>';
   Array.from(document.querySelectorAll('.tab')).forEach(b=>b.addEventListener('click',()=>{ state.tab=b.getAttribute('data-tab'); render(); }));
 }
 
@@ -232,7 +245,7 @@ function personaPickerHtml(){
     return '<button class="p-btn" title="'+esc(p.name)+'" data-pid="'+p.id+'" data-csstext="'+ring+'"><div data-csstext="'+img+'"></div></button>';
   }).join('');
   return '<div class="persona-pick">'+btns+'</div>'
-    + '<div class="persona-name"><b>'+esc(cur.name)+'</b> · '+esc(cur.role)+'</div>';
+    + '<div class="persona-name"><b>'+esc(cur.name)+'</b> · '+esc(isAr() && cur.roleAr ? cur.roleAr : cur.role)+'</div>';
 }
 
 function heroIdleHtml(){
@@ -242,9 +255,9 @@ function heroIdleHtml(){
     + '<div class="hero-shade1"></div><div class="hero-shade2"></div>'
     + '<div class="hero-chip"><span class="chip" data-csstext="background:rgba('+p.accent+',0.16);border:1px solid rgba('+p.accent+',0.55);box-shadow:0 0 14px rgba('+p.accent+',0.3)"><i data-csstext="background:rgb('+p.accent+');box-shadow:0 0 8px rgb('+p.accent+')"></i>'+esc(p.name)+'</span></div>'
     + '<div class="hero-copy">'
-    +   '<div class="hero-eyebrow">Ready when you are</div>'
-    +   '<div class="hero-title">Ask me anything about AML compliance.</div>'
-    +   '<div class="hero-lede">Every answer comes with a cited legal basis, a clear decision guide, and the recommended next steps.</div>'
+    +   '<div class="hero-eyebrow">'+esc(tr('advisor.hero.ready','Ready when you are'))+'</div>'
+    +   '<div class="hero-title">'+esc(tr('advisor.hero.title','Ask me anything about AML compliance.'))+'</div>'
+    +   '<div class="hero-lede">'+esc(tr('advisor.hero.lede','Every answer comes with a cited legal basis, a clear decision guide, and the recommended next steps.'))+'</div>'
     + '</div></div>';
 }
 function heroReasoningHtml(){
@@ -252,7 +265,7 @@ function heroReasoningHtml(){
   return '<div class="hero-reason">'
     + '<div class="scan"></div>'
     + '<div class="reason-av"><div data-csstext="background-image:url(\''+p.img+'\');background-position:'+p.pos+'"></div></div>'
-    + '<div class="reason-txt">Reviewing the cited legal sources…</div>'
+    + '<div class="reason-txt">'+esc(tr('advisor.hero.reviewing','Reviewing the cited legal sources…'))+'</div>'
     + '<div class="dots">'
     +   '<span data-csstext="background:var(--ac1);box-shadow:0 0 8px var(--ac1)"></span>'
     +   '<span data-csstext="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
@@ -266,12 +279,12 @@ function heroAnswerHtml(){
     const ok = la.ok !== false;
     const modelChip = la.model ? ' · '+la.model : '';
     return '<div class="card ans"><div class="card-pad">'
-      + '<div class="sec-lbl"><span>Advisor response</span><i></i></div>'
-      + '<div class="eyebrow">You asked</div>'
+      + '<div class="sec-lbl"><span>'+esc(tr('advisor.response','Advisor response'))+'</span><i></i></div>'
+      + '<div class="eyebrow">'+esc(tr('advisor.youAsked','You asked'))+'</div>'
       + '<div class="asked">'+esc(state.askedQuestion)+'</div>'
       + '<div data-csstext="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
-      +   '<span class="pill" data-csstext="'+pillStyle(ok?'low':'high')+'">'+esc(p.role)+'</span>'
-      +   '<span class="conf"'+(ok?'':' data-csstext="color:#FF8A8A"')+'>'+(ok?'<i></i>':'&#9888; ')+esc(state.mode+' mode'+modelChip)+'</span>'
+      +   '<span class="pill" data-csstext="'+pillStyle(ok?'low':'high')+'">'+esc(isAr() && p.roleAr ? p.roleAr : p.role)+'</span>'
+      +   '<span class="conf"'+(ok?'':' data-csstext="color:#FF8A8A"')+'>'+(ok?'<i></i>':'&#9888; ')+esc(tr('advisor.mode.'+state.mode,state.mode)+' '+tr('advisor.mode','mode').toLowerCase()+modelChip)+'</span>'
       + '</div>'
       /* A mode the backend could not afford is stated, never swallowed: the
          operator asked for deep analysis and must know they did not get it.
@@ -280,7 +293,7 @@ function heroAnswerHtml(){
       + '<div class="summary" data-csstext="white-space:pre-line">'+esc(la.text)+'</div>'
       + govFlagsHtml(la)
       + (la.auditLine ? '<div data-csstext="margin-top:20px;padding:10px 13px;border-radius:8px;background:#0B101A;border:1px solid rgba(255,255,255,0.06)"><div class="eyebrow" data-csstext="font-size:9.5px;word-break:break-all;color:#8A94A8">'+esc(la.auditLine)+'</div></div>' : '')
-      + '<button class="again" id="askAgain" data-csstext="margin-top:18px"><span>&#8634;</span> Ask another</button>'
+      + '<button class="again" id="askAgain" data-csstext="margin-top:18px"><span>&#8634;</span> '+esc(tr('advisor.askAnother','Ask another'))+'</button>'
       + '</div></div>';
   }
   /* No live answer in the answer phase: render the idle hero. Substituting a
@@ -296,21 +309,21 @@ function heroHtml(){
 
 function renderAsk(){
   const modes = MODES.map(m=>
-    '<button class="mode-btn'+(state.mode===m?' active':'')+'" data-mode="'+m+'">'+m+'</button>').join('');
+    '<button class="mode-btn'+(state.mode===m?' active':'')+'" data-mode="'+m+'">'+esc(tr('advisor.mode.'+m,m))+'</button>').join('');
   $('main').innerHTML =
     '<div class="ask-grid">'
     + '<div class="card"><div class="card-pad">'
-    +   '<div class="sec-lbl"><span>Your question</span><i></i></div>'
-    +   '<textarea class="q" id="qInput" aria-label="Compliance question" placeholder="Ask a compliance question, e.g. what CDD applies to a cross-border gold shipment?"></textarea>'
+    +   '<div class="sec-lbl"><span>'+esc(tr('advisor.question','Your question'))+'</span><i></i></div>'
+    +   '<textarea class="q" id="qInput" aria-label="'+esc(tr('advisor.question','Compliance question'))+'" placeholder="'+esc(tr('advisor.questionPlaceholder','Ask a compliance question, e.g. what CDD applies to a cross-border gold shipment?'))+'"></textarea>'
     +   '<p class="ai-transparency" role="note" data-csstext="margin:12px 0 0;font-size:11px;line-height:1.5;color:#8590A6">&#9888; You are interacting with an AI system (Anthropic Claude). Output is decision-support only — it is not a compliance decision. MLRO review required.</p>'
     +   (aupAcked() ? '' : '<div id="aupGate" role="note" data-csstext="margin-top:12px;padding:11px 13px;border-radius:8px;background:#1A1206;border:1px solid rgba(255,180,80,0.4);font-size:11.5px;line-height:1.55;color:#E8C28A">By using the Advisor you accept the <strong>AI Acceptable-Use Policy</strong>: decision-support only · MLRO review required · no tipping-off · do not paste data that must not leave the device. <button id="aupAckBtn" type="button" data-csstext="margin-left:6px;padding:5px 11px;border-radius:6px;border:1px solid rgba(255,180,80,0.6);background:rgba(255,180,80,0.14);color:#FFD9A0;cursor:pointer;font:inherit;font-size:11px">I acknowledge</button></div>')
     +   '<div data-csstext="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px">'
-    +     '<button class="ask-btn" id="askBtn">Ask the advisor <span data-csstext="font-size:11px">&#9658;</span></button>'
+    +     '<button class="ask-btn" id="askBtn">'+esc(tr('advisor.ask','Ask the advisor'))+' <span data-csstext="font-size:11px">&#9658;</span></button>'
     +   '</div>'
-    +   '<div class="mode-strip"><span class="ml">Mode</span><div class="mode-group">'+modes+'</div></div>'
+    +   '<div class="mode-strip"><span class="ml">'+esc(tr('advisor.mode','Mode'))+'</span><div class="mode-group">'+modes+'</div></div>'
     + '</div></div>'
     + '<div>'
-    +   '<div data-csstext="margin-bottom:16px"><div class="sec-lbl" data-csstext="margin-bottom:11px"><span>Advisor persona</span><i></i></div>'+personaPickerHtml()+'</div>'
+    +   '<div data-csstext="margin-bottom:16px"><div class="sec-lbl" data-csstext="margin-bottom:11px"><span>'+esc(tr('advisor.persona','Advisor persona'))+'</span><i></i></div>'+personaPickerHtml()+'</div>'
     +   '<div id="hero" role="status" aria-live="polite">'+heroHtml()+'</div>'
     +   '<div id="govStrip">'+govStatsHtml()+'</div>'
     + '</div>'
@@ -342,7 +355,7 @@ function ask(){
   if(!q){
     askSeq++;   // invalidate any in-flight ask so a late answer can't overwrite this prompt
     state.askedQuestion = ''; state.phase = 'answer';
-    state.liveAnswer = {ok:false, text:'Please enter a question for the advisor.'};
+    state.liveAnswer = {ok:false, text:tr('advisor.emptyQuestion','Please enter a question for the advisor.')};
     $('hero').innerHTML = heroHtml(); applyCssText($('hero')); bindHero(); return;
   }
   // PII guard: warn (once) before identifiers leave the device.
@@ -425,7 +438,7 @@ function ask(){
    that error rather than rendering an empty hero. */
 function answerFromResponse(data){
   if(data && data.text) return data;
-  return {ok:false, text:(data && data.error) ? String(data.error) : 'The advisor is unavailable — please try again.'};
+  return {ok:false, text:(data && data.error) ? String(data.error) : tr('advisor.unavailable','The advisor is unavailable — please try again.')};
 }
 function reset(){ clearTimeout(reasoningTimer); askSeq++; state.phase='idle'; state.liveAnswer=null; $('hero').innerHTML = heroHtml(); applyCssText($('hero')); }
 
@@ -434,9 +447,9 @@ function askQuestion(q){ state.tab='ask'; state.question=q; render(); }
 function renderQa(){
   $('main').innerHTML =
     '<div class="qa-wrap">'
-    + '<div class="sec-lbl"><span>Regulatory Q&amp;A</span><i></i></div>'
-    + '<div class="qa-desc">Source-cited regulatory questions, grouped by topic and grounded in UAE Federal Decree-Law No. 10 of 2025, Cabinet Resolution No. (134) of 2025 and FATF. Pick a question to read its cited answer.</div>'
-    + '<input class="qa-filter" id="qaFilter" aria-label="Filter questions" placeholder="Filter questions…">'
+    + '<div class="sec-lbl"><span>'+esc(tr('advisor.qa.title','Regulatory Q&A'))+'</span><i></i></div>'
+    + '<div class="qa-desc">'+esc(tr('advisor.qa.desc','Source-cited regulatory questions, grouped by topic and grounded in UAE Federal Decree-Law No. 10 of 2025, Cabinet Resolution No. (134) of 2025 and FATF. Pick a question to read its cited answer.'))+'</div>'
+    + '<input class="qa-filter" id="qaFilter" aria-label="'+esc(tr('advisor.qa.filter','Filter questions'))+'" placeholder="'+esc(tr('advisor.qa.filter','Filter questions…'))+'">'
     + '<div class="reg-groups" id="regGroups"></div>'
     + '</div>';
   const f = $('qaFilter');
@@ -452,8 +465,8 @@ function regAnswerHtml(ans){
   const basis = refs.map(r=>'<div class="qa-basis"><div class="ref">'+esc(r.ref)+'</div><div class="note">'+esc(r.note)+'</div></div>').join('');
   return '<div class="qa-body">'
     + (ans.a ? '<div class="qa-summary">'+esc(ans.a)+'</div>' : '')
-    + (basis ? '<div class="block-h">Cited basis<i></i></div><div data-csstext="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'+basis+'</div>' : '')
-    + '<button class="again" data-ask="'+esc(qText(ans))+'"><span>&#8634;</span> Take to the advisor</button>'
+    + (basis ? '<div class="block-h">'+esc(tr('advisor.citedBasis','Cited basis'))+'<i></i></div><div data-csstext="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'+basis+'</div>' : '')
+    + '<button class="again" data-ask="'+esc(qText(ans))+'"><span>&#8634;</span> '+esc(tr('advisor.takeToAdvisor','Take to the advisor'))+'</button>'
     + '</div>';
 }
 function renderRegGroups(){
@@ -473,7 +486,7 @@ function renderRegGroups(){
     }).join('')+'</div>';
     html += '</div>';
   });
-  $('regGroups').innerHTML = html || '<p class="empty">No questions match “'+esc(fil)+'”.</p>';
+  $('regGroups').innerHTML = html || '<p class="empty">'+esc(tr('advisor.qa.noMatch','No questions match “'+fil+'”.',{q:fil}))+'</p>';
   applyCssText($('regGroups'));
   Array.from(document.querySelectorAll('.reg-cat-head')).forEach(b=>b.addEventListener('click',()=>{ const gi=+b.getAttribute('data-gi'); state.regOpen = state.regOpen===gi?null:gi; state.qOpen=null; renderRegGroups(); }));
   Array.from(document.querySelectorAll('.reg-q')).forEach(b=>b.addEventListener('click',()=>{ const key=b.getAttribute('data-gi')+'␟'+b.getAttribute('data-q'); state.qOpen = state.qOpen===key?null:key; renderRegGroups(); }));
@@ -508,13 +521,13 @@ const GROUP_PLAY = {
 function toolsList(){ return (typeof window!=='undefined' && Array.isArray(window.SUPER_TOOLS) && window.SUPER_TOOLS.length) ? window.SUPER_TOOLS : [{id:'escalation', label:'⚡ Escalation Decision Engine', group:'Core Tools'}]; }
 function currentTool(){ const L=toolsList(); return L.find(t=>t.id===state.toolId) || L[0]; }
 const ESC_FIELDS = [
-  {key:'subject', label:'Subject name', req:true, ph:'Full subject name'},
-  {key:'risk', label:'Risk score (0-100)', ph:'e.g. 87', num:true},
-  {key:'sanctions', label:'Sanctions hits (comma-separated)', ph:'OFAC, UN, EU'},
-  {key:'pep', label:'PEP tier', ph:'national, ministerial, local…'},
-  {key:'typologies', label:'Typologies (comma-separated)', ph:'structuring, layering, tbml'},
-  {key:'jurisdictions', label:'Jurisdictions (comma-separated)', ph:'RU, IR, AE'},
-  {key:'notes', label:'Additional notes', ph:'Any additional context…', area:true}
+  {key:'subject', label:'Subject name', labelAr:'اسم الطرف', req:true, ph:'Full subject name', phAr:'الاسم الكامل للطرف'},
+  {key:'risk', label:'Risk score (0-100)', labelAr:'درجة المخاطر (0-100)', ph:'e.g. 87', phAr:'مثلاً 87', num:true},
+  {key:'sanctions', label:'Sanctions hits (comma-separated)', labelAr:'مطابقات العقوبات (مفصولة بفواصل)', ph:'OFAC, UN, EU', phAr:'OFAC, UN, EU'},
+  {key:'pep', label:'PEP tier', labelAr:'فئة الشخص المعرّض سياسياً', ph:'national, ministerial, local…', phAr:'وطني، وزاري، محلي…'},
+  {key:'typologies', label:'Typologies (comma-separated)', labelAr:'الأنماط (مفصولة بفواصل)', ph:'structuring, layering, tbml', phAr:'التجزئة، التمويه، TBML'},
+  {key:'jurisdictions', label:'Jurisdictions (comma-separated)', labelAr:'الاختصاصات (مفصولة بفواصل)', ph:'RU, IR, AE', phAr:'RU, IR, AE'},
+  {key:'notes', label:'Additional notes', labelAr:'ملاحظات إضافية', ph:'Any additional context…', phAr:'أي سياق إضافي…', area:true}
 ];
 function escalationRun(v){
   const subject = (v.subject||'').trim() || 'the subject';
@@ -564,10 +577,12 @@ function genericRun(tool, ctx){
     triggers: refs, actions: play.steps };
 }
 function renderField(f){
-  const lab='<label class="tf-label" for="tf_'+f.key+'">'+esc(f.label)+(f.req?' <span data-csstext="color:var(--ac2)">*</span>':'')+'</label>';
+  const label = isAr() && f.labelAr ? f.labelAr : f.label;
+  const ph = isAr() && f.phAr ? f.phAr : f.ph;
+  const lab='<label class="tf-label" for="tf_'+f.key+'">'+esc(label)+(f.req?' <span data-csstext="color:var(--ac2)">*</span>':'')+'</label>';
   const inp = f.area
-    ? '<textarea class="tf-input" id="tf_'+f.key+'" rows="4" placeholder="'+esc(f.ph)+'"></textarea>'
-    : '<input class="tf-input" id="tf_'+f.key+'"'+(f.num?' inputmode="numeric"':'')+' placeholder="'+esc(f.ph)+'">';
+    ? '<textarea class="tf-input" id="tf_'+f.key+'" rows="4" placeholder="'+esc(ph)+'"></textarea>'
+    : '<input class="tf-input" id="tf_'+f.key+'"'+(f.num?' inputmode="numeric"':'')+' placeholder="'+esc(ph)+'">';
   return '<div class="tf-row'+(f.area?' tf-area':'')+'">'+lab+inp+'</div>';
 }
 function renderToolResult(){
@@ -581,13 +596,13 @@ function renderToolResult(){
       +   '<span data-csstext="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.18s"></span>'
       +   '<span data-csstext="background:var(--ac2);box-shadow:0 0 8px var(--ac2);animation-delay:.36s"></span>'
       + '</div>'
-      + '<div data-csstext="font-family:var(--mono);font-size:12px;color:#828DA4">Compiling cited guidance…</div>'
+      + '<div data-csstext="font-family:var(--mono);font-size:12px;color:#828DA4">'+esc(tr('advisor.tools.compiling','Compiling cited guidance…'))+'</div>'
       + '</div>';
   }
   if(r.kind==='brain'){
     return '<div class="tool-result">'
       + '<div data-csstext="margin:20px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-      +   '<span class="pill" data-csstext="'+pillStyle(r.ok!==false?'low':'high')+'">Brain-powered analysis</span>'
+      +   '<span class="pill" data-csstext="'+pillStyle(r.ok!==false?'low':'high')+'">'+esc(tr('advisor.tools.brain','Brain-powered analysis'))+'</span>'
       +   (r.model ? '<span class="conf"><i></i>'+esc(r.model)+'</span>' : '')
       + '</div>'
       + '<div class="summary" data-csstext="white-space:pre-line">'+esc(r.text)+'</div>'
@@ -595,7 +610,7 @@ function renderToolResult(){
       + '</div>';
   }
   const head = r.kind==='generic'
-    ? '<div data-csstext="margin:20px 0 14px"><span class="pill" data-csstext="'+pillStyle('low')+'">Deterministic guidance</span></div>'
+    ? '<div data-csstext="margin:20px 0 14px"><span class="pill" data-csstext="'+pillStyle('low')+'">'+esc(tr('advisor.tools.deterministic','Deterministic guidance'))+'</span></div>'
     : '<div data-csstext="margin:20px 0 14px"><span class="pill" data-csstext="'+pillStyle(r.tone)+'">'+esc(r.verdict)+'</span></div>';
   const trig = r.triggers.map(t=>{
     const cite = esc(t.ref||t.label||''), note = esc(t.note||(t.ref?t.label:'')||'');
@@ -605,9 +620,9 @@ function renderToolResult(){
   return '<div class="tool-result">'
     + head
     + '<div class="summary">'+esc(r.summary)+'</div>'
-    + '<div class="block-h">'+(r.kind==='generic'?'Cited basis':'Triggers &amp; cited basis')+'<i></i></div>'
+    + '<div class="block-h">'+(r.kind==='generic'?esc(tr('advisor.citedBasis','Cited basis')):esc(tr('advisor.tools.triggers','Triggers & cited basis')))+'<i></i></div>'
     + '<div data-csstext="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">'+trig+'</div>'
-    + '<div class="block-h">'+(r.kind==='generic'?'Recommended steps':'Required actions')+'<i></i></div>'
+    + '<div class="block-h">'+(r.kind==='generic'?esc(tr('advisor.tools.recommended','Recommended steps')):esc(tr('advisor.tools.required','Required actions')))+'<i></i></div>'
     + '<div data-csstext="display:flex;flex-direction:column;gap:9px">'+acts+'</div>'
     + '</div>';
 }
@@ -622,14 +637,14 @@ function renderTools(){
   if(curG!==null) opts+='</optgroup>';
   const title = stripEmoji(tool.label);
   const form = isEsc ? ESC_FIELDS.map(renderField).join('')
-    : renderField({key:'context', label:'Case context / details', req:true, area:true,
-        ph:'Describe the scenario, transactions or behaviour. Use roles / categories (e.g. “a tier-1 PEP”, “a DPMS dealer”), not named parties.'});
-  const cta = isEsc ? 'Get Escalation Decision' : 'Run '+title;
+    : renderField({key:'context', label:tr('advisor.tools.context','Case context / details'), req:true, area:true,
+        ph:tr('advisor.tools.contextPh','Describe the scenario, transactions or behaviour. Use roles / categories (e.g. “a tier-1 PEP”, “a DPMS dealer”), not named parties.')});
+  const cta = isEsc ? tr('advisor.tools.escalation','Get Escalation Decision') : tr('advisor.tools.run','Run '+title,{tool:title});
   $('main').innerHTML =
     '<div class="qa-wrap">'
-    + '<div class="sec-lbl"><span>Super Tools</span><i></i></div>'
-    + '<div class="qa-desc">Specialist MLRO tools — every tool returns an instant, deterministic, citation-backed result keyed to the scenario. Pick a tool, fill the inputs, and run.</div>'
-    + '<select class="tool-select" id="toolSelect" aria-label="Select tool">'+opts+'</select>'
+    + '<div class="sec-lbl"><span>'+esc(tr('advisor.tools.title','Super Tools'))+'</span><i></i></div>'
+    + '<div class="qa-desc">'+esc(tr('advisor.tools.desc','Specialist MLRO tools — every tool returns an instant, deterministic, citation-backed result keyed to the scenario. Pick a tool, fill the inputs, and run.'))+'</div>'
+    + '<select class="tool-select" id="toolSelect" aria-label="'+esc(tr('advisor.tools.select','Select tool'))+'">'+opts+'</select>'
     + '<div class="card" data-csstext="margin-top:14px"><div class="card-pad">'
     +   '<div class="tool-title">'+esc(tool.label)+'</div>'
     +   '<div class="tool-form">'+form+'</div>'
@@ -643,12 +658,12 @@ function renderTools(){
   const run=$('toolRun'); if(run) run.addEventListener('click', ()=>{
     const t=currentTool();
     if(t.id==='escalation'){
-      if(!String(state.toolInputs.subject||'').trim()){ state.toolResult={error:'Subject name is required.'}; renderResultOnly(); const el=$('tf_subject'); if(el&&el.focus) el.focus(); return; }
+      if(!String(state.toolInputs.subject||'').trim()){ state.toolResult={error:tr('advisor.tools.subjectRequired','Subject name is required.')}; renderResultOnly(); const el=$('tf_subject'); if(el&&el.focus) el.focus(); return; }
       state.toolResult = escalationRun(state.toolInputs);
       renderResultOnly();
     } else {
       const ctx = String(state.toolInputs.context||'').trim();
-      if(!ctx){ state.toolResult={error:'Please add some case context.'}; renderResultOnly(); const el=$('tf_context'); if(el&&el.focus) el.focus(); return; }
+      if(!ctx){ state.toolResult={error:tr('advisor.tools.contextRequired','Please add some case context.')}; renderResultOnly(); const el=$('tf_context'); if(el&&el.focus) el.focus(); return; }
       state.toolResult = {kind:'loading'};
       renderResultOnly();
       const result = genericRun(t, ctx);
@@ -705,6 +720,14 @@ render();
   render(); setInterval(render, 1000);
 })();
 
+
+/* Re-render JavaScript-built chrome when the shared language changes. */
+if(typeof window!=='undefined' && window.addEventListener){
+  window.addEventListener('hsra:langchange', function(){
+    renderAvatar();
+    render();
+  });
+}
 
 /* CSP-safe wiring: replaces the former inline onclick on the language toggle.
    hsToggleLang is a global defined in i18n.js (loaded earlier on the page). */

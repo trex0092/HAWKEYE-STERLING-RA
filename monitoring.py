@@ -292,6 +292,15 @@ def monitor_run(today, counts, timings=None, llm_calls=None, path=None, persist=
     return {"snapshot": snap, **res}
 
 
+# Thin news coverage also earns a make-up sweep. On 3 Oct 2026 GDELT reached 0
+# subjects and Google News 24, so 972 of 996 subjects were reached by Bing
+# alone; am_errors stayed 0 (one feed counts as covered) and the 03:07 make-up
+# firing exited in 40 s. A subject reached by ONE feed or NONE counts as thin;
+# when they are at least this share of the book, a fresh runner re-sweeps.
+# A make-up run never re-triggers on thin coverage alone (bounded: at most one
+# thin-coverage make-up per day). 0 disables.
+MAKEUP_THIN_FEED_PCT = float(os.environ.get("MAKEUP_THIN_FEED_PCT", "0.5"))
+
 def makeup_decision(today, path=None):
     """Should a same-day coverage MAKE-UP sweep run? Consulted by the retry
     firings of the daily screening on days that already have a successful run:
@@ -324,6 +333,13 @@ def makeup_decision(today, path=None):
             bits.append(f"{pep} individual(s) lost PEP coverage")
         return {"sweep": True, "uncovered": am + pep,
                 "reason": " and ".join(bits) + " in today's earlier run"}
+    subjects = int(counts.get("subjects") or 0)
+    thin = int(counts.get("feed_single") or 0) + int(counts.get("feed_none") or 0)
+    if (MAKEUP_THIN_FEED_PCT > 0 and subjects and not counts.get("makeup")
+            and thin / subjects >= MAKEUP_THIN_FEED_PCT):
+        return {"sweep": True, "uncovered": thin,
+                "reason": (f"{thin} of {subjects} subject(s) were reached by one news feed or none "
+                           "in today's earlier run — re-sweeping from a fresh runner for multi-feed coverage")}
     return {"sweep": False, "uncovered": 0,
             "reason": "today's earlier run had full news + PEP coverage — make-up sweep not needed"}
 
@@ -436,6 +452,67 @@ def _fmt_count(x):
 # escalation verdict for the anomaly-watch workflow to act on. Always exits 0
 # (a missing/short history is simply "no escalation"), so the workflow stays
 # green and only opens an issue when there is a genuine sustained anomaly.
+# ── Population Stability Index (docs/aims/population-stability-monitoring.md) ─
+# The spec's §1 metric, as a pure function so the quarterly review and the
+# eventual scheduled wiring compute it the same way:
+#   PSI = Σ over bins (actual% − expected%) × ln(actual% ÷ expected%)
+# Guards from the spec: bins whose EXPECTED count is < 5 are merged into the
+# next bin before computing (a trailing remainder merges backwards), and a
+# window with total actual or expected n < 50 reports "n too small", never a
+# score. A bin with actual (or expected) share 0 after merging would make the
+# log undefined; it is floored at PSI_EPSILON, the usual convention, and the
+# floor is reported so the reader knows the score leaned on it.
+PSI_MIN_N = 50
+PSI_MIN_BIN = 5
+PSI_EPSILON = 1e-4
+
+def psi_reading(value):
+    """§1 reading: < 0.10 stable · 0.10–0.25 investigate · > 0.25 action."""
+    if value is None:
+        return "n too small"
+    if value < 0.10:
+        return "stable"
+    return "investigate" if value <= 0.25 else "action"
+
+def population_stability_index(expected, actual):
+    """expected/actual: equal-length lists of bin COUNTS (same bin order).
+    Returns {"psi": float|None, "reading": str, "bins": int, "floored": int,
+    "n_expected": int, "n_actual": int}. Never raises on short or empty data:
+    a window too small to judge says so instead of reporting a number."""
+    if len(expected) != len(actual) or not expected:
+        raise ValueError("expected and actual must be non-empty and the same length")
+    exp = [max(0, int(x)) for x in expected]
+    act = [max(0, int(x)) for x in actual]
+    n_e, n_a = sum(exp), sum(act)
+    out = {"psi": None, "reading": "n too small", "bins": 0, "floored": 0,
+           "n_expected": n_e, "n_actual": n_a}
+    if n_e < PSI_MIN_N or n_a < PSI_MIN_N:
+        return out
+    merged, cur_e, cur_a = [], 0, 0
+    for e, a in zip(exp, act):
+        cur_e += e
+        cur_a += a
+        if cur_e >= PSI_MIN_BIN:
+            merged.append([cur_e, cur_a])
+            cur_e, cur_a = 0, 0
+    if cur_e or cur_a:
+        if merged:
+            merged[-1][0] += cur_e
+            merged[-1][1] += cur_a
+        else:
+            merged.append([cur_e, cur_a])
+    import math
+    total, floored = 0.0, 0
+    for e, a in merged:
+        pe, pa = e / n_e, a / n_a
+        if pe <= 0 or pa <= 0:
+            floored += 1
+            pe, pa = max(pe, PSI_EPSILON), max(pa, PSI_EPSILON)
+        total += (pa - pe) * math.log(pa / pe)
+    out.update(psi=round(total, 6), reading=psi_reading(total), bins=len(merged), floored=floored)
+    return out
+
+
 if __name__ == "__main__":
     import sys
     mode = sys.argv[1] if len(sys.argv) > 1 else "escalate"

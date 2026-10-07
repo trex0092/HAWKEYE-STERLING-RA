@@ -36,8 +36,8 @@ mode. Then the §6 TEST-000 verification before real use.
 - Roles are stored per device; changes are audit-logged.
 
 ## Enabling the AI features (after the DPA)
-1. Sign the Anthropic DPA; confirm the PDPL transfer basis.
-2. Set `LLM_TRIAGE=1` (adverse-media triage) and/or provision `ANTHROPIC_API_KEY`
+1. Verify and record the executed Anthropic DPA, contracted processing terms and PDPL transfer basis. If execution cannot be verified, keep customer-data egress gated and close open actions 36/42 before enabling triage.
+2. Set `LLM_TRIAGE=1` (adverse-media triage) only after the triage go-live checklist is signed, and/or provision `ANTHROPIC_API_KEY`
    for the Advisor. With no key, everything runs deterministic with no egress.
 3. The quarterly advisor bias eval then self-runs.
 
@@ -45,8 +45,10 @@ mode. Then the §6 TEST-000 verification before real use.
 - **Backups/DR** — the Asana mirror + monthly git commit of risk-data overrides
   are automatic; GitHub/Netlify/Asana form the recovery triangle (see
   [`backup-recovery.md`](../governance/backup-recovery.md)).
-- **BCP drill** — periodically confirm a second person can rotate secrets and
-  operate (closes risk R-17).
+- **BCP drill** — periodically confirm a second trained operator can recover and
+  operate the service without the primary administrator. The first recorded cycle
+  remains open under governance item 44 and is the mitigation path for risk R-17.
+  Record the drill in [`../aims/bcp-exercise-record.md`](../aims/bcp-exercise-record.md).
 - **Monitoring** — the assurance workflows run themselves (live count in
   [`data/board-figures.json`](../../data/board-figures.json), generated, never
   hand-maintained); the daily AI Governance Report flags any control that stops

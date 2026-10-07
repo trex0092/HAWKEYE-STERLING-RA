@@ -28,6 +28,9 @@ on:
       - 'netlify/functions/brain-soul.js'
       - 'data/ai-assets.json'
       - 'scripts/advisor-eval.mjs'
+      # The workflow itself decides how the eval runs (secret, egress
+      # allow-list, failure routing): a change to it is re-verified too.
+      - '.github/workflows/advisor-eval.yml'
 
 # Least privilege at the top level; the job declares its own write scope.
 permissions:
@@ -104,7 +107,10 @@ jobs:
           # from a repo variable: a stale variable cannot misroute an approved
           # destination, and test/asana-notify.test.mjs fails CI on any
           # unapproved section literal.
-          ASANA_SECTION_GID: '1218451992088222'
+          # REPOINTED 2026-10-03: "AI & Platform Governance" is now an approved
+          # section (1218985347982681, registered in asana-sections.mjs against
+          # the live project), so the Advisor guardrail result is filed there.
+          ASANA_SECTION_GID: '1218985347982681'
         # Title must not claim a regression when the eval could not run (e.g. the
         # API returned 400s on a billing lapse) — the report's Result line is the
         # discriminator, written by scripts/advisor-eval.mjs.

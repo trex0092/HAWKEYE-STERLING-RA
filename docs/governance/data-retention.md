@@ -35,12 +35,20 @@ compliance officer's own device, with explicit, auditable relays to Asana and gi
 - **Third-party data risk.** Anthropic is the only LLM processor (see the asset register); regulatory
   sources are public. Asana is the task/record processor under the workspace agreement.
 
-## Open items (Layer 2 residual gaps)
+## Current residual items
 
-- **Formal DPIA** covering the on-device processing and the Anthropic processing (GDPR/PDPL).
-- **Advisor bias review** — a periodic qualitative review of Advisor outputs for skew across
-  jurisdictions/typologies (the structural invariants are checked by `scripts/advisor-eval.mjs`; bias
-  is a human-judgement review, tracked here).
+The former DPIA and Advisor-bias-review gaps are no longer open: the 2026 DPIA is on file and the
+2026-10-01 quarterly Advisor Bias Eval completed with 0 findings and 0 eval errors. Current residual
+data-governance items are tracked rather than hidden here:
+
+- **Vendor / cross-border evidence:** Asana and Anthropic assurance records still require the
+  confirmations in open-actions items 35 and 36; Composio remains gated by item 29 and the transfer
+  position remains subject to item 11.
+- **Confidential endpoint identity:** the shared-token controls protect the configured path but are not
+  verified per-user authentication or RBAC; open-actions item 20 is the closure path.
+- **Persistence and recovery objective:** Asana mirrors provide off-device operational copies, while a
+  dedicated authenticated persistence tier and explicit assessment-data RPO/RTO remain open under
+  item 23.
 
 > **Guidance for officers.** Treat the Advisor as decision support. Do not paste material into it that
 > must not leave the device. The authoritative record of any assessment is the on-device register and

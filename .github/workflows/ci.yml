@@ -59,6 +59,8 @@ jobs:
         run: node test/crypto-b64.test.mjs
       - name: Run CSP-report function tests
         run: node test/csp-report.test.js
+      - name: Run browser + function error telemetry tests
+        run: node test/telemetry.test.mjs
       - name: Validate CycloneDX SBOM generator
         run: node test/sbom.test.mjs
       - name: Check CHANGELOG format
@@ -163,6 +165,8 @@ jobs:
         run: node scripts/reg-sources-doc.mjs --check
       - name: Check the GRC metrics snapshot is in sync with the estate
         run: node scripts/grc-metrics.mjs --check
+      - name: Check enterprise AI governance controls, evidence freshness and generated views
+        run: node scripts/ai-governance-controls.mjs --check
       - name: Check the README coverage figures are in sync with the screening configuration
         run: node scripts/coverage-figures.mjs --check
       - name: Check the country coverage gap report is in sync with the screening configuration
@@ -185,6 +189,10 @@ jobs:
         run: node test/composio-integration.test.mjs
       - name: Run obligation register test (instruments, controls, watch sources)
         run: node test/obligations.test.mjs
+      - name: Run external screening benchmark (independent MIT Cascade name pairs; ratchet floors)
+        run: node test/external-benchmark.test.mjs
+      - name: Run country AML intelligence link test (every jurisdiction maps to a listed page; link-only, no content)
+        run: node test/country-intel-links.test.mjs
       - name: Run GRC metrics test (metric bases + KRI wiring + appetite vs code)
         run: node test/grc-metrics.test.mjs
       - name: Run policy register test (ownership, approval record, shadow-policy sweep)
@@ -230,7 +238,7 @@ jobs:
         # so they compile here with everything else.
         # str_dossier.py was missing from this list while being exercised by
         # test/engine_test.py — tested, but never syntax-gated.
-        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py str_dossier.py mcp_tools.py mcp_server.py scripts/matcher-parity-probe.py scripts/daily-screen-fetch.py scripts/daily-screen-run.py scripts/daily-screen-report.py
+        run: python -m py_compile screen.py ai.py agents.py kyc.py txn_monitor.py payment_screen.py monitoring.py str_dossier.py mcp_tools.py mcp_server.py scripts/matcher-parity-probe.py scripts/daily-screen-fetch.py scripts/daily-screen-run.py scripts/daily-screen-report.py
       - name: Run cross-engine matcher parity (screen.py vs sanctions-match.mjs)
         # Runs here, AFTER setup-python, because it drives both engines: the node
         # test shells to scripts/matcher-parity-probe.py. The per-backend accuracy

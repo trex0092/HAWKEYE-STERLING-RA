@@ -21,12 +21,12 @@
 [![PEP Configured Scope](data/badges/pep-worldwide.svg)](data/screening-country-coverage.json)
 
 **Worldwide screening scope:** the configured sanctions, adverse-media and PEP controls apply to the full 195-country subject universe. Runtime operational status is reported separately above from actual screening evidence. Dedicated national sanctions sources and dedicated Google News editions are depth metrics shown below.
-[![Sanctions Lists Screened](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsLists&label=sanctions%20lists%20screened&color=b31b1b)](data/coverage-figures.json)
-[![Sanctions Jurisdictions](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsJurisdictions&label=sanctions%20jurisdictions&color=b31b1b)](data/coverage-figures.json)
-[![Sanctions Countries Researched](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsCountriesResearched&label=sanctions%20countries%20researched&suffix=%20%2F%20195&color=b31b1b)](data/sanctions-country-coverage.json)
-[![Adverse Media Editions](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaEditions&label=adverse%20media%20editions&color=e67e22)](data/coverage-figures.json)
-[![Adverse Media Countries](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaCountries&label=adverse%20media%20countries&color=e67e22)](data/coverage-figures.json)
-[![Adverse Media Languages](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaLanguages&label=adverse%20media%20languages&color=e67e22)](data/coverage-figures.json)
+[![Sanctions Lists Screened](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsLists&label=sanctions%20lists%20screened&color=007ec6)](data/coverage-figures.json)
+[![Sanctions Jurisdictions](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsJurisdictions&label=sanctions%20jurisdictions&color=007ec6)](data/coverage-figures.json)
+[![Sanctions Countries Researched](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.sanctionsCountriesResearched&label=sanctions%20countries%20researched&suffix=%20%2F%20195&color=007ec6)](data/sanctions-country-coverage.json)
+[![Adverse Media Editions](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaEditions&label=adverse%20media%20editions&color=007ec6)](data/coverage-figures.json)
+[![Adverse Media Countries](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaCountries&label=adverse%20media%20countries&color=007ec6)](data/coverage-figures.json)
+[![Adverse Media Languages](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrex0092%2FHAWKEYE-STERLING-RA%2Fmain%2Fdata%2Fcoverage-figures.json&query=%24.figures.adverseMediaLanguages&label=adverse%20media%20languages&color=007ec6)](data/coverage-figures.json)
 [![Adverse media backbones](https://img.shields.io/badge/adverse%20media%20backbones-Google%20News%20%C2%B7%20GDELT%20%C2%B7%20Bing-e67e22)](scripts/adverse-media.mjs)
 [![PEP source](https://img.shields.io/badge/PEP-worldwide%20%28Wikidata%29%20%2B%20RCA-8e44ad)](screen.py)
 [![PEP Harvest](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/pep-worldwide.yml?branch=main&label=pep%20harvest)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/pep-worldwide.yml)
@@ -35,7 +35,7 @@
 
 [![CI](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/ci.yml/badge.svg)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/codeql.yml/badge.svg)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/codeql.yml)
-[![Daily Screening](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/weekly-adverse-media.yml?branch=main&label=daily%20screening)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/weekly-adverse-media.yml)
+[![Daily Screening](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/weekly-adverse-media.yml/badge.svg?branch=main&event=schedule)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/weekly-adverse-media.yml)
 [![Controls Freshness](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/freshness-check.yml?branch=main&label=controls%20freshness)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/freshness-check.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/trex0092/HAWKEYE-STERLING-RA/badge)](https://scorecard.dev/viewer/?uri=github.com/trex0092/HAWKEYE-STERLING-RA)
 [![Latest Release](https://img.shields.io/github/v/release/trex0092/HAWKEYE-STERLING-RA?label=release)](https://github.com/trex0092/HAWKEYE-STERLING-RA/releases)
@@ -57,7 +57,7 @@
 [![Attestation Verify](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/attestation-verify.yml?branch=main&label=attestation%20verify)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/attestation-verify.yml)
 [![Bandit](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/bandit.yml?branch=main&label=bandit)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/bandit.yml)
 [![Fortify](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/fortify.yml?branch=main&label=fortify)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/fortify.yml)
-[![Dependency Review](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/dependency-review.yml?branch=main&label=dependency%20review)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/dependency-review.yml)
+[![Dependency Review](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/dependency-review.yml?event=pull_request&label=dependency%20review)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/dependency-review.yml)
 [![Lighthouse](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/lighthouse.yml?branch=main&label=lighthouse)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/lighthouse.yml)
 [![Scorecard](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/scorecard.yml?branch=main&label=scorecard)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/scorecard.yml)
 
@@ -501,16 +501,22 @@ view is the [roadmap](docs/executive/roadmap.md).
   R-13. An interim manual compensating control was adopted 2026-07-29.
 - **Part of the policy pack is draft.** Two procedures are approved and in
   force; sixteen instruments await Board approval (register item 18).
-- **Function endpoints are effectively public by design.** A static browser
-  app cannot keep a real secret; Origin and shared-token checks deter but do
-  not authenticate - [`netlify/functions/_auth.js`](netlify/functions/_auth.js)
-  states this honestly. Verified identity is register item 20.
-- **Assessments persist on-device only** (`localStorage`); the only off-device
-  copy is the override-sheet mirror. A server-side persistence tier with an
-  RPO/RTO statement is register item 23.
-- **The LLM layer ships disabled.** Every LLM path is fail-closed behind
-  `ANTHROPIC_API_KEY` *plus* an explicit opt-in flag, both default off pending
-  the Anthropic DPA - production behaviour is deterministic-only.
+- **Function endpoints can be effectively public when `APP_SHARED_TOKEN` is unset.**
+  Confidential read relays require `X-App-Token` when the shared token is configured,
+  but that shared bearer secret is still not verified per-user identity or RBAC. The
+  repository does not infer the live environment setting; verified identity is register
+  item 20. See [`netlify/functions/_auth.js`](netlify/functions/_auth.js).
+- **Assessments and the activity log are primarily on-device** (`localStorage`).
+  Asana mirrors provide off-device operational copies of the assessment register,
+  activity log and risk-data overrides, but there is no dedicated authenticated
+  persistence tier with a documented and rehearsed assessment-data RPO/RTO. That
+  remaining preservation gap is register item 23.
+- **LLM runtime state is mixed and must not be inferred from defaults.** The Advisor
+  is an active on-request Anthropic surface. Adverse-media triage code defaults OFF
+  and requires explicit `LLM_TRIAGE=1`, but the repository cannot read the live
+  repo-variable value; the third-party register preserves a 2026-07-16 owner
+  attestation that it was enabled while the formal DPA/go-live evidence remains
+  unresolved. Items 36 and 42 reconcile the legal and runtime records.
 - **Alert delivery is Asana-only.** A delivery failure fails the run loudly,
   but no second channel pages anyone - register item 21.
 - **Arabic coverage is partial.** The assessment screen is fully translated;

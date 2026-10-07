@@ -24,9 +24,10 @@ this file that would alter *their* authority is itself a Board act.
   encoded as config-as-code in [`.github/settings.yml`](.github/settings.yml)
   and drift-guarded by `test/protection-contexts.test.mjs`.
 - `enforce_admins` is intentionally off: the sole maintainer merges
-  owner-authored PRs after CI passes. That bypass is a **documented,
-  risk-accepted** consequence of single-maintainer operation (risk **R-17**),
-  not an oversight — see the hardening doc for the compensating controls.
+  owner-authored PRs after CI passes. That bypass is a **documented consequence**
+  of single-maintainer operation under risk **R-17**, not a silently accepted
+  exception. R-17 remains on a Mitigate treatment, with the first BCP/second-operator
+  exercise tracked as open action 44. See the hardening doc for the compensating controls.
 
 ## Release authority
 
@@ -42,8 +43,9 @@ Single-maintainer key-person risk is carried openly as **R-17** in the
 [AI risk register](docs/aims/ai-risk-register.md), mitigated by
 [`docs/aims/bcp.md`](docs/aims/bcp.md), the
 [setup runbook](docs/app-setup-runbook.md) (which enables a second operator),
-and the succession record in [`MAINTAINERS.md`](MAINTAINERS.md). If the
-maintainer is unavailable, HS Management designates a successor per the BCP;
+and the succession record in [`MAINTAINERS.md`](MAINTAINERS.md). The first
+recorded second-operator exercise remains open under item 44. If the maintainer
+is unavailable, HS Management designates a successor per the BCP;
 the successor's first read is [`CLAUDE.md`](CLAUDE.md), which carries the
 repo's enforced invariants.
 

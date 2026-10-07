@@ -34,7 +34,7 @@
 <link rel="stylesheet" href="console.css">
 </head>
 <body>
-<a class="skip-link" href="#main">Skip to main content</a>
+<a class="skip-link" href="#main" data-i18n="skip.main">Skip to main content</a>
 <div class="bg-glow"></div>
 <div class="bg-grid"></div>
 <div class="wrap">
@@ -45,13 +45,13 @@
       <span class="sub" data-i18n="console.sub">Operations Console</span>
     </div>
     <div class="hdr-right">
-      <nav class="nav" aria-label="Suite navigation">
+      <nav class="nav" aria-label="Suite navigation" data-i18n-aria="nav.label">
         <a href="index.html" data-i18n="nav.assessment">Assessment</a>
         <a href="console.html" class="active" aria-current="page" data-i18n="nav.console">Console</a>
         <a href="advisor.html" data-i18n="nav.advisor">Advisor</a>
       </nav>
       <button id="langToggle" data-act="hsToggleLang" title="Switch language / تبديل اللغة" aria-label="Switch language">عربي</button>
-      <span class="sess-chip hidden" id="sessTimer" title="Time left in this unlocked session"><span class="sess-ic">⏱</span><span class="sess-t">--:--</span></span>
+      <span class="sess-chip hidden" id="sessTimer" title="Time left in this unlocked session" data-i18n-title="session.remaining"><span class="sess-ic">⏱</span><span class="sess-t">--:--</span></span>
     </div>
   </header>
   <div class="i18n-caveat hidden" id="i18nCaveat" role="note">ترجمة آلية للواجهة — للاسترشاد فقط، ويجب مراجعتها من مختصّ قبل الاعتماد الرسمي. بيانات اللوحة الحيّة تبقى بالإنجليزية.</div>
@@ -61,10 +61,10 @@
     <div class="col-l">
       <div class="hud">
         <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
-        <div class="tele t-tl"><div class="k">THREAT LEVEL</div><div class="v tele-ok" id="threatLevel">NOMINAL</div></div>
-        <div class="tele t-tr"><div class="k">PROCESSOR</div><div class="v tele-dim">ZX-77 · 16C</div></div>
-        <div class="tele t-bl"><div class="k">UPTIME</div><div class="v tele-dim" id="uptime">00:00:00</div></div>
-        <div class="tele t-br"><div class="k">NETWORK</div><div class="v tele-ok">SECURE</div></div>
+        <div class="tele t-tl"><div class="k" data-i18n="console.threatLevel">THREAT LEVEL</div><div class="v tele-ok" id="threatLevel" data-i18n="console.nominal">NOMINAL</div></div>
+        <div class="tele t-tr"><div class="k" data-i18n="console.processor">PROCESSOR</div><div class="v tele-dim">ZX-77 · 16C</div></div>
+        <div class="tele t-bl"><div class="k" data-i18n="console.uptime">UPTIME</div><div class="v tele-dim" id="uptime">00:00:00</div></div>
+        <div class="tele t-br"><div class="k" data-i18n="console.network">NETWORK</div><div class="v tele-ok" data-i18n="console.secure">SECURE</div></div>
 
         <div class="radar">
           <div class="conic"></div>
@@ -80,14 +80,14 @@
         </div>
 
         <div class="duty">
-          <div class="on">● AI ANALYST ON DUTY</div>
+          <div class="on" data-i18n="console.analystDuty">● AI ANALYST ON DUTY</div>
           <div class="nm" id="operatorName">Cypher</div>
           <div class="rl" id="operatorRole">Transaction Monitoring Unit</div>
         </div>
       </div>
 
       <div class="panel reassign">
-        <div class="lbl">Reassign Operator</div>
+        <div class="lbl" data-i18n="console.reassign">Reassign Operator</div>
         <div class="ops" id="operatorStrip"></div>
       </div>
     </div>
@@ -99,10 +99,10 @@
       <div class="lower">
         <div class="stream">
           <div class="stream-h">
-            <div class="panel-h">Live Alert Stream</div>
+            <div class="panel-h" data-i18n="console.liveAlerts">Live Alert Stream</div>
             <div class="fl-row10">
-              <button id="asanaRefresh" class="asana-refresh" type="button" title="Refresh from Asana" aria-label="Refresh from Asana"><span class="ar-ico">&#8635;</span></button>
-              <div class="streaming"><i></i>ON DEVICE</div>
+              <button id="asanaRefresh" class="asana-refresh" type="button" title="Refresh from Asana" aria-label="Refresh from Asana" data-i18n-title="console.refreshAsana" data-i18n-aria="console.refreshAsana"><span class="ar-ico">&#8635;</span></button>
+              <div class="streaming"><i></i><span data-i18n="console.onDevice">ON DEVICE</span></div>
             </div>
           </div>
           <!-- Refresh outcome, visible and announced. The button's `title` was the
@@ -116,11 +116,11 @@
 
         <div class="side-col">
           <div class="panel">
-            <div class="panel-h mb14">Diligence Mix</div>
+            <div class="panel-h mb14" data-i18n="console.diligenceMix">Diligence Mix</div>
             <div id="riskBars"></div>
           </div>
           <div class="panel">
-            <div class="panel-h mb13">Jurisdiction Watch</div>
+            <div class="panel-h mb13" data-i18n="console.jurisdictionWatch">Jurisdiction Watch</div>
             <div id="jurWatch"></div>
           </div>
         </div>
@@ -129,6 +129,7 @@
   </div>
 </div>
 
+<script defer src="telemetry.js"></script>
 <script defer src="console.js"></script>
 <script defer src="analytics.js"></script>
 <footer id="hsra-legal-footer"></footer>

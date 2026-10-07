@@ -171,7 +171,10 @@ export function obligationHygiene(root = ROOT) {
   const reg = json(root, 'data/obligations.json');
   return {
     withoutOwner: reg.obligations.filter((o) => !o.owner || !String(o.owner).trim()).length,
-    withoutWatchSource: reg.obligations.filter((o) => !o.watch_source).length
+    withoutWatchSource: reg.obligations.filter((o) => !o.watch_source).length,
+    /* Article-level evidence still owed by counsel/MLRO (open-actions item 5):
+       a row counts until a named human promotes its source_citation to sourced. */
+    withoutSourcedCitation: reg.obligations.filter((o) => !o.source_citation || o.source_citation.basis !== 'sourced').length
   };
 }
 
@@ -278,6 +281,7 @@ export async function computeMetrics(root = ROOT) {
     unjustifiedSuppressions: unjustifiedSuppressions(root),
     obligationsWithoutOwner: hygiene.withoutOwner,
     obligationsWithoutWatchSource: hygiene.withoutWatchSource,
+    obligationsWithoutSourcedCitation: hygiene.withoutSourcedCitation,
     openActionsWithoutTargetDate: openActionsWithoutTargetDate(root),
     residualAboveAppetite: rva.above.length,
     risksWithoutAppetitePosition: rva.unclaimed.length
@@ -335,7 +339,7 @@ export async function computeMetrics(root = ROOT) {
       controlEffectivenessRate: { value: ce.rate, numerator: ce.effective, denominator: ce.tested, basis: 'Assurance-matrix §1 rows whose named proof artefacts all exist ÷ rows with an automated proof. Manual rows (§4) are excluded by design.' },
       complianceCompletionRate: { value: cc.rate, numerator: cc.met, denominator: cc.total, basis: 'Obligations at status "met" ÷ regulatory obligations. "partial" means the control is built and evidenced but a human act is outstanding — see the open-actions item on each row.', partial: cc.partial, pending: cc.pending },
       kriBreachRate: { value: pct(breachedCount, measurable.length), numerator: breachedCount, denominator: measurable.length, basis: 'Instrumented KRIs in breach ÷ instrumented KRIs. Uninstrumented KRIs are listed with their reason and excluded from the denominator rather than scored as passing.' },
-      overdueIssueRate: { value: null, numerator: null, denominator: null, basis: 'Not instrumented: the register’s governance rows carry no target date pending the Board’s item-17 decision, so the KRI cannot be aged; the engineering rows opened 2026-08 carry maintainer-set dates and are counted per row by openActionsWithoutTargetDate. See KRI-09 in data/risk-appetite.json.' },
+      overdueIssueRate: { value: null, numerator: null, denominator: null, basis: 'Not instrumented: the register still carries open rows without owner-approved target dates, so the KRI cannot be aged consistently; maintainer-owned engineering rows carry dates, while governance/vendor rows remain undated until the responsible human owner sets them. The gap is counted per row by openActionsWithoutTargetDate. See KRI-09 in data/risk-appetite.json.' },
       thirdPartyAssessmentCoverage: { value: tp.rate, numerator: tp.assessed, denominator: tp.total, basis: 'Vendors whose safeguard/DPA position is settled ÷ vendors in the third-party register. A cell still asking for a confirmation counts as outstanding.', outstanding: tp.outstanding },
       auditFindingClosureRate: { value: fc.rate, numerator: fc.closed, denominator: fc.total, basis: 'CAPA rows (CA-nn corrective + HA-nn hardening) at status Closed ÷ all CAPA rows.', open: fc.open }
     },

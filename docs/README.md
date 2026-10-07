@@ -1,6 +1,6 @@
 # Documentation Map
 
-~190 documents in 12 packs plus 9 standalone references. Each pack's own
+~195 documents in 12 packs plus 9 standalone references. Each pack's own
 README (where one exists) is the authoritative index for that pack; this page
 is the way in. Repo-level governance lives at the root:
 [`../GOVERNANCE.md`](../GOVERNANCE.md) (decision rights),

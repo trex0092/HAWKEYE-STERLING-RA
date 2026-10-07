@@ -31,7 +31,7 @@ annually) and after material change. Use this template per review; keep the log.
 Open items to table at the first formal review (sourced from the current pack):
 - Ratify the standalone **AI Policy** ([`../governance/ai-policy.md`](../governance/ai-policy.md), A.2.2).
 - Accept residual risks, incl. **R-13** (transaction-layer blind spot — R.16 feed decision).
-- DPA status: sign **Anthropic DPA**; confirm **Asana DPA** + data-residency regions.
+- DPA/vendor status: reconcile the **Anthropic DPA execution record and live triage state** (items 36/42); confirm **Asana DPA** + contracted data-residency region (item 35).
 - Run the **Advisor bias review** first cycle ([`../governance/advisor-bias-review-2026.md`](../governance/advisor-bias-review-2026.md)).
 - Confirm group-entity goAML/EOCN registration; update compliance-manual legal references (FDL 10/2025).
 - Produce the standalone **Proliferation Financing risk assessment** and re-prioritise

@@ -125,7 +125,8 @@
       "review_cadence_months": 12,
       "next_review": "2026-09-15",
       "calendar_duty": "tfs-procedure-annual-review",
-      "note": "Discharges OB-04/OB-05: suspend without delay, verify, report, release only on a written basis."
+      "note": "Discharges OB-04/OB-05: suspend without delay, verify, report, release only on a written basis. The recorded 2026-09-15 review is overdue and tracked by open-actions item 41.",
+      "open_action": 41
     },
     {
       "id": "POL-08",
@@ -159,7 +160,8 @@
       "review_cadence_months": 12,
       "next_review": "2026-09-15",
       "calendar_duty": "internal-watchlist-annual-review",
-      "note": "The human path by which a curated list changes — the one screening input not fetched automatically."
+      "note": "The human path by which a curated list changes, including the internal watchlist review. The recorded 2026-09-15 review is overdue and tracked by open-actions item 41.",
+      "open_action": 41
     },
     {
       "id": "POL-10",
@@ -590,7 +592,8 @@
       "approval_note": "Operative on publication; quarterly MLRO sign-off, next review recorded in the document (2026-09-30).",
       "review_cadence_months": 3,
       "next_review": "2026-09-30",
-      "note": "Registered 2026-07-28. The change-control instrument the prompt register already cites as its authority — it governed changes while sitting outside the register that tracks instruments."
+      "note": "Registered 2026-07-28. The change-control instrument the prompt register cites as its authority. The 2026 Q3 review due 2026-09-30 remains open under item 38.",
+      "open_action": 38
     },
     {
       "id": "POL-37",
@@ -638,6 +641,10 @@
     {
       "path": "docs/policies/README.md",
       "reason": "The policy pack's index page. It lists instruments and points at them; it is not itself a governing instrument."
+    },
+    {
+      "path": "docs/aims/bcp-exercise-record.md",
+      "reason": "Reusable evidence template for a BCP/vendor-exit drill. It records the result of an exercise but does not set a governing rule, approval authority or standing control requirement; those live in the registered Business Continuity & Resilience Plan and the control-testing calendar."
     }
   ],
   "shadow_policy_note": "No governing instrument exists outside this register. test/policies.test.mjs scans docs/ for filenames carrying policy, procedure, charter, runbook or sop and fails if one is neither registered nor explicitly excluded with a reason — so a procedure cannot be written, relied on, and left unowned and unreviewed."

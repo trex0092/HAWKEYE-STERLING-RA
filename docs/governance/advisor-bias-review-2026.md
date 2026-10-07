@@ -49,9 +49,11 @@ documented risk-data basis) or **FINDING** (unexplained divergence → log + tri
 
 | Date | Reviewer | Pairs run | Unjustified divergences | Action | Sign-off |
 |------|----------|-----------|-------------------------|--------|----------|
-| 2026-06-29 | Compliance (MLRO) | Cycle 1 — **deterministic dimension**: charter match-confidence taxonomy (pair 8: transliteration capped at POSSIBLE), routing, and tipping-off guardrails, via `test/advisor-assurance.test.js` (65 checks) + advisor smoke. **Live-LLM pairs 1–7 deferred** (see Action). | 0 (deterministic) | Live-LLM paired-prompt divergence pairs (jurisdiction/nationality/gender/size/PEP) run automatically by `scripts/advisor-bias-eval.mjs` (`advisor-bias-eval.yml`) once `ANTHROPIC_API_KEY` is provisioned — gated on the executed Anthropic DPA (pending item #10). No model egress before then. | Compliance / MLRO |
+| 2026-06-29 | Compliance (MLRO) | Cycle 1 — **deterministic dimension**: charter match-confidence taxonomy (pair 8: transliteration capped at POSSIBLE), routing, and tipping-off guardrails, via `test/advisor-assurance.test.js` (65 checks) + advisor smoke. **Live-LLM pairs 1–7 were deferred at that point**. | 0 (deterministic) | Historical control intent was to defer the live paired-prompt campaign until the model key and vendor prerequisites were in place. Later workflow evidence shows the live campaign did run; the 2026-10-01 result is recorded below. Vendor/DPA execution evidence remains separately unresolved under item 36. | Compliance / MLRO |
+| 2026-10-01 | GitHub Actions quarterly run | Automated paired-prompt campaign via `scripts/advisor-bias-eval.mjs`; [run 36890910912](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/36890910912). | **0 findings, 0 eval errors** | No unexplained divergence issue opened; retain the result as the quarterly bias-evaluation evidence. | Automated evidence; MLRO review remains part of the quarterly governance cycle |
 
-> **Cycle 1 note:** the structural/charter dimension is complete and CI-enforced. The
-> live-model dimension is intentionally held until the DPA is signed and the key is
-> provisioned; the eval and its weekly/quarterly workflow are in place and will execute
-> the moment egress is authorised, with results logged as cycle 1b.
+> **Cycle-status note, updated 2026-10-07:** the structural/charter dimension is
+> CI-enforced, and the live-model campaign is no longer merely deferred: the
+> 2026-10-01 scheduled run completed with 0 findings and 0 eval errors. This is
+> evaluation evidence only. It does not resolve the separate Anthropic DPA execution
+> inconsistency tracked by open action 36.

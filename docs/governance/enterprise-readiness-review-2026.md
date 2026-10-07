@@ -150,7 +150,7 @@ Performance metrics · Retirement criteria):
 | `adverse-media-classifier.md` | Keyword/typology classifier + GDELT/Google News feeds (EN+AR) |
 | `pep-identifier.md` | Wikidata PEP signal — note best-effort nature, MANUAL REVIEW fallback |
 | `advisor-llm.md` | Cited-answer Advisor (`brain-soul.js`, charter guardrails, weekly eval) — the card regulators will actually read; include prompt strategy + injection red-team reference |
-| `ai-triage.md` | LLM adverse-media triage (gated `LLM_TRIAGE=0` until DPA) — card states the gate explicitly |
+| `ai-triage.md` | LLM adverse-media triage, fail-closed by default and explicit opt-in. The repository does not prove the current production variable; items 36/42 reconcile vendor and runtime evidence. |
 
 ### 6-C · Risk register upgrade [PROPOSED — High]
 Reformat `ai-risk-register.md` rows to: Risk · Likelihood (1–5) · Impact (1–5) · **Inherent** ·
@@ -285,7 +285,7 @@ outside this plan.)*
 - [ ] KPI dashboard shows current month with real numbers
 - [ ] AI Policy v1.0 + Stakeholder Impact Assessment **ratified** (signature rows filled)
 - [ ] DPIA §6 residual-risk acceptance signed by MLRO
-- [ ] Anthropic DPA executed — or its pending status stated on slide 1 (never discovered mid-meeting)
+- [ ] Anthropic DPA execution record reconciled and evidenced, with any unresolved status stated on slide 1 (item 36; never discovered mid-meeting)
 - [ ] TEST-000 end-to-end evidence captured (screenshots in demo pack; task in HAWKEYE STERLING APP)
 - [ ] Daily Compliance Brief + AI Governance Report from *this week* exportable as evidence
 - [ ] Assurance Coverage Matrix reviewed — every row's proof ran green in the last cycle
@@ -306,6 +306,20 @@ COSO, ISO 31000, FATF RBA, Wolfsberg guidance, and GDPR/PDPL as cited inline.*
 *Appended as an addendum: sections 1-17 above are the 2 July point-in-time record and are
 deliberately left unedited (same convention as the code-scanning triage record). Every claim below
 is [OBSERVED] against commit `8576ad61` unless marked otherwise.*
+
+*Estate re-verification · 1 October 2026 — Screening Morning Dispatch added: GitHub delivers this
+repository's scheduled events 4-6h late, so the daily screening reached Asana mid-afternoon (UAE).
+The new workflow fires in the UTC evening, waits on the runner until 00:05 UTC and dispatches
+Sanctions Screen and Daily Screening, so results land before 09:00 UAE; each screen's own cron
+stays the backstop. An accepted dispatch is never reported as delivery. Timing change only — no
+scored control changed.*
+
+*Estate re-verification · 7 October 2026 — the BCP/vendor-exit assurance pass added one
+curated evidence template, `docs/aims/bcp-exercise-record.md`, and linked the first recorded
+second-operator drill to open action 44. This records the missing human exercise; it does not claim
+that the drill has occurred or change any residual-risk score.*
+
+Verified at HEAD: 70 workflows · 196 markdown documents under docs/ (163 excluding docs/research/auto).
 
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days
@@ -655,7 +669,7 @@ sign-off, `dpia-2026.md` §6); ISO/IEC 42001 mandatory-documents index added; wo
 - [ ] KPI dashboard shows current month with real numbers (log present; current-month row to complete)
 - [x] AI Policy v1.0 + Stakeholder Impact Assessment ratified (2026-07-02, signature rows filled)
 - [x] DPIA §6 residual-risk acceptance signed by MLRO (2026-07-02)
-- [ ] Anthropic DPA executed (still DRAFT: `docs/aims/anthropic-dpa-execution-pack.md`; state it on slide 1)
+- [ ] Anthropic DPA execution record reconciled: the execution pack remains DRAFT with fields blank while a 2026-07-16 owner attestation reports execution (item 36; state the unresolved position on slide 1)
 - [ ] TEST-000 end-to-end evidence captured
 - [ ] Daily Compliance Brief + AI Governance Report from *this week* exportable as evidence
 - [ ] Assurance Coverage Matrix reviewed: every row's proof ran green in the last cycle
@@ -666,7 +680,8 @@ sign-off, `dpia-2026.md` §6); ISO/IEC 42001 mandatory-documents index added; wo
 
 ### 18.4 Outstanding to reach 4.5
 
-COSO/ISO 31000 crosswalk columns (§6-D) · charter + committee ToR (§8, register P2) · KPI 10
-app-log change + rendered dashboard (§12) · walkthrough video (§14) · executed Anthropic DPA
-(register P3) with the live bias cycle it unlocks (P6) · GitHub UI hardening checklist rows
-(register P23-P25). Re-score at least quarterly and on any figure drift (CI-enforced).
+COSO/ISO 31000 crosswalk columns (§6-D) · charter + committee ToR (§8) · KPI 10
+app-log change + rendered dashboard (§12) · walkthrough video (§14) · verified/reconciled
+Anthropic DPA execution record (open action 36) and triage go-live state (open action 42) ·
+GitHub UI hardening checklist rows. Re-score at least quarterly and on any figure drift
+(CI-enforced).

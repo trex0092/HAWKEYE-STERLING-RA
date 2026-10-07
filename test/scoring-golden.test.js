@@ -10,6 +10,7 @@
    Usage: node test/scoring-golden.test.js */
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const appjs = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
@@ -38,11 +39,11 @@ global.alert = (m) => { throw new Error('alert called: '+m); };
 global.Blob = class { constructor(parts){ this.parts = parts; } };
 global.URL = { createObjectURL(){ return 'blob:test'; }, revokeObjectURL(){} };
 
-(0, eval)(appjs + `
+new vm.Script(appjs + `
 ;globalThis.__app = {
   computeAssessment, defaultState,
   get state(){ return state; }, set state(v){ state = v; }
-};`);
+};`, { filename: path.join(__dirname, '..', 'app.js') }).runInThisContext();
 const A = globalThis.__app;
 
 /* ── Tiny assert harness ── */

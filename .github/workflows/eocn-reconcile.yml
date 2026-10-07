@@ -77,10 +77,25 @@ jobs:
         # a token at import, so the placeholder that used to be needed here is
         # gone; the real secret stays confined to the "File the review task in
         # Asana" step below.
+        env:
+          # Licence-free mode (repository variable OPENSANCTIONS_DATA=0): the
+          # OpenSanctions mirror is the only machine-readable copy of the EOCN
+          # list, so the reconciliation is not prepared automatically. The
+          # review is then a manual check against the official EOCN publication;
+          # the daily screen's 7-day review-age gate still enforces it.
+          OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}
         run: |
           python3 << 'PYEOF'
           import datetime, json, os, sys
           import screen
+
+          if not screen.OPENSANCTIONS_DATA:
+              print("::warning::Licence-free mode (OPENSANCTIONS_DATA=0): no automated EOCN reconciliation. "
+                    "Review data/eocn-local-terrorist-list.json by hand against the official EOCN "
+                    "publication (https://www.uaeiec.gov.ae); the daily review-age gate still enforces it.")
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+                  out.write("licence_off=1\n")
+              sys.exit(0)
 
           PATH = "data/eocn-local-terrorist-list.json"
           with open(PATH, encoding="utf-8") as f:
@@ -160,24 +175,19 @@ jobs:
           PYEOF
 
       - name: Push the prepared review branch
+        if: steps.reconcile.outputs.licence_off != '1'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -u
           git config user.name "eocn-reconcile"
           git config user.email "actions@github.com"
-          git add data/eocn-local-terrorist-list.json
-          git commit -m "eocn: prepared weekly review — merge records MLRO sign-off"
-          # Single rolling branch (rebuilt as <main> + one commit each run) so
-          # stale preparations never pile up; auth is the ephemeral env token in
-          # the push URL — the checkout persists no credentials.
-          pushed=
-          for attempt in 1 2 3 4 5; do
-            git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/eocn-reconcile && { pushed=1; break; }
-            echo "push failed (attempt $attempt) — retrying"
-            sleep $((attempt * 3))
-          done
-          [ -n "$pushed" ] || { echo "::error::push of the prepared eocn-reconcile branch failed"; exit 1; }
+          # Single rolling review branch. Written on its own tip
+          # (scripts/push-state-branch.sh) so the Actions token never pushes a
+          # workflow-file change; a PR from it into main still diffs to the
+          # EOCN list only. Created from main when absent (e.g. after a merge).
+          scripts/push-state-branch.sh eocn-reconcile "eocn: prepared weekly review — merge records MLRO sign-off" \
+            data/eocn-local-terrorist-list.json
 
       - name: Check for an already-open EOCN review task
         id: existing
@@ -236,7 +246,7 @@ jobs:
           PYEOF
 
       - name: File the review task in Asana
-        if: steps.existing.outputs.skip != '1'
+        if: steps.existing.outputs.skip != '1' && steps.reconcile.outputs.licence_off != '1'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ADDED: ${{ steps.reconcile.outputs.added }}
@@ -246,3 +256,12 @@ jobs:
           node scripts/asana-alert.mjs \
             "EOCN weekly review prepared — one click to sign off (${ADDED} designation(s) folded in, count ${COUNT})" \
             "The eocn-reconcile workflow cross-checked data/eocn-local-terrorist-list.json against the OpenSanctions ae_local_terrorists mirror and pushed the prepared review to the eocn-reconcile branch. ACTION: open ${COMPARE_URL} , create the pull request, verify the evidence note (mirror-derived, pending confirmation against the official EOCN publication at uaeiec.gov.ae), and MERGE — the merge records the MLRO review and resets the 7-day review-age gate on the daily screening. If this is not merged within 7 days of the stamped lastReviewed date the daily control goes red by design."
+
+      - name: File the manual review task in Asana (licence-free mode)
+        if: steps.existing.outputs.skip != '1' && steps.reconcile.outputs.licence_off == '1'
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+        run: |
+          node scripts/asana-alert.mjs \
+            "EOCN weekly review prepared — MANUAL check needed (licence-free mode)" \
+            "Licence-free mode is on (repository variable OPENSANCTIONS_DATA=0), so no OpenSanctions mirror was used to prepare the EOCN reconciliation. ACTION: compare data/eocn-local-terrorist-list.json with the official EOCN publication at https://www.uaeiec.gov.ae , add any new designation, and update lastReviewed / lastReviewedEvidence in a pull request under the four-eyes SOP. If lastReviewed is older than 7 days the daily screening goes red by design."

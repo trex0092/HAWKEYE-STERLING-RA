@@ -112,9 +112,17 @@ mandatory before any freeze/decline/report. Re-assess on any change to data sent
 third parties.
 
 ## 8. Go-live sign-off (LLM enablement)
-LLM triage egress is **gated OFF** (`LLM_TRIAGE=0`) until this sign-off is completed.
-Complete every ☐ before setting the `LLM_TRIAGE` repo variable to `1`. This is the
-condition in §7(a) made operational; it ties the executed DPA to enablement.
+The intended control is fail-closed: LLM triage egress must remain **OFF**
+(`LLM_TRIAGE=0`) until this sign-off is completed. Complete every ☐ before
+setting the `LLM_TRIAGE` repo variable to `1`. This is the condition in §7(a)
+made operational; it ties the executed DPA and PDPL safeguards to enablement.
+
+> **Control-state warning, 2026-10-07.** The checklist below remains incomplete,
+> while the third-party register preserves a 2026-07-16 owner attestation that
+> `LLM_TRIAGE=1` was enabled. This repository cannot read the live repo-variable
+> value, so it does not infer whether production is currently ON or OFF. Open action
+> 42 requires immediate verification and either completion/evidence of every
+> prerequisite or reversion to `0` until the checklist is complete.
 
 | Check | Status |
 |---|---|

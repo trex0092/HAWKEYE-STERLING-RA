@@ -1,7 +1,7 @@
 /* Unit tests for the FATF watchdog's pure logic (no network).
    Usage: node test/watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
-import { loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical, snapshotDate } from '../scripts/fatf-watchdog.mjs';
+import { foldEntities, recordedPlenary, removalsStillNamed, loadBaseline, extractCountries, classifyCountries, diffLists, buildAlert, normalize, collectReviewsDue, extractSheet, snapshotAgeDays, SNAPSHOT_STALE_DAYS, assertPlausible, parseCdxTimestamps, listsIdentical, snapshotDate, fetchRetrying, snapshotUrls } from '../scripts/fatf-watchdog.mjs';
 
 function throws(fn) { try { fn(); return false; } catch { return true; } }
 
@@ -161,6 +161,64 @@ check('a label carrying no stamp, or none at all, persists nothing network-shape
   && snapshotDate(undefined) === 'unknown');
 check('injected text around a stamp cannot reach the file',
   snapshotDate('20260731091550","x":"\n../../evil') === '2026-07-31');
+
+/* ── archive reads: retry 429/5xx, fall back across captures (3 Oct 2026: a
+   1-day-old capture existed, its single fetch got 429, the watchdog skipped) ── */
+{
+  const resp = (status, retryAfter) => ({ status, ok: status >= 200 && status < 300,
+    headers: { get: (h) => (h.toLowerCase() === 'retry-after' ? retryAfter || null : null) } });
+  const waits = [];
+  let calls = 0;
+  const seq = [resp(429, '2'), resp(503), resp(200)];
+  const ok = await fetchRetrying('https://web.archive.org/web/x', {}, {
+    fetchImpl: async () => seq[calls++], sleep: async (ms) => { waits.push(ms); }, baseMs: 1000, capMs: 60000 });
+  check('archive fetch: a 429 then a 503 are retried and the third attempt succeeds', ok && ok.status === 200 && calls === 3);
+  check('archive fetch: Retry-After is honoured, never below the linear backoff', waits[0] === 2000 && waits[1] === 2000);
+  calls = 0;
+  const gone = await fetchRetrying('u', {}, { fetchImpl: async () => { calls++; return resp(404); }, sleep: async () => {} });
+  check('archive fetch: a 404 is not retried', gone === null && calls === 1);
+  calls = 0;
+  const down = await fetchRetrying('u', {}, { fetchImpl: async () => { calls++; throw new Error('reset'); }, sleep: async () => {} });
+  check('archive fetch: network errors are retried, then null (never a fabricated page)', down === null && calls === 3);
+  const urls = snapshotUrls(['20261001000000', 'junk', '20261002020916', '20261002020916', '20260930000000', '20260901000000'], 'https://p/x');
+  check('snapshot fallback: newest 3 distinct captures, raw id_ form first, junk ignored',
+    urls.length === 6 && urls[0].url === 'https://web.archive.org/web/20261002020916id_/https://p/x'
+    && urls[1].url === 'https://web.archive.org/web/20261002020916/https://p/x'
+    && urls[2].ts === '20261001000000' && urls[4].ts === '20260930000000');
+}
+
+/* ── 3 Oct 2026 false delisting: apostrophes / entities in the page ──
+   An archived capture spelt the names with a typographic apostrophe or an HTML
+   entity; both dropped out of the grey list and a removal the FATF never made
+   was alerted. Every spelling must classify identically. */
+{
+  const page = (ci, lao) => '<h2>High-risk jurisdictions subject to a call for action</h2><ul><li>Iran</li><li>Myanmar</li><li>North Korea</li></ul>'
+    + '<h2>Jurisdictions under increased monitoring</h2><ul><li>Angola</li><li>' + ci + '</li><li>' + lao + '</li><li>Kenya</li></ul>';
+  const want = JSON.stringify(['Angola', "Cote D'Ivoire", 'Kenya', "Lao People's Democratic Republic"]);
+  const variants = [
+    ["Côte d'Ivoire", 'Lao PDR'],
+    ['Côte d’Ivoire', 'Lao People’s Democratic Republic'],
+    ['C&ocirc;te d&#39;Ivoire', 'Lao People&#39;s Democratic Republic'],
+    ['Côte d&rsquo;Ivoire', 'Lao People&#x2019;s Democratic Republic'],
+  ];
+  check('FATF: plain, typographic and entity apostrophes all classify Côte d\'Ivoire and Lao PDR as grey',
+    variants.every(([ci, lao]) => JSON.stringify(classifyCountries(page(ci, lao), baseline).grey) === want));
+  check('foldEntities: numeric, named and accented entities fold to plain characters',
+    foldEntities('d&#8217;I &#x2019; &rsquo; &amp; C&ocirc;te') === "d'I ' ' & Cote");
+  const rec = recordedPlenary();
+  check('recordedPlenary: the 19 June 2026 statements give 3 black and 22 grey under the watchdog\'s own names',
+    rec && rec.date === '2026-06-19' && rec.black.length === 3 && rec.grey.length === 22
+    && rec.grey.includes("Cote D'Ivoire") && rec.grey.includes("Lao People's Democratic Republic"));
+  check('removalsStillNamed: a "removed" name still spelt on the page is caught as parser loss; an absent one is not',
+    JSON.stringify(removalsStillNamed('<li>Côte d&rsquo;Ivoire</li><li>Lao PDR</li>', ["Cote D'Ivoire", "Lao People's Democratic Republic", 'Algeria']))
+      === JSON.stringify(["Cote D'Ivoire", "Lao People's Democratic Republic"]));
+  const src = readFileSync(new URL('../scripts/fatf-watchdog.mjs', import.meta.url), 'utf8');
+  const main = src.slice(src.indexOf('const diff = diffLists(prev, current);'));
+  check('FATF main: a page equal to the recorded plenary repairs the state before any list-change alert',
+    main.indexOf('listsIdentical(current, plenary)') > 0 && main.indexOf('listsIdentical(current, plenary)') < main.indexOf("createTask('FATF list change: '"));
+  check('FATF main: an uncorroborated removal is recorded as parser drift, never alerted as a delisting',
+    main.indexOf('removalsStillNamed(') > 0 && main.indexOf('removalsStillNamed(') < main.indexOf("createTask('FATF list change: '"));
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

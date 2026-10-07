@@ -3,9 +3,12 @@
 import { readFileSync } from 'node:fs';
 import {
   loadSources, extractText, fingerprint, denoise, computeChanges, contentChanges, buildReport,
-  persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback,
-  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS
+  persistentErrors, stateMateriallyChanged, snapshotAgeDays, rawSnapshotUrl, fetchWithFallback, fetchCaptureRetrying,
+  CAPTURE_READ_ATTEMPTS, CAPTURE_RETRY_AFTER_CAP_S,
+  captureAcceptable, tsToIsoDate, spnAuthHeader, diffTexts, classifySeverity, changeContext, FP_VERSION, ERROR_STREAK_ALERT, SNAPSHOT_STALE_DAYS,
+  REG_REVIEW_CHECKLIST, decodeEntities, extractLinks, diffLinks, comparedLine, parseAnalysis,
 } from '../scripts/reg-watch.mjs';
+import { buildHtmlBody } from '../scripts/asana-notify.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -113,6 +116,12 @@ const rep = buildReport(changes, '2026-06-16');
 check('report names changed sources and the data files to edit',
   rep.includes('Source A') && rep.includes('Source B') && rep.includes('assets/super-data.js'));
 check('report folds fetch errors into a no-action note', rep.includes('could not be fetched') && rep.includes('Source D'));
+check('a change report carries the reviewer record (impact, instrument, assessor) with blanks',
+  rep.includes('**Reviewer record:**') && REG_REVIEW_CHECKLIST.every(item => rep.includes(item))
+  && rep.includes('Assessed by: ______'));
+check('a no-change or seed report carries no reviewer record',
+  !seedRep.includes('Reviewer record')
+  && !buildReport([{ id: 'c', name: 'C', status: 'unchanged' }], '2026-06-16').includes('Reviewer record'));
 check('report is quiet when nothing moved',
   buildReport([{ id: 'c', name: 'C', status: 'unchanged' }], '2026-06-16').includes('No regulatory content changes detected'));
 
@@ -208,6 +217,43 @@ check('fetchWithFallback returns the direct response when it succeeds (no waybac
     return r.body === 'direct' && !r.via && calls === 1;
   })());
 
+check('capture reads: a 429 then a 503 are retried and the capture is used (3 Oct NAMLCFTC case)',
+  await (async () => {
+    const seq = [{ ok: false, status: 429, body: '' }, { ok: false, status: 503, body: '' }, { ok: true, status: 200, body: 'page' }];
+    let i = 0; const waits = [];
+    const r = await fetchCaptureRetrying(async () => seq[i++], 'u', { sleep: async (ms) => { waits.push(ms); }, baseMs: 5 });
+    return r.body === 'page' && i === 3 && waits.join() === '5,10';
+  })());
+check('capture reads: a 404 is not retried; persistent 429 returns the failure (never a fabricated page)',
+  await (async () => {
+    let n = 0;
+    const a = await fetchCaptureRetrying(async () => { n++; return { ok: false, status: 404, body: '' }; }, 'u', { sleep: async () => {} });
+    let m = 0;
+    const b = await fetchCaptureRetrying(async () => { m++; return { ok: false, status: 429, body: '' }; }, 'u', { sleep: async () => {} });
+    return a.status === 404 && n === 1 && b.status === 429 && !b.ok && m === CAPTURE_READ_ATTEMPTS && m === 4;
+  })());
+check('capture reads honour Retry-After (capped) when it asks for longer than the linear backoff',
+  await (async () => {
+    const seq = [{ ok: false, status: 429, body: '', retryAfter: 20 }, { ok: false, status: 429, body: '', retryAfter: 600 },
+      { ok: false, status: 429, body: '' }, { ok: true, status: 200, body: 'page' }];
+    let i = 0; const waits = [];
+    const r = await fetchCaptureRetrying(async () => seq[i++], 'u', { sleep: async (ms) => { waits.push(ms); }, baseMs: 5 });
+    return r.body === 'page' && waits.join() === [20000, CAPTURE_RETRY_AFTER_CAP_S * 1000, 15].join();
+  })());
+check('capture reads are serialized: two sources never read archive.org at the same time',
+  await (async () => {
+    let inFlight = 0, peak = 0;
+    const slow = async () => { inFlight++; peak = Math.max(peak, inFlight); await new Promise(r => setTimeout(r, 5)); inFlight--; return { ok: true, status: 200, body: 'x' }; };
+    const out = await Promise.all([1, 2, 3].map(() => fetchCaptureRetrying(slow, 'u', { sleep: async () => {} })));
+    return peak === 1 && out.every(o => o.body === 'x');
+  })());
+check('fetchWithFallback reads captures through the retrying helper, and accepts an SPN redirect to a fresh capture even on 429',
+  (() => {
+    const src = readFileSync(new URL('../scripts/reg-watch.mjs', import.meta.url), 'utf8');
+    return (src.match(/fetchCaptureRetrying\(fetchFn, 'https:\/\/web\.archive\.org\/web\/' \+ ts \+ 'id_\/' \+ url, opts\.retry\)/g) || []).length === 3
+      && /if \(ts && captureAcceptable\(ts, notBefore\)\) \{/.test(src);
+  })());
+
 /* ── diffTexts: detailed change delivery ── */
 const oldPage = 'the reporting threshold is aed 55,000 for cash transactions. registration via goaml is mandatory. contact us on the portal.';
 const newPage = 'the reporting threshold is aed 60,000 for cash transactions. registration via goaml is mandatory. new circular 4 of 2026 applies to dealers. contact us on the portal.';
@@ -259,6 +305,103 @@ check('report shouts about persistently unreachable sources',
   && loudRep.includes('failing ' + ERROR_STREAK_ALERT + ' consecutive runs'));
 check('report keeps one-off blips in the folded no-action note',
   loudRep.includes('could not be fetched') && loudRep.includes('Blip'));
+
+/* ── 3 Oct 2026: daily false alerts from re-stamped footers / one-segment pages ── */
+{
+  const ar = (d) => 'وزارة الاقتصاد الإعلانات الهامة آخر تحديث للمحتوى بتاريخ: ' + d + ' اكتوبر 2026 حقوق النشر';
+  check('denoise: an Arabic "last updated" stamp with a month name no longer moves the text',
+    denoise(ar('02')).replace(/\s+/g, ' ').trim() === denoise(ar('03')).replace(/\s+/g, ' ').trim());
+  check('denoise: English "last updated" stamps (day-month and month-day forms) are stripped',
+    denoise('page last updated: 2 october 2026 body').replace(/\s+/g, ' ').trim() === 'body'
+    && denoise('last modified on october 3, 2026 body').replace(/\s+/g, ' ').trim() === 'body');
+  check('denoise: a dated ENTRY in a list of actions is content and is kept (OFAC recent actions)',
+    denoise('counter terrorism designations october 02, 2026 - sanctions list updates').includes('october 02, 2026'));
+  const cc = changeContext('edic for agri-food launches to support digital innovation across europe', 'edic for agri-food launched to support digital innovation across europe', 3);
+  check('changeContext isolates the changed words with context',
+    cc.removedWords.join(' ') === 'launches' && cc.addedWords.join(' ') === 'launched'
+    && cc.addedExcerpt.includes('⟦launched⟧') && cc.removedExcerpt.includes('⟦launches⟧'));
+  const longOld = 'answers on the ai act european ai office governance and enforcement of the ai act overview of the guidelines on the ai act standardisation of the ai act latest news edic for agri-food launches to support innovation';
+  const d1 = diffTexts(longOld, longOld.replace('launches', 'launched'));
+  check('severity reads only the changed words: a keyword in the unchanged text ("standard") no longer makes it HIGH',
+    classifySeverity(d1).severity === 'LOW' && d1.changedText.join(' ') === 'launched launches');
+  const d2 = diffTexts('recent actions list. iran-related designations updates follow here.', 'recent actions list. counter terrorism designations october 02, 2026 - iran-related designations updates follow here.');
+  check('a genuine new designation entry is still HIGH, quoted by its changed words',
+    classifySeverity(d2).severity === 'HIGH' && d2.added.some(x => x.includes('counter terrorism designations')));
+  const d3 = diffTexts('alpha beta gamma delta epsilon zeta. eta theta iota kappa lambda mu nu.', 'eta theta iota kappa lambda mu nu. alpha beta gamma delta epsilon zeta.');
+  check('re-ordered / re-segmented identical words are cosmetic, not a content change',
+    d3.addedCount === 0 || d3.cosmetic === true);
+  const d4 = diffTexts('the main text block of the regulator page carries several words here and there', 'the main text block of the regulator page words carries several here and there');
+  check('the same words in a different order within a segment are flagged cosmetic', d4.cosmetic === true);
+  const st = computeChanges([{ id: 'x', name: 'X', url: 'https://x.example' }], { sources: {} }, { x: { ok: true, status: 200, body: '<p>hello regulator page text</p>' } }, '2026-10-03');
+  check('computeChanges records the fingerprint version on every new hash', st.state.sources.x.fp === FP_VERSION && FP_VERSION >= 2);
+  const st2 = computeChanges([{ id: 'x', name: 'X', url: 'https://x.example' }], { sources: { x: { hash: 'old', bytes: 1, changedAt: '2026-10-01' } } },
+    { x: { ok: true, status: 200, body: '<p>hello regulator page text</p>' } }, '2026-10-03');
+  check('a changed source carries the stored fingerprint version (v1 when unrecorded) for the re-baseline check',
+    st2.changes[0].status === 'changed' && st2.changes[0].prevFp === 1);
+  const src = readFileSync(new URL('../scripts/reg-watch.mjs', import.meta.url), 'utf8');
+  check('main: an old-version hash is re-checked against the re-filtered stored snapshot before any change is reported',
+    /c\.prevFp \|\| 1\) < FP_VERSION/.test(src) && src.indexOf("c.status = 'rebaselined'") < src.indexOf('c.diff = diffTexts(decodeEntities(oldText), decodeEntities(newText))'));
+  const rq = buildReport([{ id: 'm', name: 'UAE MoE', url: 'https://m', status: 'rebaselined' }, { id: 'n', name: 'N', url: 'https://n', status: 'cosmetic' }], '2026-10-04', 'check');
+  check('report: demoted changes are stated with their reason, never hidden',
+    rq.includes('Not alerted (2)') && rq.includes('UAE MoE') && rq.includes('re-checked and unchanged') && rq.includes('No regulatory content changes'));
+  check('main: rebaselined / cosmetic sources are dropped from the alert count',
+    src.includes('moved.splice(0, moved.length, ...contentChanges(changes))'));
+}
+
+
+/* ── Precise change cards: decoded text, itemised publications, provenance, AI fields ── */
+check('decodeEntities: numeric, hex, named and accented references read as plain text',
+  decodeEntities("treasury&#39;s list page 3 &hellip; caf&eacute; &amp; co &#x2019;") === "treasury's list page 3 … café & co ’");
+check('decodeEntities leaves unknown references as printed (never guesses)',
+  decodeEntities('a &zzfoo; b &#0; c') === 'a &zzfoo; b &#0; c');
+check('fingerprint does NOT decode entities (Sanctions Watch list hashes must not move)',
+  fingerprint('<p>A &amp; B list</p>') !== fingerprint('<p>A & B list</p>'));
+const ofacOld = '<ul><li><a href="/recent-actions/20260917">Belarus-related Designations Removals</a></li>'
+  + '<li><a href="/recent-actions/20260910?utm_source=x">Counter Narcotics Designation Removal</a></li><li><a href="/more">Read more</a></li></ul>';
+const ofacNew = '<ul><li><a href="/recent-actions/20261002#top">Counter Terrorism Designations; Iran-related Designations and Designations Updates</a></li>'
+  + '<li><a href="/recent-actions/20260917">Belarus-related Designations Removals</a></li><li><a href="mailto:ofac@x">Contact OFAC by e-mail</a></li></ul>';
+const lo = extractLinks(ofacOld, 'https://ofac.treasury.gov/recent-actions');
+const ln = extractLinks(ofacNew, 'https://ofac.treasury.gov/recent-actions');
+check('extractLinks keeps titled items with absolute links; skips generic text, mailto, tracking params and fragments',
+  lo.length === 2 && lo[1].h === 'https://ofac.treasury.gov/recent-actions/20260910'
+  && ln.length === 2 && ln[0].h === 'https://ofac.treasury.gov/recent-actions/20261002'
+  && ln[0].t === 'Counter Terrorism Designations; Iran-related Designations and Designations Updates');
+const li = diffLinks(lo, ln);
+check('diffLinks lists the new and the withdrawn item by title and link (original case)',
+  li.addedCount === 1 && li.added[0].t.startsWith('Counter Terrorism Designations')
+  && li.removedCount === 1 && li.removed[0].t === 'Counter Narcotics Designation Removal');
+check('diffLinks: an unchanged list yields no items', diffLinks(lo, lo).addedCount === 0 && diffLinks(lo, lo).removedCount === 0);
+check('severity reads a new item title (a new "Designations" item is HIGH even with no text diff)',
+  classifySeverity(null, li).severity === 'HIGH');
+check('severity without diff or items stays MEDIUM (review the page), never LOW',
+  classifySeverity(null, null).severity === 'MEDIUM');
+check('comparedLine states both versions and how each was obtained',
+  comparedLine({ status: 'changed', prevAsOf: '2026-10-02', asOf: '2026-10-03', via: 'web.archive.org snapshot 20261003010455' })
+    === 'compared the version of 2026-10-02 (direct fetch) with the version of 2026-10-03 (web.archive.org snapshot 20261003010455)');
+const an = parseAnalysis('### X\n- **What appears**: y\n**CHANGED:** OFAC added Counter Terrorism Designations (October 02, 2026)\nIMPACT: re-screen required\nACTION: re-screen customers against the SDN update\nINSTRUMENT: not stated\nSEVERITY: HIGH — new designations');
+check('parseAnalysis reads the labelled card lines and leaves absent ones absent',
+  an.changed === 'OFAC added Counter Terrorism Designations (October 02, 2026)' && an.impact === 're-screen required'
+  && an.instrument === 'not stated' && !('effective' in an));
+const precise = { id: 'ofac', name: 'US OFAC — Recent Actions', jurisdiction: 'Global', url: 'https://ofac.treasury.gov/recent-actions',
+  status: 'changed', prevAsOf: '2026-10-02', asOf: '2026-10-03', items: li, severity: 'HIGH', severityReason: 'new designations',
+  diff: diffTexts('the list. counter narcotics designation removal for the program.', 'the list. counter terrorism designations october 02, 2026 for the program.'),
+  analysis: an };
+const pr = buildReport([precise], '2026-10-03', 'check');
+check('report itemises new / withdrawn publications with links and the compared versions',
+  pr.includes('🆕 new item: [Counter Terrorism Designations; Iran-related Designations and Designations Updates](https://ofac.treasury.gov/recent-actions/20261002)')
+  && pr.includes('🗑 item no longer listed: [Counter Narcotics Designation Removal]')
+  && pr.includes('compared the version of 2026-10-02 (direct fetch) with the version of 2026-10-03 (direct fetch)'));
+const card = buildHtmlBody({ heading: 'Regulatory Watch — 1 source change', changes: [precise] });
+check('card shows the item counts, linked new item, compared versions and the labelled AI fields (escaped)',
+  card.includes('1 new / 1 removed item(s)')
+  && card.includes('🆕 <strong>New item:</strong> <a href="https://ofac.treasury.gov/recent-actions/20261002">Counter Terrorism Designations; Iran-related')
+  && card.includes('<em>Compared:</em> version of 2026-10-02 (direct fetch) → version of 2026-10-03 (direct fetch)')
+  && card.includes('<strong>Action to consider:</strong> re-screen customers against the SDN update')
+  && card.includes('AI analysis — verify against the source before acting'));
+check('main: a first item snapshot marks the state dirty so it is persisted',
+  /setOutput\('state_dirty', \(stateMateriallyChanged\(prevState, state\) \|\| linksBaselined > 0\)/.test(readFileSync(new URL('../scripts/reg-watch.mjs', import.meta.url), 'utf8')));
+check('card escapes hostile item titles', buildHtmlBody({ changes: [{ ...precise, items: { addedCount: 1, removedCount: 0,
+  added: [{ t: '<img src=x onerror=1>', h: 'https://a/"x' }], removed: [] } }] }).includes('&lt;img src=x onerror=1&gt;'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

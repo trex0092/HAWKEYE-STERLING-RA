@@ -11,8 +11,8 @@
    key is missing or the API errors, it exits 0 so the (detection-only) PR still
    opens. Model id per the repo's Claude usage standard: claude-opus-5
    (override with ANTHROPIC_MODEL, e.g. claude-sonnet-5 to cut cost). */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { extractText, CHANGES_FILE, fetchWithFallback } from './reg-watch.mjs';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { extractText, CHANGES_FILE, fetchWithFallback, parseAnalysis } from './reg-watch.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
@@ -22,13 +22,22 @@ function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection
 
 if (!KEY) skip('no ANTHROPIC_API_KEY');
 
+async function readChangesInput() {
+  if (process.stdin.isTTY) skip('no change report on stdin');
+  let input = '';
+  for await (const chunk of process.stdin) input += chunk;
+  if (!input.trim()) skip('empty change report on stdin');
+  return JSON.parse(input);
+}
+
 let date, changes;
 try {
-  /* Read directly (no exists pre-check): a missing file lands here too, and
-     check-then-read is a race the scanner rightly flags. */
-  ({ date, changes } = JSON.parse(readFileSync(CHANGES_FILE, 'utf8')));
+  /* The workflow pipes reg-watch-changes.json over stdin. Keeping file access
+     outside this network client prevents an accidental file-to-HTTP data path
+     while preserving the same reviewed public-source payload. */
+  ({ date, changes } = await readChangesInput());
 } catch (e) {
-  skip('changes file missing/unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
+  skip('changes input missing/unreadable (' + String(e && e.message || e).slice(0, 120) + ')');
 }
 /* Draft only for real content changes — an 'unreachable' alert entry has no
    new page text to analyse; it is on the card purely to surface the gap.
@@ -58,12 +67,22 @@ async function draftFor(c) {
     ...c.diff.removed.map(s => 'REMOVED: "' + s + '"'),
     ''
   ] : [];
+  /* New / removed publications as the page titles and links them — the most
+     precise evidence of what was issued or withdrawn. */
+  const itemLines = c.items ? [
+    'Publications newly listed on the page (' + c.items.addedCount + '):',
+    ...c.items.added.map(l => 'NEW ITEM: "' + l.t + '" <' + l.h + '>'),
+    'Publications no longer listed (' + c.items.removedCount + '):',
+    ...c.items.removed.map(l => 'REMOVED ITEM: "' + l.t + '" <' + l.h + '>'),
+    ''
+  ] : [];
   const prompt = [
     'You are a UAE-focused AML/CFT regulatory analyst. A monitored source changed. Draft a SHORT reviewer-facing proposal for an MLRO.',
     '',
     'Source: ' + c.name + ' (' + (c.jurisdiction || '') + ')',
     'URL: ' + c.url,
     '',
+    ...itemLines,
     ...delta,
     'Current page text (extracted, truncated):',
     '"""',
@@ -78,6 +97,14 @@ async function draftFor(c) {
     '',
     'Be concise and do NOT invent article or circular numbers that are not visible in the text. This is a proposal for human review, not a final edit.',
     '',
+    'Then, for the Asana review card, add exactly these five labelled lines (one line each, plain text, no Markdown).',
+    'Use only facts visible in the delta, the listed items or the page text; write "not stated" when the text does not say.',
+    'CHANGED: <the specific instrument / publication / entry that was added, amended or withdrawn, with its title and date as printed>',
+    'IMPACT: <what it means for a UAE dealer in precious metals and stones (DPMS), or "none — routine site change">',
+    'ACTION: <the concrete step to consider, e.g. re-screen customers against the updated list, update a policy section, brief staff, or "none">',
+    'INSTRUMENT: <number, date and issuing authority as printed, or "not stated">',
+    'EFFECTIVE: <effective / compliance date as printed, or "not stated">',
+    '',
     'End your reply with exactly one final line of the form:',
     'SEVERITY: LOW|MEDIUM|HIGH — <one short reason>',
     '(HIGH = new/changed obligations, thresholds, instruments or deadlines; MEDIUM = substantive update worth review; LOW = routine site churn.)'
@@ -87,7 +114,7 @@ async function draftFor(c) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 700, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: MODEL, max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
     });
     if (!res.ok) return '### ' + c.name + '\n_AI draft unavailable (HTTP ' + res.status + '). Review manually: ' + c.url + '_';
     const data = await res.json();
@@ -101,6 +128,8 @@ async function draftFor(c) {
 const sections = [];
 for (const c of changes) {
   const text = await draftFor(c);
+  const analysis = parseAnalysis(text);
+  if (Object.keys(analysis).length) c.analysis = analysis;
   const m = /SEVERITY:[ \t]*(LOW|MEDIUM|HIGH)(?:[ \t]*[—-][ \t]*([^\n]*))?$/im.exec(text);
   if (m) {
     c.severity = m[1].toUpperCase();

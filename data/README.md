@@ -38,11 +38,11 @@ Actions from the URLs in `sanctions-sources.json`.
 |---|---|
 | `sanctions-state.json` | `sanctions-watch.yml` (daily): per-source content fingerprints; `updated` moves only when a list actually changes |
 | `fatf-state.json` | `fatf-watchdog.yml`: last-seen FATF black/grey lists |
-| `reg-watch-state.json` + `reg-watch-snapshots/` | `regulatory-watch.yml`: content fingerprints + dated text snapshots of ~22 regulator sources |
+| `reg-watch-state.json` + `reg-watch-snapshots/` | `regulatory-watch.yml`: content fingerprints + dated text snapshots (`<id>.txt`) and titled-link item snapshots (`<id>.links.json`) of ~22 regulator sources |
 | `sanctions-screen-state.json`(`.enc`) | Screening runs: last-seen matches (no re-alert spam) |
 | `screen-delta-state.json`(`.enc`) · `screening-cases-state.json.enc` · `source-coverage-state.json`(`.enc`) · `adverse-media-evidence.json`(`.enc`) · `run-metrics.json`(`.enc`) | The daily screen's delta, case, coverage, evidence and metrics state |
 | `tfs-update-log.json` | TFS list-update timeline (detection → rescreen; MLRO completes publication dates) |
-| `risk-overrides-backup.json` | Monthly commit of the override-sheet mirror (the one off-device copy of officer work) |
+| `risk-overrides-backup.json` | Monthly git copy of the risk-data override mirror. Assessment-register and activity-log operational mirrors also exist in Asana; none of these substitutes for the dedicated authenticated persistence tier and documented/rehearsed RPO/RTO still open under item 23. |
 | `grc-metrics.json` · `board-figures.json` | Generated snapshots — regen with `node scripts/grc-metrics.mjs --write` / `node scripts/board-figures.mjs --write`; CI runs both `--check` modes |
 
 **Encryption.** Every `*.json.enc` is AES-256-GCM (scrypt) via

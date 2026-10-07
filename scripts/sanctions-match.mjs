@@ -23,8 +23,31 @@ import { readFileSync } from 'node:fs';
    Arabic- or Cyrillic-script subject must keep its letters, or it folds to the
    empty key and silently screens clear. The single source of truth —
    sanctions-screen.mjs re-exports this. */
-export function normalizeName(s) {
+/* Apostrophe variants and HTML entities, folded BEFORE anything else — kept
+   byte-identical with screen.py's _fold_apostrophe_variants. A name reaching
+   the matcher as "OʼBrien" (U+02BC, the usual apostrophe of transliterated
+   Ukrainian/Arabic names), "O’Brien", "O&#39;Brien" or "Smith &amp; Co" used
+   to key as "oʼbrien" (one letter-token, routed to MANUAL REVIEW as lost
+   script), "o 39 brien" or "smith amp co" — never meeting the plain spelling.
+   The FATF watchdog dropped two grey-listed countries for exactly this reason
+   on 3 Oct 2026. Every variant now becomes the ASCII apostrophe the pipeline
+   already treats as a separator, so plain-apostrophe names keep the exact key
+   they had and every variant meets them. Numeric entities and a closed set of
+   named ones are decoded; anything else is left as it was. */
+const NAMED_ENT = { amp: '&', apos: "'", quot: '"', nbsp: ' ', rsquo: "'", lsquo: "'", ndash: '-', mdash: '-' };
+export function foldApostropheVariants(s) {
   return String(s == null ? '' : s)
+    .replace(/&#(x[0-9a-fA-F]+|[0-9]+);/g, (m, n) => {
+      const cp = n[0] === 'x' || n[0] === 'X' ? parseInt(n.slice(1), 16) : parseInt(n, 10);
+      return cp > 0 && cp < 0x110000 ? String.fromCodePoint(cp) : ' ';
+    })
+    .replace(/&([A-Za-z])(acute|grave|circ|uml|tilde|cedil|ring);/g, '$1')
+    .replace(/&([A-Za-z]+);/g, (m, n) => (Object.hasOwn(NAMED_ENT, n.toLowerCase()) ? NAMED_ENT[n.toLowerCase()] : m))
+    .replace(/[\u2018\u2019\u201B\u02BC\u02BB\u2032\u0060\u00B4]/g, "'");
+}
+
+export function normalizeName(s) {
+  return foldApostropheVariants(s)
     /* BEFORE NFKD — й and ё are PRECOMPOSED (и+breve, е+diaeresis), so the
        mark-strip below turns them into и/е and the Cyrillic table then renders
        "Сергей" as "sergei" and "Ёлка" as "elka". screen.py romanizes on the
@@ -420,6 +443,20 @@ export function parseIdbCsv(body) {
 /* Best-effort generic sanctions XML (Canada SEMA, Switzerland SECO and similar):
    join given/last name tags, take whole/entity name tags, and split alias tags.
    Returns [] if nothing recognisable is found (caller flags coverage degraded). */
+/* A screenable name carries at least two letters (any script) and is not a
+   bare schedule reference. 1 Oct 2026: Canada's official SEMA XML began
+   publishing records whose fields are shifted against their labels — the
+   LastName field holds a date serial ("44102"), EntityOrShip holds the
+   schedule ("1, Part 1") — with NO name anywhere. The generic parser counted
+   11,087 such values as "designated names", passed the 2,500 floor, and the
+   list reported OK while screening nothing. Junk is now dropped, so a list
+   that carries no real names reads 0 and degrades loudly. */
+const SCHEDULE_REF_RE = /^(?:\d+\s*,\s*)?(?:schedule\s+\d+\s*,\s*)?part\s+[\d.]+$/i;
+export function isScreenableName(value) {
+  const v = String(value ?? '').trim();
+  return (v.match(/\p{L}/gu) || []).length >= 2 && !SCHEDULE_REF_RE.test(v);
+}
+
 export function parseGenericXml(body) {
   const s = String(body), names = [];
   const recordRe = /<(record|entry|sanctionEntity|sanctionentity|individual|entity|target)\b[^>]*>([\s\S]*?)<\/\1>/gi;
@@ -438,7 +475,7 @@ export function parseGenericXml(body) {
       for (const a of allTags(block, t)) for (const piece of a.split(/[\/;|]/)) { const v = piece.trim(); if (v) names.push(v); }
     }
   }
-  return matched ? names.filter(Boolean) : [];
+  return matched ? names.filter(isScreenableName) : [];
 }
 
 /* Switzerland SECO "Gesamtliste" XML: <target> blocks whose <identity> carries
@@ -634,6 +671,238 @@ export function parseDfatXlsx(buf) {
     }
   }
   return names;
+}
+
+/* Legacy Excel 97-2003 (.xls) reader — stdlib only. A .xls file is an OLE2
+   Compound File holding a "Workbook" (BIFF8) stream. Lebanon's ISF National
+   Terrorism Financial List is published only in this format (source-probe run
+   37128209902, 2026-10-03: HTTP 200, 137,216 bytes, D0 CF 11 E0 signature).
+   readCfbStream walks the compound file's FAT / mini-FAT chains to one named
+   stream; parseXlsSheets reads every worksheet's text and numeric cells. Every
+   offset comes from the file, so each read is bounds-checked and a damaged
+   file yields fewer rows (degraded coverage), never a throw or a hang. */
+export function readCfbStream(buf, wanted = ['Workbook', 'Book']) {
+  const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf || []);
+  if (b.length < 512 || b.readUInt32LE(0) !== 0xE011CFD0 || b.readUInt32LE(4) !== 0xE11AB1A1) return null;
+  const shift = b.readUInt16LE(30);
+  const miniShift = b.readUInt16LE(32);
+  if (shift < 7 || shift > 16 || miniShift > shift) return null;
+  const ss = 1 << shift, mss = 1 << miniShift;
+  const sectorAt = (n) => {
+    const off = (n + 1) * ss;
+    return off + ss <= b.length ? b.subarray(off, off + ss) : null;
+  };
+  /* FAT sector ids: 109 in the header, then the DIFAT chain (each DIFAT sector
+     holds ss/4-1 ids plus the next DIFAT sector id). */
+  const fatIds = [];
+  for (let i = 0; i < 109; i++) { const v = b.readUInt32LE(76 + i * 4); if (v < 0xFFFFFFFA) fatIds.push(v); }
+  let difat = b.readUInt32LE(68);
+  for (let guard = 0; difat < 0xFFFFFFFA && guard < 4096; guard++) {
+    const s = sectorAt(difat);
+    if (!s) break;
+    for (let i = 0; i < ss / 4 - 1; i++) { const v = s.readUInt32LE(i * 4); if (v < 0xFFFFFFFA) fatIds.push(v); }
+    difat = s.readUInt32LE(ss - 4);
+  }
+  const fat = [];
+  for (const id of fatIds) { const s = sectorAt(id); if (s) for (let i = 0; i < ss / 4; i++) fat.push(s.readUInt32LE(i * 4)); }
+  const chain = (start, table, cap) => {
+    const out = [];
+    const seen = new Set();
+    for (let n = start; n < 0xFFFFFFFA && n < table.length && !seen.has(n) && out.length < cap; n = table[n]) { seen.add(n); out.push(n); }
+    return out;
+  };
+  const readChain = (start) => Buffer.concat(chain(start, fat, fat.length).map(sectorAt).filter(Boolean));
+  const dir = readChain(b.readUInt32LE(48));
+  const entries = [];
+  for (let p = 0; p + 128 <= dir.length; p += 128) {
+    const nameLen = Math.min(dir.readUInt16LE(p + 64), 64);
+    entries.push({
+      name: dir.toString('utf16le', p, p + Math.max(0, nameLen - 2)),
+      type: dir[p + 66],
+      start: dir.readUInt32LE(p + 116),
+      size: dir.readUInt32LE(p + 120),
+    });
+  }
+  const root = entries.find(e => e.type === 5);
+  const hit = entries.find(e => e.type === 2 && wanted.includes(e.name));
+  if (!hit) return null;
+  if (hit.size >= b.readUInt32LE(56) || !root) return readChain(hit.start).subarray(0, hit.size);
+  /* Small streams live in the mini stream (root entry's chain), 64-byte units. */
+  const miniFat = [];
+  const mf = readChain(b.readUInt32LE(60));
+  for (let i = 0; i + 4 <= mf.length; i += 4) miniFat.push(mf.readUInt32LE(i));
+  const mini = readChain(root.start);
+  const parts = chain(hit.start, miniFat, miniFat.length).map(n => mini.subarray(n * mss, n * mss + mss));
+  return Buffer.concat(parts).subarray(0, hit.size);
+}
+
+/* BIFF8 shared-string table (SST + CONTINUE records). A string's characters
+   may run over into a CONTINUE record, which then begins with a fresh 1-byte
+   flags field (only the high-byte bit counts); rich-text runs and the
+   extended-string block may also span records, without that byte. */
+function parseBiffSst(segments) {
+  let si = 0, off = 8;
+  const out = [];
+  const cur = () => segments[si];
+  const advance = () => { si++; off = 0; return si < segments.length; };
+  const take = (n) => {
+    const parts = [];
+    while (n > 0) {
+      if (si >= segments.length) return null;
+      if (off >= cur().length) { if (!advance()) return null; continue; }
+      const k = Math.min(n, cur().length - off);
+      parts.push(cur().subarray(off, off + k)); off += k; n -= k;
+    }
+    return Buffer.concat(parts);
+  };
+  const total = segments[0] && segments[0].length >= 8 ? segments[0].readUInt32LE(4) : 0;
+  for (let s = 0; s < total; s++) {
+    if (si < segments.length && off >= cur().length) advance();
+    const head = take(3);
+    if (!head) break;
+    let cch = head.readUInt16LE(0);
+    const flags = head[2];
+    let high = (flags & 1) === 1;
+    const runs = flags & 8 ? (take(2) || Buffer.alloc(2)).readUInt16LE(0) : 0;
+    const ext = flags & 4 ? (take(4) || Buffer.alloc(4)).readUInt32LE(0) : 0;
+    let str = '';
+    while (cch > 0 && si < segments.length) {
+      if (off >= cur().length) {
+        if (!advance()) break;
+        high = (cur()[0] & 1) === 1; off = 1;
+        continue;
+      }
+      const avail = cur().length - off;
+      const k = Math.min(cch, high ? Math.floor(avail / 2) : avail);
+      if (k <= 0) { off = cur().length; continue; }
+      const chunk = cur().subarray(off, off + k * (high ? 2 : 1));
+      str += high ? chunk.toString('utf16le') : chunk.toString('latin1');
+      off += chunk.length; cch -= k;
+    }
+    if (take(runs * 4 + ext) === null && (runs || ext)) { out.push(str); break; }
+    out.push(str);
+  }
+  return out;
+}
+
+/* RK numbers: 30-bit int or the top 30 bits of an IEEE double, optionally /100. */
+function biffRk(v) {
+  let n;
+  if (v & 2) n = v >> 2;
+  else { const d = Buffer.alloc(8); d.writeUInt32LE(v & 0xFFFFFFFC, 4); n = d.readDoubleLE(0); }
+  return v & 1 ? n / 100 : n;
+}
+
+/* BIFF8 workbook stream → [{name, rows}] for every worksheet; each row is an
+   array of cell strings (numbers rendered with String()). */
+export function parseXlsSheets(buf) {
+  const wb = readCfbStream(buf);
+  if (!wb) return [];
+  const recs = [];
+  for (let p = 0; p + 4 <= wb.length;) {
+    const id = wb.readUInt16LE(p), len = wb.readUInt16LE(p + 2);
+    if (p + 4 + len > wb.length) break;
+    recs.push({ id, pos: p, data: wb.subarray(p + 4, p + 4 + len) });
+    p += 4 + len;
+  }
+  let sst = [];
+  const sheets = [];
+  for (let i = 0; i < recs.length; i++) {
+    const r = recs[i];
+    if (r.id === 0x00FC) {
+      const segs = [r.data];
+      for (let j = i + 1; j < recs.length && recs[j].id === 0x003C; j++) segs.push(recs[j].data);
+      sst = parseBiffSst(segs);
+    } else if (r.id === 0x0085 && r.data.length >= 8) {
+      const cch = r.data[6], high = r.data[7] & 1;
+      const name = high ? r.data.toString('utf16le', 8, 8 + cch * 2) : r.data.toString('latin1', 8, 8 + cch);
+      sheets.push({ name, offset: r.data.readUInt32LE(0), type: r.data[5] });
+    } else if (r.id === 0x000A) break; // EOF of the globals substream
+  }
+  const out = [];
+  for (const sh of sheets) {
+    if (sh.type !== 0) continue; // worksheets only (not charts / macro sheets)
+    let k = recs.findIndex(r => r.pos === sh.offset);
+    if (k < 0) continue;
+    const grid = new Map();
+    const put = (row, col, v) => {
+      if (!grid.has(row)) grid.set(row, []);
+      grid.get(row)[col] = String(v).replace(/\s+/g, ' ').trim();
+    };
+    let pendingFormula = null;
+    for (k = k + 1; k < recs.length && recs[k].id !== 0x000A; k++) {
+      const { id, data: d } = recs[k];
+      if (id === 0x00FD && d.length >= 10) put(d.readUInt16LE(0), d.readUInt16LE(2), sst[d.readUInt32LE(6)] ?? '');
+      else if ((id === 0x0204 || id === 0x00D6) && d.length >= 9) {
+        const cch = d.readUInt16LE(6), high = d[8] & 1;
+        put(d.readUInt16LE(0), d.readUInt16LE(2), high ? d.toString('utf16le', 9, 9 + cch * 2) : d.toString('latin1', 9, 9 + cch));
+      }
+      else if (id === 0x0203 && d.length >= 14) put(d.readUInt16LE(0), d.readUInt16LE(2), d.readDoubleLE(6));
+      else if (id === 0x027E && d.length >= 10) put(d.readUInt16LE(0), d.readUInt16LE(2), biffRk(d.readUInt32LE(6)));
+      else if (id === 0x00BD && d.length >= 6) {
+        const row = d.readUInt16LE(0), first = d.readUInt16LE(2);
+        for (let c = 0; 4 + c * 6 + 6 <= d.length - 2; c++) put(row, first + c, biffRk(d.readUInt32LE(4 + c * 6 + 2)));
+      }
+      else if (id === 0x0006 && d.length >= 14) {
+        /* FORMULA: a string result arrives in the next STRING record. */
+        if (d[6] === 0 && d.readUInt16LE(12) === 0xFFFF) pendingFormula = [d.readUInt16LE(0), d.readUInt16LE(2)];
+        else if (d.readUInt16LE(12) !== 0xFFFF) put(d.readUInt16LE(0), d.readUInt16LE(2), d.readDoubleLE(6));
+      }
+      else if (id === 0x0207 && pendingFormula && d.length >= 3) {
+        const cch = d.readUInt16LE(0), high = d[2] & 1;
+        put(pendingFormula[0], pendingFormula[1], high ? d.toString('utf16le', 3, 3 + cch * 2) : d.toString('latin1', 3, 3 + cch));
+        pendingFormula = null;
+      }
+    }
+    const rows = [...grid.keys()].sort((a, c) => a - c).map(r => {
+      const cells = grid.get(r);
+      for (let c = 0; c < cells.length; c++) if (cells[c] == null) cells[c] = '';
+      return cells;
+    });
+    out.push({ name: sh.name, rows });
+  }
+  return out;
+}
+
+/* Lebanon — ISF National Terrorism Financial List (Law No. 44 of 24/11/2015;
+   isf.gov.lb/national-terrorism-financial-list/). Header row (2026-10-03):
+   Serial # | First Name and Family Name | Title | Father's Name | … | Group
+   Type | Alias Type | Regime | Listed on | … — the "Alias Type" column holds
+   the a.k.a. names. Every row's name screens; aliases are split on their
+   separators (" - ", "- ", " -", ",", ";"). A hyphen with a space on one side
+   is a separator UNLESS the word before it is a name particle ("Abdel-
+   Metwali Bou Mariam" is one alias, written "Abdel- Metwali"), in which case
+   it is closed up. Single-word fragments are not screened alone. */
+const NAME_PARTICLES = /^(al|el|abd|abdel|abdul|abu|abou|bou|bin|ben|ibn)$/i;
+function closeParticleHyphens(s) {
+  return String(s).replace(/(\S+)\s*-\s*(?=\S)/g, (m, w) => (NAME_PARTICLES.test(w) ? w + '-' : m));
+}
+export function splitLbAliases(cell) {
+  const out = [];
+  const text = closeParticleHyphens(String(cell || '').replace(/\s+/g, ' ').trim().replace(/[.\s]+$/, ''));
+  for (const part of text.split(/\s+-\s*|\s*-\s+|\s*[,;،]\s*/)) {
+    const v = part.trim();
+    if (v.split(' ').length >= 2) out.push(v);
+  }
+  return out;
+}
+export function parseLbIsfXls(buf) {
+  const names = [];
+  for (const { rows } of parseXlsSheets(buf)) {
+    const h = rows.findIndex(r => r.some(c => /first name and family name/i.test(c)));
+    if (h < 0) continue;
+    const nameCol = rows[h].findIndex(c => /first name and family name/i.test(c));
+    const aliasCol = rows[h].findIndex(c => /^alias/i.test(c));
+    for (let i = h + 1; i < rows.length; i++) {
+      const raw = String(rows[i][nameCol] || '').replace(/\s+/g, ' ').trim();
+      if (!raw || /^-+$/.test(raw)) continue;
+      names.push(raw);
+      const closed = closeParticleHyphens(raw);
+      if (closed !== raw) names.push(closed);
+      if (aliasCol >= 0) names.push(...splitLbAliases(rows[i][aliasCol]));
+    }
+  }
+  return [...new Set(names)];
 }
 
 /* Mexico SAT Artículo 69-B (EFOS invoice-mill list): latin-1 comma CSV with
@@ -1007,6 +1276,7 @@ export function parseList(source, body) {
   if (p === 'czmfa') return parseCzMfaCsv(body);                 // Czechia MFA national list (CSV, slash-separated transliterations, valid rows only)
   if (p === 'numberedlist') return parseNumberedNameList(body);   // numbered name lists on web pages (Estonia MFA)
   if (p === 'htmltable') return parseHtmlTable(body);            // lists served as an HTML <table> (Moldova SIS, labelled vnd.ms-excel)
+  if (p === 'lbisf') return parseLbIsfXls(body);                 // Lebanon ISF national list (legacy BIFF8 .xls, bytes)
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
   if (p === 'ods' || source.type === 'ods') return parseOdsList(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
@@ -1537,7 +1807,7 @@ export function lostScriptLetters(name) {
     if (/\p{L}/u.test(c) && (c < 'A' || c > 'Z')) return true;
   }
   /* Latin-script letters fold deterministically; anything else was romanised. */
-  return [...String(name == null ? '' : name)]
+  return [...foldApostropheVariants(name)]
     .some(c => /\p{L}/u.test(c) && !/\p{Script=Latin}/u.test(c));
 }
 

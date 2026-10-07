@@ -63,8 +63,26 @@ export function extractText(raw) {
    nonces and cache-busters don't shift the fingerprint on every fetch and open
    a spurious PR. Tuned to leave real regulatory figures intact: only digit runs
    of 8+ are removed, so thresholds like 55,000 / 60,000 still register. */
+/* "Last updated" stamps written with a MONTH NAME. The numeric-date rules
+   below never matched them, so a page that re-stamps its footer every day
+   alerted every day: the UAE Ministry of Economy homepage ("آخر تحديث للمحتوى
+   بتاريخ: 02 اكتوبر 2026" → "03 اكتوبر 2026") was filed as a source change on
+   every run of 3 Oct 2026, its only difference that date. Scoped to the stamp
+   phrase on purpose — a dated entry in a list of actions (OFAC "october 02,
+   2026 - sanctions list updates") is content and is left alone. */
+const MONTHS_EN = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+const MONTHS_AR = '(?:يناير|فبراير|مارس|أبريل|ابريل|إبريل|مايو|يونيو|يونيه|يوليو|يوليه|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر|كانون الثاني|شباط|آذار|نيسان|أيار|حزيران|تموز|آب|أيلول|تشرين الأول|تشرين الثاني|كانون الأول)';
+const WORDY_DATE = '(?:\\d{1,2}(?:st|nd|rd|th)?\\s+(?:' + MONTHS_EN + '|' + MONTHS_AR + ')\\.?,?\\s+\\d{4}|' + MONTHS_EN + '\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4})';
+const UPDATE_STAMP_RE = new RegExp('(?:(?:page\\s+)?last\\s+(?:updated|modified|reviewed)(?:\\s+on)?|updated\\s+on|آخر\\s+تحديث[^:：]{0,30}|تاريخ\\s+آخر\\s+تحديث|تم\\s+التحديث(?:\\s+في)?)\\s*[:：]?\\s*' + WORDY_DATE, 'g');
+/* Bumped whenever denoise() changes what it strips: stored hashes from an
+   older version are re-checked against the stored snapshot (see main) instead
+   of being diffed blindly, so a filter upgrade never fires a wave of false
+   "changed" alerts. */
+export const FP_VERSION = 2;
+
 export function denoise(text) {
   return text
+    .replace(UPDATE_STAMP_RE, ' ')                                        // "last updated: 2 october 2026" / آخر تحديث … 02 اكتوبر 2026
     .replace(/\d{4}-\d{2}-\d{2}t\d{2}:\d{2}(:\d{2})?(\.\d+)?z?/g, ' ')   // ISO datetimes
     .replace(/\d{4}-\d{2}-\d{2}/g, ' ')                                   // ISO dates
     .replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, ' ')                           // d/m/y dates
@@ -76,6 +94,93 @@ export function denoise(text) {
 }
 export function fingerprint(raw) {
   return createHash('sha256').update(extractText(raw), 'utf8').digest('hex');
+}
+
+/* ── Display helpers (card text only — never the fingerprint) ──
+   HTML character references were shown raw on the cards ("treasury&#39;s",
+   "page 3 &hellip;"). They are decoded for DISPLAY only: fingerprint() and
+   extractText() are shared with Sanctions Watch, whose stored list hashes
+   would all move (one false "list changed" alert per list) if decoding
+   entered the hash. */
+const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', ndash: '–',
+  mdash: '—', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', laquo: '«', raquo: '»', middot: '·', bull: '•',
+  copy: '©', reg: '®', trade: '™', euro: '€', pound: '£', deg: '°', sect: '§', para: '¶', shy: '' };
+export function decodeEntities(s) {
+  return String(s || '')
+    .replace(/&#x([0-9a-f]{1,6});/gi, (m, h) => { const n = parseInt(h, 16); return n > 0 && n <= 0x10FFFF ? String.fromCodePoint(n) : m; })
+    .replace(/&#(\d{1,7});/g, (m, d) => { const n = Number(d); return n > 0 && n <= 0x10FFFF ? String.fromCodePoint(n) : m; })
+    .replace(/&([a-z]+);/gi, (m, n) => {
+      const k = n.toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, k)) return NAMED_ENTITIES[k];
+      const acc = /^([a-z])(acute|grave|circ|uml|tilde|cedil|ring)$/i.exec(n);
+      if (!acc) return m;
+      const mark = { acute: '\u0301', grave: '\u0300', circ: '\u0302', uml: '\u0308', tilde: '\u0303', cedil: '\u0327', ring: '\u030A' }[acc[2].toLowerCase()];
+      return (acc[1] + mark).normalize('NFC');
+    });
+}
+
+/* ── Itemised publications: what was ADDED or REMOVED as a linked item ──
+   Most monitored pages are lists of publications (OFAC recent actions, FATF
+   publications, CBUAE notices, MoE circulars). A text diff shows a run of
+   words; the reviewer needs the item itself — its title as the page prints
+   it (original case) and the link to the instrument. Links are snapshotted
+   beside the text snapshot and compared by title + address. Generic link
+   texts ("Read more", "اقرأ المزيد", pagination) carry no title and are
+   skipped; tracking/session query parameters never make an item "new". */
+const GENERIC_LINK_TEXT = /^(read more|more|learn more|see more|view more|view all|see all|details|download|click here|here|next|previous|prev|back|home|menu|search|share|print|open|english|العربية|عربي|اقرأ المزيد|المزيد|التفاصيل|تحميل|[0-9]+|page \d+)$/i;
+const TRACKING_PARAM = /^(utm_[a-z]+|_ga|_gid|_gl|fbclid|gclid|mc_[a-z]+|sessionid|sid|jsessionid|phpsessid|csrf|nonce|token|cachebust|cache_bust|cache-bust|ts|v|ver|build)$/i;
+function canonicalHref(href, baseUrl) {
+  let u;
+  try { u = new URL(href, baseUrl); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  u.hash = '';
+  for (const k of [...u.searchParams.keys()]) if (TRACKING_PARAM.test(k)) u.searchParams.delete(k);
+  return u.toString();
+}
+export function extractLinks(raw, baseUrl) {
+  const html = String(raw || '')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<script\b[\s\S]*?<\/script\b[^>]*>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style\b[^>]*>/gi, ' ');
+  const out = [], seen = new Set();
+  const re = /<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    const hm = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(m[1]);
+    const rawHref = hm ? decodeEntities(hm[1] ?? hm[2] ?? hm[3] ?? '').trim() : '';
+    if (!rawHref || /^(#|javascript:|mailto:|tel:)/i.test(rawHref)) continue;
+    const href = canonicalHref(rawHref, baseUrl);
+    if (!href) continue;
+    const t = decodeEntities(m[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    if (t.length < 12 || GENERIC_LINK_TEXT.test(t)) continue;
+    const key = t.toLowerCase() + '|' + href;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ t: t.length > 300 ? t.slice(0, 299) + '…' : t, h: href });
+  }
+  return out;
+}
+/* Items in `next` absent from `prev` (added) and vice versa (removed). A link
+   whose title is unchanged but whose address moved, or the reverse, is a
+   genuine change and shows on both sides. */
+export function diffLinks(prev, next, { max = 12 } = {}) {
+  const key = l => String(l.t).toLowerCase().replace(/\s+/g, ' ') + '|' + l.h;
+  const a = new Set((prev || []).map(key)), b = new Set((next || []).map(key));
+  const added = (next || []).filter(l => !a.has(key(l)));
+  const removed = (prev || []).filter(l => !b.has(key(l)));
+  return { addedCount: added.length, removedCount: removed.length, added: added.slice(0, max), removed: removed.slice(0, max) };
+}
+
+/* The five labelled card lines → c.analysis (shown on the Asana card). A
+   missing line stays missing — never filled with a guess. */
+export function parseAnalysis(text) {
+  const out = {};
+  const F = { CHANGED: 'changed', IMPACT: 'impact', ACTION: 'action', INSTRUMENT: 'instrument', EFFECTIVE: 'effective' };
+  for (const line of String(text || '').split('\n')) {
+    const m = /^[\s*_-]*(CHANGED|IMPACT|ACTION|INSTRUMENT|EFFECTIVE)[\s*_]*:[\s*_]*(.+?)\s*$/i.exec(line);
+    if (m && !out[F[m[1].toUpperCase()]]) out[F[m[1].toUpperCase()]] = m[2].replace(/\*\*/g, '').trim().slice(0, 500);
+  }
+  return out;
 }
 
 /* ── Persistent-failure alerting ──
@@ -130,6 +235,25 @@ export function captureAcceptable(ts, notBefore, now = Date.now()) {
    membership diffing (not LCS) is deliberate: it is order-insensitive, cheap,
    and a modification simply shows as one removal plus one addition. Excerpts
    are capped so a full page rewrite cannot blow up the card. */
+/* Where two versions of one segment actually differ, at word granularity.
+   A page with little sentence punctuation (much Arabic text) is ONE segment,
+   so a one-word edit used to show as a 220-char excerpt of identical leading
+   text on both sides ("added and removed are identical"), and the severity
+   heuristic scanned the whole segment for keywords that never changed. */
+export function changeContext(oldSeg, newSeg, ctxWords = 12) {
+  const a = String(oldSeg || '').split(/\s+/).filter(Boolean);
+  const b = String(newSeg || '').split(/\s+/).filter(Boolean);
+  let p = 0;
+  while (p < a.length && p < b.length && a[p] === b[p]) p++;
+  let q = 0;
+  while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+  const removedWords = a.slice(p, a.length - q), addedWords = b.slice(p, b.length - q);
+  const before = (p > ctxWords ? '… ' : '') + a.slice(Math.max(0, p - ctxWords), p).join(' ');
+  const after = a.slice(a.length - q, a.length - q + ctxWords).join(' ') + (q > ctxWords ? ' …' : '');
+  const show = ws => [before, '⟦' + ws.join(' ') + '⟧', after].filter(Boolean).join(' ');
+  return { removedWords, addedWords, removedExcerpt: show(removedWords), addedExcerpt: show(addedWords) };
+}
+
 export function diffTexts(oldText, newText, { maxExcerpts = 4, maxLen = 220 } = {}) {
   const seg = t => String(t || '')
     .split(/(?<=[.!?;])\s+/)
@@ -139,8 +263,31 @@ export function diffTexts(oldText, newText, { maxExcerpts = 4, maxLen = 220 } = 
   const aSet = new Set(a), bSet = new Set(b);
   const added = b.filter(s => !aSet.has(s));
   const removed = a.filter(s => !bSet.has(s));
+  /* Pair each removed segment with the added segment sharing the most leading
+     + trailing words (a modification), so the card shows the changed words in
+     context. Unpaired segments are genuine additions / deletions, kept whole. */
+  const shared = (x, y) => { const c = changeContext(x, y); return x.split(/\s+/).length - c.removedWords.length; };
+  const usedAdded = new Set();
+  const pairs = [];
+  for (const r of removed) {
+    let best = -1, bestScore = 0;
+    added.forEach((ad, i) => { if (usedAdded.has(i)) return; const sc = shared(r, ad); if (sc > bestScore) { bestScore = sc; best = i; } });
+    if (best >= 0 && bestScore >= 3) { usedAdded.add(best); pairs.push([r, added[best]]); }
+  }
+  const pairedRemoved = new Set(pairs.map(([r]) => r)), pairedAdded = new Set(pairs.map(([, ad]) => ad));
+  const ctx = pairs.map(([r, ad]) => changeContext(r, ad));
+  const addedEx = [...ctx.map(c => c.addedExcerpt), ...added.filter(x => !pairedAdded.has(x))];
+  const removedEx = [...ctx.map(c => c.removedExcerpt), ...removed.filter(x => !pairedRemoved.has(x))];
+  /* The text that actually changed: the differing words of each modified
+     segment plus every wholly added / removed segment. Severity reads this. */
+  const changedText = [...ctx.flatMap(c => [c.addedWords.join(' '), c.removedWords.join(' ')]),
+    ...added.filter(x => !pairedAdded.has(x)), ...removed.filter(x => !pairedRemoved.has(x))].filter(Boolean);
+  /* Same words, only reordered or re-segmented → not a content change. */
+  const bag = arr => arr.join(' ').split(/\s+/).filter(Boolean).sort().join(' ');
+  const cosmetic = (added.length + removed.length) > 0 && bag(added) === bag(removed);
   const clip = arr => arr.slice(0, maxExcerpts).map(s => s.length > maxLen ? s.slice(0, maxLen - 1) + '…' : s);
-  return { addedCount: added.length, removedCount: removed.length, added: clip(added), removed: clip(removed) };
+  return { addedCount: added.length, removedCount: removed.length, added: clip(addedEx), removed: clip(removedEx),
+    changedText: changedText.slice(0, 20), cosmetic };
 }
 
 /* ── Change-severity triage ──
@@ -150,15 +297,20 @@ export function diffTexts(oldText, newText, { maxExcerpts = 4, maxLen = 220 } = 
    → MEDIUM; cosmetic churn → LOW. The AI draft step may override with its
    own judgement (reg-draft.mjs); the heuristic is the floor, never silent. */
 const SEVERITY_HIGH_RE = /(threshold|circular|regulation|decree|resolution|directive|deadline|penalt|prohibit|obligat|must|shall|licen[cs]|freez|sanction|designat|guidance|standard|amendment|article \d)/i;
-export function classifySeverity(diff) {
-  if (!diff) return { severity: 'MEDIUM', reason: 'content changed — no itemised delta available yet, review the page' };
-  const texts = [...(diff.added || []), ...(diff.removed || [])];
+export function classifySeverity(diff, items) {
+  const titles = items ? [...(items.added || []), ...(items.removed || [])].map(l => l.t) : [];
+  if (!diff && !titles.length) return { severity: 'MEDIUM', reason: 'content changed — no itemised delta available yet, review the page' };
+  /* Only the words that changed can make a change HIGH — a keyword in the
+     unchanged remainder of a long segment says nothing about this edit. A
+     new or removed item's title is changed text too. */
+  const texts = [...(!diff ? [] : Array.isArray(diff.changedText) ? diff.changedText : [...(diff.added || []), ...(diff.removed || [])]), ...titles];
   const hit = texts.find(t => SEVERITY_HIGH_RE.test(t));
   if (hit) {
     const term = (hit.match(SEVERITY_HIGH_RE) || [])[0];
     return { severity: 'HIGH', reason: 'delta contains regulatory-instrument language ("' + term + '")' };
   }
-  const moved = (diff.addedCount || 0) + (diff.removedCount || 0);
+  const moved = ((diff && diff.addedCount) || 0) + ((diff && diff.removedCount) || 0)
+    + ((items && items.addedCount) || 0) + ((items && items.removedCount) || 0);
   if (moved >= 3) return { severity: 'MEDIUM', reason: moved + ' content segments moved — substantive page update' };
   return { severity: 'LOW', reason: 'small delta with no regulatory-instrument language — likely routine site churn' };
 }
@@ -206,21 +358,22 @@ export function computeChanges(sources, prevState, fetched, today) {
        next run (its ts predates our recording day) and flip-flops to error. */
     const asOf = (f.snapshotTs && tsToIsoDate(f.snapshotTs)) || today;
     if (!old) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, ...via };
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, fp: FP_VERSION, ...via };
       changes.push({ ...base(s), status: 'new', newHash: hash, ...via });
     } else if (old.hash == null) {
       /* first good snapshot after a prior error — record silently, no PR */
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, ...via };
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, fp: FP_VERSION, ...via };
       changes.push({ ...base(s), status: 'recovered', newHash: hash, ...via });
     } else if (old.hash !== hash) {
-      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, prevHash: old.hash, ...via };
-      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes, ...via });
+      stateSources[s.id] = { hash, bytes, checkedAt: today, changedAt: today, contentAsOf: asOf, status: f.status || 200, prevHash: old.hash, fp: FP_VERSION, ...via };
+      changes.push({ ...base(s), status: 'changed', prevHash: old.hash, newHash: hash, prevBytes: old.bytes, newBytes: bytes, prevFp: old.fp || 1,
+        prevAsOf: old.contentAsOf || old.changedAt || null, ...(old.via ? { prevVia: old.via } : {}), asOf, ...via });
     } else {
       /* Rebuild rather than spread so a stale error/errorStreak from a past
          failed run is cleared the moment the source fetches clean again.
          contentAsOf only moves forward (same content, newest confirmation). */
       const prevAsOf = old.contentAsOf || old.changedAt || '';
-      stateSources[s.id] = { hash: old.hash, bytes: old.bytes, checkedAt: today, changedAt: old.changedAt, contentAsOf: asOf > prevAsOf ? asOf : prevAsOf, status: f.status || 200, ...(old.prevHash ? { prevHash: old.prevHash } : {}), ...via };
+      stateSources[s.id] = { hash: old.hash, bytes: old.bytes, checkedAt: today, changedAt: old.changedAt, contentAsOf: asOf > prevAsOf ? asOf : prevAsOf, status: f.status || 200, ...(old.prevHash ? { prevHash: old.prevHash } : {}), ...(old.fp ? { fp: old.fp } : {}), ...via };
       changes.push({ ...base(s), status: 'unchanged' });
     }
   }
@@ -250,6 +403,25 @@ export function stateMateriallyChanged(prevState, nextState) {
 }
 
 /* ── Human-readable report (PR body + committed artifact) ── */
+/* What the reviewer records on the Regulatory Watch card for each change, so
+   the card itself evidences the reviewed decision (impact assessed, owner,
+   outcome). Fields are blank by design: the assessment is a human act. */
+export const REG_REVIEW_CHECKLIST = [
+  'Impact: [ ] none (site churn)   [ ] policy / procedure   [ ] training   [ ] obligations register   [ ] screening lists or rules',
+  'Instrument cited (number, date, issuing authority): ______   Effective date: ______',
+  'Assessed by: ______   Date: ______   Decision / follow-up card: ______',
+  'HIGH items are read first; a repealed instrument is never cited as operative law.',
+];
+
+/* Which two versions were compared, and how each was obtained — so the
+   reviewer can tell a same-day direct read from an archive capture. */
+export function comparedLine(c) {
+  if (!c || c.status !== 'changed') return '';
+  const how = v => v ? ' (' + v + ')' : ' (direct fetch)';
+  return 'compared the version of ' + (c.prevAsOf || 'an earlier run') + how(c.prevVia)
+    + ' with the version of ' + (c.asOf || 'today') + how(c.via);
+}
+
 export function buildReport(changes, today, mode) {
   const moved = contentChanges(changes);
   const errors = changes.filter(c => c.status === 'error');
@@ -276,13 +448,26 @@ export function buildReport(changes, today, mode) {
     for (const c of moved) {
       lines.push('| ' + c.name + ' | ' + (c.jurisdiction || '') + ' | ' + (c.status === 'new' ? 'first snapshot' : 'content changed') + ' | ' + c.url + ' |');
     }
-    const detailed = moved.filter(c => c.diff || c.diffNote);
+    const detailed = moved.filter(c => c.diff || c.diffNote || c.items || c.itemsNote);
     if (detailed.length) {
       lines.push('');
       lines.push('**What changed — additions and deletions in detail:**');
       for (const c of detailed) {
+        const sev = c.severity ? ' — severity **' + c.severity + '**' + (c.severityReason ? ' (' + c.severityReason + ')' : '') : '';
+        const cmp = comparedLine(c);
+        if (c.items || c.itemsNote) {
+          lines.push('- **' + c.name + '**' + (c.diff ? '' : sev) + (cmp ? ' — ' + cmp : ''));
+          if (c.items) {
+            for (const l of c.items.added) lines.push('  - 🆕 new item: [' + l.t + '](' + l.h + ')');
+            for (const l of c.items.removed) lines.push('  - 🗑 item no longer listed: [' + l.t + '](' + l.h + ')');
+            if (c.items.addedCount > c.items.added.length || c.items.removedCount > c.items.removed.length) {
+              lines.push('  - … ' + (c.items.addedCount - c.items.added.length + c.items.removedCount - c.items.removed.length) + ' more item(s) in data/reg-watch-snapshots/' + c.id + '.links.json');
+            }
+          } else {
+            lines.push('  - ' + c.itemsNote);
+          }
+        }
         if (c.diff) {
-          const sev = c.severity ? ' — severity **' + c.severity + '**' + (c.severityReason ? ' (' + c.severityReason + ')' : '') : '';
           lines.push('- **' + c.name + '** — ' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segment(s)' + sev);
           for (const s of c.diff.added) lines.push('  - ➕ added: “' + s + '”');
           for (const s of c.diff.removed) lines.push('  - ➖ removed: “' + s + '”');
@@ -295,6 +480,15 @@ export function buildReport(changes, today, mode) {
       }
     }
   }
+  /* Demoted changes are stated, never hidden: what moved the fingerprint
+     without being content, and why it was not alerted. */
+  const quiet = changes.filter(c => c.status === 'rebaselined' || c.status === 'cosmetic');
+  if (quiet.length) {
+    lines.push('');
+    lines.push('Not alerted (' + quiet.length + '): ' + quiet.map(c => c.name + ' — ' + (c.status === 'rebaselined'
+      ? 'fingerprint filter upgraded to v' + FP_VERSION + ', stored content re-checked and unchanged'
+      : 'same words re-ordered / re-segmented, no content change')).join('; ') + '.');
+  }
   const stuck = errors.filter(e => (e.errorStreak || 0) >= ERROR_STREAK_ALERT);
   if (stuck.length) {
     lines.push('');
@@ -304,6 +498,11 @@ export function buildReport(changes, today, mode) {
   }
   const transient = errors.filter(e => (e.errorStreak || 0) < ERROR_STREAK_ALERT);
   if (transient.length) appendErrors(lines, transient);
+  if (moved.length) {
+    lines.push('');
+    lines.push('**Reviewer record:**');
+    for (const item of REG_REVIEW_CHECKLIST) lines.push('- ' + item);
+  }
   lines.push('');
   lines.push('_Detection is automatic; wording changes are a reviewed decision. Country black/grey list moves are handled by the FATF Watchdog._');
   return lines.join('\n');
@@ -334,7 +533,11 @@ async function fetchDirect(url, timeoutMs = 25000) {
   try {
     const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: BROWSER_HEADERS });
     const body = await res.text();
-    return { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
+    const out = { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
+    /* Retry-After (seconds form) lets a capture read wait as long as archive.org asks. */
+    const ra = res.ok ? NaN : Number(res.headers?.get?.('retry-after'));
+    if (Number.isFinite(ra) && ra > 0) out.retryAfter = ra;
+    return out;
   } catch (e) {
     /* undici hides the real network failure (TLS, DNS, reset) in e.cause —
        surface it, or "fetch failed" is all the state ever records. */
@@ -398,6 +601,42 @@ async function spnAuthenticatedCapture(url, auth) {
   return null;
 }
 
+/* Capture reads retry 429 / 5xx / network errors with linear backoff. On
+   3 Oct 2026 archive.org held a capture of the NAMLCFTC page taken that same
+   minute, but its one read got HTTP 429, so the source stayed "unreachable"
+   for a 3rd run. Later that day the OECD capture read got 429 on all three
+   reads inside ~30 s while other sources' reads ran in parallel, so the
+   source stayed "unreachable" for a 3rd run too. Reads are therefore
+   serialized (one archive.org read at a time across all sources), get a 4th
+   attempt with a longer base, and honour Retry-After up to 30 s. A persistent
+   failure is still returned as the failure — never a fabricated page.
+   Injectable sleep keeps the unit tests instant. */
+let archiveReadChain = Promise.resolve();
+function serializeArchiveRead(fn) {
+  const run = archiveReadChain.then(fn, fn);
+  archiveReadChain = run.then(() => {}, () => {});
+  return run;
+}
+
+export const CAPTURE_READ_ATTEMPTS = 4;
+export const CAPTURE_READ_BASE_MS = 15000;
+export const CAPTURE_RETRY_AFTER_CAP_S = 30;
+
+export async function fetchCaptureRetrying(fetchFn, url, { attempts = CAPTURE_READ_ATTEMPTS, baseMs = CAPTURE_READ_BASE_MS,
+  sleep = (ms) => new Promise(r => setTimeout(r, ms)) } = {}) {
+  let snap;
+  for (let a = 1; a <= attempts; a++) {
+    snap = await serializeArchiveRead(() => fetchFn(url));
+    if (snap && snap.ok && snap.body) return snap;
+    const st = snap && snap.status;
+    const retryable = st === 429 || st === 'error' || (typeof st === 'number' && st >= 500);
+    if (!retryable || a === attempts) return snap;
+    const ra = Math.min(CAPTURE_RETRY_AFTER_CAP_S, Number(snap && snap.retryAfter) || 0) * 1000;
+    await sleep(Math.max(baseMs * a, ra));
+  }
+  return snap;
+}
+
 /* Direct fetch with one retry on transient network failure, then the same
    two-stage Wayback fallback the FATF Watchdog uses for sources whose bot
    protection 403/418s the runner outright:
@@ -426,7 +665,7 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
   if (auth) {
     const ts = await enqueueSpn(() => spnAuthenticatedCapture(url, auth));
     if (ts && captureAcceptable(ts, notBefore)) {
-      const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+      const snap = await fetchCaptureRetrying(fetchFn, 'https://web.archive.org/web/' + ts + 'id_/' + url, opts.retry);
       console.log('spn2 capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
       if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts, snapshotTs: ts };
     }
@@ -446,8 +685,10 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
       });
       const ts = (/\/web\/(\d{14})/.exec(r.url || '') || [])[1] || '';
       console.log('save-page-now ' + url + ' (attempt ' + attempt + '): HTTP ' + r.status + ' -> ' + (r.url || '(no url)'));
-      if (r.ok && ts && captureAcceptable(ts, notBefore)) {
-        const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+      /* A 429 from SPN can still redirect to a capture it just made (3 Oct:
+         HTTP 429 -> /web/20261003010455/…) — a fresh capture is usable either way. */
+      if (ts && captureAcceptable(ts, notBefore)) {
+        const snap = await fetchCaptureRetrying(fetchFn, 'https://web.archive.org/web/' + ts + 'id_/' + url, opts.retry);
         console.log('save-page-now capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
         if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org save-page-now ' + ts, snapshotTs: ts };
       }
@@ -465,7 +706,7 @@ export async function fetchWithFallback(url, fetchFn = fetchDirect, opts = {}) {
   /* 3. Most recent existing capture, if acceptable as a baseline. */
   const ts = await waybackLatestTs(url);
   if (ts && captureAcceptable(ts, notBefore)) {
-    const snap = await fetchFn('https://web.archive.org/web/' + ts + 'id_/' + url);
+    const snap = await fetchCaptureRetrying(fetchFn, 'https://web.archive.org/web/' + ts + 'id_/' + url, opts.retry);
     console.log('wayback capture fetch ' + ts + ' for ' + url + ': ' + (snap.ok ? 'OK' : (snap.error || snap.status)));
     if (snap.ok && snap.body) return { ...snap, status: 200, via: 'web.archive.org snapshot ' + ts, snapshotTs: ts };
   } else if (ts) {
@@ -550,22 +791,54 @@ async function main() {
      snapshot, then refresh snapshots for every good fetch. Snapshots live on
      the reg-watch-state branch alongside the fingerprint state. */
   mkdirSync(SNAPSHOT_DIR, { recursive: true });
+  let linksBaselined = 0;
   for (const c of changes) {
     const f = fetched[c.id];
     if (!f || !f.ok || typeof f.body !== 'string') continue;
     const newText = extractText(f.body);
     if (!newText) continue;
     const snapFile = SNAPSHOT_DIR + '/' + c.id + '.txt';
+    /* Item snapshot (titles + links), refreshed on every good fetch. */
+    const linksFile = SNAPSHOT_DIR + '/' + c.id + '.links.json';
+    let oldLinks = null;
+    try { oldLinks = JSON.parse(readFileSync(linksFile, 'utf8')); } catch {}
+    const newLinks = extractLinks(f.body, c.url);
+    if (!Array.isArray(oldLinks)) linksBaselined++;
+    writeFileSync(linksFile, JSON.stringify(newLinks, null, 1) + '\n');
     if (c.status === 'changed') {
+      if (Array.isArray(oldLinks)) {
+        c.items = diffLinks(oldLinks, newLinks);
+        console.log(c.id + ': items +' + c.items.addedCount + ' / -' + c.items.removedCount);
+      } else {
+        c.itemsNote = 'item baseline recorded this run — new / removed publications are listed by title and link from the next change';
+      }
       let oldText = '';
       try { oldText = readFileSync(snapFile, 'utf8'); } catch {}
+      /* Stored hash from an older denoise(): re-filter the stored snapshot
+         with today's rules. Equal to today's text → the content did not move,
+         only the filter did; re-baseline silently. Different → a real change,
+         reported as usual (the safe direction). */
+      if (oldText && (c.prevFp || 1) < FP_VERSION
+          && denoise(oldText.trim()).replace(/\s+/g, ' ').trim() === newText) {
+        c.status = 'rebaselined';
+        console.log(c.id + ': fingerprint v' + (c.prevFp || 1) + ' → v' + FP_VERSION + ' re-baselined, content unchanged');
+        writeFileSync(snapFile, newText + '\n');
+        continue;
+      }
       if (oldText) {
-        c.diff = diffTexts(oldText, newText);
+        /* Entities decoded for display on both sides (never in the hash). */
+        c.diff = diffTexts(decodeEntities(oldText), decodeEntities(newText));
         console.log(c.id + ': diff +' + c.diff.addedCount + ' / -' + c.diff.removedCount + ' segment(s)');
+        if (c.diff.cosmetic && !(c.items && (c.items.addedCount || c.items.removedCount))) {
+          c.status = 'cosmetic';
+          console.log(c.id + ': same words re-ordered / re-segmented — not a content change');
+          writeFileSync(snapFile, newText + '\n');
+          continue;
+        }
       } else {
         c.diffNote = 'first detailed snapshot recorded — additions/deletions will be itemised from the next change';
       }
-      const sev = classifySeverity(c.diff);
+      const sev = classifySeverity(c.diff, c.items);
       c.severity = sev.severity;
       c.severityReason = sev.reason;
       console.log(c.id + ': severity ' + c.severity + ' — ' + sev.reason);
@@ -573,6 +846,8 @@ async function main() {
     writeFileSync(snapFile, newText + '\n');
   }
 
+  /* rebaselined / cosmetic sources were demoted above; recount. */
+  moved.splice(0, moved.length, ...contentChanges(changes));
   const report = buildReport(changes, today, mode);
 
   mkdirSync('data', { recursive: true });
@@ -608,7 +883,10 @@ async function main() {
   setOutput('has_changes', flagged.length ? 'true' : 'false');
   /* Commit state whenever anything beyond checkedAt moved (e.g. an error
      streak advanced) so persistent-failure tracking survives between runs. */
-  setOutput('state_dirty', stateMateriallyChanged(prevState, state) ? 'true' : 'false');
+  /* A first item snapshot must be persisted too, or the next change could
+     never be itemised (the state branch is only written on a dirty run). */
+  if (linksBaselined) console.log('item baselines recorded: ' + linksBaselined + ' source(s)');
+  setOutput('state_dirty', (stateMateriallyChanged(prevState, state) || linksBaselined > 0) ? 'true' : 'false');
   setOutput('changed_count', String(mode === 'seed' ? seeded : moved.length));
   setOutput('pr_title', prTitle);
   setOutput('report_file', REPORT_FILE);

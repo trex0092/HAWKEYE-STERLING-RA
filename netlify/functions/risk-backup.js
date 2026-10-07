@@ -1,3 +1,6 @@
+'use strict';
+const { withFunctionTelemetry } = require('./_telemetry');
+
 /* Mirrors the compliance risk-data sheet (the officer's score overrides,
    which otherwise live only in the browser) into a single dedicated Asana
    task. A monthly GitHub Action then commits that mirror to the repository
@@ -218,3 +221,6 @@ function corsHeaders(event) {
 function resp(statusCode, obj, extra) {
   return { statusCode, headers: { 'Content-Type': 'application/json', ...(extra || {}) }, body: JSON.stringify(obj) };
 }
+
+/* Structured 5xx/exception telemetry. The wrapper never logs request bodies. */
+exports.handler = withFunctionTelemetry('risk-backup', exports.handler);

@@ -74,11 +74,16 @@ jobs:
             umsabtc1vb1fc4tfrqf0.blob.core.windows.net:443
             ofsistorage.blob.core.windows.net:443
             webgate.ec.europa.eu:443
+            ecas.ec.europa.eu:443
+            sanctionslist.fcdo.gov.uk:443
+            www.dfat.gov.au:443
+            www.sesam.search.admin.ch:443
             data.opensanctions.org:443
             www.international.gc.ca:443
             news.google.com:443
             www.bing.com:443
             api.gdeltproject.org:443
+            data.gdeltproject.org:443
             www.wikidata.org:443
             query.wikidata.org:443
             www.sec.gov:443
@@ -155,6 +160,19 @@ jobs:
           fi
           echo "state_ready=1" >> "$GITHUB_OUTPUT"
 
+      - name: Overlay the worldwide PEP list (Wikidata, CC0)
+        run: |
+          # Free worldwide PEP net for screen.py: the weekly Wikidata harvest
+          # lives on the pep-worldwide-state branch (public-officials data,
+          # unencrypted). Absent branch = the committed copy in data/ is used,
+          # and the report names the harvest date it screened against.
+          if git fetch origin pep-worldwide-state --depth=1 2>/dev/null; then
+            git checkout FETCH_HEAD -- data/pep-worldwide.json 2>/dev/null || true
+            echo "worldwide PEP list overlaid from pep-worldwide-state"
+          else
+            echo "no pep-worldwide-state branch — using the committed data/pep-worldwide.json"
+          fi
+
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
@@ -164,9 +182,20 @@ jobs:
 
       - name: Screen newly-added customers
         env:
+          # Personal EU FSF crawler token (optional) for the official EU XML
+          # fallback: the shared public token now redirects to EU Login.
+          EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
+          # Licence-free mode: set the repository variable OPENSANCTIONS_DATA=0 to
+          # download nothing from data.opensanctions.org (its data needs a
+          # commercial licence). Unset = on. See docs/aims/third-party-register.md.
+          OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}
           RUN_MODE: onboarding
+          # Optional extra bulk adverse nets (OpenSanctions debarment / regulatory).
+          # OFF unless the repository variable is set — CC-BY-NC data, see
+          # docs/aims/third-party-register.md before enabling.
+          ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}
           # HR - Employees screening population (MLRO-directed 2026-07-29,
           # see screen.py). Never forwarded here before, so screen.py always
           # fell back to its own hardcoded default (1216139945846994), which
@@ -180,8 +209,9 @@ jobs:
           ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID || '1216239131596624' }}
           ONBOARDING_WINDOW_HOURS: ${{ github.event.inputs.window_hours || '26' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # PDPL GATE: held OFF until the Anthropic DPA is executed + transfer basis recorded.
-          # Set repo variable LLM_TRIAGE=1 to re-enable once signed (no code change needed).
+          # PDPL GATE: code defaults OFF; enabling requires explicit repo variable LLM_TRIAGE=1.
+          # Governance intent requires verified DPA/transfer prerequisites first. The repository
+          # cannot infer the live variable value; open actions 36 and 42 reconcile the legal/runtime record.
           LLM_TRIAGE: ${{ vars.LLM_TRIAGE || '0' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'claude-haiku-4-5-20251001' }}
           # FraudLabs SUPPORT SIGNAL (payment-fraud indicator on the contact
@@ -221,8 +251,9 @@ jobs:
             git config user.email "actions@github.com"
             if [ -n "$STATE_ENCRYPTION_KEY" ]; then
               node scripts/state-crypto.mjs encrypt "${state_files[@]}"
+              enc_files=()
               for f in "${state_files[@]}"; do
-                [ -f "$f.enc" ] && git add "$f.enc"
+                [ -f "$f.enc" ] && enc_files+=("$f.enc")
                 git checkout HEAD -- "$f" 2>/dev/null || true
               done
             else
@@ -231,19 +262,10 @@ jobs:
               echo "::error::STATE_ENCRYPTION_KEY is not set - refusing to publish delta-state in PLAINTEXT (customer/employee names) to the public repository; state NOT persisted (P30)"
               exit 1
             fi
-            git commit -m "chore(screen): update delta-state (onboarding) [skip ci]"
-            # Persist on the screen-delta-state branch (main is protected — a plain
-            # `git push` to main is rejected and, previously, swallowed). Rebuilt as
-            # <current main> + one data commit, force-updated, matching the sweep.
-            # Auth is the ephemeral env token in the push URL — the checkout
-            # persists no credentials, so nothing lands in .git/config.
-            pushed=
-            for attempt in 1 2 3 4 5; do
-              git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/screen-delta-state && { pushed=1; break; }
-              echo "push failed (attempt $attempt) — retrying"
-              sleep $((attempt * 3))
-            done
-            [ -n "$pushed" ] || { echo "::error::state push to screen-delta-state failed after 5 attempts — state NOT persisted"; exit 1; }
+            # Persist on the screen-delta-state branch (main is protected),
+            # built on the branch's own tip so the Actions token never pushes a
+            # workflow-file change (scripts/push-state-branch.sh explains why).
+            scripts/push-state-branch.sh screen-delta-state "chore(screen): update delta-state (onboarding) [skip ci]" "${enc_files[@]}"
           else
             echo "delta-state unchanged"
           fi

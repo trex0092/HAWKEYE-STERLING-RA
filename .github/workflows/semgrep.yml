@@ -67,7 +67,7 @@ jobs:
         run: |
           semgrep scan --config .semgrep/hawkeye.yml --error --metrics off \
             app.js console.js advisor.js assets/super-data.js scripts netlify \
-            screen.py ai.py agents.py kyc.py txn_monitor.py monitoring.py \
+            screen.py ai.py agents.py kyc.py txn_monitor.py payment_screen.py monitoring.py \
             mcp_server.py mcp_tools.py str_dossier.py
 
       - name: Semgrep — community rulesets (advisory)

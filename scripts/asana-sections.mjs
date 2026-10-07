@@ -4,12 +4,38 @@
 export const MONITORING_PROJECT = '1216203370612914';
 export const CUSTOMER_PROJECT = '1214107620220121';
 export const EMPLOYEE_PROJECT = '1216239131596624';
+/* "Transaction Monitoring" section of HAWKEYE STERLING APP (renamed from
+   "Payments Register"; same gid): one task per payment, read by the daily run.
+   Deliberately NOT in SECTIONS, so requireApprovedSection refuses it to every
+   JS notifier. The ONLY card filed there is the engine's own daily Transaction
+   Monitoring report (screen.py post_tm_report), which the payment reader skips
+   by its title prefix (payment_screen.TM_REPORT_PREFIX). */
+export const PAYMENTS_SECTION = '1219097494676108';
 export const SECTIONS = Object.freeze({
   documents: Object.freeze({ gid: '1218451243658328', name: 'Follow Ups' }),
   sanctions: Object.freeze({ gid: '1218451960830318', name: 'Screening Sanctions Update' }),
   regulatory: Object.freeze({ gid: '1218451992088222', name: 'Regulatory Changes' }),
-  media: Object.freeze({ gid: '1218979441933783', name: 'Screening Adverse Media & PEP\u2019s Update' })
+  media: Object.freeze({ gid: '1218979441933783', name: 'Screening Adverse Media & PEP\u2019s Update' }),
+  /* AI / Advisor governance reports and platform-health alerts (a control that
+     cannot verify itself, a site or function down, a workflow that cannot
+     recover). Registered 2026-10-03 against the live project, where the
+     section exists under this gid. Before that the earlier gids of this
+     section (1216782693874840, 1218785568483509) had been deleted, so these
+     cards were pinned to "Regulatory Changes" and buried among law changes. */
+  governance: Object.freeze({ gid: '1218985347982681', name: 'AI & Platform Governance' })
 });
+
+/* Where a platform alert (scripts/asana-alert.mjs) is filed, by its title.
+   Document follow-ups, screening findings and law/list changes keep their own
+   sections; everything else is platform health. */
+export function alertSection(title) {
+  const s = String(title || '').toLowerCase();
+  if (/passport|emirates id|\beid\b|licen[cs]e|pending document|proof of address/.test(s)) return SECTIONS.documents.gid;
+  if (/adverse media|\bpep\b/.test(s)) return SECTIONS.media.gid;
+  if (/sanction|screening assurance/.test(s)) return SECTIONS.sanctions.gid;
+  if (/\beocn\b|regulat|fatf list|circular/.test(s)) return SECTIONS.regulatory.gid;
+  return SECTIONS.governance.gid;
+}
 
 function normalizedName(value) {
   return String(value || '').normalize('NFKC').replace(/[\u2018\u2019]/g, "'").trim().toLowerCase();

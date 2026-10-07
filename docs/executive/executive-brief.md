@@ -35,7 +35,7 @@ regulatory change) that delivers evidence into a controlled Asana workspace.
 | Decision | Effect | Owner |
 |---|---|---|
 | ~~Ratify AI Policy v1.0 + Stakeholder Impact Assessment~~ **DONE 2026-07-02** (with DPIA §6) | ISO 42001 leadership sign-off cleared | MLRO ✅ |
-| Sign **Anthropic DPA** | Unlocks AI triage + advisor bias cycle | Firm |
+| Reconcile **Anthropic DPA execution + triage go-live state** | Closes the mismatch between owner attestation, blank execution/go-live records and production configuration; the bias cycle has already run and is not evidence of DPA execution | Firm / MLRO / counsel |
 | Connect a **transaction feed** | Activates FATF R.16 monitoring (closes risk R-13) | Firm |
 | Complete **first live assessment** (TEST-000) | End-to-end go-live proof | MLRO |
 

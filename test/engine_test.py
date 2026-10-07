@@ -598,6 +598,20 @@ check("report: adverse feed failure causes are rendered with subject counts",
       "Why the news sweep failed" in _narr_amerr and "HTTP 429 rate-limited  ×2" in _narr_amerr
       and "timed out after 20s  ×1" in _narr_amerr)
 check("report: no failure-cause block when the sweep had no errors", "Why the news sweep failed" not in _narr)
+# A hit whose tier rests on the distinctive-name (core) score must say so: the
+# 3 Oct 2026 report rendered a short-designation core match as "8% · STRONG".
+_pm_core = [{"name": "ZZ Example Metals", "permalink": "https://app.asana.com/x/9", "hits": [
+    {"subject_type": "ENTITY", "subject_name": "ZZ Example Metals", "list": "UN Consolidated",
+     "matched_entry": "ZZ", "score": 8, "name_score": 8, "core_score": 100, "confidence": "STRONG"},
+    {"subject_type": "ENTITY", "subject_name": "ZZ Example Metals", "list": "EU FSF",
+     "matched_entry": "ZZ EXAMPLE", "score": 90, "name_score": 90, "core_score": 92, "confidence": "STRONG"}]}]
+_narr_core = screen.build_unified_narrative(_pm_core, [], [], [], _meta_deg,
+    {"subjects_total": 1, "companies_screened": 1, "individuals_screened": 0, "am_errors": 0, "pep_errors": 0, "delta": {}},
+    _dt.datetime(2026, 10, 3))
+check("report: a tier resting on the distinctive name says so (no bare '8% · STRONG')",
+      "8% · STRONG on the distinctive name (100%; full name 8%)" in _narr_core)
+check("report: a hit whose scores agree keeps the plain 'N% · TIER' form",
+      "90% · STRONG" in _narr_core and "90% · STRONG on the distinctive" not in _narr_core)
 # tally_enrichment: distinct am_msg samples are tallied (top 3, by subject count).
 _tally_counts, _tf, _tp = screen.tally_enrichment(
     [{"type": "ENTITY", "name": "A", "parent": "", "permalink": "", "adverse": None, "pep": None,
@@ -901,6 +915,596 @@ check("R.16 detects a corrupt feed (parse error), not silent empty",
 _ok_feed = os.path.join(_tf0.mkdtemp(), "ok.json")
 open(_ok_feed, "w").write('[]')
 check("R.16 an empty-but-valid feed is not a parse error", txn_monitor.feed_parse_error(_ok_feed) is False)
+
+# ── New R.16 typologies: profile deviation, circular flow, new geography ─────
+_pd = [{"customer": "P", "date": f"2026-05-{d:02d}", "amount": 40000, "direction": "in",
+        "method": "wire", "expected_monthly_volume": 50000} for d in (3, 10, 17)]
+check("R.16 PROFILE_DEVIATION fires when a month exceeds 1.5× the declared volume",
+      any(a["rule"] == "PROFILE_DEVIATION" for a in txn_monitor.evaluate(_pd)["alerts"]))
+check("R.16 PROFILE_DEVIATION stays quiet within the declared profile",
+      not any(a["rule"] == "PROFILE_DEVIATION" for a in txn_monitor.evaluate(_pd[:1])["alerts"]))
+check("R.16 PROFILE_DEVIATION never runs without a declared profile (no guessed baseline)",
+      not any(a["rule"] == "PROFILE_DEVIATION" for a in txn_monitor.evaluate(
+          [{k: v for k, v in t.items() if k != "expected_monthly_volume"} for t in _pd])["alerts"]))
+_cf = [{"customer": "C", "date": "2026-05-01", "amount": 100000, "direction": "out", "method": "wire",
+        "counterparty": "Example Metals FZE"},
+       {"customer": "C", "date": "2026-05-20", "amount": 97000, "direction": "in", "method": "wire",
+        "counterparty": "Example Metals FZE"}]
+check("R.16 CIRCULAR_FLOW fires on out-and-back with the same counterparty within 30d",
+      any(a["rule"] == "CIRCULAR_FLOW" for a in txn_monitor.evaluate(_cf)["alerts"]))
+check("R.16 CIRCULAR_FLOW does not fire across different counterparties",
+      not any(a["rule"] == "CIRCULAR_FLOW" for a in txn_monitor.evaluate(
+          [_cf[0], {**_cf[1], "counterparty": "Unrelated Co"}])["alerts"]))
+_ng = [{"customer": "G", "date": f"2026-04-{d:02d}", "amount": 1000, "direction": "in", "method": "wire",
+        "counterparty": "X", "counterparty_country": "Turkey"} for d in range(1, 7)]
+_ng.append({**_ng[0], "date": "2026-04-20", "counterparty_country": "Kenya"})
+check("R.16 NEW_GEOGRAPHY flags a first-ever country after enough history",
+      any(a["rule"] == "NEW_GEOGRAPHY" and "Kenya" in a["detail"] for a in txn_monitor.evaluate(_ng)["alerts"]))
+check("R.16 NEW_GEOGRAPHY does not flag a new customer's first payments",
+      not any(a["rule"] == "NEW_GEOGRAPHY" for a in txn_monitor.evaluate(_ng[:3])["alerts"]))
+
+# ── payment_screen.py: parties of a payment (inert without a feed) ───────────
+print("payment_screen.py — MT103 / pacs.008 parties, R.16 completeness")
+payment_screen = _load("payment_screen")
+_jr = json.load(open(os.path.join(ROOT, "data", "jurisdiction-risk.json"), encoding="utf-8"))
+_iso_names = set(payment_screen.ISO2_TO_JURISDICTION.values())
+_missing_iso = [c for c in _jr.get("grey", []) + _jr.get("high", []) if c.strip().lower() not in _iso_names]
+check("every FATF-listed jurisdiction has an ISO code for payment screening (add it to "
+      "ISO2_TO_JURISDICTION): " + ", ".join(_missing_iso), not _missing_iso)
+_ps_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in
+                          ("ACME GENERAL TRADING LLC", "SEA FALCON SHIPPING COMPANY", "ZED")]}
+_px = screen.safe_xml_fromstring
+_ps_kw = {"matcher": screen.screen_name, "normalizer": screen.normalize,
+          "jurisdiction_table": {"islamic republic of iran": "high", "kenya": "grey"}}
+_mt103 = ("{1:F01TESTAEADAXXX0000000000}{2:I103TESTHKHHXXXXN}{4:\n:20:TRN123456789\n:23B:CRED\n"
+          ":32A:250915AED1000000,00\n:50K:/AE070331234567890123456\nEXAMPLE TRADING LLC\nDUBAI AE\n"
+          ":52A:TESTAEADXXX\n:56A:INTMIRTHXXX\n:57A:TESTHKHHXXX\n"
+          ":59F:/12345678\n1/ACME GENERAL TRADING LLC\n2/1 EXAMPLE ROAD\n3/HK/HONG KONG\n"
+          ":70:INVOICE 12345 GOODS PAYMENT\n:71A:SHA\n-}")
+_p = payment_screen.parse_mt103(_mt103)
+_roles = {x["role"]: x for x in _p["parties"]}
+check("MT103: reference, value date, currency and amount are read",
+      _p["reference"] == "TRN123456789" and _p["date"] == "2025-09-15"
+      and _p["currency"] == "AED" and _p["amount"] == 1000000.0)
+check("MT103: :50K: account line is stripped, the name is kept",
+      _roles["originator"]["name"] == "EXAMPLE TRADING LLC")
+check("MT103: :59F: structured beneficiary name and country are read",
+      _roles["beneficiary"]["name"] == "ACME GENERAL TRADING LLC" and _roles["beneficiary"]["country"] == "HK")
+check("MT103: a BIC party gets its country from the BIC (:56A: intermediary → IR)",
+      _roles["intermediary"]["bic"] == "INTMIRTHXXX" and _roles["intermediary"]["country"] == "IR")
+check("MT103: :70: remittance text is captured", _p["remittance"] == ["INVOICE 12345 GOODS PAYMENT"])
+_r = payment_screen.screen_payment(_p, _ps_lists, **_ps_kw)
+check("a listed beneficiary STOPs the payment (CRITICAL, POL-07)",
+      _r["outcome"].startswith("STOP") and _r["severity"] == "CRITICAL")
+check("a party bank in a call-for-action jurisdiction is reported",
+      any("call-for-action" in f for f in _r["findings"]))
+check("a BIC-only bank is disclosed as not name-screened, never silently skipped",
+      any(not x["name_screened"] and "BIC only" in x["note"] for x in _r["parties"]))
+_clean = payment_screen.parse_mt103(_mt103.replace("ACME GENERAL TRADING LLC", "HARMLESS TEXTILES LLC")
+                                    .replace("INTMIRTHXXX", "INTMGB2LXXX"))
+check("a payment with no listed party and no listed country is NO MATCH",
+      payment_screen.screen_payment(_clean, _ps_lists, **_ps_kw)["outcome"] == "NO MATCH")
+check("a down core list makes 'no match' PROVISIONAL, naming the list",
+      payment_screen.screen_payment(_clean, _ps_lists, lists_degraded=["UN"], **_ps_kw)["outcome"]
+      == "NO MATCH — PROVISIONAL")
+_nobn = payment_screen.parse_mt103(_mt103.replace("1/ACME GENERAL TRADING LLC\n", "").replace("INTMIRTHXXX", "INTMGB2LXXX"))
+_r16 = payment_screen.screen_payment(_nobn, _ps_lists, **_ps_kw)
+check("a missing beneficiary name is REVIEW — INCOMPLETE (R.16)",
+      _r16["outcome"] == "REVIEW — INCOMPLETE (R.16)" and _r16["r16_missing"])
+_rem = payment_screen.parse_mt103(_clean and _mt103.replace("ACME GENERAL TRADING LLC", "HARMLESS TEXTILES LLC")
+                                  .replace("INTMIRTHXXX", "INTMGB2LXXX")
+                                  .replace("GOODS PAYMENT", "FREIGHT SEA FALCON SHIPPING COMPANY"))
+check("a designated multi-word name inside the payment reference is caught",
+      payment_screen.screen_payment(_rem, _ps_lists, **_ps_kw)["remittance_hits"])
+check("a single short designated token inside free text is not flagged (noise guard)",
+      not payment_screen.screen_payment(
+          payment_screen.parse_mt103(_mt103.replace("GOODS PAYMENT", "ZED")), _ps_lists, **_ps_kw)["remittance_hits"])
+_pacs = ('<?xml version="1.0"?><Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf>'
+         '<GrpHdr><MsgId>M1</MsgId><IntrBkSttlmDt>2026-09-15</IntrBkSttlmDt></GrpHdr>'
+         '<CdtTrfTxInf><PmtId><EndToEndId>E2E-1</EndToEndId></PmtId>'
+         '<IntrBkSttlmAmt Ccy="AED">2500.50</IntrBkSttlmAmt>'
+         '<Dbtr><Nm>Example Trading LLC</Nm><PstlAdr><Ctry>AE</Ctry></PstlAdr></Dbtr>'
+         '<DbtrAgt><FinInstnId><BICFI>TESTAEADXXX</BICFI></FinInstnId></DbtrAgt>'
+         '<IntrmyAgt1><FinInstnId><BICFI>INTMKEN1XXX</BICFI></FinInstnId></IntrmyAgt1>'
+         '<CdtrAgt><FinInstnId><BICFI>TESTHKHHXXX</BICFI></FinInstnId></CdtrAgt>'
+         '<Cdtr><Nm>Acme General Trading LLC</Nm><PstlAdr><Ctry>HK</Ctry></PstlAdr></Cdtr>'
+         '<RmtInf><Ustrd>INV 1</Ustrd></RmtInf></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>')
+_pp = payment_screen.parse_payment_message(_pacs, _px)
+check("pacs.008: one payment per CdtTrfTxInf with id, date, amount and currency",
+      len(_pp) == 1 and _pp[0]["reference"] == "E2E-1" and _pp[0]["date"] == "2026-09-15"
+      and _pp[0]["amount"] == 2500.5 and _pp[0]["currency"] == "AED")
+check("pacs.008: debtor/creditor names and agent BIC countries are read",
+      {x["role"]: x["name"] for x in _pp[0]["parties"]}.get("beneficiary") == "Acme General Trading LLC"
+      and any(x["role"] == "intermediary" and x["country"] == "KE" for x in _pp[0]["parties"]))
+check("pacs.008: a listed creditor STOPs the payment",
+      payment_screen.screen_payment(_pp[0], _ps_lists, **_ps_kw)["outcome"].startswith("STOP"))
+try:
+    payment_screen.parse_pacs008('<?xml version="1.0"?><!DOCTYPE d [<!ENTITY x "y">]><Document/>', _px)
+    check("pacs.008: a DTD/ENTITY declaration is refused before parsing", False)
+except ValueError:
+    check("pacs.008: a DTD/ENTITY declaration is refused before parsing", True)
+_fr = payment_screen.screen_feed(
+    [{"customer": "C", "date": "2026-09-15", "amount": 1, "direction": "out", "method": "wire",
+      "payment_message": "<Document><unclosed>"},
+     {"customer": "Example Trading LLC", "date": "2026-09-15", "amount": 1, "direction": "out",
+      "method": "wire", "counterparty": "Harmless Textiles LLC", "counterparty_country": "Kenya"}],
+    _ps_lists, xml_parser=_px, **_ps_kw)
+check("feed: an unparseable payment message is COUNTED, never silently dropped", len(_fr["errors"]) == 1)
+check("feed: a legacy record's counterparty country NAME is checked against the FATF list",
+      _fr["results"] and _fr["results"][0]["outcome"] == "REVIEW — HIGH-RISK JURISDICTION")
+_inactive = payment_screen.report_lines(None, False)
+for _call, _why in ((lambda: payment_screen.parse_pacs008(_pacs), "no hardened XML parser"),
+                    (lambda: payment_screen.screen_payment(_p, _ps_lists), "no matcher/normalizer")):
+    try:
+        _call()
+        check(f"payment_screen refuses to run with {_why} (no silent fallback)", False)
+    except ValueError:
+        check(f"payment_screen refuses to run with {_why} (no silent fallback)", True)
+check("payment_screen does not import screen.py (no import cycle)",
+      "import screen" not in open(os.path.join(ROOT, "payment_screen.py"), encoding="utf-8").read().replace(
+          "does not import screen.py", ""))
+# ── Asana Payments Register: one task per payment (template or pasted message) ─
+_reg_note = ("Date: 2026-10-01\nDirection: out\nAmount: 250,000\nCurrency: aed\nMethod: wire\n"
+             "Customer: Example Trading LLC\nOriginator: Example Trading LLC\nOriginator country: AE\n"
+             "Beneficiary: Acme General Trading LLC\nBeneficiary country: Hong Kong\n"
+             "Intermediary bank: INTMIRTHXXX\nReference: INVOICE 12345\nExpected monthly volume: 100000\n")
+_re1 = payment_screen.parse_register_entry("PAY-001", _reg_note)
+_re1_roles = {x["role"]: x for x in _re1["parties"]}
+check("register: the template yields amount, currency, direction and the reference",
+      _re1["amount"] == 250000.0 and _re1["currency"] == "AED" and _re1["direction"] == "out"
+      and _re1["remittance_info"] == "INVOICE 12345" and _re1["transaction_id"] == "PAY-001")
+check("register: a BIC on a bank line is read as a BIC, a 2-letter country as a code, a name as a name",
+      _re1_roles["intermediary"].get("bic") == "INTMIRTHXXX" and _re1_roles["originator"]["country"] == "AE"
+      and _re1_roles["beneficiary"]["country_name"] == "Hong Kong")
+check("register: the declared profile feeds the PROFILE_DEVIATION rule",
+      _re1["expected_monthly_volume"] == 100000.0
+      and any(a["rule"] == "PROFILE_DEVIATION" for a in txn_monitor.evaluate([_re1])["alerts"]))
+check("register: a pasted MT103 is screened as a payment message",
+      payment_screen.parse_register_entry("PAY-002", _mt103.split("{4:\n", 1)[1]).get("payment_message"))
+check("register: a task with no payment in it yields nothing (counted by the caller, never screened as clear)",
+      payment_screen.parse_register_entry("PAY-003", "call the client tomorrow") is None)
+_reg_res = payment_screen.screen_feed([{**_re1, "permalink": "https://app.asana.com/0/1/2"}],
+                                      _ps_lists, xml_parser=_px, **_ps_kw)
+check("register: a listed beneficiary in a register entry STOPs the payment",
+      _reg_res["results"][0]["outcome"].startswith("STOP"))
+check("register: the report links the flagged payment back to its Asana task",
+      any("Record: https://app.asana.com/0/1/2" in ln for ln in payment_screen.report_lines(_reg_res, True)))
+
+class _RegResp:
+    def __init__(self, code, data=None): self.status_code, self._d, self.text = code, data, "stub"
+    def json(self): return self._d
+_reg_pages = [
+    _RegResp(200, {"data": [{"gid": "1", "name": "PAY-001", "notes": _reg_note, "permalink_url": "u1"},
+                            {"gid": "2", "name": "note", "notes": "nothing here"}],
+                   "next_page": {"offset": "o2"}}),
+    _RegResp(200, {"data": [{"gid": "3", "name": "PAY-002", "notes": _mt103.split("{4:\n", 1)[1],
+                             "permalink_url": "u3"}], "next_page": None}),
+]
+_reg_calls = []
+def _reg_stub(method, url, **kw):
+    _reg_calls.append(dict(kw.get("params") or {}))
+    return _reg_pages[len(_reg_calls) - 1]
+_orig_ar2 = screen.asana_request
+try:
+    screen.asana_request = _reg_stub
+    screen.ASANA_PAYMENTS_SECTION_GID = "999"
+    _recs, _bad = screen.get_payment_register()
+finally:
+    screen.asana_request = _orig_ar2
+check("register loader: follows pagination and reads only OPEN tasks of the register SECTION",
+      len(_reg_calls) == 2 and _reg_calls[1].get("offset") == "o2"
+      and all(c.get("completed_since") == "now" and c.get("section") == "999"
+              and "project" not in c for c in _reg_calls))
+check("register loader: counts the task with no payment instead of dropping it",
+      len(_recs) == 2 and _bad == 1 and _recs[0]["permalink"] == "u1")
+try:
+    screen.asana_request = lambda *a, **k: _RegResp(500)
+    screen.get_payment_register()
+    check("register loader: an Asana failure raises (reported DEGRADED, never an empty register)", False)
+except RuntimeError:
+    check("register loader: an Asana failure raises (reported DEGRADED, never an empty register)", True)
+finally:
+    screen.asana_request = _orig_ar2
+    screen.ASANA_PAYMENTS_SECTION_GID = ""
+# ── Daily Transaction Monitoring report (filed in the Transaction Monitoring section) ─
+_tm_alerts = txn_monitor.evaluate([_re1])["alerts"]
+_tm_name, _tm_notes = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", _reg_res, _tm_alerts, register_read=1, unreadable=1)
+check("TM report: a STOP payment titles the report ACTION REQUIRED with the tallies and date",
+      _tm_name.startswith(payment_screen.TM_REPORT_PREFIX + "ACTION REQUIRED — STOP 1 · Review 0 · Rule alerts ")
+      and _tm_name.endswith(" — 02 Oct 2026"))
+check("TM report: the body carries confidentiality, legal basis, screening, alerts, obligations, cases and notes",
+      all(x in _tm_notes for x in ("CONFIDENTIAL", "Article 25", "Federal Decree-Law No. 10 of 2025",
+                                   "POL-19", "①  PAYMENT SCREENING", "②  MONITORING ALERTS",
+                                   "③  REPORTING OBLIGATIONS", "④  CASES BY CUSTOMER", "⑤  OPERATING NOTES",
+                                   "STOP — POTENTIAL SANCTIONS MATCH", "PROFILE_DEVIATION",
+                                   "Record: https://app.asana.com/0/1/2", "Do not tip off.")))
+check("TM report: a STOP payment raises the TFS obligation (POL-07) in §③",
+      "TFS — 1 potential sanctions match(es)" in _tm_notes and "POL-07" in _tm_notes)
+check("TM report: the STOP payment and the rule alert of one customer form ONE case with the A–H record",
+      _tm_notes.count("▸ CASE ") == 1 and "▸ CASE 1 — Customer: Example Trading LLC — highest severity CRITICAL" in _tm_notes
+      and all(x in _tm_notes for x in ("A  Case ref", "B  KYC / CDD / EDD", "D  Screening — sanctions",
+                                       "G  [ ] escalated to Compliance Officer", "[ ] no action — reasons",
+                                       "H  Evidence location", "filing + 5 years")))
+check("TM report: unreadable tasks are disclosed, not dropped",
+      "1 task(s) with nothing usable" in _tm_notes)
+_tm_n0, _tm_b0 = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0)
+check("TM report: an empty register posts 'No open findings' and says there was nothing to screen",
+      "No open findings — STOP 0 · Review 0 · Rule alerts 0 · Customers 0" in _tm_n0
+      and "No payment to screen today." in _tm_b0 and "No customer case today." in _tm_b0)
+_tm_nd, _tm_bd = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", None, [], register_read=0, degraded="the payments could not be read (RuntimeError)")
+check("TM report: a run that could not read the payments is titled DEGRADED and clears nothing",
+      "DEGRADED — " in _tm_nd and "No payment is cleared by this run" in _tm_bd)
+
+_rep_pages = [_RegResp(200, {"data": [
+    {"gid": "9", "name": payment_screen.TM_REPORT_PREFIX + "No open findings — STOP 0 · Review 0 · "
+                        "Rule alerts 0 — 01 Oct 2026", "notes": "report body"},
+    {"gid": "1", "name": "PAY-001", "notes": _reg_note, "permalink_url": "u1"}], "next_page": None})]
+try:
+    screen.asana_request = lambda *a, **k: _rep_pages[0]
+    screen.ASANA_PAYMENTS_SECTION_GID = "999"
+    _recs2, _bad2 = screen.get_payment_register()
+finally:
+    screen.asana_request = _orig_ar2
+    screen.ASANA_PAYMENTS_SECTION_GID = ""
+check("register loader: the daily report card in the same section is neither read as a payment nor counted",
+      len(_recs2) == 1 and _bad2 == 0)
+
+_tm_ctx = {"configured": True, "read": 1, "unreadable": 0, "feed": _reg_res, "alerts": _tm_alerts,
+           "degraded": ""}
+_tm_rt = _dt.datetime(2026, 10, 2, 8, 0)
+def _tm_post(existing=(), post_code=201, place_code=200):
+    calls = []
+    def stub(method, url, **kw):
+        calls.append((method, url, kw))
+        if method == "GET":
+            return _RegResp(200, {"data": [{"gid": "7", "name": n} for n in existing], "next_page": None})
+        if url.endswith("/addProject"):
+            return _RegResp(place_code, {})
+        return _RegResp(post_code, {"data": {"gid": "55"}})
+    try:
+        screen.asana_request = stub
+        screen.ASANA_PAYMENTS_SECTION_GID = "999"
+        screen.TM_REPORT_FAILED["failed"] = False
+        gid = screen.post_tm_report(_tm_rt, _tm_ctx)
+    finally:
+        screen.asana_request = _orig_ar2
+        screen.ASANA_PAYMENTS_SECTION_GID = ""
+    return gid, calls, screen.TM_REPORT_FAILED["failed"]
+_g, _c, _f = _tm_post()
+_posts = [c for c in _c if c[0] == "POST" and c[1].endswith("/tasks")]
+_place = [c for c in _c if c[1].endswith("/addProject")]
+check("TM report delivery: posts one task and places it in the Transaction Monitoring section",
+      _g == "55" and not _f and len(_posts) == 1
+      and _posts[0][2]["json"]["data"]["name"].startswith(payment_screen.TM_REPORT_PREFIX)
+      and _place and _place[0][2]["json"]["data"]["section"] == "999")
+_g, _c, _f = _tm_post(existing=[_tm_name])
+check("TM report delivery: a second run the same day finds today's report and posts no duplicate",
+      _g == "7" and not any(c[0] == "POST" for c in _c) and not _f)
+_g, _c, _f = _tm_post(post_code=500)
+check("TM report delivery: a failed post turns the run red (TM_REPORT_FAILED)", _g is None and _f)
+_g, _c, _f = _tm_post(place_code=500)
+check("TM report delivery: a report outside its section turns the run red", _g is None and _f)
+screen.TM_REPORT_FAILED["failed"] = False
+check("TM report delivery: nothing is posted when the section is not configured",
+      screen.post_tm_report(_tm_rt, {**_tm_ctx, "configured": False}) is None)
+# ── STR red-flag catalogue + the typology rules it maps to (fictional data) ──
+_rf_doc = json.load(open(os.path.join(ROOT, "data", "str-red-flags.json"), encoding="utf-8"))
+_rf_codes = [f["code"] for f in _rf_doc["flags"]]
+check("red flags: the STR register holds the MLRO's 100 flags in 6 categories with unique STR- codes",
+      len(_rf_codes) == 100 and len(set(_rf_codes)) == 100 and _rf_doc["register"] == "STR"
+      and all(c.startswith("STR-") for c in _rf_codes)
+      and set(_rf_doc["categories"]) == {"ML", "TF", "PF", "SE", "CO", "CP"})
+_sar_doc = json.load(open(os.path.join(ROOT, "data", "sar-red-flags.json"), encoding="utf-8"))
+_sar_codes = [f["code"] for f in _sar_doc["flags"]]
+check("red flags: the SAR register holds 506 flags in 31 categories with unique SAR- codes",
+      len(_sar_codes) == 506 and len(set(_sar_codes)) == 506 and _sar_doc["register"] == "SAR"
+      and len(_sar_doc["categories"]) == 31 and all(c.startswith("SAR-") for c in _sar_codes))
+import re as _re_rf
+_rule_codes = set(_re_rf.findall(r'_alert\("([A-Z_]+)"', open(os.path.join(ROOT, "txn_monitor.py"),
+                                                              encoding="utf-8").read()))
+_rf_bad = sorted({d for doc in (_rf_doc, _sar_doc) for f in doc["flags"] for d in f["detected_by"]}
+                 - _rule_codes - set(_sar_doc["controls"]))
+check("red flags: every 'detected_by' in both registers names a real rule or a defined control"
+      + (f" — unknown: {_rf_bad}" if _rf_bad else ""), not _rf_bad)
+check("red flags: every control a register uses is defined in that register",
+      all(d in doc["controls"] or d in _rule_codes
+          for doc in (_rf_doc, _sar_doc) for f in doc["flags"] for d in f["detected_by"]))
+def _rules(rec_list):
+    return [a["rule"] for a in txn_monitor.evaluate(rec_list)["alerts"]]
+_c = "Example Trading LLC"
+check("RAPID_RESALE: 1,000 g bought then sold back 3 days later at a loss is flagged, with the loss",
+      any(a["rule"] == "RAPID_RESALE" and "loss" in a["detail"] for a in txn_monitor.evaluate([
+          {"customer": _c, "date": "2026-10-01", "amount": 300000, "direction": "in", "method": "wire",
+           "transaction_type": "buy", "weight_g": 1000},
+          {"customer": _c, "date": "2026-10-04", "amount": 270000, "direction": "out", "method": "wire",
+           "transaction_type": "sell", "weight_g": 990}])["alerts"]))
+check("RAPID_RESALE: not flagged when the resale is 20 days later or the weight differs by 30%",
+      "RAPID_RESALE" not in _rules([
+          {"customer": _c, "date": "2026-10-01", "amount": 1, "transaction_type": "buy", "weight_g": 1000},
+          {"customer": _c, "date": "2026-10-21", "amount": 1, "transaction_type": "sell", "weight_g": 1000}])
+      and "RAPID_RESALE" not in _rules([
+          {"customer": _c, "date": "2026-10-01", "amount": 1, "transaction_type": "buy", "weight_g": 1000},
+          {"customer": _c, "date": "2026-10-02", "amount": 1, "transaction_type": "sell", "weight_g": 700}]))
+_fn_in = [{"customer": _c, "date": f"2026-10-0{i}", "amount": 10000, "direction": "in", "method": "wire",
+           "counterparty": f"Payer {i}", "counterparty_country": "AE"} for i in range(1, 6)]
+_fn_out = {"customer": _c, "date": "2026-10-08", "amount": 45000, "direction": "out", "method": "wire",
+           "counterparty": "Foreign Recipient", "counterparty_country": "Testland"}
+check("FUNNEL: five payers in, then most of it out to one foreign payee, is flagged",
+      "FUNNEL" in _rules(_fn_in + [_fn_out]))
+check("FUNNEL: not flagged with four payers, or when the onward payee is in the UAE",
+      "FUNNEL" not in _rules(_fn_in[:4] + [_fn_out])
+      and "FUNNEL" not in _rules(_fn_in + [{**_fn_out, "counterparty_country": "United Arab Emirates"}]))
+_mj = lambda cs: {"customer": _c, "date": "2026-10-01", "amount": 1,
+                  "parties": [{"role": "x", "country": c} for c in cs]}
+check("MULTI_JURISDICTION: a payment chain through 4 countries is flagged, 3 is not",
+      "MULTI_JURISDICTION" in _rules([_mj(["AE", "HK", "TR", "GB"])])
+      and "MULTI_JURISDICTION" not in _rules([_mj(["AE", "HK", "GB"])]))
+_kw = lambda txt: {"customer": _c, "date": "2026-10-01", "amount": 1, "remittance_info": txt}
+check("REFERENCE_KEYWORD: 'consultancy fee' and 'via hawala' are flagged; 'furnace commissioning' is not",
+      "REFERENCE_KEYWORD" in _rules([_kw("consultancy fee Q3")])
+      and "REFERENCE_KEYWORD" in _rules([_kw("settled via hawala")])
+      and "REFERENCE_KEYWORD" not in _rules([_kw("furnace commissioning works")]))
+check("PERSONAL_ACCOUNT and CASH_NO_SOURCE_OF_FUNDS fire only on the recorded facts",
+      {"PERSONAL_ACCOUNT", "CASH_NO_SOURCE_OF_FUNDS"} <= set(_rules([
+          {"customer": _c, "date": "2026-10-01", "amount": 20000, "method": "cash",
+           "personal_account_for_corporate": True, "source_of_funds_verified": False}]))
+      and not {"PERSONAL_ACCOUNT", "CASH_NO_SOURCE_OF_FUNDS"} & set(_rules([
+          {"customer": _c, "date": "2026-10-01", "amount": 20000, "method": "cash",
+           "source_of_funds_verified": True},
+          {"customer": _c, "date": "2026-10-01", "amount": 20000, "method": "wire",
+           "source_of_funds_verified": False}])))
+_rfa = txn_monitor.evaluate([{"customer": _c, "date": "2026-10-01", "amount": 1,
+                              "red_flags": ["ML-11", "TF-07", "XX-99"]}])["alerts"]
+_rfa_by = {a["detail"].split(" ")[0]: a for a in _rfa if a["rule"] == "RED_FLAG"}
+check("RED_FLAG: a bare 'ML-11' is the STR register's; HIGH with its text; a TF flag is CRITICAL (possible TFS event)",
+      _rfa_by["STR-ML-11"]["severity"] == "HIGH" and "rapidly resold" in _rfa_by["STR-ML-11"]["detail"]
+      and _rfa_by["STR-TF-07"]["severity"] == "CRITICAL" and "POL-07" in _rfa_by["STR-TF-07"]["detail"])
+check("RED_FLAG: an unknown code is reported, never dropped",
+      any("unknown red-flag code 'XX-99'" in a["detail"] for a in _rfa))
+_rf_path = txn_monitor.RED_FLAGS_PATH
+try:
+    txn_monitor.RED_FLAGS_PATH = os.path.join(ROOT, "data", "no-such-red-flags.json")
+    txn_monitor._RED_FLAGS.clear()
+    _rf_err = txn_monitor.evaluate([{"customer": _c, "date": "2026-10-01", "amount": 1,
+                                     "red_flags": ["ML-11"]}])
+finally:
+    txn_monitor.RED_FLAGS_PATH = _rf_path
+    txn_monitor._RED_FLAGS.clear()
+check("RED_FLAG: a missing catalogue is a counted rule error, not a silent pass",
+      _rf_err["rule_errors"].get("rule_red_flag_recorded") == 1)
+_tpl = payment_screen.parse_register_entry("PAY-RF", (
+    "Date: 2026-10-02\nAmount: 60000\nDirection: out\nMethod: cash\nCustomer: Example Trading LLC\n"
+    "Beneficiary: Demo Refinery\nOriginator: Example Trading LLC\n"
+    "Type (buy | sell | refund): sell\nWeight (grams): 1,000 g\nPurpose: consultancy fee\n"
+    "Third party payment (yes/no): yes\nThird party relationship (related | unrelated): Unrelated\n"
+    "Source of funds verified (yes/no): no\nDelivery confirmed (yes/no): no\n"
+    "Payment completed (yes/no): yes\nInvoice mismatch (yes/no): maybe\n"
+    "Red flags (codes, e.g. ML-11, TF-07): ml-11, TF-07\n"))
+check("template: bracketed hints are ignored, yes/no and numbers are read, red-flag codes normalised",
+      _tpl["transaction_type"] == "sell" and _tpl["weight_g"] == 1000.0
+      and _tpl["third_party_payment"] is True and _tpl["third_party_relationship"] == "unrelated"
+      and _tpl["source_of_funds_verified"] is False and _tpl["goods_transaction"] is True
+      and _tpl["red_flags"] == ["ML-11", "TF-07"])
+check("template: a value that is not an explicit yes/no is ignored, never guessed",
+      "invoice_mismatch" not in _tpl)
+check("template: the filled-in facts reach the rules (third party, phantom delivery, SOF, keyword, red flags)",
+      {"THIRD_PARTY_PAYMENT", "PHANTOM_DELIVERY", "CASH_NO_SOURCE_OF_FUNDS", "REFERENCE_KEYWORD",
+       "RED_FLAG"} <= set(_rules([_tpl])))
+_sar_a = txn_monitor.evaluate([{"customer": _c, "date": "2026-10-01", "amount": 1,
+                                "red_flags": ["sar-cb-3", "SAR-SA-01"]}])["alerts"]
+_sar_by = {a["detail"].split(" ")[0]: a for a in _sar_a if a["rule"] == "RED_FLAG"}
+check("RED_FLAG: SAR codes are normalised ('sar-cb-3' → SAR-CB-03, HIGH); a SAR sanctions flag is CRITICAL",
+      _sar_by["SAR-CB-03"]["severity"] == "HIGH" and "Source of Funds" in _sar_by["SAR-CB-03"]["detail"]
+      and _sar_by["SAR-SA-01"]["severity"] == "CRITICAL")
+_act = payment_screen.parse_register_entry("ACT-1", "Customer: Demo Gold FZE\nDate: 2026-10-02\n"
+                                           "Red flags: SAR-CB-14, SAR-UB-05\n")
+check("activity record: 'Customer:' + 'Red flags:' with no payment is an activity record, not unreadable",
+      _act and _act["activity_only"] is True and _act["red_flags"] == ["SAR-CB-14", "SAR-UB-05"]
+      and "RED_FLAG" in _rules([_act]))
+check("activity record: a task with red flags but no customer stays unreadable (counted)",
+      payment_screen.parse_register_entry("ACT-2", "Red flags: SAR-CB-14\n") is None)
+_w = lambda amt, ctry, m="wire", d="2026-10-01": {"customer": _c, "date": d, "amount": amt, "method": m,
+                                                  "counterparty_country": ctry}
+check("THRESHOLD (DPMSR, POL-19 §3): an international wire ≥ AED 55,000 is in scope; a UAE wire is not",
+      "THRESHOLD" in _rules([_w(60000, "Testland")]) and "THRESHOLD" not in _rules([_w(60000, "AE")])
+      and any("DPMSR" in a["detail"] for a in txn_monitor.evaluate([_w(60000, "Testland")])["alerts"]))
+check("LINKED_THRESHOLD: two same-day cash payments summing ≥ AED 55,000 are a linked series; different days are not",
+      "LINKED_THRESHOLD" in _rules([_w(30000, "", "cash"), _w(30000, "", "cash")])
+      and "LINKED_THRESHOLD" not in _rules([_w(30000, "", "cash"), _w(30000, "", "cash", "2026-10-02")]))
+check("alerts carry their payment's id and task link for the report",
+      txn_monitor.evaluate([{**_w(60000, "Testland"), "transaction_id": "PAY-9",
+                             "permalink": "u9"}])["alerts"][0]["permalink"] == "u9")
+check("red-flag cross-reference: STRUCTURING cites its STR and SAR register entries",
+      {"STR-ML-20", "SAR-ST-01"} <= set(txn_monitor.red_flag_refs("STRUCTURING")))
+_multi = [{"customer": "Demo Gold FZE", "date": "2026-10-01", "amount": 60000, "method": "cash",
+           "transaction_id": "P1", "red_flags": ["SAR-CB-14", "STR-ML-19"],
+           "source_of_funds_verified": False}]
+_mn, _mb = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, txn_monitor.evaluate(_multi)["alerts"],
+    register_read=1, flag_refs=txn_monitor.red_flag_refs)
+check("TM report: 3+ distinct indicators on one customer are marked MULTIPLE INDICATORS",
+      "▸ CASE 1 — Customer: Demo Gold FZE" in _mb and "MULTIPLE INDICATORS" in _mb)
+check("TM report: a DPMSR-scope payment raises the DPMSR obligation and the case lists it",
+      "DPMSR — 1 transaction(s)/series" in _mb and "Obligations: TFS (POL-07)" not in _mb
+      and "DPMSR" in _mb.split("▸ CASE 1")[1])
+check("TM report: rule alerts cite the red-flag register entries they evidence",
+      "Red-flag register: " in _mb)
+_en_n, _en_b = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
+    entity_name="Example Reporting Entity LLC")
+check("TM report: the reporting entity heads the report and is named on its own line",
+      _en_b.startswith("EXAMPLE REPORTING ENTITY LLC — TRANSACTION MONITORING — DAILY REPORT")
+      and "Reporting entity: Example Reporting Entity LLC" in _en_b)
+check("TM report: an unreadable reporting entity is shown as UNAVAILABLE, never guessed",
+      "Reporting entity: ⚠ UNAVAILABLE" in _tm_b0 and _tm_b0.startswith("REPORTING ENTITY UNAVAILABLE — "))
+check("no company name in GitHub: the workflow carries no reporting-entity name or default",
+      "REPORTING_ENTITY_NAME" not in open(
+          os.path.join(ROOT, ".github", "workflows", "weekly-adverse-media.yml"), encoding="utf-8").read())
+_orig_ar3 = screen.asana_request
+try:
+    screen.asana_request = lambda *a, **k: _RegResp(200, {"data": {"workspace": {"name": "Example Workspace"}}})
+    _ent_ok = screen._asana_entity_name()
+    screen.asana_request = lambda *a, **k: _RegResp(500)
+    _ent_bad = screen._asana_entity_name()
+finally:
+    screen.asana_request = _orig_ar3
+check("reporting entity: read from the Asana workspace; an Asana failure gives '' (report says UNAVAILABLE)",
+      _ent_ok == "Example Workspace" and _ent_bad == "")
+_book = [{"gid": "1214000000000001", "name": "Example Trading LLC", "permalink": "https://app.asana.com/x/1"},
+         {"gid": "1214000000000002", "name": "Demo Gold FZE", "permalink": "https://app.asana.com/x/2"},
+         {"gid": "1216000000000009", "name": "Sample Employee", "kind": "employee"}]
+_rr = [{"customer": "https://app.asana.com/1/1213645083721316/project/1214107620220121/task/1214000000000002"},
+       {"customer": "example trading llc"}, {"customer": "Unknown Buyer Ltd"}, {"customer": "Sample Employee"}]
+_links = screen.resolve_register_customers(_rr, _book)
+check("customer resolver: an Asana task link or the exact name ties the task to its Customer Database record",
+      _rr[0]["customer"] == "Demo Gold FZE" and _rr[1]["customer"] == "Example Trading LLC"
+      and _rr[0]["customer_in_db"] and _rr[1]["customer_in_db"]
+      and _links == {"Demo Gold FZE": "https://app.asana.com/x/2", "Example Trading LLC": "https://app.asana.com/x/1"})
+check("customer resolver: an unknown name, and an employee, are NOT customers (customer_in_db False)",
+      _rr[2]["customer_in_db"] is False and _rr[3]["customer_in_db"] is False)
+check("CUSTOMER_NOT_IN_DB: fires only when the resolver found no customer record",
+      "CUSTOMER_NOT_IN_DB" in _rules([{**_rr[2], "date": "2026-10-01", "amount": 1}])
+      and "CUSTOMER_NOT_IN_DB" not in _rules([{**_rr[1], "date": "2026-10-01", "amount": 1}])
+      and "CUSTOMER_NOT_IN_DB" not in _rules([{"customer": "X", "date": "2026-10-01", "amount": 1}]))
+_cl_n, _cl_b = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []},
+    txn_monitor.evaluate([{**_rr[1], "date": "2026-10-01", "amount": 60000, "method": "cash"},
+                          {**_rr[2], "date": "2026-10-01", "amount": 1}])["alerts"],
+    register_read=2, customer_links=_links)
+check("TM report: each case links its Customer Database record, or says NOT FOUND",
+      "Customer Database: https://app.asana.com/x/1" in _cl_b
+      and "Customer Database: ⚠ NOT FOUND" in _cl_b.split("Customer: Unknown Buyer Ltd")[1])
+_tm_ne, _tm_be = payment_screen.build_tm_daily_report(
+    "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []}, [], register_read=0,
+    rule_errors={"rule_funnel": 2})
+check("TM report: a crashed monitoring rule makes the report DEGRADED and names the rule",
+      "DEGRADED — " in _tm_ne and "rule_funnel" in _tm_be and "NOT checked" in _tm_be)
+# ── Optional extra bulk adverse nets (OpenSanctions debarment / regulatory) ──
+check("extra adverse nets are OFF by default (CC-BY-NC — an explicit decision turns them on)",
+      screen.ADVERSE_WATCHLIST_EXTRA == [] or os.environ.get("ADVERSE_WATCHLIST_EXTRA"))
+_ex_csv = ("id,schema,name,aliases\n"
+           "deb-1,Company,Sample Debarred Contractor Ltd,Sample Debarred Contractor\n").encode()
+_ex_dl = screen.download
+try:
+    screen.download = lambda url, label: _ex_csv if "/debarment/" in url else b""
+    _ex = screen.load_adverse_watchlist_extra(["debarment", "regulatory", "bogus"])
+finally:
+    screen.download = _ex_dl
+_deb = _ex.get("OpenSanctions debarment watchlist")
+_reg = _ex.get("OpenSanctions regulatory watchlist")
+check("extra nets: a loaded collection carries its entries; a failed one is UNAVAILABLE (count 0); unknown names are ignored",
+      _deb and len(_deb[0]) == 2 and _reg and _reg[2]["count"] == 0 and len(_ex) == 2)
+_ex_hits = screen.screen_watchlist(
+    [("COMPANY", "Sample Debarred Contractor Ltd", None, {})], [], {}, "2026-10-03", extra=_ex)
+_ex_art = (_ex_hits.get("Sample Debarred Contractor Ltd") or [{}])[0]
+check("extra nets: a debarment listing is found even with the crime list empty, titled and linked to its dataset",
+      "OpenSanctions debarment dataset" in _ex_art.get("title", "")
+      and _ex_art.get("url", "").endswith("/entities/deb-1/") and _ex_art.get("watchlist") is True)
+_cr_hits = screen.screen_watchlist([("COMPANY", "Sample Debarred Contractor Ltd", None, {})],
+                                   _deb[0], {}, "2026-10-03")
+check("extra nets: crime-list findings keep their exact title (delta fingerprints unchanged)",
+      (_cr_hits.get("Sample Debarred Contractor Ltd") or [{}])[0].get("title", "").endswith("— OpenSanctions crime dataset"))
+for _wf in ("weekly-adverse-media.yml", "onboarding-screen.yml"):
+    _wft = open(os.path.join(ROOT, ".github", "workflows", _wf), encoding="utf-8").read()
+    check(f"{_wf} passes ADVERSE_WATCHLIST_EXTRA from a repository variable, with no default",
+          "ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}\n" in _wft)
+# ── Licence-free mode (OPENSANCTIONS_DATA=0) + free Wikidata PEP net ────────
+check("licence switch: unset/empty OPENSANCTIONS_DATA keeps today's behaviour (on)",
+      screen.OPENSANCTIONS_DATA is True or os.environ.get("OPENSANCTIONS_DATA", "").strip() == "0")
+_lf_urls = []
+_lf_saved = (screen.download, screen.OPENSANCTIONS_DATA)
+try:
+    screen.download = lambda url, label: (_lf_urls.append(url) or _ex_csv)
+    screen.OPENSANCTIONS_DATA = False
+    _lf_pep = screen.load_pep_mirror()
+    _lf_wl = screen.load_adverse_watchlist()
+    _lf_ex = screen.load_adverse_watchlist_extra(["debarment"])
+    _lf_al, _lf_lm = {}, {}
+    screen.load_worldwide_sanctions(_lf_al, _lf_lm)
+    _lf_eocn = screen.load_eocn_mirror()
+    check("licence-free mode: no OpenSanctions net downloads anything",
+          _lf_urls == [] and _lf_pep is None and _lf_wl[0] is None and _lf_ex == {}
+          and _lf_eocn[0] == set() and _lf_al == {})
+    check("licence-free mode: the switched-off nets are marked licence-off (reported by name, not 'unavailable')",
+          _lf_wl[2]["date"] == "licence-off" and _lf_lm["worldwide"]["date"] == "licence-off"
+          and _lf_eocn[1]["date"] == "licence-off")
+finally:
+    screen.download, screen.OPENSANCTIONS_DATA = _lf_saved
+for _wf in ("weekly-adverse-media.yml", "onboarding-screen.yml"):
+    _wft = open(os.path.join(ROOT, ".github", "workflows", _wf), encoding="utf-8").read()
+    check(f"{_wf} passes OPENSANCTIONS_DATA from a repository variable, with no default",
+          "OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}\n" in _wft)
+    check(f"{_wf} allows the official UK / AU / CH list hosts and overlays the Wikidata PEP list",
+          all(h in _wft for h in ("sanctionslist.fcdo.gov.uk:443", "www.dfat.gov.au:443",
+                                  "www.sesam.search.admin.ch:443"))
+          and "git checkout FETCH_HEAD -- data/pep-worldwide.json" in _wft)
+import gzip as _gz, tempfile as _tf
+_wd_ds = {"v": 1, "harvested": "2026-10-02T06:51:13Z", "count": 2, "entries": [
+    {"qid": "Q1", "name": "Example Minister Person", "aliases": ["E. Minister Person", "Пример"],
+     "position": "Minister of Finance", "country": "Exampleland", "current": True},
+    {"qid": "Q2", "name": "Ng W", "aliases": [], "position": "senator", "country": "", "current": True}]}
+with _tf.NamedTemporaryFile(suffix=".json", delete=False) as _wf_tmp:
+    _wf_tmp.write(_gz.compress(json.dumps(_wd_ds).encode()))
+_wd_idx, _wd_meta = screen.load_pep_wikidata_net(_wf_tmp.name)
+os.unlink(_wf_tmp.name)
+check("Wikidata PEP net: the gzipped harvest loads with its count and harvest date",
+      _wd_idx is not None and _wd_meta["count"] == 2 and _wd_meta["date"] == "2026-10-02")
+_wd_hit = screen.pep_wikidata_lookup(_wd_idx, "person example minister")
+check("Wikidata PEP net: exact + word-order match, office and Wikidata link carried as evidence",
+      _wd_hit.get("hit") and _wd_hit["id"] == "Q1" and "Minister of Finance, Exampleland" in _wd_hit["category"]
+      and _wd_hit["source_url"] == "https://www.wikidata.org/wiki/Q1" and _wd_hit.get("via_mirror"))
+check("Wikidata PEP net: an alias matches; a stranger does not; a sub-5-char key is never indexed",
+      screen.pep_wikidata_lookup(_wd_idx, "E. Minister Person").get("hit")
+      and not screen.pep_wikidata_lookup(_wd_idx, "Unrelated Person").get("hit")
+      and not screen.pep_wikidata_lookup(_wd_idx, "Ng W").get("hit"))
+_old_ds = dict(_wd_ds, harvested="2026-08-06T06:22:05Z")
+with _tf.NamedTemporaryFile(suffix=".json", delete=False) as _wf_tmp3:
+    _wf_tmp3.write(json.dumps(_old_ds).encode())
+_old_idx, _old_meta = screen.load_pep_wikidata_net(_wf_tmp3.name)
+os.unlink(_wf_tmp3.name)
+check("Wikidata PEP net: an old harvest is marked STALE (the net still screens)",
+      _old_meta["stale"] is True and _old_idx is not None and len(_old_idx) > 0)
+_fresh_ds = dict(_wd_ds, harvested=_dt.date.today().isoformat() + "T00:00:00Z")
+with _tf.NamedTemporaryFile(suffix=".json", delete=False) as _wf_tmp2:
+    _wf_tmp2.write(json.dumps(_fresh_ds).encode())
+check("Wikidata PEP net: a this-week harvest is not stale",
+      screen.load_pep_wikidata_net(_wf_tmp2.name)[1]["stale"] is False)
+os.unlink(_wf_tmp2.name)
+check("Wikidata PEP net: a missing file is unavailable (logged), never a silent clear",
+      screen.load_pep_wikidata_net("/nonexistent/pep.json") == (None, {"count": 0, "date": "unavailable"}))
+_pn_stats = {"subjects_total": 2, "companies_screened": 1, "individuals_screened": 1, "am_errors": 0,
+             "pep_errors": 0, "delta": {}, "opensanctions_data": False,
+             "pep_nets": {"OpenSanctions PEP/RCA dataset": {"count": 0, "date": "licence-off"},
+                          screen.PEP_WIKIDATA_LABEL: {"count": 423826, "date": "2026-10-02"}}}
+_pn_n = screen.build_unified_narrative([], [], [], [], _meta_deg, _pn_stats, _dt.datetime(2026, 10, 3))
+check("report: each PEP net is named with its state (Wikidata count + harvest date; OpenSanctions OFF, RCA gap stated)",
+      "Wikidata worldwide PEP list (CC0) · 423,826 office-holders, harvested 2026-10-02" in _pn_n
+      and "OpenSanctions PEP/RCA dataset · OFF — licence-free mode" in _pn_n
+      and "relatives / close associates (RCA) are NOT bulk-screened" in _pn_n)
+_pn_stale = dict(_pn_stats, pep_nets={screen.PEP_WIKIDATA_LABEL: {"count": 5, "date": "2026-08-01", "stale": True}})
+check("report: a stale Wikidata harvest is flagged in §③",
+      "⚠ STALE harvest" in screen.build_unified_narrative([], [], [], [], _meta_deg, _pn_stale, _dt.datetime(2026, 10, 3)))
+check("report: licence-free mode says the crime watchlist is OFF and the news feeds are the only adverse nets",
+      "OpenSanctions crime watchlist · OFF — licence-free mode" in _pn_n)
+_meta_lo = {**_meta_deg, "worldwide": {"count": 0, "date": "licence-off", "tier": "supplementary"}}
+check("report: a licence-off worldwide sanctions net is named, not 'not reached'",
+      "OFF — licence-free mode (OPENSANCTIONS_DATA=0) - not screened"
+      in screen.build_unified_narrative([], [], [], [], _meta_lo, _pn_stats, _dt.datetime(2026, 10, 3)))
+import inspect as _insp_pn
+_ssrc = _insp_pn.getsource(screen.screen_subject_set)
+check("run: the free Wikidata PEP net runs after the OpenSanctions net (first hit wins), and its state reaches the report",
+      _ssrc.find("load_pep_mirror()") < _ssrc.find("load_pep_wikidata_net()")
+      and '"pep_nets": pep_nets' in _ssrc and '"opensanctions_data": OPENSANCTIONS_DATA' in _ssrc)
+check("report: payment screening says INACTIVE without a feed (no implied clearance)",
+      len(_inactive) == 1 and "INACTIVE" in _inactive[0])
+_active = payment_screen.report_lines(payment_screen.screen_feed(
+    [{"customer": "C", "date": "2026-09-15", "amount": 1, "direction": "out", "method": "wire",
+      "payment_message": _mt103}], _ps_lists, xml_parser=_px, **_ps_kw), True)
+check("report: a STOP payment carries the POL-07 PNMR / CNMR + FFR instruction",
+      any("STOP" in ln for ln in _active) and any("PNMR" in ln and "CNMR + FFR" in ln for ln in _active))
 # Velocity baseline must EXCLUDE the spike day from its own mean, otherwise a large
 # single-day spike inflates the threshold and never fires (regression guard).
 _vel = txn_monitor.evaluate([
@@ -998,6 +1602,29 @@ for _d in ("2026-07-04", "2026-07-05", "2026-07-06"):
     _sus = monitoring.monitor_run(_d, {"subjects": 500, "errors": 150}, {"total": 100}, {}, _sp)
 check("sustained anomaly detected across consecutive runs", "error_rate" in _sus["sustained"])
 check("escalation fires on a sustained anomaly", monitoring.escalation(path=_sp)["escalate"])
+# Population Stability Index (docs/aims/population-stability-monitoring.md §1)
+_same = monitoring.population_stability_index([100, 200, 300], [100, 200, 300])
+check("PSI of an unchanged distribution is 0 and stable", _same["psi"] == 0 and _same["reading"] == "stable")
+_shift = monitoring.population_stability_index([500, 300, 200], [200, 300, 500])
+import math as _m
+_exp_psi = sum((a - e) * _m.log(a / e) for e, a in ((0.5, 0.2), (0.3, 0.3), (0.2, 0.5)))
+check("PSI matches the spec formula on a hand-computed shift", abs(_shift["psi"] - round(_exp_psi, 6)) < 1e-9)
+check("PSI reading bands follow the spec (<0.10 stable, 0.10-0.25 investigate, >0.25 action)",
+      monitoring.psi_reading(0.05) == "stable" and monitoring.psi_reading(0.10) == "investigate"
+      and monitoring.psi_reading(0.25) == "investigate" and monitoring.psi_reading(0.26) == "action"
+      and _shift["reading"] == "action")
+_small = monitoring.population_stability_index([10, 20], [10, 20])
+check("PSI refuses a window with n < 50 (reports 'n too small', never a score)",
+      _small["psi"] is None and _small["reading"] == "n too small")
+_merge = monitoring.population_stability_index([2, 98, 100], [3, 97, 100])
+check("PSI merges bins whose expected count is < 5 before computing", _merge["bins"] == 2 and _merge["psi"] is not None)
+_zero = monitoring.population_stability_index([50, 50], [100, 0])
+check("PSI floors an empty bin instead of failing, and says so", _zero["floored"] == 1 and _zero["reading"] == "action")
+try:
+    monitoring.population_stability_index([1, 2], [1])
+    check("PSI rejects mismatched bin lists", False)
+except ValueError:
+    check("PSI rejects mismatched bin lists", True)
 check("report renders a SUSTAINED ANOMALY escalate line", "SUSTAINED ANOMALY" in monitoring.build_monitoring_section(_sus, {}))
 _sp2 = os.path.join(_dir, "blip.json")
 for _d in ("2026-07-01", "2026-07-02", "2026-07-03"):
@@ -1245,8 +1872,12 @@ screen.time.monotonic = lambda: 1000.0
 def _reset_breaker():
     screen._GDELT_STATE["consecutive_failures"] = 0
     screen._GDELT_STATE["open"] = False
+    screen._GDELT_STATE["last_probe"] = 0.0
     screen._GNEWS_STATE["consecutive_zero"] = 0
     screen._GNEWS_STATE["open"] = False
+    screen._GNEWS_STATE["zero_since"] = None
+    screen._GNEWS_STATE["last_probe"] = 0.0
+    screen._GNEWS_STATE["tripped"] = False
     screen._BING_STATE["consecutive_failures"] = 0
     screen._BING_STATE["open"] = False
     screen._GNEWS_GATE.reset()
@@ -1343,6 +1974,35 @@ screen.search_adverse_media("Acme")
 check("a GDELT success keeps the circuit closed and the streak at zero",
       screen._GDELT_STATE["consecutive_failures"] == 0 and not screen._GDELT_STATE["open"])
 
+# GDELT half-open recovery (3 Oct 2026: GDELT 429'd for 2 minutes, then
+# stayed off for the remaining 26 minutes of the run).
+_reset_breaker(); _calls["gdelt"] = 0
+screen.search_gdelt = _gdelt_down
+for _ in range(screen.GDELT_BREAKER_AFTER):
+    screen.search_adverse_media("Acme")
+_t_trip = screen._GDELT_STATE["last_probe"]
+check("GDELT trip stamps last_probe (probe clock armed)", screen._GDELT_STATE["open"] and _t_trip > 0)
+check("no GDELT probe before GDELT_PROBE_SECONDS have passed",
+      screen._gdelt_should_probe(now=_t_trip + screen.GDELT_PROBE_SECONDS - 1) is False)
+_mono = screen.time.monotonic
+try:
+    screen.time.monotonic = lambda: _t_trip + screen.GDELT_PROBE_SECONDS + 1
+    _calls["gdelt"] = 0
+    screen.search_adverse_media("Acme")
+    check("a failed GDELT probe sends ONE query and leaves the circuit open",
+          _calls["gdelt"] == 1 and screen._GDELT_STATE["open"])
+    _calls["gdelt"] = 0
+    screen.search_adverse_media("Acme")
+    check("the next subject inside the same interval does not probe again", _calls["gdelt"] == 0)
+    screen.time.monotonic = lambda: _t_trip + 2 * screen.GDELT_PROBE_SECONDS + 2
+    screen.search_gdelt = lambda *_a, **_k: []
+    screen.search_adverse_media("Acme")
+    check("a successful GDELT probe closes the circuit — GDELT coverage resumes",
+          not screen._GDELT_STATE["open"] and screen._GDELT_STATE["consecutive_failures"] == 0)
+finally:
+    screen.time.monotonic = _mono
+_reset_breaker()
+
 # ── run-global rate gate + Google News circuit breaker (13 Jul regression) ────
 # Per-worker pacing was not enough: 8 workers each sleeping 0.4s still burst
 # ~16 req/s at Google News, so the limiter tripped on 9 Jul never cooled
@@ -1403,6 +2063,51 @@ screen.search_gdelt = lambda *_a, **_k: []
 screen.search_adverse_media("One Good Fetch LLC")
 check("a single Google News success resets the breaker streak",
       screen._GNEWS_STATE["consecutive_zero"] == 0 and not screen._GNEWS_STATE["open"])
+
+# Time-based trip: a zero-coverage streak at max backoff lasting
+# GNEWS_BREAKER_SECONDS opens the circuit long before GNEWS_BREAKER_AFTER
+# subjects (2 Oct 2026: 30 subjects took ~29 min, all at zero coverage).
+_reset_breaker(); _calls["gnews"] = 0
+screen._GNEWS_GATE.interval = screen._GNEWS_GATE.cap
+screen.requests.get = _gnews_refused
+screen.search_gdelt = lambda *_a, **_k: []
+screen._GNEWS_STATE["consecutive_zero"] = 1
+screen._GNEWS_STATE["zero_since"] = screen.time.monotonic() - (screen.GNEWS_BREAKER_SECONDS + 1)
+screen.search_adverse_media("Slow Refusal LLC")
+check("Google News circuit opens once a zero-coverage streak at max backoff lasts GNEWS_BREAKER_SECONDS",
+      screen._GNEWS_STATE["open"] and screen._GNEWS_STATE["tripped"]
+      and screen._GNEWS_STATE["consecutive_zero"] < screen.GNEWS_BREAKER_AFTER)
+# Half-open probe: no probe before GNEWS_PROBE_SECONDS; then exactly ONE fetch.
+_calls["gnews"] = 0
+screen.search_adverse_media("Too Soon To Probe LLC")
+check("no recovery probe before GNEWS_PROBE_SECONDS have passed since the trip", _calls["gnews"] == 0)
+screen._GNEWS_STATE["last_probe"] = screen.time.monotonic() - (screen.GNEWS_PROBE_SECONDS + 1)
+_calls["gnews"] = 0
+screen.search_adverse_media("Probe Still Refused LLC")
+check("a failed recovery probe sends ONE fetch and leaves the circuit open",
+      _calls["gnews"] == 1 and screen._GNEWS_STATE["open"])
+screen._GNEWS_STATE["last_probe"] = screen.time.monotonic() - (screen.GNEWS_PROBE_SECONDS + 1)
+_calls["gnews"] = 0
+screen.requests.get = _gnews_first_ok
+screen.search_adverse_media("Probe Answered LLC")
+check("a successful recovery probe closes the circuit; the run still counts as tripped",
+      _calls["gnews"] == 1 and not screen._GNEWS_STATE["open"] and screen._GNEWS_STATE["tripped"])
+check("a run whose breaker tripped never stamps its rotation window as swept",
+      'and not _GNEWS_STATE.get("tripped")' in open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read())
+_reset_breaker()
+
+# Overlap: the news sweep starts BEFORE the CPU-bound watchlist/sanctions
+# matching (it needs only the subject set) and is collected after it; a crash
+# in between cancels the queued subjects instead of waiting them out.
+_sss = open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read()
+_sss = _sss[_sss.index("def screen_subject_set("):]
+check("enrichment starts before the watchlist and sanctions passes and is collected after them",
+      _sss.index("_enrich_pool.map(_enrich") < _sss.index("load_adverse_watchlist()")
+      < _sss.index("screen_customers(customers, all_lists)") < _sss.index("for i, r in zip(order, _enrich_iter)"))
+check("a crash during matching cancels the queued enrichment (no waiting out the sweep)",
+      "_enrich_pool.shutdown(wait=False, cancel_futures=True)" in _sss)
+check("per-match AI summaries run on the bounded triage pool, not one by one",
+      "_sx.map(_summarise, _summary_work)" in _sss)
 
 # GDELT is paced by its own fixed-interval gate (≤ 1 request / 5s per IP,
 # shared across all workers — 8 simultaneous first hits is how it 429'd).
@@ -1578,9 +2283,9 @@ screen.download = _orig_download
 check("parse_eu still parses via the shared simple-csv parser",
       screen.parse_eu(_SIMPLE)[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"})
 
-# EU FSF is the one core list whose PRIMARY is the OpenSanctions host, so its
-# fallback runs the other way: official webgate XML. Names live in wholeName
-# attributes on <nameAlias> elements (entities and aliases alike).
+# EU FSF: the official webgate XML is the PRIMARY (free) since 2026-10-03; the
+# OpenSanctions mirror is a fallback only while OPENSANCTIONS_DATA allows it.
+# Names live in wholeName attributes on <nameAlias> elements.
 _FSF_XML = (b'<?xml version="1.0" encoding="UTF-8"?><export generationDate="2026-07-29">'
             b'<sanctionEntity logicalId="1"><nameAlias wholeName="EVIL CORP" firstName=""/>'
             b'<nameAlias wholeName="E &amp; CORP"/></sanctionEntity>'
@@ -1588,36 +2293,150 @@ _FSF_XML = (b'<?xml version="1.0" encoding="UTF-8"?><export generationDate="2026
             b'</export>')
 check("FSF official XML parses wholeName attributes (entities + aliases, unescaped)",
       screen.parse_eu_official_xml(_FSF_XML) == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
+# Tiny fixtures sit below the real coverage floors; zero them for the loader
+# tests (the below-floor path has its own checks further down).
+_floors_real = dict(screen.CORE_LIST_FLOORS)
+screen.CORE_LIST_FLOORS.update({k: 0 for k in screen.CORE_LIST_FLOORS})
 _dl_urls.clear()
-screen.download = lambda url, label: (_dl_urls.append(url) or _FSF_XML)
-_fb = screen._eu_official_fallback(set())
-check("EU fallback loads the official XML when the mirror yielded nothing",
-      bool(_fb) and _fb[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"})
-check("EU fallback provenance is explicit in the list date (audit trail)",
-      bool(_fb) and "official" in _fb[1].lower())
-check("EU fallback targets webgate with the public FSF token",
-      bool(_dl_urls) and "webgate.ec.europa.eu" in _dl_urls[0] and "token=" in _dl_urls[0])
-check("no official-XML fetch when the mirror loaded",
-      screen._eu_official_fallback({"LOADED"}) is None and len(_dl_urls) == 1)
+screen.download = lambda url, label: (_dl_urls.append(url) or (_FSF_XML if "webgate" in url else _SIMPLE))
+_eu = screen.load_eu_list()
+check("EU: the official XML is the primary and the mirror is not fetched when it loads",
+      _eu[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"} and _eu[3] is True
+      and len(_dl_urls) == 1 and "webgate.ec.europa.eu" in _dl_urls[0] and "token=" in _dl_urls[0])
+check("EU: provenance names the official XML (audit trail)", "official" in _eu[1].lower())
+check("EU: unset EU_FSF_TOKEN keeps the public URL",
+      screen.eu_official_xml_url({}) == screen.EU_OFFICIAL_XML_URL)
+_pu = screen.eu_official_xml_url({"EU_FSF_TOKEN": " personal_123 "})
+check("EU: a personal EU_FSF_TOKEN replaces only the token parameter",
+      _pu.startswith("https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?")
+      and _pu.endswith("token=personal_123") and _pu.count("token=") == 1)
+check("EU: an injection-shaped token is ignored",
+      screen.eu_official_xml_url({"EU_FSF_TOKEN": "x&url=https://evil"}) == screen.EU_OFFICIAL_XML_URL)
+check("EU: an EU Login sign-in page parses to no names (fails loudly, never 'loaded')",
+      screen.parse_eu_official_xml(b"<!DOCTYPE html><html><title>EU Login</title></html>") == set())
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url)
+                                      or (b"<html><title>EU Login</title></html>" if "webgate" in url else _SIMPLE))
+_eu = screen.load_eu_list()
+check("EU: a sign-in page falls back to the mirror while the licence switch allows it",
+      _eu[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _eu[1].lower() and _eu[3] is True
+      and len(_dl_urls) == 2 and "eu_fsf/targets.simple.csv" in _dl_urls[1])
+_os_saved = screen.OPENSANCTIONS_DATA
+try:
+    screen.OPENSANCTIONS_DATA = False
+    _dl_urls.clear()
+    _eu = screen.load_eu_list()
+    check("EU: licence-free mode never touches the mirror — the list is unavailable, not fetched",
+          _eu[0] == set() and _eu[3] is False and len(_dl_urls) == 1
+          and not any("opensanctions" in u for u in _dl_urls))
+    check("licence-free mode: OFAC/UN mirror fallbacks are off",
+          screen._mirror_fallback(set(), "us_ofac_sdn", "OFAC SDN") is None and len(_dl_urls) == 1)
+finally:
+    screen.OPENSANCTIONS_DATA = _os_saved
 screen.download = lambda url, label: None
-check("official XML also down → no fallback (degrade-loudly paths take over)",
-      screen._eu_official_fallback(set()) is None)
+check("EU: official XML and mirror both down -> unavailable, not fetched",
+      screen.load_eu_list() == (set(), "unavailable", "", False))
 screen.download = _orig_download
 
-# Every core list with a second origin must actually be WIRED to it, on BOTH
-# load paths — the 2026-07-29 multi-homing bug class was exactly a helper that
-# existed but one path didn't call. UK falls back to the OpenSanctions
-# gb_hmt_sanctions mirror; EU to the official XML; AU/CH have no second origin
-# (documented in the loader) and rely on the outage gate.
+# AU / CH: official DFAT .xlsx and SECO XML (free) — ported from
+# parseDfatXlsx / parseSecoXml in scripts/sanctions-match.mjs.
+_SECO = (b'<swiss-sanctions-list><target><individual><identity main="true">'
+         b'<name name-type="primary-name"><name-part name-part-type="given-name"><value>Ivan</value></name-part>'
+         b'<name-part name-part-type="family-name"><value lang="ru"><![CDATA[Petrov &amp; Sons]]></value></name-part></name>'
+         b'<name name-type="alias"><name-part name-part-type="whole-name"><value>IVAN P</value></name-part></name>'
+         b'</identity></individual></target></swiss-sanctions-list>')
+check("SECO XML: every <name> block assembles its <value> parts (attributes + CDATA kept)",
+      screen.parse_seco_xml(_SECO) == {"Ivan Petrov & Sons", "IVAN P"})
+check("SECO XML: empty / HTML input parses to nothing", screen.parse_seco_xml(None) == set()
+      and screen.parse_seco_xml(b"<html><body>Just a moment...</body></html>") == set())
+import zipfile as _zf, io as _zio
+def _xlsx(sheets, shared):
+    b = _zio.BytesIO()
+    with _zf.ZipFile(b, "w", _zf.ZIP_DEFLATED) as z:
+        z.writestr("xl/sharedStrings.xml", "<sst>" + "".join(f"<si><t>{t}</t></si>" for t in shared) + "</sst>")
+        for i, rows in enumerate(sheets, 1):
+            xml = "<worksheet><sheetData>"
+            for r, cells in enumerate(rows, 1):
+                xml += f'<row r="{r}">' + "".join(
+                    (f'<c r="{c}{r}" t="s"><v>{v}</v></c>' if isinstance(v, int) else
+                     f'<c r="{c}{r}" t="inlineStr"><is><r><t>{v[:4]}</t></r><r><t>{v[4:]}</t></r></is></c>')
+                    for c, v in cells) + "</row>"
+            z.writestr(f"xl/worksheets/sheet{i}.xml", xml + "</sheetData></worksheet>")
+    return b.getvalue()
+_dfat = _xlsx([[[("A", 0), ("B", 1), ("C", 2)],
+                [("A", 3), ("B", 4), ("C", 5)],
+                [("A", 6), ("B", "ISLAMIC REVOLUTIONARY GUARD CORPS"), ("C", 5)],
+                [("A", 7), ("B", 8)]]],
+              ["Reference", "Name of Individual or Entity", "Name Type",
+               "1", "EXAMPLE DESIGNEE &amp; CO", "Primary Name", "1a", "2", "----"])
+check("DFAT xlsx: name columns are read (shared + multi-run inline strings), Name Type and dash placeholders skipped",
+      screen.parse_dfat_xlsx(_dfat) == {"EXAMPLE DESIGNEE & CO", "ISLAMIC REVOLUTIONARY GUARD CORPS"})
+check("DFAT xlsx: a non-zip body (bot page) parses to nothing", screen.parse_dfat_xlsx(b"<html>blocked</html>") == set())
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url) or (_dfat if "dfat.gov.au" in url else _SIMPLE))
+_au = screen.load_au_list()
+check("AU: the official DFAT file is the primary; no mirror fetch when it loads",
+      _au[0] == {"EXAMPLE DESIGNEE & CO", "ISLAMIC REVOLUTIONARY GUARD CORPS"} and _au[3] is True
+      and "official" in _au[1] and len(_dl_urls) == 1)
+_dl_urls.clear()
+screen.download = lambda url, label: (_dl_urls.append(url) or (b"<html>blocked</html>" if "admin.ch" in url else _SIMPLE))
+_ch = screen.load_ch_list()
+check("CH: an unparseable official file falls back to the mirror (licence permitting), provenance marked",
+      _ch[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _ch[1].lower() and _ch[3] is True
+      and "ch_seco_sanctions" in _dl_urls[1])
+try:
+    screen.OPENSANCTIONS_DATA = False
+    _dl_urls.clear()
+    check("CH: licence-free mode -> unavailable and NOT fetched (outage gate, never a refusal)",
+          screen.load_ch_list() == (set(), "unavailable", "", False) and len(_dl_urls) == 1)
+finally:
+    screen.OPENSANCTIONS_DATA = _os_saved
+screen.download = _orig_download
+_floor_saved = dict(screen.CORE_LIST_FLOORS)
+try:
+    screen.CORE_LIST_FLOORS["au"] = 5   # the 2-name official fixture is now "truncated"
+    _dl_urls.clear()
+    screen.download = lambda url, label: (_dl_urls.append(url) or (_dfat if "dfat.gov.au" in url else _SIMPLE))
+    _au2 = screen.load_au_list()
+    check("AU: an official file below its floor falls back to the mirror instead of refusing the run (delivery protected)",
+          _au2[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _au2[1] and len(_dl_urls) == 2)
+    screen.download = lambda url, label: (_dfat if "dfat.gov.au" in url else None)
+    _au3 = screen.load_au_list()
+    check("AU: below floor with no mirror -> the official names stay 'obtained' so the floor gate still refuses corrupt data",
+          _au3[0] == {"EXAMPLE DESIGNEE & CO", "ISLAMIC REVOLUTIONARY GUARD CORPS"} and _au3[3] is True)
+finally:
+    screen.CORE_LIST_FLOORS.clear(); screen.CORE_LIST_FLOORS.update(_floor_saved)
+    screen.download = _orig_download
+try:
+    screen.CORE_LIST_FLOORS["eu"] = 5; screen.CORE_LIST_FLOORS["uk"] = 5
+    screen.download = lambda url, label: (_FSF_XML if "webgate" in url else _SIMPLE)
+    _eu_bf = screen.load_eu_list()
+    check("EU: an official XML below its floor falls back to the mirror (delivery protected)",
+          _eu_bf[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _eu_bf[1])
+    screen.download = lambda url, label: (_FSF_XML if "webgate" in url else None)
+    check("EU: below floor with no mirror -> official names kept as obtained (floor gate decides)",
+          screen.load_eu_list()[0] == {"EVIL CORP", "E & CORP", "BAD ACTOR"} and screen.load_eu_list()[3] is True)
+    screen.download = lambda url, label: (b"Name 6,Name 1\nEXAMPLE,ONE\n" if "fcdo.gov.uk" in url else _SIMPLE)
+    _uk_bf = screen.load_uk_list()
+    check("UK: an official CSV below its floor falls back to the mirror (delivery protected)",
+          _uk_bf[0] == {"BAD GUY", "ALIAS ONE", "ALIAS TWO"} and "mirror" in _uk_bf[1])
+finally:
+    screen.download = _orig_download
+screen.CORE_LIST_FLOORS.clear(); screen.CORE_LIST_FLOORS.update(_floors_real)
+check("CH: the slow SESAM endpoint gets its longer timeout",
+      screen.DOWNLOAD_TIMEOUTS.get(screen.CH_OFFICIAL_XML_URL) == 150)
+
+# Every core list must be WIRED to its loader on BOTH load paths — the
+# 2026-07-29 multi-homing bug class was a helper one path didn't call.
 import inspect as _inspect
 _src_daily  = _inspect.getsource(screen.load_all_lists)
 _src_legacy = _inspect.getsource(screen.main)
 for _pname, _psrc in (("daily", _src_daily), ("legacy", _src_legacy)):
     check(f"{_pname} path wires the OFAC mirror fallback", "us_ofac_sdn" in _psrc)
     check(f"{_pname} path wires the UN mirror fallback", "un_sc_sanctions" in _psrc)
-    check(f"{_pname} path loads the UK list via load_uk_list (UK Sanctions List first)",
-          "load_uk_list()" in _psrc and "gb_hmt_sanctions" not in _psrc)
-    check(f"{_pname} path wires the EU official-XML fallback", "_eu_official_fallback" in _psrc)
+    check(f"{_pname} path loads UK/EU/AU/CH via their official-first loaders",
+          all(f"{f}()" in _psrc for f in ("load_uk_list", "load_eu_list", "load_au_list", "load_ch_list"))
+          and "gb_hmt_sanctions" not in _psrc and "data.opensanctions.org" not in _psrc)
     check(f"{_pname} path folds OFAC aliases only when the mirror did not serve",
           "_fold_ofac_aliases" in _psrc
           and _psrc.find("us_ofac_sdn") < _psrc.find("_fold_ofac_aliases"))
@@ -2527,7 +3346,14 @@ class _CaseResp:
     text = ""
     @staticmethod
     def json(): return {"data": {"gid": "1"}}
+class _NoSubtasks:
+    status_code = 200
+    text = ""
+    @staticmethod
+    def json(): return {"data": []}
 def _rec_case(method, url, **kw):
+    if method == "GET" and url.endswith("/subtasks"):   # same-day dedup lookup: no cases yet
+        return _NoSubtasks()
     if "/addProject" in url:      # board attach after a create: not a case itself
         return _CaseResp()
     _case_names.append(((kw.get("json") or {}).get("data") or {}).get("name", ""))
@@ -2550,6 +3376,79 @@ finally:
 check("an open candidate still raises an MLRO case", _n_open == 1)
 check("an identity-excluded candidate raises NO case (the queue, not just the report)",
       _n_excl == 0)
+
+# ── Case-card wording follows the registered TFS procedure (POL-07) ──────────
+# A sanctions match is a PNMR (potential) or freeze + CNMR + FFR (confirmed) in
+# goAML, with the STR/SAR decided in parallel; the card must say so, start with
+# the stop-the-dealing instruction, and leave every MLRO field blank.
+_case_notes = {}
+def _rec_notes(method, url, **kw):
+    if method == "GET" and url.endswith("/subtasks"):
+        return _NoSubtasks()
+    if "/addProject" in url:
+        return _CaseResp()
+    _d = ((kw.get("json") or {}).get("data") or {})
+    _case_notes[_d.get("name", "")] = _d.get("notes", "")
+    return _CaseResp()
+try:
+    screen.asana_request = _rec_notes
+    screen.open_mlro_cases(
+        "parent", _mk_match(None),
+        [{"subject_type": "INDIVIDUAL", "subject_name": "B", "permalink": "p",
+          "articles": [{"is_new": True, "title": "t", "source": "s", "date": "d", "url": "u"}]}],
+        [{"is_new": True, "subject_name": "C", "id": "Q1", "category": "PEP", "permalink": "p"}],
+        _dtmod.datetime(2026, 7, 30))
+finally:
+    screen.asana_request = _orig_ar
+_sn = next((v for k, v in _case_notes.items() if k.startswith("🔴 SANCTIONS case")), "")
+_pn = next((v for k, v in _case_notes.items() if k.startswith("🟠 PEP case")), "")
+_an = next((v for k, v in _case_notes.items() if k.startswith("🟡 Adverse-media case")), "")
+check("sanctions case opens with the POL-07 stop-the-dealing instruction",
+      _sn.splitlines()[2] == screen.TFS_CASE_STOP_LINE)
+check("sanctions case offers PNMR (potential) and freeze + CNMR + FFR (confirmed) via goAML",
+      "PNMR filed in goAML" in _sn and "CNMR + FFR filed in goAML" in _sn)
+check("sanctions case keeps the STR/SAR decision parallel, not instead",
+      "STR/SAR assessed in parallel (not instead)" in _sn)
+check("sanctions case asks for the evidence POL-07 step 7 requires (identifiers, time, goAML ref)",
+      "Identifiers compared" in _sn and "goAML reference: ______" in _sn)
+check("sanctions case ends its decision block with the tip-off warning (kept by the protected tail)",
+      _sn.rstrip().endswith("Do not tip off. UAE Cabinet Resolution 74/2020 applies."))
+check("sanctions case no longer says a generic 'escalate / freeze (TFS)'",
+      "escalate / freeze (TFS)" not in _sn)
+check("PEP case names the R.12 controls and leaves the approver blank",
+      "senior-management approval" in _pn and "source of funds/wealth" in _pn
+      and "Senior-management approver: ______" in _pn and "tip off" in _pn)
+check("adverse-media case states it is not a TFS event and asks for the identity check",
+      "not a TFS event (no PNMR/CNMR)" in _an and "name-only — disambiguate before acting" in _an
+      and "tip off" in _an)
+check("no case card pre-fills an MLRO decision",
+      all("[x]" not in v.lower() for v in _case_notes.values()))
+
+# The decision block must survive truncation on an oversized HIGH-risk case:
+# the STR/SAR draft follows it, and both sit inside the protected tail.
+_big = ("\n".join(f"- [INDIVIDUAL] S → OFAC SDN: \"N{i}\"  90%" for i in range(5000))
+        + "\n\n" + "\n".join(screen.TFS_CASE_DISPOSITION) + "\n\n"
+        + ai.draft_str("Example Trading LLC", "p",
+                       [{"subject_type": "INDIVIDUAL", "subject_name": "S", "list": "OFAC SDN",
+                         "matched_entry": "N", "score": 97}], False, [],
+                       {"rating": "HIGH", "factors": ["f"], "edd": "e"}))
+_capped = screen.cap_notes(_big, screen.CASE_NOTES_FLOOR, tail_chars=screen.CASE_NOTES_TAIL)
+check("truncated HIGH-risk case keeps the full POL-07 decision block",
+      all(line in _capped for line in screen.TFS_CASE_DISPOSITION))
+
+# The daily report's §① action class and sign-off carry the same filings.
+_narr_tfs = screen.build_unified_narrative(
+    [], [], [], [], _meta_deg,
+    {"subjects_total": 1, "companies_screened": 1, "individuals_screened": 0,
+     "am_errors": 0, "pep_errors": 0, "delta": {}},
+    _dtmod.datetime(2026, 7, 30))
+check("report §① states PNMR / CNMR + FFR in goAML (POL-07), not a generic FIU report",
+      "PNMR in goAML" in _narr_tfs and "CNMR + FFR in goAML" in _narr_tfs
+      and "report to the FIU" not in _narr_tfs)
+check("report sign-off offers PNMR and CNMR/FFR outcomes with a goAML reference",
+      "[ ] PNMR filed" in _narr_tfs and "CNMR/FFR filed" in _narr_tfs and "goAML Ref: ______" in _narr_tfs)
+check("report §② marks adverse media as not a TFS event",
+      "Not a TFS event (no PNMR/CNMR)" in _narr_tfs)
 
 _prev_ie = screen.IDENTITY_EXCLUSION
 screen.IDENTITY_EXCLUSION = False
@@ -3067,6 +3966,7 @@ check("legacy daily post failure arms the delivery gate (no more green no-delive
 # section. Follow Ups is reserved for document expiries and pending documents.
 _posted = []
 _attached = []
+_attachment_uploads = []
 def _record_post(method, url, **kw):
     if method == "GET":
         class _G:
@@ -3091,6 +3991,14 @@ def _record_post(method, url, **kw):
             @staticmethod
             def json(): return {"data": {}}
         return _A()
+    if url.endswith("/api/1.0/attachments"):
+        _attachment_uploads.append((kw.get("data"), kw.get("files"), kw.get("headers")))
+        class _Att:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "att-1"}}
+        return _Att()
     raise AssertionError(f"unexpected Asana call: {method} {url}")
 
 screen.asana_request = _record_post
@@ -3136,6 +4044,14 @@ def _stale_section_post(method, url, **kw):
             status_code = 400
             text = "Section must be in project"
         return _Bad()
+    if url.endswith("/api/1.0/attachments"):
+        _attachment_uploads.append((kw.get("data"), kw.get("files"), kw.get("headers")))
+        class _Att:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "att-1"}}
+        return _Att()
     raise AssertionError(f"unexpected Asana call: {method} {url}")
 
 _prev_failed = screen.UNIFIED_DELIVERY_FAILED["failed"]
@@ -3229,6 +4145,14 @@ def _record_shrink(method, url, **kw):
             @staticmethod
             def json(): return {"data": {}}
         return _A()
+    if url.endswith("/api/1.0/attachments"):
+        _attachment_uploads.append((kw.get("data"), kw.get("files"), kw.get("headers")))
+        class _Att:
+            status_code = 200
+            text = ""
+            @staticmethod
+            def json(): return {"data": {"gid": "att-1"}}
+        return _Att()
     raise AssertionError(f"unexpected Asana call: {method} {url}")
 _orig_stored = screen.NOTES_BUDGET["stored"]
 screen.asana_request = _record_shrink
@@ -3460,6 +4384,8 @@ def _bl_match(name, score=90):
 
 _bl_created = []
 _orig_create_case = screen.create_case_subtask
+_orig_existing_cases = screen.existing_case_subtasks
+screen.existing_case_subtasks = lambda gid: {}   # backlog tests: no same-day cases filed yet
 screen.create_case_subtask = lambda parent, nm, notes, due, section: (_bl_created.append((nm, notes)), True)[1]
 _orig_cap = screen.CASE_SUBTASK_CAP
 screen.CASE_SUBTASK_CAP = 2
@@ -3512,6 +4438,7 @@ try:
           and screen.load_case_backlog(_st5) == [])
 finally:
     screen.create_case_subtask = _orig_create_case
+    screen.existing_case_subtasks = _orig_existing_cases
     screen.CASE_SUBTASK_CAP = _orig_cap
 
 # ── coverage make-up decision + enrichment rotation (spread-across-the-day) ──
@@ -3536,6 +4463,23 @@ check("news coverage lost today → sweep with honest count",
 _p = _mk(); json.dump([{"date": "2026-08-05", "counts": {"am_errors": 0, "pep_errors": 3}}], open(_p, "w"))
 check("PEP-only loss also sweeps",
       monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
+_p = _mk(); json.dump([{"date": "2026-10-03", "counts": {"subjects": 996, "am_errors": 0, "pep_errors": 0,
+                                                        "feed_single": 972, "feed_none": 0}}], open(_p, "w"))
+d = monitoring.makeup_decision("2026-10-03", path=_p)
+check("thin coverage (3 Oct: 972 of 996 on one feed) → sweep, with the count stated",
+      d["sweep"] is True and d["uncovered"] == 972 and "one news feed or none" in d["reason"])
+_p = _mk(); json.dump([{"date": "2026-10-03", "counts": {"subjects": 996, "am_errors": 0, "pep_errors": 0,
+                                                        "feed_single": 972, "makeup": 1}}], open(_p, "w"))
+check("a make-up run never re-triggers on thin coverage alone (bounded, once a day)",
+      monitoring.makeup_decision("2026-10-03", path=_p)["sweep"] is False)
+_p = _mk(); json.dump([{"date": "2026-10-03", "counts": {"subjects": 996, "am_errors": 0, "pep_errors": 0,
+                                                        "feed_single": 100, "feed_none": 0}}], open(_p, "w"))
+check("mostly multi-feed coverage → no sweep",
+      monitoring.makeup_decision("2026-10-03", path=_p)["sweep"] is False)
+_ssrc_mk = __import__("inspect").getsource(screen.screen_subject_set)
+check("run metrics persist feed reach (single / none) and the make-up flag, counts only",
+      '"feed_single": int(feed_coverage_snapshot().get("single", 0))' in _ssrc_mk
+      and '"makeup": int(mode == "makeup")' in _ssrc_mk)
 _p = _mk(); json.dump({"not": "a list"}, open(_p, "w"))
 check("malformed history → sweep, never a silent all-clear",
       monitoring.makeup_decision("2026-08-05", path=_p)["sweep"] is True)
@@ -4253,40 +5197,69 @@ check("stale_core_lists: respects the configured limit",
 _fcdo_csv = (b'"id","schema","name","aliases"\n'
              b'"a1","Person","EXAMPLE DESIGNEE ONE","E. DESIGNEE;DESIGNEE EXAMPLE"\n'
              b'"a2","Organization","EXAMPLE HOLDINGS LLC",""\n')
+# Official UK Sanctions List CSV: a report-date title row, then the Name 1..6
+# header (GOV.UK format guide), one row per name record.
+_uksl_csv = (b'Report Date: 02/10/2026\n'
+             b'Last Updated,Name 6,Name 1,Name 2,Name 3,Name 4,Name 5,Name type\n'
+             b'01/10/2026,DESIGNEE,EXAMPLE,ONE,,,,Primary Name\n'
+             b'01/10/2026,EXAMPLE HOLDINGS LLC,,,,,,Primary Name\n')
 _uk_calls = []
 _orig_dl_uk, _orig_parse_uk = screen.download, screen.parse_uk
+_uk_floor = screen.CORE_LIST_FLOORS["uk"]
+screen.CORE_LIST_FLOORS["uk"] = 0
 try:
     def _dl_ok(url, label):
-        _uk_calls.append(url); return _fcdo_csv if "gb_fcdo_sanctions" in url else b"CONLIST"
+        _uk_calls.append(url)
+        return _uksl_csv if "sanctionslist.fcdo.gov.uk" in url else _fcdo_csv
     screen.download = _dl_ok
     _n, _d, _h, _f = screen.load_uk_list()
-    check("UK: the UK Sanctions List mirror is the primary and carries names + aliases",
-          _n == {"EXAMPLE DESIGNEE ONE", "E. DESIGNEE", "DESIGNEE EXAMPLE", "EXAMPLE HOLDINGS LLC"} and _f is True)
-    check("UK: the retired ConList is NOT fetched when the primary loaded",
-          len(_uk_calls) == 1 and "gb_fcdo_sanctions" in _uk_calls[0])
-    check("UK: provenance names the UK Sanctions List (no stale-date claim)",
-          _d.startswith("live (UK Sanctions List") and screen.list_age_days(_d) is None)
+    check("UK: the official FCDO CSV is the primary (assembled Name 1..6)",
+          _n == {"EXAMPLE ONE DESIGNEE", "EXAMPLE HOLDINGS LLC"} and _f is True)
+    check("UK: neither the mirror nor the retired ConList is fetched when the official file loaded",
+          len(_uk_calls) == 1 and "sanctionslist.fcdo.gov.uk" in _uk_calls[0])
+    check("UK: the official file's report date becomes the list date (staleness-checkable)",
+          _d == "02/10/2026" and screen.list_age_days(_d, _dt.date(2026, 10, 3), dayfirst=True) == 1)
 
     _uk_calls.clear()
-    def _dl_mirror_empty(url, label):
+    screen.download = lambda url, label: (_uk_calls.append(url)
+                                          or (b"<html>error</html>" if "fcdo.gov.uk" in url else _fcdo_csv))
+    _n1, _d1, _h1, _f1 = screen.load_uk_list()
+    check("UK: an unusable official file falls back to the OpenSanctions mirror (licence permitting)",
+          _n1 == {"EXAMPLE DESIGNEE ONE", "E. DESIGNEE", "DESIGNEE EXAMPLE", "EXAMPLE HOLDINGS LLC"}
+          and "mirror" in _d1 and _f1 is True and "gb_fcdo_sanctions" in _uk_calls[1])
+    check("UK: mirror provenance carries no stale-date claim", screen.list_age_days(_d1) is None)
+
+    _uk_calls.clear()
+    def _dl_both_empty(url, label):
         _uk_calls.append(url)
+        if "fcdo.gov.uk" in url: return None
         return b'"id","schema","name","aliases"\n' if "gb_fcdo_sanctions" in url else b"CONLIST-BYTES"
-    screen.download = _dl_mirror_empty
-    screen.parse_uk = lambda data: ({"OLD DESIGNEE"}, "03/06/2026", "hash")
+    screen.download = _dl_both_empty
+    screen.parse_uk = lambda data: ({"OLD DESIGNEE"}, "03/06/2026", "hash") if data == b"CONLIST-BYTES" else (set(), "unknown", "")
     _n2, _d2, _h2, _f2 = screen.load_uk_list()
-    check("UK: an empty primary falls back to the retired ConList", _n2 == {"OLD DESIGNEE"} and _f2 is True
-          and len(_uk_calls) == 2 and "ConList.csv" in _uk_calls[1])
+    check("UK: official and mirror empty -> the retired ConList", _n2 == {"OLD DESIGNEE"} and _f2 is True
+          and len(_uk_calls) == 3 and "ConList.csv" in _uk_calls[2])
     check("UK: the fallback keeps ConList's own date, which the staleness check then flags",
           _d2 == "03/06/2026"
           and screen.stale_core_lists({"uk": {"count": 1, "date": _d2}}, _today) == [("uk", 110)])
+    _os_saved_uk = screen.OPENSANCTIONS_DATA
+    try:
+        screen.OPENSANCTIONS_DATA = False
+        _uk_calls.clear()
+        screen.load_uk_list()
+        check("UK: licence-free mode skips the OpenSanctions mirror",
+              not any("opensanctions" in u for u in _uk_calls) and len(_uk_calls) == 2)
+    finally:
+        screen.OPENSANCTIONS_DATA = _os_saved_uk
 
     screen.download = lambda url, label: None
     screen.parse_uk = _orig_parse_uk
     _n3, _d3, _h3, _f3 = screen.load_uk_list()
-    check("UK: both sources down -> empty and not fetched (the outage gate takes over)",
+    check("UK: every source down -> empty and not fetched (the outage gate takes over)",
           not _n3 and _f3 is False)
 finally:
     screen.download, screen.parse_uk = _orig_dl_uk, _orig_parse_uk
+    screen.CORE_LIST_FLOORS["uk"] = _uk_floor
 
 _run_dt = _dt.datetime(2026, 9, 21, 5, 0)
 _meta_fresh = _sm(ofac={"count": 17000, "date": "live"}, un={"count": 900, "date": "2026-09-19"},
@@ -4387,9 +5360,11 @@ _cust = {"gid": "111", "name": "Example Gold Trading LLC", "email": "owner@examp
 _emp = {"gid": "222", "name": "John Example Staff", "individuals": ["John Example Staff"],
         "entity_owners": [], "kyc": {}, "kind": "employee"}
 _mv = screen.mask_values_for_customer(_cust)
-check("mask: customer name, individuals, entity owners, email and ID number are masked",
+check("mask: customer name, individuals and entity owners are masked",
       all(v in _mv for v in ("Example Gold Trading LLC", "Jane Q Example", "JANE Q EXAMPLE",
-                             "jane q example", "Example Holdings Ltd", "owner@example.com", "P1234567")))
+                             "jane q example", "Example Holdings Ltd")))
+check("mask: email and ID numbers are not echoed into mask commands (never logged; CodeQL private-data)",
+      "owner@example.com" not in _mv and "P1234567" not in _mv)
 check("mask: values shorter than MASK_MIN_LEN are not masked",
       "Al" not in _mv and all(len(v) >= screen.MASK_MIN_LEN for v in _mv))
 _lines = []
@@ -4406,6 +5381,23 @@ try:
 finally:
     if _prev_gha is not None:
         os.environ["GITHUB_ACTIONS"] = _prev_gha
+# Regression: a Copilot Autofix (#725) made the no-emitter path `return 0`
+# unconditionally, so production runs masked nothing. On the runner the
+# default path must emit to stdout.
+import io as _io_priv, contextlib as _ctx_priv
+_prev_gha2 = os.environ.get("GITHUB_ACTIONS")
+os.environ["GITHUB_ACTIONS"] = "true"
+_buf = _io_priv.StringIO()
+try:
+    with _ctx_priv.redirect_stdout(_buf):
+        _n_prod = screen.mask_population([_emp])
+finally:
+    if _prev_gha2 is None:
+        os.environ.pop("GITHUB_ACTIONS", None)
+    else:
+        os.environ["GITHUB_ACTIONS"] = _prev_gha2
+check("mask: on GitHub Actions the default path emits ::add-mask:: to stdout (masking is live)",
+      _n_prod > 0 and "::add-mask::John Example Staff" in _buf.getvalue())
 check("subject_log_ref identifies a row by gid, never by name",
       screen.subject_log_ref(_cust) == "subject gid 111" and "Example" not in screen.subject_log_ref(_cust))
 _src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
@@ -4417,6 +5409,313 @@ _name_logs = [l for l in _src.splitlines()
               if _re_priv.search(r"\blog\(f", l)
               and _re_priv.search(r"\{(subj_name|subject_name|c\['name'\]|name)\}|\{c\.get\('name'", l)]
 check("no run-log line interpolates a subject name (public Actions logs)", not _name_logs)
+
+# ── FULL RESULTS IN ASANA: complete report + results register attached ──────
+# The card is capped by Asana's notes limit; the remainder used to live only in
+# the (public, now name-masked) run log. Every report task now carries both.
+_rel30 = [{"key": f"owner {i}", "type": "shared owner / UBO", "members": [f"Co {i}A", f"Co {i}B"]}
+          for i in range(30)]
+_st_rel = {**_st(), "related_parties": _rel30}
+_n_card = screen.build_unified_narrative([], [], [], [], _meta_ww, _st_rel, _run_dt)
+_n_full = screen.build_unified_narrative([], [], [], [], _meta_ww, _st_rel, _run_dt, caps={"full": True})
+check("full results: the card itemises 25 clusters and points the rest to the attached full report",
+      "+5 more clusters (see the attached full report)" in _n_card and "Owner 29" not in _n_card)
+check("full results: the full render itemises every cluster with no '+N more' cut",
+      "Owner 29" in _n_full and "more clusters" not in _n_full)
+_src_all = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
+check("full results: no report line still sends the reader to the (public, masked) run log",
+      "(see run log)" not in _src_all and "Full list in the workflow run log" not in _src_all
+      and "every one is in the run log" not in _src_all)
+
+_reg = screen.build_results_register(
+    [{"name": "Acme Gold LLC", "permalink": "https://app.asana.com/x/1",
+      "hits": [{"subject_name": "Jane Roe", "subject_type": "INDIVIDUAL", "list": "OFAC SDN",
+                "matched_entry": "ROE, Jane", "score": 92, "confidence": "STRONG"},
+               {"subject_name": "Jane Roe", "subject_type": "INDIVIDUAL", "list": "UN Consolidated",
+                "matched_entry": "Jane R", "score": 100},
+               {"subject_name": "Jane Roe", "subject_type": "INDIVIDUAL", "list": "EU FSF",
+                "matched_entry": "J Roe", "score": 70, "identity_excluded": True}]}],
+    [{"name": "=HYPERLINK(\"x\")", "permalink": "https://app.asana.com/x/2"}],
+    [{"subject_type": "INDIVIDUAL", "subject_name": "John Doe", "parent": "Beta Bullion",
+      "permalink": "https://app.asana.com/x/3",
+      "articles": [{"title": "Doe charged", "source": "Example News", "url": "https://n.example/1",
+                    "tier": "HIGH", "categories": ["Fraud"], "date": "2026-09-30"}]}],
+    [{"subject_name": "Rich Poe", "parent": "Gamma Gold", "permalink": "https://app.asana.com/x/4",
+      "category": "PEP", "label": "Minister", "description": "Cabinet minister",
+      "source_url": "https://www.wikidata.org/wiki/Q1", "review": False}])
+_reg_txt = _reg.decode("utf-8")
+import csv as _csv_reg, io as _io_reg
+_reg_rows = list(_csv_reg.DictReader(_io_reg.StringIO(_reg_txt.lstrip("\ufeff"))))
+check("register: UTF-8 BOM so Excel opens non-Latin names correctly", _reg_txt.startswith("\ufeff"))
+check("register: header carries the documented columns",
+      list(_reg_rows[0].keys()) == screen.REGISTER_COLUMNS)
+check("register: one row per sanctions hit, classed CONFIRMED / POTENTIAL / EXCLUDED ON IDENTITY",
+      [r["result"] for r in _reg_rows if r["domain"] == "sanctions" and r["subject"] == "Jane Roe"]
+      == ["POTENTIAL", "CONFIRMED", "EXCLUDED ON IDENTITY"])
+check("register: customers with no sanctions match are listed too (the complete population)",
+      any(r["result"] == "NO MATCH" for r in _reg_rows))
+check("register: spreadsheet formula injection is neutralised",
+      any(r["customer"] == "'=HYPERLINK(\"x\")" for r in _reg_rows))
+check("register: adverse-media article rows carry title, source, severity and link",
+      any(r["domain"] == "adverse_media" and r["matched_name_or_title"] == "Doe charged"
+          and r["confidence_or_severity"] == "HIGH" and r["link"] == "https://n.example/1" for r in _reg_rows))
+check("register: PEP findings carry role and source",
+      any(r["domain"] == "pep" and r["matched_name_or_title"] == "Minister"
+          and r["link"].endswith("Q1") for r in _reg_rows))
+
+check("attachments: the delivered report task received the full report and the results register",
+      [u[0]["parent"] for u in _attachment_uploads[:2]] == ["1", "1"]
+      and _attachment_uploads[0][1]["file"][0] == "full-screening-report-2026-07-29.txt"
+      and _attachment_uploads[1][1]["file"][0] == "screening-results-register-2026-07-29.csv")
+check("attachments: uploaded as multipart, never with the JSON Content-Type header",
+      all("Content-Type" not in (u[2] or {}) for u in _attachment_uploads))
+
+def _att_fail(method, url, **kw):
+    class _F:
+        status_code = 500
+        text = "boom"
+    return _F()
+_orig_req_att = screen.asana_request
+_prev_frf = screen.FULL_RESULTS_FAILED["failed"]
+screen.asana_request = _att_fail
+screen.FULL_RESULTS_FAILED["failed"] = False
+try:
+    _att_ok = screen.attach_full_results("1", "x", b"y", _dt.datetime(2026, 7, 29))
+finally:
+    screen.asana_request = _orig_req_att
+check("attachments: an upload failure is reported as failure (never as delivered)", _att_ok is False)
+_prev_hf = screen.DELIVERY_HARD_FAIL
+screen.FULL_RESULTS_FAILED["failed"] = True
+screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+screen.DELIVERY_HARD_FAIL = True
+try:
+    screen.enforce_delivery_gate()
+    _gate_exit = None
+except SystemExit as e:
+    _gate_exit = e.code
+finally:
+    screen.DELIVERY_HARD_FAIL = _prev_hf
+    screen.FULL_RESULTS_FAILED["failed"] = _prev_frf
+check("attachments: a delivered card WITHOUT its full results fails the delivery gate (exit 5)",
+      _gate_exit == 5)
+
+# ── SAME-DAY CASE DEDUP: a re-run appends to the existing case, never a duplicate ──
+_dd_calls = []
+class _DDResp:
+    def __init__(self, code, data): self.status_code, self._d, self.text = code, data, ""
+    def json(self): return self._d
+def _dd_asana(method, url, **kw):
+    _dd_calls.append((method, url, kw))
+    if method == "GET" and url.endswith("/subtasks"):
+        return _DDResp(200, {"data": [{"gid": "case-9", "name": "🟡 Adverse-media case: Jane Roe"}]})
+    if url.endswith("/stories"):
+        return _DDResp(201, {"data": {"gid": "s1"}})
+    if url.endswith("/api/1.0/tasks"):
+        return _DDResp(201, {"data": {"gid": "new-case"}})
+    return _DDResp(200, {"data": {}})
+_dd_af = [{"subject_type": "INDIVIDUAL", "subject_name": "Jane Roe", "parent": "Acme", "permalink": "p",
+           "articles": [{"title": "Different article on re-run", "is_new": True, "source": "S", "url": "u"}]},
+          {"subject_type": "INDIVIDUAL", "subject_name": "John Doe", "parent": "Acme", "permalink": "p",
+           "articles": [{"title": "First story", "is_new": True, "source": "S", "url": "u"}]}]
+_orig_ar_dd = screen.asana_request
+screen.asana_request = _dd_asana
+try:
+    _dd_n = screen.open_mlro_cases("report-1", [], _dd_af, [], _dt.datetime(2026, 10, 1, 12, 55))
+finally:
+    screen.asana_request = _orig_ar_dd
+_dd_story = [c for c in _dd_calls if c[1].endswith("/tasks/case-9/stories")]
+_dd_created = [c for c in _dd_calls if c[1].endswith("/api/1.0/tasks")]
+check("case dedup: a same-day re-run adds its new items to the existing case as a comment",
+      len(_dd_story) == 1 and "Different article on re-run" in _dd_story[0][2]["json"]["data"]["text"])
+check("case dedup: no duplicate case is created for a subject already cased today",
+      len(_dd_created) == 1 and "John Doe" in _dd_created[0][2]["json"]["data"]["name"] and _dd_n == 1)
+def _dd_unreadable(method, url, **kw):
+    _dd_calls.append((method, url, kw))
+    if method == "GET":
+        return _DDResp(404, {})
+    return _DDResp(201, {"data": {"gid": "new-case"}})
+_dd_calls.clear()
+screen.asana_request = _dd_unreadable
+try:
+    _dd_n2 = screen.open_mlro_cases("report-1", [], _dd_af, [], _dt.datetime(2026, 10, 1, 12, 55))
+finally:
+    screen.asana_request = _orig_ar_dd
+check("case dedup: an unreadable case list fails OPEN — every case is still created",
+      _dd_n2 == 2)
+
+# ── Canada SEMA junk-name guard (published XML with misaligned columns) ──────
+_ca_broken = (b'<data-set><record><EntityOrShip-EntiteOuNavire>1, Part 1</EntityOrShip-EntiteOuNavire>'
+              b'<TitleOrShipType-TitreOuTypeDeNavire>1</TitleOrShipType-TitreOuTypeDeNavire>'
+              b'<LastName-NomDeFamille>44102</LastName-NomDeFamille></record></data-set>')
+_ca_n, _ca_d, _ = screen.parse_canada(_ca_broken)
+check("canada: a feed with only date serials / schedule refs in name fields is UNAVAILABLE, not 'live'",
+      not _ca_n and _ca_d == "unavailable")
+_ca_good = ('<data-set><record><GivenName-Prenom>Ivan</GivenName-Prenom>'
+            '<LastName-NomDeFamille>Petrov</LastName-NomDeFamille></record>'
+            '<record><EntityOrShip-EntiteOuNavire>Rostec Industrial Holding</EntityOrShip-EntiteOuNavire></record>'
+            '</data-set>').encode()
+_ca_n2, _ca_d2, _ = screen.parse_canada(_ca_good)
+check("canada: real person and entity names still parse (recall unchanged)",
+      {"Ivan Petrov", "Rostec Industrial Holding"} <= _ca_n2 and _ca_d2 == "live")
+check("is_screenable_name: digits/dates/schedule refs rejected; real names in any script kept",
+      not screen.is_screenable_name("44102") and not screen.is_screenable_name("1, Part 1")
+      and screen.is_screenable_name("ООО Ромашка") and screen.is_screenable_name("Partners Trading LLC"))
+
+# ── Format-drift guard on every core list (both list-building paths) ─────────
+_dj_mixed = screen.drop_junk_names("TEST", {"Ivan Petrov", "Rostec", "12345"})
+check("drop_junk_names: a stray non-name is dropped, real names kept (set type preserved)",
+      _dj_mixed == {"Ivan Petrov", "Rostec"} and isinstance(_dj_mixed, set))
+check("drop_junk_names: a parse that is MOSTLY junk is treated as empty (format drift)",
+      screen.drop_junk_names("TEST", ["44102", "1, Part 1", "45394", "Ivan Petrov"]) == [])
+check("drop_junk_names: a clean list is returned unchanged",
+      screen.drop_junk_names("TEST", ["Ivan Petrov", "ООО Ромашка"]) == ["Ivan Petrov", "ООО Ромашка"])
+_dj_src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
+check("drop_junk_names: applied to all seven core lists in BOTH list-building paths",
+      _dj_src.count('drop_junk_names(label, names) for label, names in (') == 2)
+
+# ── FULL RESULTS SELF-HEAL: a re-run attaches missing files to today's report ──
+check("has_full_results: both files required",
+      screen.has_full_results(["full-screening-report-2026-10-02.txt", "screening-results-register-2026-10-02.csv"])
+      and not screen.has_full_results(["full-screening-report-2026-10-02.txt"]) and not screen.has_full_results(None))
+_heal_calls = []
+class _HResp:
+    def __init__(self, code, data): self.status_code, self._d, self.text = code, data, ""
+    def json(self): return self._d
+def _heal_asana(existing):
+    def _f(method, url, **kw):
+        _heal_calls.append((method, url))
+        if method == "GET" and url.endswith("/attachments"):
+            return _HResp(200, {"data": [{"name": n} for n in existing]})
+        if method == "POST" and url.endswith("/attachments"):
+            return _HResp(200, {"data": {"gid": "a1"}})
+        return _HResp(200, {"data": {}})
+    return _f
+_orig_ar_heal, _prev_frf_heal = screen.asana_request, screen.FULL_RESULTS_FAILED["failed"]
+try:
+    screen.FULL_RESULTS_FAILED["failed"] = False
+    screen.asana_request = _heal_asana([])
+    screen.heal_full_results("rep-1", "card", lambda caps: "FULL", b"csv", _dt.datetime(2026, 10, 2), [], [], [])
+    _healed = [c for c in _heal_calls if c[0] == "POST"]
+    check("self-heal: a delivered report missing its full results gets both files on the re-run",
+          len(_healed) == 2 and not screen.FULL_RESULTS_FAILED["failed"])
+    _heal_calls.clear()
+    screen.asana_request = _heal_asana(["full-screening-report-2026-10-02.txt", "screening-results-register-2026-10-02.csv"])
+    screen.heal_full_results("rep-1", "card", lambda caps: "FULL", b"csv", _dt.datetime(2026, 10, 2), [], [], [])
+    check("self-heal: nothing is re-uploaded when the full results are already attached",
+          not [c for c in _heal_calls if c[0] == "POST"])
+    screen.asana_request = lambda method, url, **kw: _HResp(500, {})
+    screen.heal_full_results("rep-1", "card", None, b"csv", _dt.datetime(2026, 10, 2), [], [], [])
+    check("self-heal: an unreadable attachment list fails the delivery gate (never 'delivered')",
+          screen.FULL_RESULTS_FAILED["failed"])
+finally:
+    screen.asana_request = _orig_ar_heal
+    screen.FULL_RESULTS_FAILED["failed"] = _prev_frf_heal
+
+# ── safe_err: encoded names in request URLs never reach the public log ───────
+class _ConnErr(Exception):
+    pass
+_se = screen.safe_err(_ConnErr("HTTPSConnectionPool(host='news.google.com', port=443): Max retries exceeded "
+                              "with url: /rss/search?q=%22Jane+Roe%22+fraud&hl=en (Caused by Timeout)"))
+check("safe_err: the URL path and query (URL-encoded subject name) are redacted",
+      "Jane" not in _se and "%22" not in _se and "news.google.com" in _se and "_ConnErr" in _se)
+_se2 = screen.safe_err(RuntimeError("GDELT HTTP 429 for https://api.gdeltproject.org/api/v2/doc/doc?query=%22Jane%20Roe%22"))
+check("safe_err: a bare URL keeps its host but loses the query", "Jane" not in _se2 and "gdeltproject.org" in _se2)
+_src_se = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "screen.py"), encoding="utf-8").read()
+check("safe_err: no news-feed failure line logs the raw exception text",
+      "google-news fetch/parse failed ({_k}): {str(e)" not in _src_se
+      and "unavailable for this subject ({str(e)" not in _src_se
+      and "retry failed ({str(e)" not in _src_se)
+
+
+# ── GDELT GKG 24-hour worldwide stream (bulk; offline, synthetic names) ──────
+import datetime as _dt, io as _io
+def _gkg_row(stamp, source, url, persons, orgs, title, srclc=""):
+    f = [""] * 27
+    f[0] = stamp + "-1"; f[1] = stamp; f[3] = source; f[4] = url
+    f[12] = ";".join(f"{p},{i * 10}" for i, p in enumerate(persons))
+    f[14] = ";".join(f"{o},{i * 10}" for i, o in enumerate(orgs))
+    f[25] = (f"srclc:{srclc};eng:GT-{srclc}" if srclc else "")
+    f[26] = f"<PAGE_TITLE>{title}</PAGE_TITLE>"
+    return "\t".join(f)
+_st = screen.gkg_file_stamps(_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), 24, lag_slots=1)
+check("gkg: 24 hours → 96 fifteen-minute stamps ending one slot back",
+      len(_st) == 96 and _st[0] == "20261003190000" and _st[1] == "20261003184500" and _st[-1] == "20261002191500")
+_st4 = screen.gkg_file_stamps(_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), 24)
+check("gkg: the default window ends one hour back (the translated stream publishes late)",
+      len(_st4) == 96 and _st4[0] == "20261003181500")
+_ta = screen.gkg_article({"title": "ZZ Example Metals opens a new branch", "themes": ["CORRUPTION", "KILL", "ARREST"],
+                          "date": "20261003", "stamp": "20261003180000", "source": "example.com", "url": "u", "lang": "en"})
+check("gkg: an AML theme on the article body flags a neutral headline as tier 'weak', with the theme named",
+      _ta["flagged"] and _ta["tier"] == "weak" and "Bribery / Corruption" in _ta["categories"]
+      and "theme(s): corruption" in _ta["evidence"])
+_tg = screen.gkg_article({"title": "ZZ Example Metals opens a new branch", "themes": ["ARREST", "TRIAL", "TERROR", "KILL"],
+                          "date": "20261003", "stamp": "20261003180000", "source": "example.com", "url": "u", "lang": "en"})
+check("gkg: generic crime themes (ARREST/TRIAL/TERROR/KILL) never flag on their own", not _tg["flagged"])
+_rows, _bad = screen.parse_gkg_rows("\n".join([
+    _gkg_row("20261003190000", "example.com", "https://example.com/a", ["Zara Quill Example"], [],
+             "Zara Quill Example arrested in fraud probe"),
+    "too\tfew\tcolumns",
+    _gkg_row("20261003190000", "exemple.fr", "https://exemple.fr/b", ["Zara Example"], ["ZZ Example Metals Trading"],
+             "Enquête pour blanchiment d&#39;argent", "fra"),
+]))
+check("gkg: rows parse to persons / orgs / unescaped title / source language; a short row is counted, not parsed",
+      len(_rows) == 2 and _bad == 1 and _rows[0]["persons"] == ["Zara Quill Example"]
+      and _rows[1]["title"] == "Enquête pour blanchiment d'argent" and _rows[1]["lang"] == "fra" and _rows[0]["lang"] == "en")
+_idx = screen.gkg_subject_index([("k1", "Zara Quill Example", "person"), ("k2", "ZZ Example Metals Trading LLC", "org"),
+                                 ("k3", "Mononym", "person")])
+check("gkg: full name and first+last-name form both match the person; single tokens never index",
+      screen.gkg_match(_rows[0], _idx) == {"k1"} and "k1" in screen.gkg_match(_rows[1], _idx))
+check("gkg: a different person with the same first and last token but an extra token does not match",
+      screen.gkg_match({"persons": ["Zara Other Example"], "orgs": []}, _idx) == set())
+check("gkg: an organisation matches on its full distinctive-token set",
+      "k2" in screen.gkg_match({"persons": [], "orgs": ["ZZ Example Metals Trading"]}, _idx))
+def _zip(text):
+    b = _io.BytesIO()
+    with _zf.ZipFile(b, "w") as z:
+        z.writestr("x.gkg.csv", text)
+    return b.getvalue()
+_payload = _zip("\n".join([
+    _gkg_row("20261003190000", "example.com", "https://example.com/a", ["Zara Quill Example"], [], "Zara Quill Example arrested in fraud probe"),
+    _gkg_row("20261003190000", "example.com", "https://example.com/c", ["Zara Quill Example"], [], "Zara Quill Example opens a new store"),
+]))
+_calls = {"n": 0}
+def _fake_fetch(url):
+    _calls["n"] += 1
+    if _calls["n"] == 1:
+        return _payload
+    if _calls["n"] == 2:
+        raise RuntimeError("boom")
+    return None
+_old_hours = screen.GKG_HOURS
+screen.GKG_HOURS = 1
+_hits = screen.gkg_sweep([("k1", "Zara Quill Example", "person")],
+                         end_utc=_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), fetch=_fake_fetch)
+screen.GKG_HOURS = _old_hours
+_gs = screen.gkg_stats_snapshot()
+# A second sweep in the same process must start with fresh counters and language buckets.
+_calls2 = {"n": 0}
+def _fake_fetch2(url):
+    _calls2["n"] += 1
+    return _payload if _calls2["n"] == 1 else None
+_old_hours2 = screen.GKG_HOURS
+screen.GKG_HOURS = 1
+screen.gkg_sweep([("k1", "Zara Quill Example", "person")],
+                 end_utc=_dt.datetime(2026, 10, 3, 19, 22, tzinfo=_dt.timezone.utc), fetch=_fake_fetch2)
+screen.GKG_HOURS = _old_hours2
+_gs2 = screen.gkg_stats_snapshot()
+check("gkg sweep: per-run statistics reset before each invocation",
+      _gs2["expected"] == 8 and _gs2["read"] == 1 and _gs2["failed"] == 0 and _gs2["missing"] == 7
+      and _gs2["rows"] == 2 and _gs2["subjects"] == 1)
+check("gkg sweep: only the ADVERSE story is returned, with GKG provenance and body-mention evidence",
+      list(_hits) == ["k1"] and len(_hits["k1"]) == 1 and _hits["k1"][0]["flagged"]
+      and "GDELT GKG" in _hits["k1"][0]["source"] and "article body" in _hits["k1"][0]["evidence"])
+check("gkg sweep: expected / read / missing / failed are counted (a partial stream is never silent)",
+      _gs["expected"] == 8 and _gs["read"] == 1 and _gs["failed"] == 1 and _gs["missing"] == 6
+      and not screen.gkg_complete(_gs) and screen.gkg_complete({"ran": True, "expected": 10, "read": 9}))
+_src_gk = open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read()
+check("gkg: findings are merged additively (dedupe by title/url) and the stream is disclosed in §②",
+      "_gkg_hits.get(normalize(r[\"name\"]))" in _src_gk and "GDELT 24-hour worldwide stream" in _src_gk
+      and "GDELT 24-hour stream INCOMPLETE" in _src_gk)
 
 print()
 if _fail:

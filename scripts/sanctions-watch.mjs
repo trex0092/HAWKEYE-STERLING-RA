@@ -20,8 +20,11 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { loadSources, computeChanges, contentChanges } from './reg-watch.mjs';
+import { describeFetchError, fetchFollowingCookies, applySourceToken } from './sanctions-screen.mjs';
+import { parseList } from './sanctions-match.mjs';
 
 export const SOURCES_FILE = 'data/sanctions-sources.json';
+export const EXTRA_FILE   = 'data/sanctions-extra.json';
 export const STATE_FILE   = 'data/sanctions-state.json';
 export const REPORT_FILE  = 'sanctions-watch-report.md';
 export const CHANGES_FILE = 'sanctions-watch-changes.json';
@@ -85,16 +88,115 @@ export function buildReport(changes, today, mode, counts) {
 }
 
 /* ── Network (runner only; not imported by tests) ── */
-async function fetchSource(s, timeoutMs = 45000) {
+/* A designation list is CSV / XML / JSON. An HTML page in its place is a
+   sign-in, error or holding page; fingerprinting it would record a fake "list
+   change" in the TFS evidence log and leave the list unwatched. Pure. */
+export function looksLikeHtmlPage(body) {
+  const head = String(body || '').slice(0, 512).replace(/^\uFEFF/, '').trimStart().toLowerCase();
+  return head.startsWith('<!doctype html') || head.startsWith('<html');
+}
+const LIST_TYPES = new Set(['csv', 'xml', 'json']);
+/* A source that now needs a sign-in (EU FSF since 1 Oct 2026) is not a
+   transient outage: escalate on the first run instead of after the streak. */
+export const SIGN_IN_RE = /requires a sign-in|login page|HTML page/i;
+
+/* Fetch one list for fingerprinting, on the same path as the screen
+   (scripts/sanctions-screen.mjs): optional personal token (tokenEnv), the
+   cookie-carrying redirect follower when a redirect loops, and the full cause
+   chain on failure instead of a bare "fetch failed". fetchImpl is injectable
+   for the offline tests. */
+export async function fetchSource(s, timeoutMs = 45000, { fetchImpl = fetch } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  const headers = { 'user-agent': 'HawkeyeSterling-SanctionsWatch/1.0' };
+  const href = applySourceToken(s.url, s.tokenEnv).href;
   try {
-    const res = await fetch(s.url, { signal: ctrl.signal, redirect: 'follow', headers: { 'user-agent': 'HawkeyeSterling-SanctionsWatch/1.0' } });
+    let res;
+    try {
+      // codeql[js/file-access-to-http]: reviewed 2026-10-02, intended design, not a leak.
+      // Same flow the watcher always had: a public designation-list URL from the
+      // reviewed in-repo config (data/sanctions-sources.json); no subject data is sent.
+      res = await fetchImpl(href, { signal: ctrl.signal, redirect: 'follow', headers });
+    } catch (e) {
+      if (!/redirect count exceeded/i.test(describeFetchError(e))) throw e;
+      res = await fetchFollowingCookies(href, { signal: ctrl.signal, headers }, { fetchImpl });
+    }
     const body = await res.text();
-    return { ok: res.ok, status: res.status, body: res.ok ? body : '', error: res.ok ? null : ('HTTP ' + res.status) };
+    if (!res.ok) return { ok: false, status: res.status, body: '', error: 'HTTP ' + res.status };
+    if (LIST_TYPES.has(String(s.type || '').toLowerCase()) && looksLikeHtmlPage(body)) {
+      return { ok: false, status: res.status, body: '', gated: true,
+        error: 'served an HTML page, not the ' + s.type + ' list (sign-in or error page) - not fingerprinted' };
+    }
+    return { ok: true, status: res.status, body, error: null };
   } catch (e) {
-    return { ok: false, status: 'error', body: '', error: String(e && e.message || e).slice(0, 200) };
+    const error = describeFetchError(e);
+    return { ok: false, status: 'error', body: '', error, gated: SIGN_IN_RE.test(error) };
   } finally { clearTimeout(t); }
+}
+
+/* A core list's declared fallback (fallbackSourceId, e.g. eu-fsf -> fr-dgt
+   while the EU list sits behind EU Login) is watched too: without it a gated
+   primary leaves its designations with no change detection at all, so new EU
+   freezes would wait for the next scheduled screen instead of re-screening at
+   once. Only fallbacks the core registry names are added, never the whole
+   extra file. Pure. */
+/* The watcher fetches a fallback only from this reviewed, in-code allowlist:
+   the registry entry supplies the parser and name, never the URL, so the set
+   of hosts the watch can reach is fixed by code review (test/sanctions-watch
+   pins each URL to its registry entry, so the two cannot drift). */
+export const WATCHED_FALLBACK_URLS = Object.freeze({
+  'fr-dgt': 'https://gels-avoirs.dgtresor.gouv.fr/ApiPublic/api/v1/publication/derniere-publication-fichier-json',
+});
+
+export function watchedSources(core, extra) {
+  const ids = new Set(core.map(s => String(s.id)));
+  const extraById = new Map((extra || []).filter(s => s && s.enabled !== false).map(s => [String(s.id), s]));
+  const out = core.slice();
+  for (const s of core) {
+    const fb = String(s.fallbackSourceId || '');
+    if (!fb || ids.has(fb) || !extraById.has(fb)) continue;
+    const url = Object.prototype.hasOwnProperty.call(WATCHED_FALLBACK_URLS, fb) ? WATCHED_FALLBACK_URLS[fb] : '';
+    if (!url) { console.warn('sanctions-watch: fallback ' + fb + ' is not in WATCHED_FALLBACK_URLS - not watched'); continue; }
+    const e = extraById.get(fb);
+    out.push({ id: fb, name: String(e.name || fb), jurisdiction: e.jurisdiction, type: e.type, parser: e.parser,
+      url, fingerprintBy: 'names', fallbackFor: s.id });
+    ids.add(fb);
+  }
+  return out;
+}
+
+/* A fallback is fingerprinted by its parsed, sorted, de-duplicated name set,
+   not its raw bytes: a JSON register re-issued with a new publication
+   timestamp but the same designations must not read as a list change (each
+   change dispatches a full re-screen and writes the TFS evidence log). Returns
+   the canonical text and the name count; null when nothing parses, which the
+   caller treats as a fetch error rather than an empty list. Pure. */
+export function namesFingerprintBody(source, body) {
+  let names = [];
+  try { names = parseList(source, body) || []; } catch { names = []; }
+  const set = [...new Set(names.map(n => String(n || '').replace(/\s+/g, ' ').trim()).filter(Boolean))].sort();
+  return set.length ? { text: set.join('\n'), count: set.length } : null;
+}
+
+/* A gated or unreachable primary whose declared fallback fetched cleanly
+   this run still has designation change-detection (through the fallback), so
+   it is reported as covered rather than escalated as a blind list on every
+   run. Without a working fallback it stays a persistent error. Pure. */
+export function splitCoveredErrors(persistentErrors, sources, fetched) {
+  const byId = new Map(sources.map(s => [String(s.id), s]));
+  const covered = [], blind = [];
+  for (const e of persistentErrors || []) {
+    const fb = String((byId.get(String(e.id)) || {}).fallbackSourceId || '');
+    if (fb && byId.has(fb) && fetched[fb] && fetched[fb].ok) covered.push({ ...e, fallback: fb });
+    else blind.push(e);
+  }
+  return { covered, blind };
+}
+
+/* The changes that warrant an immediate re-screen: a list whose content
+   moved since the last good snapshot. Pure. */
+export function rescreenTriggers(changes) {
+  return (changes || []).filter(c => c && c.status === 'changed');
 }
 
 function loadState() {
@@ -120,7 +222,15 @@ export function trackErrorStreaks(sources, fetched, stateSources, threshold) {
     else {
       anyError = true;
       rec.errStreak = (Number(rec.errStreak) || 0) + 1;
-      if (rec.errStreak >= threshold) persistentErrors.push({
+      if (f && f.gated) {
+        persistentErrors.push({
+          name: s.name, id: s.id, url: s.url, streak: rec.errStreak,
+          status: 'sign-in required', errorStreak: rec.errStreak,
+          detail: 'the list now requires a sign-in — change-detection is blind'
+            + (s.tokenEnv ? '; set the ' + s.tokenEnv + ' repository secret (personal download token)' : '')
+            + ' (' + String(f.error || '').slice(0, 160) + ')'
+        });
+      } else if (rec.errStreak >= threshold) persistentErrors.push({
         name: s.name, id: s.id, url: s.url, streak: rec.errStreak,
         status: 'unreachable', errorStreak: rec.errStreak,
         detail: 'unreachable ' + rec.errStreak + ' consecutive runs — change-detection is blind'
@@ -387,12 +497,24 @@ async function main() {
     return;
   }
   const sources = loadSources(readFileSync(SOURCES_FILE, 'utf8'));
+  let extra = [];
+  try { extra = (JSON.parse(readFileSync(EXTRA_FILE, 'utf8')).sources) || []; }
+  catch (e) { console.warn('sanctions-watch: extra sources unreadable, fallbacks not watched (' + e.message + ')'); }
+  for (const fb of watchedSources(sources, extra).slice(sources.length)) sources.push(fb);
   const today = new Date().toISOString().slice(0, 10);
   const prevState = loadState();
   const prev = (prevState && prevState.sources) || {};
 
   const fetched = {};
   await Promise.all(sources.map(async s => { fetched[s.id] = await fetchSource(s); }));
+  const nameCounts = {};
+  for (const s of sources) {
+    const f = fetched[s.id];
+    if (s.fingerprintBy !== 'names' || !f || !f.ok) continue;
+    const fp = namesFingerprintBody(s, f.body);
+    if (fp) { f.body = fp.text; nameCounts[s.id] = fp.count; }
+    else { f.ok = false; f.body = ''; f.error = 'parsed 0 names - not fingerprinted'; }
+  }
 
   const { changes, state } = computeChanges(sources, prevState, fetched, today);
 
@@ -400,7 +522,8 @@ async function main() {
   const counts = {};
   for (const s of sources) {
     const f = fetched[s.id];
-    const now = (f && f.ok && typeof f.body === 'string') ? countEntries(f.body, s.type, s.marker, s.noHeader) : null;
+    const now = typeof nameCounts[s.id] === 'number' ? nameCounts[s.id]
+      : (f && f.ok && typeof f.body === 'string') ? countEntries(f.body, s.type, s.marker, s.noHeader) : null;
     const prevCount = prev[s.id] && typeof prev[s.id].count === 'number' ? prev[s.id].count : null;
     if (typeof now === 'number') state.sources[s.id].count = now;
     else if (typeof prevCount === 'number' && state.sources[s.id]) state.sources[s.id].count = prevCount;
@@ -408,10 +531,16 @@ async function main() {
   }
 
   const ERROR_STREAK_ALERT = Number(process.env.SANCTIONS_ERROR_STREAK) || 3;
-  const { persistentErrors, anyError } = trackErrorStreaks(sources, fetched, state.sources, ERROR_STREAK_ALERT);
+  const tracked = trackErrorStreaks(sources, fetched, state.sources, ERROR_STREAK_ALERT);
+  const { anyError } = tracked;
+  const { covered, blind: persistentErrors } = splitCoveredErrors(tracked.persistentErrors, sources, fetched);
 
   const moved = contentChanges(changes);
   let report = buildReport(changes, today, mode, counts);
+  if (covered.length) {
+    report += '\n\nCOVERED BY FALLBACK - the list itself is not readable, but its declared fallback fetched cleanly and is watched for changes:\n'
+      + covered.map(e => '- ' + e.name + ' (' + e.status + ', ' + e.streak + ' run(s)) - watched through ' + e.fallback).join('\n');
+  }
   if (persistentErrors.length) {
     report += '\n\n⚠ PERSISTENT SOURCE FAILURES — a list has been unreachable for '
       + ERROR_STREAK_ALERT + '+ consecutive runs (its change-detection is BLIND):\n'
@@ -495,7 +624,10 @@ async function main() {
   /* CONTENT changes only (new/changed lists), excluding persistent-error
      alerts: the workflow's immediate-re-screen dispatch keys on this, and a
      dead URL must alert without pointlessly re-screening unchanged data. */
-  setOutput('content_changes', String(moved.length));
+  /* A first snapshot (status "new": a list just added to the watch, e.g. a
+     declared fallback) is a baseline, not a designation event - the TFS log
+     already records it as one - so only a CHANGED list re-screens. */
+  setOutput('content_changes', String(rescreenTriggers(changes).length));
   setOutput('pr_title', prTitle);
 }
 

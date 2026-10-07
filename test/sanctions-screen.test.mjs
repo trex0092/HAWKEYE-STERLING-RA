@@ -8,7 +8,7 @@ import {
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
   whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
-  getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay
+  getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay, loadSanctionsLists
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName, parseIdbCsv } from '../scripts/sanctions-match.mjs';
 const scr = await import('../scripts/sanctions-screen.mjs');
@@ -1603,6 +1603,51 @@ check('sanctions loader resolves declared fallback coverage before setting degra
     && /unresolved\.length > 0/.test(src);
 })());
 
+check('EU FSF declares the French DGT register (all EU freezes, no sign-in) as its coverage fallback', (() => {
+  const core = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-sources.json'), 'utf8'));
+  const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
+  const contract = JSON.parse(readFileSync(join(ROOT, 'data/worldwide-screening-sources.json'), 'utf8'));
+  const eu = (core.sources || []).find(s => s.id === 'eu-fsf');
+  const fr = (extra.sources || []).find(s => s.id === 'fr-dgt');
+  const req = (contract.domains.sanctions.sources || []).find(s => s.id === 'eu-fsf');
+  return eu && fr && req && eu.fallbackSourceId === 'fr-dgt' && req.fallbackSourceId === 'fr-dgt'
+    && fr.enabled !== false && Number(fr.minNames) >= 9000;
+})());
+{
+  /* Behavioural: a selective load (sourceIds, as the runtime assurance does)
+     reaches a fallback that lives in the extra file, and a failed primary
+     with a complete fallback is "coverage preserved", not degraded; with the
+     fallback absent the same failure stays degraded. */
+  const { mkdtempSync, writeFileSync: wf } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'eu-fb-'));
+  const fbFile = join(dir, 'fr.json');
+  wf(fbFile, JSON.stringify({ entries: ['Alpha Trading Holdings', 'Bravo Shipping Company', 'Charlie Metals Group'] }));
+  const sourcesFile = join(dir, 'sources.json');
+  wf(sourcesFile, JSON.stringify({ sources: [
+    { id: 'eu-fsf', name: 'EU test', url: 'https://example.invalid/eu', file: join(dir, 'absent.csv'), parser: 'eu', fallbackSourceId: 'fr-dgt' },
+    { id: 'uk-ofsi', name: 'UK test', url: 'https://example.invalid/uk', file: join(dir, 'absent-uk.csv') },
+  ] }));
+  const extraFile = join(dir, 'extra.json');
+  wf(extraFile, JSON.stringify({ sources: [
+    { id: 'fr-dgt', name: 'DGT test', file: fbFile, parser: 'curated', minNames: 2 },
+    { id: 'zz-other', name: 'Not selected', file: fbFile, parser: 'curated' },
+  ] }));
+  const quiet = [console.log, console.warn, console.error];
+  console.log = console.warn = console.error = () => {};
+  let sel, bare;
+  try {
+    sel = await loadSanctionsLists({ sourcesFile, extraFile, sourceIds: ['eu-fsf', 'fr-dgt'], listTimeoutMs: 1000 });
+    bare = await loadSanctionsLists({ sourcesFile, extraFile, sourceIds: ['eu-fsf'], listTimeoutMs: 1000 });
+  } finally { [console.log, console.warn, console.error] = quiet; }
+  check('selective load includes the requested extra-file fallback and nothing unrequested',
+    sel.lists.map(l => l.id).join() === 'fr-dgt' && sel.total === 2);
+  check('failed EU primary with a complete DGT fallback: coverage preserved, run not degraded, substitution named',
+    sel.degraded === false && sel.notes.some(n => /EU test/.test(n) && /fallback fr-dgt/.test(n) && /coverage preserved/.test(n)));
+  check('failed EU primary without its fallback loaded stays degraded (never silent)',
+    bare.degraded === true && bare.unresolvedSources.includes('eu-fsf') && bare.notes.some(n => /coverage degraded/.test(n)));
+}
+
 check('SECO direct source declares its already-enabled SECO mirror as coverage fallback', (() => {
   const extra = JSON.parse(readFileSync(join(ROOT, 'data/sanctions-extra.json'), 'utf8'));
   const direct = (extra.sources || []).find(s => s.id === 'ch-seco');
@@ -1968,6 +2013,171 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   check('the name-bearing report is not echoed to the run log on GitHub Actions',
     /GITHUB_ACTIONS === 'true'\) console\.log\('sanctions-screen: report written to/.test(src)
     && /else console\.log\(report\);/.test(src));
+}
+
+
+/* Format-drift guard (Canada SEMA, 1 Oct 2026): a source whose parse yields
+   mostly non-names is treated as drifted, never screened as "loaded". */
+{
+  const d1 = scr.screenableNames(['44102', '1, Part 1', 'Part 2', '45394', 'Ivan Petrov']);
+  check('drift guard: a feed of mostly dates/serials/schedule refs is DRIFTED', d1.drifted && d1.dropped === 4);
+  const d2 = scr.screenableNames(['Ivan Petrov', 'Rostec', 'ООО Ромашка', '王伟', '12345']);
+  check('drift guard: a healthy feed keeps every real name and drops the stray number',
+    !d2.drifted && d2.dropped === 1 && d2.kept.length === 4 && d2.kept.includes('王伟'));
+  check('drift guard: an empty parse is not "drifted" (the 0-names path reports it)', !scr.screenableNames([]).drifted);
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  check('drift guard: the list loader applies it to every source before floors and indexing',
+    /const junk = screenableNames\(parsed\);[\s\S]{0,600}FORMAT DRIFT[\s\S]{0,400}const names = junk\.kept;/.test(src));
+}
+
+// describeFetchError: a network failure must say WHY, not just "fetch failed"
+// (EU consolidated list, 1 Oct 2026: the cause was hidden on error.cause).
+{
+  const d = scr.describeFetchError;
+  const tls = new TypeError('fetch failed', { cause: Object.assign(new Error('unable to verify the first certificate'), { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }) });
+  check('fetch error: the TLS cause code and message are surfaced',
+    d(tls) === 'fetch failed <- UNABLE_TO_VERIFY_LEAF_SIGNATURE: unable to verify the first certificate');
+  const reset = new TypeError('fetch failed', { cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }) });
+  check('fetch error: a connection reset is surfaced', /ECONNRESET/.test(d(reset)));
+  const nested = new TypeError('fetch failed', { cause: new Error('connect failed', { cause: Object.assign(new Error('connect ETIMEDOUT 1.2.3.4:443'), { code: 'ETIMEDOUT' }) }) });
+  check('fetch error: a nested cause chain is followed', /connect failed/.test(d(nested)) && /ETIMEDOUT/.test(d(nested)));
+  check('fetch error: a plain error is unchanged', d(new Error('HTTP 503')) === 'HTTP 503');
+  check('fetch error: null / string inputs never throw', d(null) === 'unknown error' && d('boom') === 'boom');
+  check('fetch error: bounded length', d(new Error('x'.repeat(1000))).length <= 300);
+  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('fetch error: every source-load failure reports the cause chain',
+    /could not be loaded \(' \+ describeFetchError\(e\)/.test(src) && /transport failure — retry in ' \+ delay \+ 'ms: ' \+ describeFetchError\(e\)/.test(src));
+}
+
+// fetchFollowingCookies: a cookie-gated redirect (the EU list's loop) must
+// resolve when the cookie is carried, and a true loop must fail bounded,
+// naming its chain. Offline: a scripted fetch stands in for the server.
+{
+  const resp = (status, { location, cookies = [], body = '' } = {}) => ({
+    status, ok: status >= 200 && status < 300,
+    headers: { get: k => (k === 'location' ? (location || null) : null), getSetCookie: () => cookies },
+    text: async () => body,
+  });
+  const seen = [];
+  const gate = async (url, opts) => {
+    seen.push({ url, cookie: (opts.headers || {}).cookie || '', redirect: opts.redirect });
+    if (!/gate=ok/.test((opts.headers || {}).cookie || '')) return resp(302, { location: url, cookies: ['gate=ok; Path=/; Secure'] });
+    return resp(200, { body: 'Entity_LogicalId;NameAlias_WholeName' });
+  };
+  const r = await scr.fetchFollowingCookies('https://list.example/files/content?token=t', { headers: { 'user-agent': 'x' } }, { fetchImpl: gate });
+  check('redirect: a cookie-gated redirect resolves once the cookie is carried', r.status === 200 && (await r.text()).startsWith('Entity_LogicalId'));
+  check('redirect: the cookie is sent on the next hop and redirects are followed manually',
+    seen.length === 2 && seen[1].cookie === 'gate=ok' && seen.every(x => x.redirect === 'manual'));
+  check('redirect: the hop chain is recorded without the query string',
+    r.redirectChain.length === 2 && /^302 list\.example\/files\/content \(\+1 cookie\)$/.test(r.redirectChain[0]) && !/token/.test(r.redirectChain.join(' ')));
+  let calls = 0;
+  const loop = async (url) => { calls++; return resp(302, { location: url }); };
+  let err = null;
+  try { await scr.fetchFollowingCookies('https://list.example/a', {}, { fetchImpl: loop, maxHops: 4 }); } catch (e) { err = e; }
+  check('redirect: a true loop fails loudly, bounded, and names its chain',
+    err && /redirect loop not resolved/.test(err.message) && /302 list\.example\/a/.test(err.message) && calls === 5);
+  const rel = async (url) => (url.endsWith('/b') ? resp(200, { body: 'ok' }) : resp(301, { location: '/b' }));
+  const r2 = await scr.fetchFollowingCookies('https://list.example/a', {}, { fetchImpl: rel });
+  check('redirect: a relative Location is resolved against the current URL', r2.status === 200 && r2.redirectChain.length === 2);
+  let e2 = null;
+  try { await scr.fetchFollowingCookies('https://list.example/a', {}, { fetchImpl: async () => resp(302, { location: 'file:///etc/passwd' }) }); } catch (e) { e2 = e; }
+  check('redirect: never follows a redirect to a non-http(s) scheme', e2 && /unsupported scheme/.test(e2.message));
+  const plain = await scr.fetchFollowingCookies('https://list.example/a', {}, { fetchImpl: async () => resp(404) });
+  check('redirect: a non-redirect error status is returned as-is for the caller to judge', plain.status === 404);
+  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('redirect: the source fetch falls back to it only on "redirect count exceeded"',
+    /\/redirect count exceeded\/i\.test\(describeFetchError\(e\)\)[\s\S]{0,300}fetchFollowingCookies\(url/.test(src));
+}
+
+// EU Login gate (2 Oct 2026 live chain): a redirect that lands on a sign-in
+// page is a loud, named failure — never a 200 "list" — and a personal
+// download token, when configured, replaces only the request's token.
+{
+  const resp = (status, { location, cookies = [] } = {}) => ({
+    status, ok: status >= 200 && status < 300,
+    headers: { get: k => (k === 'location' ? (location || null) : null), getSetCookie: () => cookies },
+    text: async () => '<html>EU Login</html>',
+  });
+  const hops = {
+    'https://webgate.example/fsd/content?token=t': resp(307, { location: 'https://webgate.example/fsd/content?token=t&s=1', cookies: ['a=1'] }),
+    'https://webgate.example/fsd/content?token=t&s=1': resp(303, { location: 'https://ecas.example/cas/login?loginRequestId=x' }),
+    'https://ecas.example/cas/login?loginRequestId=x': resp(200),
+  };
+  let err = null;
+  try { await scr.fetchFollowingCookies('https://webgate.example/fsd/content?token=t', {}, { fetchImpl: async u => hops[u] }); } catch (e) { err = e; }
+  check('login gate: landing on a sign-in page fails loudly and says so',
+    err && /requires a sign-in/.test(err.message) && /ecas\.example\/cas\/login/.test(err.message) && !/loginRequestId/.test(err.message));
+  const t = scr.applySourceToken;
+  const pub = 'https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw';
+  check('token: unset secret keeps the configured URL', t(pub, 'EU_FSF_TOKEN', {}).href === pub && !t(pub, 'EU_FSF_TOKEN', {}).personal);
+  const pers = t(pub, 'EU_FSF_TOKEN', { EU_FSF_TOKEN: ' abc-123_XYZ ' });
+  check('token: a set secret replaces only the token parameter', pers.personal && new URL(pers.href).searchParams.get('token') === 'abc-123_XYZ'
+    && new URL(pers.href).pathname === new URL(pub).pathname && new URL(pers.href).host === 'webgate.ec.europa.eu');
+  check('token: a malformed secret (injection attempt) is ignored', t(pub, 'EU_FSF_TOKEN', { EU_FSF_TOKEN: 'x&url=https://evil' }).href === pub);
+  check('token: no tokenEnv on a source = no change', t(pub, undefined, { EU_FSF_TOKEN: 'abc' }).href === pub);
+  const cfg = JSON.parse(readFileSync(fileURLToPath(new URL('../data/sanctions-sources.json', import.meta.url)), 'utf8'));
+  const eu = (cfg.sources || []).find(x => x.id === 'eu-fsf');
+  check('token: the EU source opts in via EU_FSF_TOKEN and keeps the public URL in config', eu && eu.tokenEnv === 'EU_FSF_TOKEN' && /token=dG9rZW4tMjAxNw$/.test(eu.url));
+  for (const wf of ['sanctions-screen.yml', 'sanctions-runtime-assurance.yml']) {
+    const y = readFileSync(fileURLToPath(new URL('../.github/workflows/' + wf, import.meta.url)), 'utf8');
+    check('token: ' + wf + ' passes the secret to the list loader', /EU_FSF_TOKEN: \$\{\{ secrets\.EU_FSF_TOKEN \}\}/.test(y));
+  }
+}
+
+// Adverse-media second pass (2 Oct 2026: 11 zero-coverage subjects left after
+// the in-sweep retry). Re-check only those, after a cool-down, bounded.
+{
+  const run = scr.runAmSecondPass;
+  let t = 1000;
+  const clock = () => t;
+  const slept = [];
+  const sleep = async ms => { slept.push(ms); t += ms; };
+  const item = ok => ({ retry: async () => { t += 10; if (ok === 'throw') throw new Error('x'); return ok; } });
+  const r1 = await run([item(true), item(false), item(true)], { deadlineMs: 1e9, delayMs: 60000, now: clock, sleep });
+  check('second pass: re-checks every queued subject after a cool-down and counts recoveries',
+    r1.attempted === 3 && r1.recovered === 2 && slept[0] === 60000 && r1.skipped === '');
+  const r2 = await run([item(true)], { deadlineMs: t + 30000, delayMs: 60000, now: clock, sleep });
+  check('second pass: skipped (and said so) when the cool-down would cross the enrichment deadline',
+    r2.attempted === 0 && /budget/.test(r2.skipped));
+  const many = Array.from({ length: scr.AM_SECOND_PASS_MAX + 1 }, () => item(true));
+  const r3 = await run(many, { deadlineMs: 1e12, delayMs: 0, now: clock, sleep });
+  check('second pass: a mass failure (providers down globally) is not re-queried', r3.attempted === 0 && /cap/.test(r3.skipped));
+  const r4 = await run([item('throw'), item(true)], { deadlineMs: 1e12, delayMs: 0, now: clock, sleep });
+  check('second pass: a retry that throws stays unrecovered, never aborts the pass', r4.attempted === 2 && r4.recovered === 1);
+  const r5 = await run([], { deadlineMs: 0 });
+  check('second pass: an empty queue is a no-op', r5.attempted === 0 && r5.recovered === 0 && r5.skipped === '');
+  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('second pass: only ERRORED (zero-coverage) subjects are queued, and a recovery un-counts the error',
+    /if \(am\.errored\) \{\s*amErrors\+\+; amIncomplete = true;\s*amSecondPassQueue\.push/.test(src)
+    && /if \(again\.errored\) return false;\s*amErrors--; amIncomplete = false;/.test(src));
+  check('second pass: a recovered subject is rebuilt through the same finalize() path',
+    /applyAm\(again\);\s*const rebuilt = finalize\(\);/.test(src) && /heartbeat\(\);\s*return finalize\(\);/.test(src));
+  check('second pass: runs before the input-order restore, bounded by the enrichment deadline',
+    src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order') && /deadlineMs: enrichDeadline/.test(src));
+}
+
+/* ── licence-free mode (OPENSANCTIONS_DATA=0) ── */
+{
+  const srcs = [
+    { id: 'ch-seco', url: 'https://www.sesam.search.admin.ch/x.xml' },
+    { id: 'ch-seco-opensanctions', url: 'https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv' },
+    { id: 'internal', file: 'data/internal.json' },
+  ];
+  const on = scr.licenceFreeFilter(srcs, {});
+  check('licence-free filter: unset OPENSANCTIONS_DATA keeps every source', on.kept.length === 3 && on.skipped.length === 0);
+  check('licence-free filter: "1" keeps every source', scr.licenceFreeFilter(srcs, { OPENSANCTIONS_DATA: '1' }).skipped.length === 0);
+  const off = scr.licenceFreeFilter(srcs, { OPENSANCTIONS_DATA: '0' });
+  check('licence-free filter: "0" skips only OpenSanctions-hosted sources (official + file sources kept)',
+    off.skipped.map(x => x.id).join() === 'ch-seco-opensanctions' && off.kept.map(x => x.id).join() === 'ch-seco,internal');
+  const lookalike = scr.licenceFreeFilter([{ id: 'x', url: 'https://evilopensanctions.org/a.csv' }], { OPENSANCTIONS_DATA: '0' });
+  check('licence-free filter: matches the opensanctions.org host exactly, not a look-alike suffix',
+    lookalike.skipped.length === 0 && lookalike.kept.length === 1);
+  const loaderSrc = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('licence-free filter: the loader applies it and names the skipped sources in the run notes',
+    /const licence = licenceFreeFilter\(sources\);/.test(loaderSrc) && /not screened - ' \+ licence\.skipped\.map/.test(loaderSrc));
+  const wf = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');
+  check('licence-free filter: Sanctions Screen passes the repository variable with no default',
+    /OPENSANCTIONS_DATA: \$\{\{ vars\.OPENSANCTIONS_DATA \}\}\n/.test(wf));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

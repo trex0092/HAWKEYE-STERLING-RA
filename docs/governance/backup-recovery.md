@@ -21,6 +21,15 @@ UAE Federal Decree-Law No. (26) of 2021, Art. 23 (10-year retention).
 On-device data never leaves the device except through the server-side Asana
 relay (token held in Netlify env, never in the browser).
 
+## Current preservation limitation
+
+The Asana mirrors are off-device operational copies, but they are not treated as a
+dedicated authenticated persistence tier with a defined assessment-data recovery
+objective. **Open action 23 remains open** until an authenticated persistence/sync
+tier is live, recovery is rehearsed against it, and the BCP records the applicable
+RPO/RTO for assessment data. This document does not infer those controls from the
+existence of the mirrors alone.
+
 ## Export integrity (independent verification)
 
 Every JSON export carries an `integrity` envelope:

@@ -13,6 +13,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 /* Shared Asana client: bounded retry on 429/5xx + the re-run dedup guard. */
 import { asana, findRecentDuplicate, listProjectTasks as listTasksIn } from './asana-notify.mjs';
+import { retryAfterDelayMs } from './runtime-recovery.mjs';
 
 export const STATE_FILE = 'data/fatf-state.json';
 const FATF_URL = 'https://www.fatf-gafi.org/en/countries/black-and-grey-lists.html';
@@ -25,6 +26,10 @@ const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
    (scripts/asana-sections.mjs). The old "FATF list moves" and "Assessment
    Report" sections no longer exist in HAWKEYE STERLING APP. */
 const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1218451992088222';
+/* A monitoring GAP (the lists could not be verified) is a platform-health
+   alert, filed under "AI & Platform Governance"; a list CHANGE stays under
+   "Regulatory Changes". */
+const FATF_GAP_SECTION_GID = process.env.ASANA_FATF_GAP_SECTION_GID || '1218985347982681';
 const FATF_SKIP_ALERT = Number(process.env.FATF_SKIP_ALERT) || 2; /* consecutive unreachable runs before a monitoring-gap alert */
 
 /* FATF naming → the app's baseline naming */
@@ -103,11 +108,31 @@ export function extractCountries(segment, baseline) {
    recently precedes it in the page; the first classified occurrence of a
    name decides its list. Occurrences before any heading (nav links) are
    ignored. Works on a lowercased copy, which preserves string positions. */
+/* HTML entities and typographic apostrophes, folded to the plain characters
+   the country dictionary is keyed on. On 3 Oct 2026 an archived capture of the
+   FATF page spelt "Côte d’Ivoire" / "Lao People’s Democratic Republic" with a
+   non-ASCII apostrophe or an entity; the dictionary (plain "'") matched
+   neither, both names silently dropped out of the grey list, and the watchdog
+   alerted a removal that the FATF never made (the 19 June 2026 statement still
+   lists both). Every position below is taken on the folded string itself, so a
+   multi-character entity collapsing to one character cannot skew anything. */
+const NAMED_ENTITIES = { amp: '&', apos: "'", quot: '"', nbsp: ' ', rsquo: "'", lsquo: "'", rsaquo: "'", lsaquo: "'", prime: "'" };
+export function foldEntities(html) {
+  return String(html || '')
+    .replace(/&#(x[0-9a-f]+|\d+);?/gi, (m, n) => {
+      const cp = n[0] === 'x' || n[0] === 'X' ? parseInt(n.slice(1), 16) : parseInt(n, 10);
+      return Number.isFinite(cp) && cp > 0 && cp < 0x110000 ? String.fromCodePoint(cp) : ' ';
+    })
+    .replace(/&([a-z])(acute|grave|circ|uml|tilde|cedil|ring|slash);/gi, '$1')
+    .replace(/&([a-z]+);/gi, (m, n) => NAMED_ENTITIES[n.toLowerCase()] ?? m)
+    .replace(/[\u2018\u2019\u201b\u02bc\u2032\u00b4`]/g, "'");
+}
+
 export function classifyCountries(html, baseline) {
   /* lowercase + accent fold + 1:1 hyphen/whitespace fold; headings and
      matches use the SAME folded string, and every fold maps one character
      to one character, so positions stay mutually consistent */
-  const lower = String(html || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  const lower = foldEntities(html).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[\u2010\u2011\u2012\u2013\u2014-]/g, ' ').replace(/\s/g, ' ');
   const positions = (needle) => {
     const out = []; let i = 0;
@@ -208,6 +233,36 @@ export function snapshotDate(source) {
    reshuffle must not read as a move. Used for STALE-capture corroboration — see
    the `stale` branch in main() for why an equality test is safe there and a diff
    is not. A missing/garbled side is never "identical". */
+/* The FATF lists as recorded from the last plenary's public statements
+   (data/fatf-assessments.json, verbatim from fatf-gafi.org, keyed on the same
+   canonical names). The FATF changes its lists only at plenaries, so a page
+   that agrees with this record means the lists did not move — whatever a
+   stored state from an earlier, defective parse says. */
+export function recordedPlenary(path = 'data/fatf-assessments.json') {
+  try {
+    const d = JSON.parse(readFileSync(path, 'utf8'));
+    const rows = Array.isArray(d.jurisdictions) ? d.jurisdictions : [];
+    const pick = (l) => rows.filter(r => r && r.list === l && r.riskName).map(r => r.riskName).sort();
+    const out = { date: String(d.plenary || ''), black: pick('black'), grey: pick('grey') };
+    return out.black.length && out.grey.length ? out : null;
+  } catch { return null; }
+}
+
+/* A REMOVAL must be corroborated: the removed name may not still be spelt
+   inside the list region of the page under a looser, letters-only comparison
+   (which ignores apostrophes, entities, accents and spacing entirely). If it
+   is, the parser lost it — a drift to report, never a delisting to announce. */
+export function removalsStillNamed(html, removed, aliases = ALIASES) {
+  const letters = (x) => foldEntities(x).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/<[^>]*>/g, ' ').replace(/[^a-z]/g, '');
+  const page = letters(html);
+  const out = [];
+  for (const name of removed || []) {
+    const forms = [name, ...Object.entries(aliases).filter(([, c]) => c === name).map(([a]) => a)].map(letters).filter(f => f.length >= 4);
+    if (forms.some(f => page.includes(f))) out.push(name);
+  }
+  return out;
+}
+
 export function listsIdentical(a, b) {
   const same = (x, y) => Array.isArray(x) && Array.isArray(y)
     && x.length === y.length
@@ -263,6 +318,47 @@ export function parseCdxTimestamps(json) {
     out.push(ts);
   }
   return out.sort().reverse();
+}
+
+/* Archive reads that answer 429 (rate limit) or 5xx are retried, honouring
+   Retry-After (capped). On 3 Oct 2026 a 1-day-old capture existed but its ONE
+   fetch got a 429, so the watchdog skipped for the 8th run in a row.
+   Returns the ok Response, or null after the last attempt. Pure (injectable
+   fetch/sleep) for the test suite. */
+export async function fetchRetrying(url, opts = {}, { attempts = 3, fetchImpl = fetch,
+  sleep = (ms) => new Promise(r => setTimeout(r, ms)), baseMs = 10000, capMs = 60000 } = {}) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    let r;
+    try { r = await fetchImpl(url, opts); }
+    catch (e) { console.log('archive fetch error (attempt ' + attempt + '): ' + e.message); }
+    if (r) {
+      let shown = url;
+      try { const u = new URL(url); shown = u.pathname + u.search; } catch { /* not a URL — log as given */ }
+      console.log('archive fetch ' + shown + ' (attempt ' + attempt + '): ' + r.status);
+      if (r.ok) return r;
+      if (r.status !== 429 && r.status < 500) return null;   /* a 404/403 will not heal on retry */
+    }
+    if (attempt < attempts) {
+      const hinted = r && r.headers && typeof r.headers.get === 'function'
+        ? retryAfterDelayMs(r.headers.get('retry-after')) : 0;
+      await sleep(Math.min(capMs, Math.max(hinted, baseMs * attempt)));
+    }
+  }
+  return null;
+}
+
+/* Snapshot URLs to try, newest capture first: the raw `id_` form (FATF's own
+   HTML with no Wayback toolbar, served by a different path) and the normal
+   form, for up to `max` distinct captures — one rate-limited capture must not
+   blind the watchdog when an older-but-fresh one is readable. */
+export function snapshotUrls(timestamps, pageUrl, max = 3) {
+  const uniq = [...new Set((timestamps || []).filter(t => /^\d{14}$/.test(String(t))))].sort().reverse().slice(0, max);
+  const out = [];
+  for (const ts of uniq) {
+    out.push({ ts, url: 'https://web.archive.org/web/' + ts + 'id_/' + pageUrl });
+    out.push({ ts, url: 'https://web.archive.org/web/' + ts + '/' + pageUrl });
+  }
+  return out;
 }
 
 /* The only authoritative source is the official FATF page. It 403s our
@@ -333,19 +429,19 @@ async function fetchFatfSegments() {
     console.log('wayback CDX index: ' + cd.status);
     if (cd.ok) candidates.push(...parseCdxTimestamps(await cd.json()));
   } catch (e) { console.log('wayback CDX error: ' + e.message); }
-  const ts = candidates.sort().reverse()[0];
-  if (ts) {
-    const age = snapshotAgeDays(ts);
-    console.log('newest existing snapshot: ' + ts + ' (' + Math.round(age) + 'd old)'
-      + (age > SNAPSHOT_STALE_DAYS ? ' — past the ' + SNAPSHOT_STALE_DAYS + 'd freshness bar' : ''));
-    try {
-      const s = await fetch('https://web.archive.org/web/' + ts + '/' + FATF_URL, { headers, redirect: 'follow' });
-      console.log('fetch snapshot ' + ts + ': ' + s.status);
-      if (s.ok) {
+  const tries = snapshotUrls(candidates, FATF_URL);
+  if (tries.length) {
+    const newest = tries[0].ts, newestAge = snapshotAgeDays(newest);
+    console.log('newest existing snapshot: ' + newest + ' (' + Math.round(newestAge) + 'd old)'
+      + (newestAge > SNAPSHOT_STALE_DAYS ? ' — past the ' + SNAPSHOT_STALE_DAYS + 'd freshness bar' : ''));
+    for (const { ts, url } of tries) {
+      const s = await fetchRetrying(url, { headers, redirect: 'follow' });
+      if (s) {
+        const age = snapshotAgeDays(ts);
         return { html: await s.text(), source: 'fatf-gafi.org via web.archive.org snapshot ' + ts,
                  stale: age > SNAPSHOT_STALE_DAYS, ageDays: age };
       }
-    } catch (e) { console.log('snapshot fetch error: ' + e.message); }
+    }
   } else {
     console.log('no existing snapshot found by either endpoint');
   }
@@ -531,11 +627,11 @@ export async function main(mode) {
       writeFileSync(STATE_FILE, JSON.stringify(st, null, 2) + '\n');
       if (st.skipStreak >= FATF_SKIP_ALERT && REG_PROJECT_GID) {
         const url = await createTask(
-          '⚠ FATF monitoring GAP — list source unreachable ' + st.skipStreak + ' consecutive run(s)',
+          '⚠ FATF monitoring GAP — lists not verified ' + st.skipStreak + ' consecutive run(s)',
           'The FATF black/grey-list watchdog could not verify the lists against an authoritative capture for '
           + st.skipStreak + ' consecutive runs. FATF list moves may be UNDETECTED.\n\nThis run: ' + why
           + '\n\nVerify manually on ' + FATF_URL + ' and check the source endpoints.',
-          undefined, REG_PROJECT_GID, REG_FATF_SECTION_GID);
+          undefined, REG_PROJECT_GID, FATF_GAP_SECTION_GID);
         console.log('FATF monitoring-gap alert filed (skipStreak=' + st.skipStreak + '): ' + url);
       }
     } catch (e) { console.error('FATF skip-streak bookkeeping failed: ' + e.message); }
@@ -566,6 +662,17 @@ export async function main(mode) {
       assertPlausible(staleLists);   /* a garbled capture must not "corroborate" anything */
     } catch (e) {
       await recordGap('only a stale capture (' + age + 'd old) and it did not parse: ' + e.message);
+      return;
+    }
+    /* The stored state itself can be the odd one out (an earlier defective
+       parse): a capture that matches the recorded plenary statements exactly
+       is authoritative for "no move", so the state is repaired from it. */
+    const plenaryRec = recordedPlenary();
+    if (!listsIdentical(prevState, staleLists) && plenaryRec && listsIdentical(staleLists, plenaryRec)) {
+      console.log('stale capture (' + age + 'd old) matches the recorded ' + plenaryRec.date
+        + ' plenary lists exactly; stored state differed — state repaired, lists unchanged');
+      writeFileSync(STATE_FILE, JSON.stringify({ ...staleLists, updated: new Date().toISOString().slice(0, 10),
+        repairedFrom: 'recorded plenary ' + plenaryRec.date, lastCorroboratedSnapshot: snapshotDate(fetched.source) }, null, 2) + '\n');
       return;
     }
     if (!listsIdentical(prevState, staleLists)) {
@@ -616,6 +723,25 @@ export async function main(mode) {
   const diff = diffLists(prev, current);
   const changed = [...diff.blackAdded, ...diff.blackRemoved, ...diff.greyAdded, ...diff.greyRemoved];
   if (!changed.length) { console.log('no FATF list changes — staying silent'); return; }
+
+  /* The page agrees exactly with the recorded plenary statements: the lists
+     have not moved, so the difference is in the STORED state (written by an
+     earlier defective parse). Repair the state; no list-change alert. */
+  const plenary = recordedPlenary();
+  if (plenary && listsIdentical(current, plenary)) {
+    console.log('page matches the recorded ' + plenary.date + ' plenary lists exactly; stored state differed ('
+      + changed.join(', ') + ') — state repaired, no list-change alert');
+    writeFileSync(STATE_FILE, JSON.stringify({ ...current, updated: new Date().toISOString().slice(0, 10), repairedFrom: 'recorded plenary ' + plenary.date }, null, 2) + '\n');
+    return;
+  }
+  /* A removal whose name is still spelt in the page is a parse loss, not a
+     delisting: report the drift loudly, keep the stored state, never alert a move. */
+  const lost = removalsStillNamed(fetched.html, [...diff.blackRemoved, ...diff.greyRemoved]);
+  if (lost.length) {
+    await recordGap('the parser lost ' + lost.join(', ') + ' — still named on the page (' + source
+      + ') but not read into either list. Treated as parser drift, not a delisting; stored lists kept');
+    return;
+  }
 
   const today = new Date().toISOString().slice(0, 10).split('-').reverse().join('/');
   const affected = await findAffected(changed);
