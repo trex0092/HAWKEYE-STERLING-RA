@@ -37,7 +37,7 @@ material change, and at the quarterly management review._
 | Delivery outcomes recorded in the tamper-evident activity log | `test/app.test.js` (`asana.delivery.ok/failed` cases) | Every push/PR | CI run log + in-app log |
 | Failed deliveries visible and retryable across assessments | `test/app.test.js` (retry-all + status chips) | Every push/PR | CI run log |
 | App ↔ Asana drift detected (gaps / orphans / duplicates / mismatches) | `asana-reconcile.yml` → `scripts/asana-reconcile.mjs`; logic in `test/asana-reconcile.test.mjs` | Weekly (Mon 10:00 UTC) + per-push tests | PII-free card in *Ongoing Monitoring*; issue fallback |
-| Delivery functions live and authenticated (probe expects 400, not 5xx) | `function-health.yml` | Daily 05:15 UTC | Run log; Asana alert on failure |
+| Delivery functions deployed and required upstream credentials/configuration reachable through the health path; this is not end-user authentication evidence | `function-health.yml` | Daily 05:23 UTC | Run log; Asana alert on failure; a configured app-token gate can prevent the read-only Asana-token probe and is reported as `gated` |
 
 ### 1.3 Sanctions / AM / PEP screening
 
