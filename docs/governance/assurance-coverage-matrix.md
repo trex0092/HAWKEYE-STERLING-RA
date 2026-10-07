@@ -186,7 +186,7 @@ workflow has a loud failure path (red run, GitHub-issue fallback, or Asana alert
 | Gap | Status |
 |---|---|
 | Transaction monitoring (FATF R.16) engine **inactive** pending a real feed | Risk **R-13** / open action 6 |
-| Vendor and transfer assurance remains incomplete: Asana DPA/region, Anthropic execution record, Composio go-live conditions and transfer-basis decisions are not all verified | Open actions 11, 29, 35 and 36; [`third-party-register.md`](../aims/third-party-register.md) |
+| Vendor and transfer assurance remains incomplete: Asana DPA/region, Anthropic execution record, Composio go-live conditions and transfer-basis decisions are not all verified; the triage live-state/go-live checklist is also unresolved | Open actions 11, 29, 35, 36 and 42; [`third-party-register.md`](../aims/third-party-register.md) |
 | Weekly live Advisor behavioural assurance is incomplete: scheduled runs 36453013672 (2026-09-28) and 37345739408 (2026-10-05) were blocked by provider usage/credit limits | Open action 40; [`eval-scorecard.md`](eval-scorecard.md) |
 | Confidential function endpoints do not yet have verified per-user identity / RBAC; Origin + shared-token controls are compensating controls | Open action 20; [`_auth.js`](../../netlify/functions/_auth.js) |
 | 2026 Q3 model-validation sign-off is overdue | Open action 38; [`model-validation-2026.md`](model-validation-2026.md) |
