@@ -203,7 +203,7 @@ export function renderDashboard(reg, dashboard) {
     '',
     '| Signal | Current value | Source |',
     '|---|---:|---|',
-    '| Control effectiveness rate | ' + dashboard.governance_signals.control_effectiveness_rate + '% | `data/grc-metrics.json` |',
+    '| Automated proof-path coverage (GRC control-effectiveness metric) | ' + dashboard.governance_signals.control_effectiveness_rate + '% | `data/grc-metrics.json` |',
     '| Third-party assessment coverage | ' + dashboard.governance_signals.third_party_assessment_coverage + '% | `data/grc-metrics.json` |',
     '| Audit finding closure rate | ' + dashboard.governance_signals.audit_finding_closure_rate + '% | `data/grc-metrics.json` |',
     '| Governance drift count | ' + dashboard.governance_signals.governance_drift_count + ' | `data/grc-metrics.json` |',
@@ -224,6 +224,8 @@ export function renderDashboard(reg, dashboard) {
     '## Interpretation',
     '',
     'This dashboard reports the state represented by the repository. It does not turn a missing human approval, unsigned contract, unperformed audit, or uncommissioned external assessment into a completed control.',
+    '',
+    'The 100% automated proof-path signal is the GRC metric for assurance-matrix rows whose named automated proof artefacts exist. It is not the percentage of enterprise AI controls rated effective; the six-layer counts above are the authoritative status view for that question.',
     '',
     'A CI pass proves that the register is internally consistent, its evidence paths exist, its review deadline has not expired, and the generated views match their sources. It does not constitute MLRO, Board, legal, regulator, or external-auditor approval.',
     ''
