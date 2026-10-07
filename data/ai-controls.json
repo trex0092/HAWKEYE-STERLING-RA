@@ -464,10 +464,12 @@
       "status": "partial",
       "evidence": [
         "netlify/functions/_auth.js",
+        "netlify/functions/_ratelimit.js",
         "netlify.toml",
         ".github/workflows/codeql.yml",
         ".github/workflows/semgrep.yml",
         ".github/workflows/fortify.yml",
+        "docs/security/history-scrub-runbook.md",
         "docs/governance/open-actions-register.md"
       ],
       "tests": [
@@ -476,9 +478,11 @@
         "test/asana-functions.test.js",
         "test/property-fuzz.test.js"
       ],
-      "note": "Application and repository security controls are tested, but production function endpoints do not yet have verified user identity. The current Origin/shared-token gate is explicitly a compensating control; open action 20 adds real JWT/OIDC role-based authentication.",
+      "note": "Application and repository security controls are tested, but three material gaps remain: pre-redaction subject data is still retrievable from public git history until item 1 is executed; production function endpoints lack verified per-user identity/RBAC under item 20; and the billed LLM relay still uses per-instance rather than fleet-wide rate limiting under item 22.",
       "closure_actions": [
-        20
+        1,
+        20,
+        22
       ]
     },
     {
@@ -497,8 +501,11 @@
       "tests": [
         "test/freshness-check.test.mjs"
       ],
-      "note": "Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation.",
+      "note": "Detection, freshness checks, runbooks and kill switches exist, but incident/control operations are not yet fully proven: item 21 adds an independent non-Asana alert channel, item 24 requires production telemetry rehearsal, item 26 requires deploy self-heal/rollback automation plus rehearsal, and item 31 is the first AI incident-response tabletop.",
       "closure_actions": [
+        21,
+        24,
+        26,
         31
       ]
     },
@@ -581,15 +588,20 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Continuous",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/assurance-coverage-matrix.md",
-        "docs/governance/data-retention.md"
+        "docs/governance/data-retention.md",
+        "docs/governance/backup-recovery.md",
+        "docs/governance/open-actions-register.md"
       ],
       "tests": [
         "test/export-integrity.test.js"
       ],
-      "note": "Decision provenance, audit trails and evidence retention are part of the assurance matrix."
+      "note": "Decision provenance, hash-chained audit records, exports and Asana off-device mirrors exist, but assessments/activity remain primarily browser-local and the repository still lacks a dedicated authenticated persistence tier with a documented and rehearsed assessment-data RPO/RTO. Open action 23 closes that preservation/recovery gap.",
+      "closure_actions": [
+        23
+      ]
     },
     {
       "id": "EAI-AUD-05",
