@@ -6,13 +6,21 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — completed the third six-layer reconciliation.
-> Vendor-assurance and external-assurance closure paths are now explicit rather
+> **Last updated:** 2026-10-07 — completed the fourth six-layer reconciliation.
+> Two assurance-cadence gaps that had aged past their recorded dates are now
+> explicit: item 38 closes the overdue 2026 Q3 model-validation sign-off due
+> 2026-09-30, and item 39 reconciles the quarterly Advisor bias-eval evidence
+> scheduled for 2026-10-01. The enterprise inventory gap already carried by item
+> 9 is also treated as a live limitation in the six-layer control status rather
+> than a separate repository-only concern. No review or evaluation is fabricated.
+>
+> **Previous update (2026-10-07):** completed the third six-layer reconciliation.
+> Vendor-assurance and external-assurance closure paths became explicit rather
 > than implied by broader counsel/strategy rows: item 35 verifies the Asana DPA
 > and contracted region, item 36 resolves the Anthropic DPA execution-record
 > inconsistency, and item 37 resolves the independent-assurance posture after the
 > ISO/IEC 42001 path decision. No vendor position, audit, certification or human
-> approval is marked complete by this edit.
+> approval was marked complete by that edit.
 >
 > **Previous update (2026-10-07):** completed the second six-layer reconciliation.
 > The residual-risk dashboard already showed two risks above appetite with no
@@ -60,11 +68,11 @@
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
 > (20–24 and 26–28) carry dates under the maintainer's own authority. Items
-> 29–37 are vendor/governance/assurance actions whose deadlines belong to their
+> 29–39 are vendor/governance/assurance actions whose deadlines belong to their
 > named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 26 of 34 undated at this update.
+> per row — 28 of 36 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -102,6 +110,8 @@
 | 35 | Verify the Asana vendor DPA and contracted processing region. The third-party register still says **confirm on file** and **confirm** for the region, so `EAI-DMG-05` and KRI-04 cannot treat Asana as assessed. | MLRO / DPO | DPA reference/evidence and the contracted processing region are recorded in the third-party register; the safeguard cell no longer contains an unresolved confirmation marker | — | to open |
 | 36 | Resolve the Anthropic DPA execution record. The vendor row records an owner attestation dated 2026-07-16, while the execution block remains explicitly **DRAFT — pending signature** with blank DPA reference, signatory, execution date and processing region. | MLRO / DPO / counsel | The repository records one verified position: either an executed DPA with reference, authorised signatory/date, processing region and transfer basis, or a corrected statement that execution remains pending with the AI path gated as required | — | to open |
 | 37 | Resolve `EAI-AUD-06` independent external assurance after item 10. A Board decision to remain on self-assessment does not equal an external audit; a certification/assurance path requires an actual independent assessor. | Board / MLRO | After item 10, either an independent AI-governance/ISO 42001 assurance engagement is commissioned and its result/evidence recorded, or the control is formally reclassified `not_applicable` with a Board-approved rationale for continued self-assessment | — | to open |
+| 38 | Complete the overdue 2026 Q3 model-validation sign-off. [`model-validation-2026.md`](model-validation-2026.md) states next review **2026-09-30** and its Q3 quarterly row remains pending as of 2026-10-07. | MLRO | The Q3 row is completed with the actual validation run/evidence, findings, MLRO sign-off and date; the document's next-review date moves to the next approved cycle | — | to open |
+| 39 | Reconcile the quarterly Advisor bias-evaluation evidence. [`eval-scorecard.md`](eval-scorecard.md) lists the next scheduled bias run as **2026-10-01** but contains no recorded result. This action does not assume whether the workflow ran. | MLRO / Compliance Engineering | Verify the 2026-10-01 workflow history. If it completed, append the actual result and any finding/CAPA reference to the scorecard; if it did not complete, dispatch the evaluation and record the resulting evidence | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
