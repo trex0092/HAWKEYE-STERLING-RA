@@ -1,0 +1,566 @@
+{
+  "schema": "hawkeye-sterling.enterprise-ai-controls/v1",
+  "title": "Enterprise AI Governance six-layer control register",
+  "description": "Machine-readable control map for the six enterprise governance layers: Policy; Roles & Accountability; Risk Management; Data & Model Governance; Monitoring & Controls; Audit & Assurance. It is a crosswalk over existing Hawkeye Sterling sources of truth, not a replacement for the AIMS risk register, third-party register, assurance matrix, policy register or AI asset register.",
+  "framework_note": "The taxonomy was inspired by a six-layer enterprise AI governance practitioner graphic supplied during design review. The repository wording, control mapping and diagram are original; no third-party artwork is stored.",
+  "register_review": {
+    "compiled_on": "2026-10-07",
+    "compiled_by": "Compliance Engineering",
+    "next_review_by": "2027-01-07",
+    "cadence": "Quarterly, and on any new AI asset, provider, model family, material prompt charter, tool/connector, or data-flow change.",
+    "approval_note": "Compilation and CI validation do not constitute MLRO, Board, legal or external-auditor approval. Human approvals remain recorded in their authoritative governance documents."
+  },
+  "status_semantics": {
+    "effective": "Control is implemented and the named repository evidence exists. This label does not imply external certification.",
+    "partial": "Control exists, but an identified human, contractual, operational or assurance step remains open.",
+    "open": "Control objective is applicable but the named assurance activity has not yet been completed.",
+    "not_applicable": "Control objective is not applicable to the current system boundary; rationale must be recorded."
+  },
+  "layers": [
+    {
+      "id": "L1",
+      "name": "Policy",
+      "purpose": "Define principles, permitted use, approval gates and regulatory alignment."
+    },
+    {
+      "id": "L2",
+      "name": "Roles & Accountability",
+      "purpose": "Assign accountable owners, decision rights, legal oversight and escalation."
+    },
+    {
+      "id": "L3",
+      "name": "Risk Management",
+      "purpose": "Identify, classify, assess, mitigate and explicitly treat residual AI risk."
+    },
+    {
+      "id": "L4",
+      "name": "Data & Model Governance",
+      "purpose": "Govern data, prompts, models, providers, lineage, versions, access and retention."
+    },
+    {
+      "id": "L5",
+      "name": "Monitoring & Controls",
+      "purpose": "Monitor performance, bias, drift, security, incidents and continuous control operation."
+    },
+    {
+      "id": "L6",
+      "name": "Audit & Assurance",
+      "purpose": "Preserve evidence, test controls, audit governance, track remediation and support independent assurance."
+    }
+  ],
+  "controls": [
+    {
+      "id": "EAI-POL-01",
+      "layer": "L1",
+      "name": "AI principles and policy",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Annual and on material change",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/ai-policy.md",
+        "docs/governance/uae-ai-charter-mapping-2026.md"
+      ],
+      "tests": [
+        "test/policies.test.mjs"
+      ],
+      "note": "Defines the governing AI principles and maps them to the UAE AI Charter."
+    },
+    {
+      "id": "EAI-POL-02",
+      "layer": "L1",
+      "name": "Acceptable-use rules",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Annual and on material change",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/ai-acceptable-use-policy.md",
+        "data/policies.json"
+      ],
+      "tests": [
+        "test/policies.test.mjs"
+      ],
+      "note": "Permitted and prohibited use is documented and the Advisor has an acknowledgment gate."
+    },
+    {
+      "id": "EAI-POL-03",
+      "layer": "L1",
+      "name": "AI use-case approval criteria",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Per new or materially changed AI use case",
+      "status": "partial",
+      "evidence": [
+        "docs/governance/ai-use-case-intake.md",
+        "docs/governance/ai-asset-register.md"
+      ],
+      "tests": [
+        "test/ai-assets.test.js"
+      ],
+      "note": "A repository intake gate is implemented in this change; formal organizational adoption remains a human governance act."
+    },
+    {
+      "id": "EAI-POL-04",
+      "layer": "L1",
+      "name": "Regulatory and framework alignment",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "At least annual and on material legal change",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/nist-ai-rmf-mapping-2026.md",
+        "docs/governance/iso-42001-soa-2026.md",
+        "docs/governance/eu-ai-act-assessment-2026.md"
+      ],
+      "tests": [
+        "test/clause-mapping.test.mjs"
+      ],
+      "note": "Self-assessment crosswalks are maintained; external certification is not implied."
+    },
+    {
+      "id": "EAI-ROL-01",
+      "layer": "L2",
+      "name": "Named accountable owner for every AI asset",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Quarterly and on asset change",
+      "status": "effective",
+      "evidence": [
+        "data/ai-assets.json",
+        "docs/governance/ai-asset-register.md"
+      ],
+      "tests": [
+        "test/ai-assets.test.js"
+      ],
+      "note": "Every registered AI surface carries ownership, risk tier and oversight posture."
+    },
+    {
+      "id": "EAI-ROL-02",
+      "layer": "L2",
+      "name": "Business ownership and operating RACI",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Annual and on organizational change",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/operating-model.md",
+        "docs/governance/ai-control-ownership-matrix.md"
+      ],
+      "tests": [],
+      "note": "Separates accountability, operation, review and escalation responsibilities."
+    },
+    {
+      "id": "EAI-ROL-03",
+      "layer": "L2",
+      "name": "AI governance committee and legal oversight",
+      "owner": "Board / MLRO",
+      "operator": "AI Governance Committee",
+      "cadence": "Quarterly and on material governance decision",
+      "status": "partial",
+      "evidence": [
+        "docs/governance/ai-governance-committee-charter.md",
+        "docs/governance/open-actions-register.md"
+      ],
+      "tests": [
+        "test/policies.test.mjs"
+      ],
+      "note": "The charter exists, while the repository's open-actions register still records human ratification actions."
+    },
+    {
+      "id": "EAI-ROL-04",
+      "layer": "L2",
+      "name": "Escalation paths and human decision authority",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering / operators",
+      "cadence": "Continuous; exercise at least annually",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/ai-incident-runbook.md",
+        "docs/governance/operating-model.md"
+      ],
+      "tests": [
+        "test/advisor-assurance.test.js"
+      ],
+      "note": "AI remains advisory; escalation and override authority remain human."
+    },
+    {
+      "id": "EAI-RSK-01",
+      "layer": "L3",
+      "name": "AI risk identification and scoring",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Quarterly and on significant change",
+      "status": "effective",
+      "evidence": [
+        "docs/aims/ai-risk-register.md",
+        "data/risk-appetite.json"
+      ],
+      "tests": [
+        "test/grc-metrics.test.mjs"
+      ],
+      "note": "AI risks are scored on inherent and residual likelihood-impact positions."
+    },
+    {
+      "id": "EAI-RSK-02",
+      "layer": "L3",
+      "name": "Risk appetite and residual-risk treatment",
+      "owner": "MLRO / Board",
+      "operator": "Compliance Engineering",
+      "cadence": "Quarterly and on appetite change",
+      "status": "partial",
+      "evidence": [
+        "docs/governance/risk-appetite-statement-2026.md",
+        "data/grc-metrics.json",
+        "data/ai-risk-acceptances.json",
+        "docs/governance/residual-risk-acceptance-register.md"
+      ],
+      "tests": [
+        "test/grc-metrics.test.mjs"
+      ],
+      "note": "The repository currently reports risks above appetite and does not infer acceptance without a human decision."
+    },
+    {
+      "id": "EAI-RSK-03",
+      "layer": "L3",
+      "name": "Impact and privacy assessment",
+      "owner": "MLRO / DPO",
+      "operator": "Compliance Engineering",
+      "cadence": "On new use case, new data flow, new provider and material change",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/dpia-2026.md",
+        "docs/governance/stakeholder-impact-assessment-2026.md"
+      ],
+      "tests": [],
+      "note": "Privacy and stakeholder impacts are assessed separately from model performance."
+    },
+    {
+      "id": "EAI-RSK-04",
+      "layer": "L3",
+      "name": "Mitigation and corrective-action tracking",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Continuous",
+      "status": "effective",
+      "evidence": [
+        "docs/aims/corrective-actions.md",
+        "docs/governance/open-actions-register.md"
+      ],
+      "tests": [
+        "test/grc-metrics.test.mjs"
+      ],
+      "note": "Findings are routed to CAPA/open actions with closure evidence."
+    },
+    {
+      "id": "EAI-RSK-05",
+      "layer": "L3",
+      "name": "Use-case classification before deployment",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Per new or materially changed AI use case",
+      "status": "partial",
+      "evidence": [
+        "docs/governance/ai-use-case-intake.md",
+        "data/ai-assets.json"
+      ],
+      "tests": [
+        "test/ai-assets.test.js"
+      ],
+      "note": "The intake form requires classification and risk tiering; organizational ratification of the new gate remains explicit."
+    },
+    {
+      "id": "EAI-DMG-01",
+      "layer": "L4",
+      "name": "AI inventory and system boundary",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Quarterly and on asset change",
+      "status": "effective",
+      "evidence": [
+        "data/ai-assets.json",
+        "docs/governance/ai-asset-register.md"
+      ],
+      "tests": [
+        "test/ai-assets.test.js"
+      ],
+      "note": "Shadow-AI drift is checked against model API callers."
+    },
+    {
+      "id": "EAI-DMG-02",
+      "layer": "L4",
+      "name": "Data lineage, minimisation and retention",
+      "owner": "MLRO / DPO",
+      "operator": "Compliance Engineering",
+      "cadence": "Annual and on data-flow change",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/data-retention.md",
+        "docs/governance/dpia-2026.md"
+      ],
+      "tests": [],
+      "note": "Inputs, retention and cross-border considerations are documented."
+    },
+    {
+      "id": "EAI-DMG-03",
+      "layer": "L4",
+      "name": "Prompt and model version/change control",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Per change",
+      "status": "effective",
+      "evidence": [
+        "data/prompt-assets.json",
+        "docs/governance/prompt-lifecycle-register.md",
+        "docs/governance/model-validation-2026.md"
+      ],
+      "tests": [
+        "test/prompt-register.test.mjs"
+      ],
+      "note": "Prompt fingerprints and model routing changes are CI-governed."
+    },
+    {
+      "id": "EAI-DMG-04",
+      "layer": "L4",
+      "name": "Model validation and bias evaluation",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Weekly live evaluation; quarterly bias review; on model change",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/model-validation-2026.md",
+        "docs/aims/bias-fairness-testing.md",
+        "docs/governance/advisor-bias-review-2026.md"
+      ],
+      "tests": [
+        "test/advisor-assurance.test.js",
+        "test/advisor-bias-eval.test.mjs"
+      ],
+      "note": "Validation covers governed use of external models rather than claiming validation of the provider's foundation model."
+    },
+    {
+      "id": "EAI-DMG-05",
+      "layer": "L4",
+      "name": "AI and AI-adjacent vendor assurance",
+      "owner": "MLRO / DPO",
+      "operator": "Compliance Engineering",
+      "cadence": "At onboarding, annually, and on material provider change",
+      "status": "partial",
+      "evidence": [
+        "docs/aims/third-party-register.md",
+        "docs/governance/ai-vendor-assurance.md",
+        "data/grc-metrics.json"
+      ],
+      "tests": [
+        "test/grc-metrics.test.mjs"
+      ],
+      "note": "The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required."
+    },
+    {
+      "id": "EAI-DMG-06",
+      "layer": "L4",
+      "name": "Tool, connector and access governance",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Quarterly and on connector/permission change",
+      "status": "effective",
+      "evidence": [
+        "data/tool-surfaces.json",
+        "docs/governance/tool-connector-register.md"
+      ],
+      "tests": [
+        "test/tool-register.test.mjs"
+      ],
+      "note": "Capabilities, credentials and agent authorization are explicitly inventoried."
+    },
+    {
+      "id": "EAI-MON-01",
+      "layer": "L5",
+      "name": "AI performance and behavioural monitoring",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Weekly and per build",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/eval-scorecard.md",
+        "scripts/advisor-eval.mjs"
+      ],
+      "tests": [
+        "test/advisor-assurance.test.js"
+      ],
+      "note": "Offline and live evals provide repeatable behavioural assurance."
+    },
+    {
+      "id": "EAI-MON-02",
+      "layer": "L5",
+      "name": "Bias and drift monitoring",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Quarterly bias review; continuous configuration drift checks",
+      "status": "effective",
+      "evidence": [
+        "scripts/advisor-bias-eval.mjs",
+        "docs/aims/runtime-monitoring.md",
+        "data/grc-metrics.json"
+      ],
+      "tests": [
+        "test/advisor-bias-eval.test.mjs",
+        "test/grc-metrics.test.mjs"
+      ],
+      "note": "Bias testing and governance-drift counters are separate controls."
+    },
+    {
+      "id": "EAI-MON-03",
+      "layer": "L5",
+      "name": "Security and access controls",
+      "owner": "Compliance Engineering",
+      "operator": "Compliance Engineering",
+      "cadence": "Per build and continuous runtime configuration",
+      "status": "effective",
+      "evidence": [
+        "netlify.toml",
+        ".github/workflows/codeql.yml",
+        ".github/workflows/semgrep.yml",
+        ".github/workflows/fortify.yml"
+      ],
+      "tests": [
+        "test/csp.test.mjs",
+        "test/security-headers.test.mjs"
+      ],
+      "note": "Application and repository security controls are tested independently of model quality."
+    },
+    {
+      "id": "EAI-MON-04",
+      "layer": "L5",
+      "name": "Incident detection, response and control freshness",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Daily freshness; incident-driven response; annual exercise",
+      "status": "partial",
+      "evidence": [
+        "docs/governance/ai-incident-runbook.md",
+        ".github/workflows/freshness-check.yml",
+        "docs/governance/open-actions-register.md"
+      ],
+      "tests": [
+        "test/freshness-check.test.mjs"
+      ],
+      "note": "Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation."
+    },
+    {
+      "id": "EAI-MON-05",
+      "layer": "L5",
+      "name": "Governance metrics and continuous reporting",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Daily/continuous with quarterly management review",
+      "status": "effective",
+      "evidence": [
+        "data/grc-metrics.json",
+        "docs/governance/grc-metrics.md",
+        "scripts/governance-report.mjs"
+      ],
+      "tests": [
+        "test/governance-report.test.mjs",
+        "test/grc-metrics.test.mjs"
+      ],
+      "note": "Metrics are computed from repository evidence and drift-checked in CI."
+    },
+    {
+      "id": "EAI-AUD-01",
+      "layer": "L6",
+      "name": "Control-to-evidence assurance map",
+      "owner": "MLRO / Internal Audit",
+      "operator": "Compliance Engineering",
+      "cadence": "Continuous; review at internal audit",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/assurance-coverage-matrix.md",
+        "data/grc-metrics.json"
+      ],
+      "tests": [
+        "test/grc-metrics.test.mjs"
+      ],
+      "note": "Automated proof paths are checked for existence and reflected in the control-effectiveness metric."
+    },
+    {
+      "id": "EAI-AUD-02",
+      "layer": "L6",
+      "name": "Internal audit programme",
+      "owner": "Internal Audit",
+      "operator": "Internal Audit",
+      "cadence": "At least annual",
+      "status": "partial",
+      "evidence": [
+        "docs/aims/internal-audit.md",
+        "docs/governance/open-actions-register.md"
+      ],
+      "tests": [],
+      "note": "The programme exists; the open-actions register records the first thematic review as a human action still to complete."
+    },
+    {
+      "id": "EAI-AUD-03",
+      "layer": "L6",
+      "name": "Management review and governance decisions",
+      "owner": "Board / MLRO",
+      "operator": "AI Governance Committee",
+      "cadence": "Quarterly and on material decision",
+      "status": "partial",
+      "evidence": [
+        "docs/aims/management-review.md",
+        "docs/governance/ai-governance-committee-charter.md"
+      ],
+      "tests": [],
+      "note": "Templates and decision rights exist; this register does not fabricate completed meetings or approvals."
+    },
+    {
+      "id": "EAI-AUD-04",
+      "layer": "L6",
+      "name": "Preservation of decisions and audit evidence",
+      "owner": "MLRO",
+      "operator": "Compliance Engineering",
+      "cadence": "Continuous",
+      "status": "effective",
+      "evidence": [
+        "docs/governance/assurance-coverage-matrix.md",
+        "docs/governance/data-retention.md"
+      ],
+      "tests": [
+        "test/export-integrity.test.js"
+      ],
+      "note": "Decision provenance, audit trails and evidence retention are part of the assurance matrix."
+    },
+    {
+      "id": "EAI-AUD-05",
+      "layer": "L6",
+      "name": "Remediation tracking and closure",
+      "owner": "MLRO / Internal Audit",
+      "operator": "Compliance Engineering",
+      "cadence": "Continuous with quarterly review",
+      "status": "effective",
+      "evidence": [
+        "docs/aims/corrective-actions.md",
+        "data/grc-metrics.json"
+      ],
+      "tests": [
+        "test/grc-metrics.test.mjs"
+      ],
+      "note": "CAPA closure is measured as a management metric rather than asserted."
+    },
+    {
+      "id": "EAI-AUD-06",
+      "layer": "L6",
+      "name": "Independent external assurance",
+      "owner": "Board / MLRO",
+      "operator": "External assessor when commissioned",
+      "cadence": "Optional / Board decision",
+      "status": "open",
+      "evidence": [
+        "docs/governance/enterprise-readiness-review-2026.md",
+        "docs/governance/open-actions-register.md"
+      ],
+      "tests": [],
+      "note": "No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned."
+    }
+  ]
+}

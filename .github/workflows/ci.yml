@@ -163,6 +163,8 @@ jobs:
         run: node scripts/reg-sources-doc.mjs --check
       - name: Check the GRC metrics snapshot is in sync with the estate
         run: node scripts/grc-metrics.mjs --check
+      - name: Check enterprise AI governance controls, evidence freshness and generated views
+        run: node scripts/ai-governance-controls.mjs --check
       - name: Check the README coverage figures are in sync with the screening configuration
         run: node scripts/coverage-figures.mjs --check
       - name: Check the country coverage gap report is in sync with the screening configuration
