@@ -36,3 +36,13 @@ How the screening control keeps operating (or fails safely) under disruption.
 If automation is unavailable, the MLRO performs screening via the source portals
 (OFAC/UN/EU/UK/EOCN, goAML) and records it manually until service is restored —
 the obligation is daily and must not lapse.
+
+## Exercise record and current gap
+The annual control-testing calendar requires a BCP/vendor-exit exercise. Risk
+`R-17` also requires a second trained operator to demonstrate that the service
+can be recovered and operated without the primary administrator.
+
+No completed exercise record is present as of 2026-10-07. Open action 44 requires
+a dated drill that identifies the second operator, records recovery and operating
+steps performed, captures observed RTO, and routes any findings into CAPA/open
+actions. A planned exercise is not treated as operating evidence.
