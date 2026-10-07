@@ -7,12 +7,15 @@
 > third-party register, and the readiness review addendum).
 >
 > **Last updated:** 2026-10-07 — completed the fourth six-layer reconciliation.
-> Two assurance-cadence gaps that had aged past their recorded dates are now
-> explicit: item 38 closes the overdue 2026 Q3 model-validation sign-off due
-> 2026-09-30, and item 39 reconciles the quarterly Advisor bias-eval evidence
-> scheduled for 2026-10-01. The enterprise inventory gap already carried by item
-> 9 is also treated as a live limitation in the six-layer control status rather
-> than a separate repository-only concern. No review or evaluation is fabricated.
+> The overdue 2026 Q3 model-validation sign-off remains explicit as item 38.
+> The apparent 2026-10-01 bias-eval evidence gap was checked against GitHub
+> Actions and closed in this change: run 36890910912 completed successfully with
+> 0 findings and 0 eval errors, and the governance ledgers now record it. The
+> weekly Advisor behavioural eval exposed a different live gap: scheduled runs
+> 36453013672 (2026-09-28) and 37345739408 (2026-10-05) were incomplete because
+> the Anthropic account hit usage/credit limits. Item 40 now tracks restoration
+> of live behavioural assurance and a successful recovery run. No successful
+> evaluation is fabricated.
 >
 > **Previous update (2026-10-07):** completed the third six-layer reconciliation.
 > Vendor-assurance and external-assurance closure paths became explicit rather
@@ -68,7 +71,7 @@
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
 > (20–24 and 26–28) carry dates under the maintainer's own authority. Items
-> 29–39 are vendor/governance/assurance actions whose deadlines belong to their
+> 29–38 and 40 are vendor/governance/assurance actions whose deadlines belong to their
 > named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
@@ -111,7 +114,7 @@
 | 36 | Resolve the Anthropic DPA execution record. The vendor row records an owner attestation dated 2026-07-16, while the execution block remains explicitly **DRAFT — pending signature** with blank DPA reference, signatory, execution date and processing region. | MLRO / DPO / counsel | The repository records one verified position: either an executed DPA with reference, authorised signatory/date, processing region and transfer basis, or a corrected statement that execution remains pending with the AI path gated as required | — | to open |
 | 37 | Resolve `EAI-AUD-06` independent external assurance after item 10. A Board decision to remain on self-assessment does not equal an external audit; a certification/assurance path requires an actual independent assessor. | Board / MLRO | After item 10, either an independent AI-governance/ISO 42001 assurance engagement is commissioned and its result/evidence recorded, or the control is formally reclassified `not_applicable` with a Board-approved rationale for continued self-assessment | — | to open |
 | 38 | Complete the overdue 2026 Q3 model-validation sign-off. [`model-validation-2026.md`](model-validation-2026.md) states next review **2026-09-30** and its Q3 quarterly row remains pending as of 2026-10-07. | MLRO | The Q3 row is completed with the actual validation run/evidence, findings, MLRO sign-off and date; the document's next-review date moves to the next approved cycle | — | to open |
-| 39 | Reconcile the quarterly Advisor bias-evaluation evidence. [`eval-scorecard.md`](eval-scorecard.md) lists the next scheduled bias run as **2026-10-01** but contains no recorded result. This action does not assume whether the workflow ran. | MLRO / Compliance Engineering | Verify the 2026-10-01 workflow history. If it completed, append the actual result and any finding/CAPA reference to the scorecard; if it did not complete, dispatch the evaluation and record the resulting evidence | — | to open |
+| 40 | Restore live Advisor behavioural-evaluation capacity. Scheduled run [36453013672](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/36453013672) on 2026-09-28 was incomplete because the Anthropic account hit its specified API usage limit; scheduled run [37345739408](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/37345739408) on 2026-10-05 was incomplete because the credit balance was too low. Both produced zero regression findings but did not complete the governed 30-case live suite. | Repo owner / MLRO | Restore provider capacity or an approved equivalent live-eval route, dispatch `advisor-eval.yml`, obtain a completed run with zero eval errors, record the recovery in [`eval-scorecard.md`](eval-scorecard.md), and clear the monitoring alert | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
