@@ -35,8 +35,10 @@ that would flip this conclusion.
 The deterministic risk engine (`app.js` scoring) and the screening engine's
 rule-based matching are **not AI systems** under Art. 3(1) — fully deterministic,
 no inference from data beyond fixed rules. The AI-system boundary covers the
-Advisor (LLM Q&A) and the LLM-gated classification paths in `ai.py` (off by
-default pending the Anthropic DPA — `LLM_TRIAGE=0`).
+Advisor (LLM Q&A) and the LLM-gated classification paths in `ai.py`. The triage
+code defaults off (`LLM_TRIAGE=0`) and requires explicit opt-in; the repository
+cannot prove the current production variable value, and open action 36 reconciles
+the Anthropic DPA/runtime evidence.
 
 *Digital Omnibus note (2026):* the European AI Office's new **exclusive
 competence** covers AI systems built on a GPAI model **by the same provider**.
