@@ -620,6 +620,35 @@
         10,
         37
       ]
+    },
+    {
+      "id": "EAI-AUD-07",
+      "layer": "L6",
+      "name": "Regular control testing and review currency",
+      "owner": "MLRO / Internal Audit",
+      "operator": "Compliance Engineering / control owners",
+      "cadence": "Continuous automation; quarterly and annual human review cycles",
+      "status": "partial",
+      "evidence": [
+        "docs/governance/ai-control-testing-calendar.md",
+        "docs/governance/policy-register.md",
+        "data/compliance-calendar.json",
+        "docs/governance/open-actions-register.md"
+      ],
+      "tests": [
+        "test/policies.test.mjs",
+        "test/compliance-calendar.test.mjs",
+        "test/grc-metrics.test.mjs"
+      ],
+      "closure_actions": [
+        8,
+        14,
+        15,
+        31,
+        38,
+        41
+      ],
+      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle."
     }
   ]
 }
