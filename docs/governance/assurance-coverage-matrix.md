@@ -11,7 +11,7 @@ GitHub Actions workflow). *Frequency* = when it runs. *Evidence* = where the
 result is recorded. All referenced workflows live in `.github/workflows/`; tests
 in `test/`.
 
-_Last reviewed: 2026-07-28 · Owner: Compliance Engineering · Review: with each
+_Last reviewed: 2026-10-07 · Owner: Compliance Engineering · Review: with each
 material change, and at the quarterly management review._
 
 ---
@@ -105,9 +105,9 @@ material change, and at the quarterly management review._
 |---|---|---|---|
 | Advisor guardrails (charter integrity, tipping-off, legal citations, routing) | `test/advisor-assurance.test.js` (127 checks) + advisor smoke tests | Every push/PR | CI run log |
 | Behavioural eval with Asana alert on regression | `advisor-eval.yml` → `scripts/advisor-eval.mjs` | Weekly (Mon 08:00 UTC) | Card / issue fallback |
-| Bias eval (deterministic dimension; live-LLM pairs gated on DPA) | `advisor-bias-eval.yml` + `test/bias_eval.py` | Quarterly | [`advisor-bias-review-2026.md`](advisor-bias-review-2026.md) |
+| Bias eval (deterministic checks + live paired-prompt campaign) | `advisor-bias-eval.yml` + `test/bias_eval.py` | Quarterly | [`advisor-bias-review-2026.md`](advisor-bias-review-2026.md); 2026-10-01 run 36890910912 recorded 0 findings / 0 eval errors |
 | Prompt-injection red team | `test/redteam_injection.py` | Every push/PR | CI run log; [`red-team-procedure`](../aims/red-team-procedure.md) |
-| LLM egress gated until DPA executed (`LLM_TRIAGE=0`) | Env gate in `onboarding-screen.yml` / `weekly-adverse-media.yml` | Every run | Workflow env; [`third-party-register`](../aims/third-party-register.md) |
+| LLM adverse-media triage is explicit opt-in (`LLM_TRIAGE=1`; default `0`) and can be killed independently of the Advisor | Gate in `ai.py`, `onboarding-screen.yml` and `weekly-adverse-media.yml` | Every run | Workflow env; vendor/legal readiness is governed separately in [`third-party-register`](../aims/third-party-register.md) |
 | AI asset register: schema + shadow-AI scan; quarterly review currency | `test/ai-assets.test.js` (shape, CI); register-review row in `governance-report.yml` (currency — REVIEW OVERDUE past 100 days) | Every push/PR + daily | CI run log; daily governance card |
 | Prompt change control: every governed prompt matches its approved fingerprint; anti-shadow-prompt scan | `test/prompt-register.test.mjs` (SHA-256 per prompt region; re-pin via `scripts/prompt-register.mjs --update`) | Every push/PR | CI run log; [`prompt-lifecycle-register`](prompt-lifecycle-register.md) + `data/prompt-assets.json` history |
 | Agent capability inventory: action/authz/credential table matches `agents.py` both ways; runtime invariants intact | `test/tool-register.test.mjs` | Every push/PR | CI run log; [`tool-connector-register`](tool-connector-register.md) |
@@ -174,18 +174,23 @@ workflow has a loud failure path (red run, GitHub-issue fallback, or Asana alert
 
 | Activity | Owner | Cadence | Record |
 |---|---|---|---|
-| Model validation sign-off | MLRO | Quarterly (next due 2026-09-30) | [`model-validation-2026.md`](model-validation-2026.md) |
-| Management review of the AIMS | Senior mgmt / MLRO | Quarterly | [`management-review.md`](../aims/management-review.md) |
+| Model validation sign-off | MLRO | Quarterly — 2026 Q3 sign-off due 2026-09-30 is **overdue** (item 38) | [`model-validation-2026.md`](model-validation-2026.md) |
+| Management review of the AIMS | Senior mgmt / MLRO | Quarterly — first review remains recorded as `_scheduled — Q3 2026_` (item 32) | [`management-review.md`](../aims/management-review.md) |
 | **Manual penetration test** of the live app + functions (beyond the automated ZAP baseline): authenticated-flow abuse, business-logic, rate-limit bypass, CORS/origin edge cases | Firm (external tester recommended) | **Annual** | Report filed in `docs/governance/`; findings → [`corrective-actions.md`](../aims/corrective-actions.md) |
 | Review of deferred architectural decisions (function auth / Netlify Identity, distributed rate limiting, WebAuthn) | Firm | Annual or on risk change | This doc + [`ai-governance-gap-analysis-2026.md`](ai-governance-gap-analysis-2026.md) |
 | Asana token custody: scoped service account + rotation on personnel change | Firm (Asana admin) | On change / annual | [`third-party-register.md`](../aims/third-party-register.md) |
-| TFS name-match procedure review + tabletop walk-through (suspend → verify → PNMR/CNMR+FFR → release) | MLRO | Annual (calendar duty) + after every real TFS event | [`tfs-name-match-procedure.md`](../aims/tfs-name-match-procedure.md) §4 event log |
+| TFS name-match procedure review + tabletop walk-through (suspend → verify → PNMR/CNMR+FFR → release) | MLRO | Annual (calendar duty) + after every real TFS event — 2026-09-15 cycle is **overdue** (item 41) | [`tfs-name-match-procedure.md`](../aims/tfs-name-match-procedure.md) §4 event log |
 
 ## 5 · Known gaps (stated, not hidden)
 
 | Gap | Status |
 |---|---|
-| Transaction monitoring (FATF R.16) engine **inactive** pending a real feed | Risk **R-13** in [`ai-risk-register.md`](../aims/ai-risk-register.md) |
-| LLM triage + live-LLM bias pairs **off** pending Anthropic DPA signature | Gated by `LLM_TRIAGE=0`; [`third-party-register.md`](../aims/third-party-register.md) |
-| Write endpoints are unauthenticated by design (browser cannot hold a secret); compensating controls: origin allow-list, rate limit, input gates, no data readback | Deferred decision — Netlify Identity would close it |
+| Transaction monitoring (FATF R.16) engine **inactive** pending a real feed | Risk **R-13** / open action 6 |
+| Vendor and transfer assurance remains incomplete: Asana DPA/region, Anthropic execution record, Composio go-live conditions and transfer-basis decisions are not all verified | Open actions 11, 29, 35 and 36; [`third-party-register.md`](../aims/third-party-register.md) |
+| Weekly live Advisor behavioural assurance is incomplete: scheduled runs 36453013672 (2026-09-28) and 37345739408 (2026-10-05) were blocked by provider usage/credit limits | Open action 40; [`eval-scorecard.md`](eval-scorecard.md) |
+| Confidential function endpoints do not yet have verified per-user identity / RBAC; Origin + shared-token controls are compensating controls | Open action 20; [`_auth.js`](../../netlify/functions/_auth.js) |
+| 2026 Q3 model-validation sign-off is overdue | Open action 38; [`model-validation-2026.md`](model-validation-2026.md) |
+| Required human assurance cycles remain open or overdue: first Internal Audit, backtesting, manual red-team, incident tabletop, first formal management review, and the TFS/watchlist review | Open actions 8, 14, 15, 31, 32 and 41 |
+| All 21 obligation rows are mapped at instrument level but still carry `source_citation.basis = needs-source` | Open action 5; `data/grc-metrics.json` counter `obligationsWithoutSourcedCitation = 21` |
+| Independent external AI-governance / ISO 42001 assurance has not been commissioned or completed | Open actions 10 and 37 |
 | ~~AI Policy & Stakeholder Impact Assessment await ratification signatures~~ **Closed 2026-07-02** — both ratified | [`ai-policy.md`](ai-policy.md) §9 (v1.0 ratified 2 July 2026); [`stakeholder-impact-assessment-2026.md`](stakeholder-impact-assessment-2026.md) sign-off table |
