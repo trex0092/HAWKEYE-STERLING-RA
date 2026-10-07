@@ -6,16 +6,24 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — completed the fourth six-layer reconciliation.
+> **Last updated:** 2026-10-07 — completed the fifth six-layer reconciliation.
+> Regular-control-testing currency is now represented as its own enterprise
+> assurance control. Item 41 tracks two in-force instruments whose recorded
+> review dates passed on 2026-09-15 without a completed review record: the TFS
+> name-match procedure and the EOCN/internal-watchlist SOP. The policy-register
+> guard now requires every overdue in-force instrument to point to a live open
+> action instead of allowing an expired review date to remain unowned.
+>
+> **Previous update (2026-10-07):** completed the fourth six-layer reconciliation.
 > The overdue 2026 Q3 model-validation sign-off remains explicit as item 38.
 > The apparent 2026-10-01 bias-eval evidence gap was checked against GitHub
-> Actions and closed in this change: run 36890910912 completed successfully with
+> Actions and closed in that change: run 36890910912 completed successfully with
 > 0 findings and 0 eval errors, and the governance ledgers now record it. The
 > weekly Advisor behavioural eval exposed a different live gap: scheduled runs
 > 36453013672 (2026-09-28) and 37345739408 (2026-10-05) were incomplete because
-> the Anthropic account hit usage/credit limits. Item 40 now tracks restoration
-> of live behavioural assurance and a successful recovery run. No successful
-> evaluation is fabricated.
+> the Anthropic account hit usage/credit limits. Item 40 tracks restoration of
+> live behavioural assurance and a successful recovery run. No successful
+> evaluation was fabricated.
 >
 > **Previous update (2026-10-07):** completed the third six-layer reconciliation.
 > Vendor-assurance and external-assurance closure paths became explicit rather
@@ -71,11 +79,11 @@
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
 > (20–24 and 26–28) carry dates under the maintainer's own authority. Items
-> 29–38 and 40 are vendor/governance/assurance actions whose deadlines belong to their
+> 29–38 and 40–41 are vendor/governance/assurance actions whose deadlines belong to their
 > named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 28 of 36 undated at this update.
+> per row — 29 of 37 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -115,6 +123,7 @@
 | 37 | Resolve `EAI-AUD-06` independent external assurance after item 10. A Board decision to remain on self-assessment does not equal an external audit; a certification/assurance path requires an actual independent assessor. | Board / MLRO | After item 10, either an independent AI-governance/ISO 42001 assurance engagement is commissioned and its result/evidence recorded, or the control is formally reclassified `not_applicable` with a Board-approved rationale for continued self-assessment | — | to open |
 | 38 | Complete the overdue 2026 Q3 model-validation sign-off. [`model-validation-2026.md`](model-validation-2026.md) states next review **2026-09-30** and its Q3 quarterly row remains pending as of 2026-10-07. | MLRO | The Q3 row is completed with the actual validation run/evidence, findings, MLRO sign-off and date; the document's next-review date moves to the next approved cycle | — | to open |
 | 40 | Restore live Advisor behavioural-evaluation capacity. Scheduled run [36453013672](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/36453013672) on 2026-09-28 was incomplete because the Anthropic account hit its specified API usage limit; scheduled run [37345739408](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/37345739408) on 2026-10-05 was incomplete because the credit balance was too low. Both produced zero regression findings but did not complete the governed 30-case live suite. | Repo owner / MLRO | Restore provider capacity or an approved equivalent live-eval route, dispatch `advisor-eval.yml`, obtain a completed run with zero eval errors, record the recovery in [`eval-scorecard.md`](eval-scorecard.md), and clear the monitoring alert | — | to open |
+| 41 | Complete the overdue 2026-09-15 control reviews for the [TFS name-match procedure](../aims/tfs-name-match-procedure.md) and the [EOCN/internal-watchlist SOP](../aims/eocn-list-update-sop.md). The policy register still carries 2026-09-15 as the next-review date for both instruments; the TFS procedure's event log contains no completed annual tabletop, and `data/internal-watchlist.json` still records its last review as 2026-07-28. | MLRO | Review both instruments against current requirements, perform and record the TFS tabletop, review every internal-watchlist entry or confirm the empty-list position, update the evidence logs/`lastReviewed`, and move each policy-register review date to its next approved cycle | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
