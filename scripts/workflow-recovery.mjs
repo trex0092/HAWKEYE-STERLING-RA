@@ -35,6 +35,17 @@ export function staleSupersededRun(control, activeRuns, {
     .sort((x, y) => runTime(x) - runTime(y))[0] || null;
 }
 
+export function activePrerequisite(control, activeRuns, {
+  branch = 'main', currentSha = '',
+} = {}) {
+  if (control?.id !== 'site-currency.yml' || !Array.isArray(activeRuns)) return null;
+  return activeRuns.find(run => run
+    && run.path === '.github/workflows/netlify-production-deploy.yml'
+    && run.head_branch === branch
+    && ACTIVE.has(run.status)
+    && (!currentSha || run.head_sha === currentSha)) || null;
+}
+
 export function decide(control, runs, { nowMs = Date.now(), branch = 'main', activeRuns = [] } = {}) {
   if (!Array.isArray(runs) || !Array.isArray(activeRuns) || !Number.isFinite(nowMs)) {
     return { action: 'unknown', reason: 'invalid run history or clock' };
@@ -385,6 +396,18 @@ async function main() {
         runs.push(...data.workflow_runs);
       }
       const controlActive = activeRuns.filter(r => r.path === `.github/workflows/${control.id}`);
+      const prerequisite = activePrerequisite(control, activeRuns, {
+        branch,
+        currentSha: process.env.GITHUB_SHA || '',
+      });
+      if (prerequisite) {
+        rows.push({
+          id: control.id,
+          action: 'wait',
+          reason: `prerequisite netlify-production-deploy.yml run ${prerequisite.id} is ${prerequisite.status}; do not probe production before the current-main deploy finishes`,
+        });
+        continue;
+      }
       const stale = staleSupersededRun(control, controlActive, {
         currentSha: process.env.GITHUB_SHA || '',
       });
@@ -458,6 +481,18 @@ export async function selfTest() {
   assert.equal(staleSupersededRun({ id: 'sanctions-screen.yml' }, [
     r({ status: 'in_progress', conclusion: null, head_sha: 'new', created_at: '2026-09-29T10:00:00Z' }),
   ], { nowMs, currentSha: 'new' }), null);
+  const deployActive = r({
+    path: '.github/workflows/netlify-production-deploy.yml',
+    status: 'in_progress',
+    conclusion: null,
+    head_sha: 'new',
+  });
+  assert.equal(activePrerequisite({ id: 'site-currency.yml' }, [deployActive],
+    { branch: 'main', currentSha: 'new' })?.id, 1);
+  assert.equal(activePrerequisite({ id: 'site-currency.yml' }, [deployActive],
+    { branch: 'main', currentSha: 'other' }), null);
+  assert.equal(activePrerequisite({ id: 'function-health.yml' }, [deployActive],
+    { branch: 'main', currentSha: 'new' }), null);
   let calls = 0;
   const response = (status, data = {}) => ({ status, ok: status >= 200 && status < 300,
     headers: { get: () => null }, json: async () => data });
