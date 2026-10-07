@@ -26,9 +26,9 @@
 | POL-04 | [AI Governance Committee Charter](ai-governance-committee-charter.md) | charter | Board | 📝 draft — adoption block (item 4) | on adoption |
 | POL-05 | [Operating Model](operating-model.md) | standard | MLRO | ✅ in force | 2027-07-15 |
 | POL-06 | [Data Retention](data-retention.md) | standard | MLRO | ✅ in force | 2027-06-21 |
-| POL-07 | [TFS Name-Match Procedure](../aims/tfs-name-match-procedure.md) | procedure | MLRO | ✅ in force | 2026-09-15 |
-| POL-08 | [Red-Team Procedure](../aims/red-team-procedure.md) | procedure | MLRO / maintainer | ✅ in force | 2026-09-30 |
-| POL-09 | [EOCN List Update SOP](../aims/eocn-list-update-sop.md) | procedure | MLRO | ✅ in force | 2026-09-15 |
+| POL-07 | [TFS Name-Match Procedure](../aims/tfs-name-match-procedure.md) | procedure | MLRO | ✅ in force | 2026-09-15 **OVERDUE · item 41** |
+| POL-08 | [Red-Team Procedure](../aims/red-team-procedure.md) | procedure | MLRO / maintainer | ✅ in force | 2026-09-30 **OVERDUE · item 15** |
+| POL-09 | [EOCN List Update SOP](../aims/eocn-list-update-sop.md) | procedure | MLRO | ✅ in force | 2026-09-15 **OVERDUE · item 41** |
 | POL-10 | [AI Incident Runbook](ai-incident-runbook.md) | runbook | MLRO | ✅ in force | 2027-06-21 |
 | POL-11 | [Backup & Recovery](backup-recovery.md) | runbook | Compliance Eng. | ✅ in force | 2027-07-28 |
 | POL-12 | [App Setup Runbook](../app-setup-runbook.md) | runbook | Compliance Eng. | ✅ in force | 2027-07-28 |
@@ -55,9 +55,10 @@
 | POL-33 | [AI Decommissioning & Retirement](../aims/decommissioning.md) | procedure | MLRO | ✅ in force | 2027-07-28 |
 | POL-34 | [Data-Quality Plan](../aims/data-quality-plan.md) | standard | MLRO | ✅ in force | 2027-06-29 |
 | POL-35 | [Internal Audit Programme](../aims/internal-audit.md) | procedure | MLRO | ✅ in force | 2027-07-28 |
-| POL-36 | [Model Validation & Change Control](model-validation-2026.md) | standard | MLRO | ✅ in force | 2026-09-30 |
+| POL-36 | [Model Validation & Change Control](model-validation-2026.md) | standard | MLRO | ✅ in force | 2026-09-30 **OVERDUE · item 38** |
+| POL-37 | [Deploy Rollback Runbook](../security/deploy-rollback-runbook.md) | runbook | Repo owner | ✅ in force | 2027-08-04 |
 
-**Thirty-six instruments.** Eighteen are in force. Eighteen are drafts: two
+**Thirty-seven instruments.** Nineteen are in force. Eighteen are drafts: two
 waiting on the same board sitting as the rest of the programme, and sixteen of
 the eighteen-document [AML/CFT/CPF policy pack](../policies/README.md), drafted
 2026-07-28 and awaiting Board approval under open-actions item 18.
@@ -76,6 +77,8 @@ internal audit programme and the model-validation pack. They had simply never
 been registered, so nothing tracked their approval or their next review. That
 is the failure this register exists to prevent, and it was hiding inside the
 register's own blind spot (see §2).
+
+POL-37 was added on 2026-08-04 when the deploy rollback runbook became an operative recovery instrument; its review cycle runs to 2027-08-04.
 
 Until an instrument is approved it is **written, not operative** — the register
 says so, the document says so, and CI fails if either claims otherwise. Sixteen
