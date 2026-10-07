@@ -10,6 +10,11 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Arabic Console and Advisor chrome completed for engineering review.**
+  - Expanded the shared EN/AR dictionary across navigation, operational labels, statuses, modes, controls, refresh/error messages and empty states.
+  - JavaScript-rendered Console cards and Advisor views now re-render immediately when the language toggles; persona role captions have Arabic UI equivalents.
+  - Regulatory Q&A answers, tool playbooks, citations, backend answer text and filed-record prose remain English by design. Open action 28 remains open only for qualified Arabic linguistic QA.
+
 - **Governance metrics and action hygiene.** Closed completed toolchain action 25 on retained CI evidence; added explicit Composio vendor-assurance action 29; aligned the GRC narrative with the generated 62.5% third-party coverage and two above-appetite risks; and refreshed the undated-action signal from 17 to 18 without inventing a human deadline.
 
 - **Operational telemetry + report-only engineering assurance.**

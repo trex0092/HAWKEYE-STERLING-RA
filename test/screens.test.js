@@ -153,6 +153,21 @@ function runScreen(file, bridge, seed){
     els.statTiles.innerHTML.includes('register encrypted'));
 })();
 
+/* ── 1d. Console Arabic chrome — labels/status/empty states are translated ── */
+(function(){
+  const { els } = runScreen('console.html',
+    '{ get state(){return state;} }',
+    {'hsra.lang':'ar'});
+  check('console(ar): stat cards render Arabic chrome',
+    els.statTiles.innerHTML.includes('الكيانات الخاضعة للمراقبة')
+    && els.statTiles.innerHTML.includes('التنبيهات المفتوحة'));
+  check('console(ar): empty states render in Arabic',
+    els.riskBars.innerHTML.includes('لا توجد تقييمات بعد')
+    && els.alertStream.innerHTML.includes('لم يتم حفظ أي تقييم بعد'));
+  check('console(ar): operator role renders in Arabic',
+    /وحدة مراقبة المعاملات/.test(els.operatorRole.textContent));
+})();
+
 /* ── 2. Hawkeye Sterling Advisor ── */
 (function(){
   const { els, fetches, api } = runScreen('advisor.html',
@@ -275,6 +290,29 @@ function runScreen(file, bridge, seed){
     && els.toolResult.innerHTML.includes('Federal Decree-Law No. 10 of 2025'));
 })();
 
+/* ── 2b. Advisor Arabic chrome — content corpus remains English by design ── */
+(function(){
+  const { els, api } = runScreen('advisor.html',
+    '{ get state(){return state;}, render, renderQa, renderTools }',
+    {'hsra.lang':'ar'});
+  check('advisor(ar): tabs and Ask chrome render in Arabic',
+    els.tabs.innerHTML.includes('اسأل المستشار')
+    && els.tabs.innerHTML.includes('الأسئلة التنظيمية')
+    && els.main.innerHTML.includes('سؤالك')
+    && els.main.innerHTML.includes('اسألني عن الامتثال لمكافحة غسل الأموال'));
+  check('advisor(ar): persona role caption renders in Arabic',
+    els.main.innerHTML.includes('مستشار أول لمكافحة غسل الأموال'));
+  api.state.tab='qa'; api.render();
+  check('advisor(ar): Q&A chrome is Arabic while regulatory catalogue stays English',
+    els.main.innerHTML.includes('تصفية الأسئلة')
+    && els.regGroups.innerHTML.includes('UAE FDL'));
+  api.state.tab='tools'; api.render();
+  check('advisor(ar): Super Tools chrome is Arabic while tool catalogue stays English',
+    els.main.innerHTML.includes('الأدوات المتخصصة')
+    && els.main.innerHTML.includes('احصل على قرار التصعيد')
+    && els.main.innerHTML.includes('Escalation Decision Engine'));
+})();
+
 /* ── 3. Regulatory Q&A inline answers + per-tool Super Tools playbooks ── */
 (function(){
   const { els, api } = runScreen('advisor.html',
@@ -329,7 +367,7 @@ function esc_(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g
   for(const page of ['console.html', 'advisor.html']){
     const raw = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');
     check(page + ': skip link is the first element in <body>',
-      /<body>\s*(\n\s*)*<a class="skip-link" href="#main">/.test(raw));
+      /<body>\s*(\n\s*)*<a class="skip-link" href="#main"[^>]*>/.test(raw));
     check(page + ': skip link targets a focusable #main', /id="main" tabindex="-1"/.test(raw));
   }
   for(const sheet of ['console.css', 'advisor.css']){
