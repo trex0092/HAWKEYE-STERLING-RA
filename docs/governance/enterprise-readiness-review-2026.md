@@ -150,7 +150,7 @@ Performance metrics · Retirement criteria):
 | `adverse-media-classifier.md` | Keyword/typology classifier + GDELT/Google News feeds (EN+AR) |
 | `pep-identifier.md` | Wikidata PEP signal — note best-effort nature, MANUAL REVIEW fallback |
 | `advisor-llm.md` | Cited-answer Advisor (`brain-soul.js`, charter guardrails, weekly eval) — the card regulators will actually read; include prompt strategy + injection red-team reference |
-| `ai-triage.md` | LLM adverse-media triage (gated `LLM_TRIAGE=0` until DPA) — card states the gate explicitly |
+| `ai-triage.md` | LLM adverse-media triage, fail-closed by default and explicit opt-in. The repository does not prove the current production variable; items 36/42 reconcile vendor and runtime evidence. |
 
 ### 6-C · Risk register upgrade [PROPOSED — High]
 Reformat `ai-risk-register.md` rows to: Risk · Likelihood (1–5) · Impact (1–5) · **Inherent** ·
@@ -285,7 +285,7 @@ outside this plan.)*
 - [ ] KPI dashboard shows current month with real numbers
 - [ ] AI Policy v1.0 + Stakeholder Impact Assessment **ratified** (signature rows filled)
 - [ ] DPIA §6 residual-risk acceptance signed by MLRO
-- [ ] Anthropic DPA executed — or its pending status stated on slide 1 (never discovered mid-meeting)
+- [ ] Anthropic DPA execution record reconciled and evidenced, with any unresolved status stated on slide 1 (item 36; never discovered mid-meeting)
 - [ ] TEST-000 end-to-end evidence captured (screenshots in demo pack; task in HAWKEYE STERLING APP)
 - [ ] Daily Compliance Brief + AI Governance Report from *this week* exportable as evidence
 - [ ] Assurance Coverage Matrix reviewed — every row's proof ran green in the last cycle
@@ -664,7 +664,7 @@ sign-off, `dpia-2026.md` §6); ISO/IEC 42001 mandatory-documents index added; wo
 - [ ] KPI dashboard shows current month with real numbers (log present; current-month row to complete)
 - [x] AI Policy v1.0 + Stakeholder Impact Assessment ratified (2026-07-02, signature rows filled)
 - [x] DPIA §6 residual-risk acceptance signed by MLRO (2026-07-02)
-- [ ] Anthropic DPA executed (still DRAFT: `docs/aims/anthropic-dpa-execution-pack.md`; state it on slide 1)
+- [ ] Anthropic DPA execution record reconciled: the execution pack remains DRAFT with fields blank while a 2026-07-16 owner attestation reports execution (item 36; state the unresolved position on slide 1)
 - [ ] TEST-000 end-to-end evidence captured
 - [ ] Daily Compliance Brief + AI Governance Report from *this week* exportable as evidence
 - [ ] Assurance Coverage Matrix reviewed: every row's proof ran green in the last cycle
@@ -675,7 +675,8 @@ sign-off, `dpia-2026.md` §6); ISO/IEC 42001 mandatory-documents index added; wo
 
 ### 18.4 Outstanding to reach 4.5
 
-COSO/ISO 31000 crosswalk columns (§6-D) · charter + committee ToR (§8, register P2) · KPI 10
-app-log change + rendered dashboard (§12) · walkthrough video (§14) · executed Anthropic DPA
-(register P3) with the live bias cycle it unlocks (P6) · GitHub UI hardening checklist rows
-(register P23-P25). Re-score at least quarterly and on any figure drift (CI-enforced).
+COSO/ISO 31000 crosswalk columns (§6-D) · charter + committee ToR (§8) · KPI 10
+app-log change + rendered dashboard (§12) · walkthrough video (§14) · verified/reconciled
+Anthropic DPA execution record (open action 36) and triage go-live state (open action 42) ·
+GitHub UI hardening checklist rows. Re-score at least quarterly and on any figure drift
+(CI-enforced).
