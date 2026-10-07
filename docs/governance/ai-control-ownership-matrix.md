@@ -25,7 +25,7 @@
 | `EAI-DMG-06` | L4 | Tool, connector and access governance | MLRO | Compliance Engineering | Quarterly and on connector/permission change | effective |
 | `EAI-MON-01` | L5 | AI performance and behavioural monitoring | MLRO | Compliance Engineering | Weekly and per build | partial |
 | `EAI-MON-02` | L5 | Bias and drift monitoring | MLRO | Compliance Engineering | Quarterly bias review; continuous configuration drift checks | effective |
-| `EAI-MON-03` | L5 | Security and access controls | Compliance Engineering | Compliance Engineering | Per build and continuous runtime configuration | effective |
+| `EAI-MON-03` | L5 | Security and access controls | Compliance Engineering | Compliance Engineering | Per build and continuous runtime configuration | partial |
 | `EAI-MON-04` | L5 | Incident detection, response and control freshness | MLRO | Compliance Engineering | Daily freshness; incident-driven response; annual exercise | partial |
 | `EAI-MON-05` | L5 | Governance metrics and continuous reporting | MLRO | Compliance Engineering | Daily/continuous with quarterly management review | effective |
 | `EAI-AUD-01` | L6 | Control-to-evidence assurance map | MLRO / Internal Audit | Compliance Engineering | Continuous; review at internal audit | effective |
