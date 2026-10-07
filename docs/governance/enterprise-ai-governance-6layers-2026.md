@@ -81,7 +81,7 @@ Both views point to the same underlying controls. A control should be implemente
 | Monitor bias | Quarterly bias evaluation and formal cross-script testing |
 | Detect drift | Prompt/tool register drift guards and governance metrics |
 | Apply security controls | CSP/HSTS, CodeQL, Semgrep, Fortify, secret scanning and least privilege |
-| Manage access controls | Tool/connector inventory, server-held credentials and repository protection |
+| Manage access controls | Tool/connector inventory, server-held credentials and repository protection; verified end-user identity on confidential function endpoints remains open under item 20 and is reported as partial on the generated dashboard |
 | Respond to incidents | AI incident runbook, kill switches and freshness alarms |
 | Report and improve | Daily governance report, GRC metrics, CAPA and management review |
 
