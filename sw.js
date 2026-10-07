@@ -14,7 +14,7 @@
      • Netlify functions (/.netlify/) → always network, never cached.
    Bump CACHE to invalidate the old shell on the next visit. */
 
-const CACHE = 'hsra-shell-v4';
+const CACHE = 'hsra-shell-v5';
 const SHELL = [
   './',
   './index.html',
