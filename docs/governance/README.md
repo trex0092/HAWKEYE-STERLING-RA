@@ -17,6 +17,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-policy.md](ai-policy.md) | Top-level standalone AI Policy (ratified 2026-07-02) | ISO 42001 A.2.2 |
+| [ai-use-case-intake.md](ai-use-case-intake.md) | Repository gate for new/materially changed AI use cases: purpose, data, provider, tools, risk tier, validation, kill switch and human approval | ISO 42001 A.6; NIST AI RMF GOVERN/MAP |
 | [risk-appetite-statement-2026.md](risk-appetite-statement-2026.md) | Eight appetite positions, each with a numeric residual ceiling, a named owner and an escalation SLA; the acceptance scale; the KRIs with their amber bands. CI pins the stated appetite to the appetite the code enforces and scores every register risk against its ceiling (DRAFT — board R7) | ISO 31000 5.4.3; NIST AI RMF GOVERN 1.3 |
 | [governance-chain.md](governance-chain.md) | The dependency map between control families — Visibility → Explainability → Accountability → Trust — with the failure propagation each break causes downstream, and **trust defined narrowly enough to be measured**. The estate had four slicings of the same territory and no control-to-control map | ISO 42001 4.4; COSO IC |
 | [kri-breach-ledger.md](kri-breach-ledger.md) | Append-only history of every KRI breach and amber signal, who was told and what followed — the history the byte-compared metrics snapshot cannot carry | ISO 31000 6.6; ISO 42001 9.1 |
@@ -41,6 +42,8 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [uae-ai-data-laws-2026.md](uae-ai-data-laws-2026.md) | 2026 UAE AI/data-law applicability + Data Office top-10 violation posture map | UAE PDPL; FDL 34/2021; Data Office |
 | [ai-frameworks-crosswalk-2026.md](ai-frameworks-crosswalk-2026.md) | FAST/SUM values + responsible-AI lifecycle orientation | Turing FAST/SUM; EU AI Act |
 | [agentic-ai-governance-6layers-2026.md](agentic-ai-governance-6layers-2026.md) | Six-layer agentic-AI governance scorecard (incl. Layer 5 human oversight) | Practitioner framework |
+| [enterprise-ai-governance-6layers-2026.md](enterprise-ai-governance-6layers-2026.md) | Enterprise six-layer crosswalk: Policy → Roles → Risk → Data/Model → Monitoring → Audit, mapped to repository evidence | Practitioner enterprise-governance view |
+| [enterprise-ai-governance-dashboard.md](enterprise-ai-governance-dashboard.md) | Generated six-layer status dashboard, including partial/open controls and live GRC signals | Evidence-derived management view |
 | [operational-ai-governance-stack-2026.md](operational-ai-governance-stack-2026.md) | Five-level operational-stack scorecard (visibility → monitoring → controls → evidence → continuous governance), incl. deliberate non-controls with re-triggers | Practitioner framework |
 | [sanctions-screening-gap-checklist-2026.md](sanctions-screening-gap-checklist-2026.md) | 36-item sanctions-screening gap self-assessment (lists, matching, TFS reporting, testing, evidence) — gaps closed in-change: TFS name-match procedure, internal watchlist, training cadence | UAE TFS practitioner checklist; Cabinet Decision 74/2020 |
 | [ai-governance-gap-analysis-2026.md](ai-governance-gap-analysis-2026.md) | Tile-by-tile gap analysis vs the AI Governance & Security periodic table | Practitioner framework |
@@ -63,6 +66,10 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-asset-register.md](ai-asset-register.md) | Inventory of AI surfaces + onboarding process | ISO 42001 A.4.2 |
+| [../../data/ai-controls.json](../../data/ai-controls.json) | Machine-readable enterprise AI control register, with layer, owner, cadence, status, evidence and tests | ISO 42001 9.1; NIST AI RMF GOVERN |
+| [ai-control-ownership-matrix.md](ai-control-ownership-matrix.md) | Generated accountability/operations matrix for every enterprise AI control | ISO 42001 5.3 |
+| [residual-risk-acceptance-register.md](residual-risk-acceptance-register.md) | Generated above-appetite decision queue plus explicit evidenced exceptional acceptances | ISO 31000 6.5; NIST AI RMF MANAGE |
+| [ai-vendor-assurance.md](ai-vendor-assurance.md) | AI/AI-adjacent provider view backed by the AIMS third-party register and live vendor-coverage metric | ISO 42001 A.10.2 |
 | [policy-register.md](policy-register.md) | Every governing instrument with owner, approval record and next review; anti-shadow-policy sweep in CI | ISO 42001 7.5 / A.2.2; NIST AI RMF GOVERN 1.2 |
 | [obligation-register.md](obligation-register.md) | Every obligation → instrument, owner, control, evidence, watch source; status honest about what waits on a human | FATF R.1; ISO 42001 4.2 |
 | [grc-metrics.md](grc-metrics.md) | Six GRC management ratios computed from the estate, with a CI freshness check | ISO 42001 9.1; NIST AI RMF MEASURE |
@@ -81,6 +88,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [ai-incident-runbook.md](ai-incident-runbook.md) | AI incident triggers, kill switch, response steps | ISO 42001 A.6; AI Act Art. 73-equivalent clocks in [eu-ai-act-assessment-2026.md §6](eu-ai-act-assessment-2026.md) |
+| [ai-control-testing-calendar.md](ai-control-testing-calendar.md) | Consolidated continuous/daily/weekly/quarterly/annual AI control-testing cadence and evidence rule | ISO 42001 9.1/9.2 |
 | [operating-model.md](operating-model.md) | Squad shape, RACI, MLRO delegation matrix, scaling triggers | ISO 42001 5.3/7.2 |
 | [incident-postmortem-template.md](incident-postmortem-template.md) | Blameless post-incident review template | — |
 | [backup-recovery.md](backup-recovery.md) | Backup & disaster-recovery runbook | ISO 42001 A.6 |
