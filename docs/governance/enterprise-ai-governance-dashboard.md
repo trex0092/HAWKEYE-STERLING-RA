@@ -30,17 +30,17 @@
 
 ## Partial and open controls
 
-| Control | Layer | Status | Why it is not fully effective |
-|---|---|---|---|
-| `EAI-POL-03` AI use-case approval criteria | L1 | **PARTIAL** | A repository intake gate is implemented in this change; formal organizational adoption remains a human governance act. |
-| `EAI-ROL-03` AI governance committee and legal oversight | L2 | **PARTIAL** | The charter exists, while the repository's open-actions register still records human ratification actions. |
-| `EAI-RSK-02` Risk appetite and residual-risk treatment | L3 | **PARTIAL** | The repository currently reports risks above appetite and does not infer acceptance without a human decision. |
-| `EAI-RSK-05` Use-case classification before deployment | L3 | **PARTIAL** | The intake form requires classification and risk tiering; organizational ratification of the new gate remains explicit. |
-| `EAI-DMG-05` AI and AI-adjacent vendor assurance | L4 | **PARTIAL** | The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required. |
-| `EAI-MON-04` Incident detection, response and control freshness | L5 | **PARTIAL** | Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation. |
-| `EAI-AUD-02` Internal audit programme | L6 | **PARTIAL** | The programme exists; the open-actions register records the first thematic review as a human action still to complete. |
-| `EAI-AUD-03` Management review and governance decisions | L6 | **PARTIAL** | Templates and decision rights exist; this register does not fabricate completed meetings or approvals. |
-| `EAI-AUD-06` Independent external assurance | L6 | **OPEN** | No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned. |
+| Control | Layer | Status | Closure actions | Why it is not fully effective |
+|---|---|---|---|---|
+| `EAI-POL-03` AI use-case approval criteria | L1 | **PARTIAL** | #30 | A repository intake gate is implemented in this change; formal organizational adoption remains a human governance act. |
+| `EAI-ROL-03` AI governance committee and legal oversight | L2 | **PARTIAL** | #4 | The charter exists, while the repository's open-actions register still records human ratification actions. |
+| `EAI-RSK-02` Risk appetite and residual-risk treatment | L3 | **PARTIAL** | #17, #33, #34 | The repository currently reports risks above appetite and does not infer acceptance without a human decision. |
+| `EAI-RSK-05` Use-case classification before deployment | L3 | **PARTIAL** | #30 | The intake form requires classification and risk tiering; organizational ratification of the new gate remains explicit. |
+| `EAI-DMG-05` AI and AI-adjacent vendor assurance | L4 | **PARTIAL** | #5, #11, #29 | The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required. |
+| `EAI-MON-04` Incident detection, response and control freshness | L5 | **PARTIAL** | #31 | Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation. |
+| `EAI-AUD-02` Internal audit programme | L6 | **PARTIAL** | #8 | The programme exists; the open-actions register records the first thematic review as a human action still to complete. |
+| `EAI-AUD-03` Management review and governance decisions | L6 | **PARTIAL** | #32 | Templates and decision rights exist; this register does not fabricate completed meetings or approvals. |
+| `EAI-AUD-06` Independent external assurance | L6 | **OPEN** | #10 | No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned. |
 
 ## Interpretation
 
