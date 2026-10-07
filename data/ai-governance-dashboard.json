@@ -6,8 +6,8 @@
   "review_by": "2027-01-07",
   "summary": {
     "controls": 30,
-    "effective": 21,
-    "partial": 8,
+    "effective": 18,
+    "partial": 11,
     "open": 1,
     "not_applicable": 0,
     "overall_status": "partial"
@@ -29,8 +29,8 @@
       "name": "Roles & Accountability",
       "purpose": "Assign accountable owners, decision rights, legal oversight and escalation.",
       "controls": 4,
-      "effective": 3,
-      "partial": 1,
+      "effective": 2,
+      "partial": 2,
       "open": 0,
       "not_applicable": 0,
       "status": "partial"
@@ -51,8 +51,8 @@
       "name": "Data & Model Governance",
       "purpose": "Govern data, prompts, models, providers, lineage, versions, access and retention.",
       "controls": 6,
-      "effective": 5,
-      "partial": 1,
+      "effective": 3,
+      "partial": 3,
       "open": 0,
       "not_applicable": 0,
       "status": "partial"
@@ -86,7 +86,7 @@
     "audit_finding_closure_rate": 95.2,
     "governance_drift_count": 0,
     "residual_above_appetite": 2,
-    "open_actions_without_target_date": 26
+    "open_actions_without_target_date": 28
   },
   "interpretation": [
     "Layer status is derived from control-register status plus repository evidence-path validation.",
