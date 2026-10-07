@@ -1,13 +1,15 @@
-# ADR-004 — Client-Side Persistence, Effectively-Public Endpoints
+# ADR-004 — Client-Side Persistence, Shared-Token Endpoint Gate
 
 **Status:** Accepted with registered exit path (in force since first release;
 recorded retroactively 2026-08-04) · **Owner:** Maintainer + MLRO ·
 **Revisit:** §4, and in any case with register items 20/23.
 
-Assessment data persists in the officer's browser (`localStorage`); there is
-no server-side database and no user authentication. This is the estate's most
-consequential architecture decision and its costs are carried openly — this
-record exists so nobody mistakes the posture for an oversight.
+Assessment data persists primarily in the officer's browser (`localStorage`);
+there is no dedicated server-side database and no verified per-user identity or
+role-based authorization on the function endpoints. A shared `X-App-Token` can
+gate the configured paths, but it is a bearer secret rather than user identity.
+This is the estate's most consequential architecture decision and its costs are
+carried openly so nobody mistakes the posture for an oversight.
 
 ## 1. Context
 
@@ -23,21 +25,24 @@ record exists so nobody mistakes the posture for an oversight.
 
 - Assessments, the register and the activity log live in `localStorage`,
   exportable by the officer; the WebCrypto device lock protects at rest.
-- Function endpoints check Origin and a shared token as a **deterrent**, not
-  authentication; confidential-read surfaces are treated as effectively
-  public in the threat model, and what they return is minimised accordingly.
-- The one off-device copy is the override-sheet mirror
-  (`data/risk-overrides-backup.json`, monthly).
+- Function endpoints check Origin and can enforce a shared `X-App-Token`. The
+  shared token materially gates configured paths, including confidential reads,
+  but it is not verified per-user authentication or RBAC; item 20 remains the
+  identity closure path.
+- Off-device operational copies exist in Asana for the assessment register,
+  activity log and risk-data sheet, with a monthly git backup for risk overrides.
+  These mirrors are not treated as a dedicated authenticated persistence tier or
+  as proof of a documented/rehearsed assessment-data RPO/RTO; item 23 remains open.
 
 ## 3. Consequences
 
 **Gained:** no server-side PII store to defend, breach-notify or localise;
 no credential lifecycle; the PDPL/DPIA posture stays simple; the app works
 offline.
-**Paid:** clearing browser storage destroys the officer's register (RPO = the
-last export or mirror); telemetry on the console is per-device, not
-firm-wide; endpoint abuse is rate-limited and monitored rather than
-identity-gated.
+**Paid:** browser storage remains the primary working store, so recovery depends
+on the latest export or operational mirror until item 23 lands; telemetry on the
+console is per-device, not firm-wide; endpoint abuse is shared-token/rate-limit
+protected rather than identity-gated.
 
 ## 4. Revisit triggers
 
@@ -46,5 +51,5 @@ write + confidential-read endpoints, target 2027-03-31) and **item 23**
 (server-side persistence tier + RPO/RTO statement, target 2027-06-30).
 Earlier triggers: a second concurrent officer needing shared live state; a
 regulator asking for firm-side retention of assessments; any incident where
-the mirror was not enough. When item 23 lands, this record flips to
+the available mirrors were not enough. When item 23 lands, this record flips to
 Superseded and the DPIA cross-border row is re-assessed in the same PR.
