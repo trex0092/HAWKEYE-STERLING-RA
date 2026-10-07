@@ -241,13 +241,18 @@
       "owner": "MLRO / DPO",
       "operator": "Compliance Engineering",
       "cadence": "On new use case, new data flow, new provider and material change",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/dpia-2026.md",
-        "docs/governance/stakeholder-impact-assessment-2026.md"
+        "docs/governance/stakeholder-impact-assessment-2026.md",
+        "docs/aims/ai-impact-assessment.md",
+        "docs/aims/pdpl-data-processing-assessment.md"
       ],
       "tests": [],
-      "note": "Privacy and stakeholder impacts are assessed separately from model performance."
+      "note": "Privacy and stakeholder assessments exist, but the adverse-media LLM-triage go-live checklist remains unsigned while the third-party register records an owner attestation that LLM_TRIAGE=1 was enabled. The live runtime state is not repository-verifiable, so the assessment/control is partial until item 42 reconciles the legal prerequisites, authorised sign-off and production configuration.",
+      "closure_actions": [
+        42
+      ]
     },
     {
       "id": "EAI-RSK-04",
@@ -383,13 +388,14 @@
       "tests": [
         "test/grc-metrics.test.mjs"
       ],
-      "note": "The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required.",
+      "note": "The live GRC metric reports outstanding third-party assurance items. In addition, the Anthropic legal/runtime record is internally inconsistent: an owner attestation reports LLM_TRIAGE enabled while the formal DPA execution and go-live checklist remain incomplete. Items 36 and 42 reconcile those records; gated features must remain gated where required.",
       "closure_actions": [
         5,
         11,
         29,
         35,
-        36
+        36,
+        42
       ]
     },
     {
