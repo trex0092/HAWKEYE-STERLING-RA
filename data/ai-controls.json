@@ -697,5 +697,35 @@
         5
       ]
     }
+  ],
+  "scope_exclusions": [
+    {
+      "action": 2,
+      "rationale": "Chase-email workflow that advances items 5 and 6; it is an administrative dependency, not a control objective."
+    },
+    {
+      "action": 3,
+      "rationale": "Queued release approval act; the deployment approval gate is operating, so the pending act is not a failed AI-governance control."
+    },
+    {
+      "action": 6,
+      "rationale": "Deterministic transaction-feed wiring for the wider AML programme, outside the enterprise AI-control denominator."
+    },
+    {
+      "action": 7,
+      "rationale": "Firm-wide AML/CFT and sanctions training beyond the AI-control scope."
+    },
+    {
+      "action": 18,
+      "rationale": "Approval of the wider AML/CFT/CPF policy pack, not an AI-specific governance control."
+    },
+    {
+      "action": 27,
+      "rationale": "Screening-engine maintainability technical debt, outside the enterprise AI-governance control set."
+    },
+    {
+      "action": 28,
+      "rationale": "Arabic UI linguistic QA/localisation, outside the enterprise AI-governance control set."
+    }
   ]
 }
