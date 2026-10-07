@@ -10,6 +10,11 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Operational telemetry + report-only engineering assurance.**
+  - Added same-origin browser exception/unhandled-rejection telemetry with strict payload minimisation and rate limiting.
+  - Added structured 5xx/exception logging to every public Netlify function without logging request or response bodies.
+  - Added a report-only toolchain workflow for c8 JavaScript coverage, coverage.py Python coverage, mypy and a five-mutant scoring-golden spot-check. Reports are retained as artifacts; no new threshold blocks merge.
+
 - **Enterprise AI governance: six-layer control system added.**
   - Added an original Policy → Roles & Accountability → Risk Management → Data & Model Governance → Monitoring & Controls → Audit & Assurance crosswalk, plus a repository-native Mermaid diagram.
   - Added `data/ai-controls.json` as the machine-readable control map, with generated ownership, dashboard and residual-risk views.

@@ -14,7 +14,7 @@
      • Netlify functions (/.netlify/) → always network, never cached.
    Bump CACHE to invalidate the old shell on the next visit. */
 
-const CACHE = 'hsra-shell-v3';
+const CACHE = 'hsra-shell-v4';
 const SHELL = [
   './',
   './index.html',
@@ -29,6 +29,7 @@ const SHELL = [
   // intentionally NOT precached (24 files); they fall back to the system stack
   // offline via fonts.css and are stale-while-revalidate cached once seen online.
   './app.js',
+  './telemetry.js',
   './console.js',
   './advisor.js',
   './app.css',

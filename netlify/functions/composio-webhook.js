@@ -1,4 +1,5 @@
 'use strict';
+const { withFunctionTelemetry } = require('./_telemetry');
 
 const crypto = require('crypto');
 
@@ -102,3 +103,6 @@ async function handler(event) {
 
 exports.handler = handler;
 exports.__internals = { verify, parsePayload, timingSafeTextEqual, header };
+
+/* Structured 5xx/exception telemetry. The wrapper never logs request bodies. */
+exports.handler = withFunctionTelemetry('composio-webhook', exports.handler);
