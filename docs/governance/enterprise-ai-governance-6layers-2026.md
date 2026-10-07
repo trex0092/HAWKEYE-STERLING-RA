@@ -80,9 +80,9 @@ Both views point to the same underlying controls. A control should be implemente
 | Track performance | Advisor eval scorecard and live evaluation |
 | Monitor bias | Quarterly bias evaluation and formal cross-script testing |
 | Detect drift | Prompt/tool register drift guards and governance metrics |
-| Apply security controls | CSP/HSTS, CodeQL, Semgrep, Fortify, secret scanning and least privilege |
+| Apply security controls | CSP/HSTS, CodeQL, Semgrep, Fortify, secret scanning and least privilege; `EAI-MON-03` remains partial for public-history redaction, verified end-user identity and fleet-wide LLM-relay rate limiting under items 1, 20 and 22 |
 | Manage access controls | Tool/connector inventory, server-held credentials and repository protection; verified end-user identity on confidential function endpoints remains open under item 20 and is reported as partial on the generated dashboard |
-| Respond to incidents | AI incident runbook, kill switches and freshness alarms |
+| Respond to incidents | AI incident runbook, kill switches and freshness alarms; `EAI-MON-04` remains partial for independent alerting, production telemetry rehearsal, deploy self-heal/rollback and the first AI incident tabletop under items 21, 24, 26 and 31 |
 | Report and improve | Daily governance report, GRC metrics, CAPA and management review |
 
 **Control IDs:** EAI-MON-01 through EAI-MON-05.
@@ -93,7 +93,7 @@ Both views point to the same underlying controls. A control should be implemente
 |---|---|
 | Keep AI inventory | Machine-readable AI asset register for the Hawkeye Sterling suite; enterprise-wide extension remains open under item 9 |
 | Maintain evidence | [Assurance Coverage Matrix](assurance-coverage-matrix.md) and evidence retention |
-| Preserve decisions | Git/Asana/audit trails, sign-off and override records |
+| Preserve decisions | Git/Asana/audit trails, sign-off and override records; `EAI-AUD-04` remains partial until item 23 provides a dedicated authenticated persistence tier plus a documented and rehearsed assessment-data RPO/RTO |
 | Test controls regularly | [AI control testing calendar](ai-control-testing-calendar.md) plus CI/scheduled workflows; `EAI-AUD-07` keeps human review/exercise currency visible and points overdue cycles to the open-actions register |
 | Review vendor assurance | Third-party register and AI-specific vendor view |
 | Map compliance obligations | [`EAI-AUD-08`](../../data/ai-controls.json) ties the obligation register, regulatory-watch sources and legal-citation guards into one tested traceability control; article-level legal sourcing remains open under item 5 and is reported as partial |
