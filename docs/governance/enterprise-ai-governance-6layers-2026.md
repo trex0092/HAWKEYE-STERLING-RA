@@ -118,6 +118,9 @@ enterprise AI control, so their absence from the dashboard is not mistaken for c
 
 They remain authoritative in the [open-actions register](open-actions-register.md) and
 must not be read as complete merely because they are outside this control denominator.
+The same seven rows are machine-readable in `data/ai-controls.json` under
+`scope_exclusions`; the control validator fails if a live open action is neither
+mapped to an incomplete control nor explicitly excluded with a rationale.
 
 ## Evidence rule
 
