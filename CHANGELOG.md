@@ -10,6 +10,12 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Enterprise AI governance: six-layer control system added.**
+  - Added an original Policy → Roles & Accountability → Risk Management → Data & Model Governance → Monitoring & Controls → Audit & Assurance crosswalk, plus a repository-native Mermaid diagram.
+  - Added `data/ai-controls.json` as the machine-readable control map, with generated ownership, dashboard and residual-risk views.
+  - Added an AI use-case intake gate, AI-vendor assurance view, explicit residual-risk acceptance ledger and consolidated control-testing calendar.
+  - CI now validates control ownership/status, every referenced evidence/test path, the quarterly register-review deadline, explicit risk-acceptance evidence and generated-view drift. The dashboard stays honest about incomplete human/external work rather than converting a green build into a governance approval.
+
 - **Sanctions: national-source depth 48 → 54 / 195. Six national sanctions lists added and verified on the runner; two non-financial proscription candidates are recorded but disabled.**
   - **How they were found.** A new fixed probe suite (`opensanctions-catalogue`, run 37147223927) read the OpenSanctions `sanctions` collection that the daily engine's worldwide net already screens: 95 member datasets, each with its publisher. Six are national sanctions or terrorist-financing lists that increase national-source depth. Two others, Germany and Ireland, are proscription sources rather than financial-sanctions lists; they are retained as disabled research references and are not loaded by the sanctions screen.
   - **Added.** The six qualifying national sources are enabled with coverage floors. Germany and Ireland remain disabled because loading them as sanctions sources would overstate national financial-sanctions coverage. A second probe (run 37147471222) parsed each one; floors are about 85% of the count.
