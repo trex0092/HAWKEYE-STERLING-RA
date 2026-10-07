@@ -21,7 +21,7 @@
 
 | Signal | Current value | Source |
 |---|---:|---|
-| Control effectiveness rate | 100% | `data/grc-metrics.json` |
+| Automated proof-path coverage (GRC control-effectiveness metric) | 100% | `data/grc-metrics.json` |
 | Third-party assessment coverage | 62.5% | `data/grc-metrics.json` |
 | Audit finding closure rate | 95.2% | `data/grc-metrics.json` |
 | Governance drift count | 0 | `data/grc-metrics.json` |
@@ -52,6 +52,8 @@
 ## Interpretation
 
 This dashboard reports the state represented by the repository. It does not turn a missing human approval, unsigned contract, unperformed audit, or uncommissioned external assessment into a completed control.
+
+The 100% automated proof-path signal is the GRC metric for assurance-matrix rows whose named automated proof artefacts exist. It is not the percentage of enterprise AI controls rated effective; the six-layer counts above are the authoritative status view for that question.
 
 A CI pass proves that the register is internally consistent, its evidence paths exist, its review deadline has not expired, and the generated views match their sources. It does not constitute MLRO, Board, legal, regulator, or external-auditor approval.
 
