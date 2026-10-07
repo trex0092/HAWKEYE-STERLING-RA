@@ -42,7 +42,7 @@ Both views point to the same underlying controls. A control should be implemente
 | Clarify business ownership | [Operating model](operating-model.md) and [control ownership matrix](ai-control-ownership-matrix.md) |
 | Define legal/governance oversight | [AI Governance Committee Charter](ai-governance-committee-charter.md); formal adoption and the DPO designation determination remain open under items 4 and 13 |
 | Set risk responsibilities | Risk register and risk-appetite ownership |
-| Create escalation paths | [AI Incident Runbook](ai-incident-runbook.md), operating-model escalation |
+| Create escalation paths | [AI Incident Runbook](ai-incident-runbook.md), operating-model escalation; `EAI-ROL-04` remains partial until the first incident-response tabletop is completed under item 31 |
 
 **Control IDs:** EAI-ROL-01 through EAI-ROL-04.
 
@@ -94,7 +94,7 @@ Both views point to the same underlying controls. A control should be implemente
 | Keep AI inventory | Machine-readable AI asset register for the Hawkeye Sterling suite; enterprise-wide extension remains open under item 9 |
 | Maintain evidence | [Assurance Coverage Matrix](assurance-coverage-matrix.md) and evidence retention |
 | Preserve decisions | Git/Asana/audit trails, sign-off and override records; `EAI-AUD-04` remains partial until item 23 provides a dedicated authenticated persistence tier plus a documented and rehearsed assessment-data RPO/RTO |
-| Test controls regularly | [AI control testing calendar](ai-control-testing-calendar.md) plus CI/scheduled workflows; `EAI-AUD-07` keeps human review/exercise currency visible and points overdue cycles to the open-actions register |
+| Test controls regularly | [AI control testing calendar](ai-control-testing-calendar.md) plus CI/scheduled workflows; `EAI-AUD-07` keeps human review/exercise currency visible and now includes the first BCP/vendor-exit drill with a second trained operator under item 44 |
 | Review vendor assurance | Third-party register and AI-specific vendor view |
 | Map compliance obligations | [`EAI-AUD-08`](../../data/ai-controls.json) ties the obligation register, regulatory-watch sources and legal-citation guards into one tested traceability control; article-level legal sourcing remains open under item 5 and is reported as partial |
 | Track remediation | CAPA and open-actions registers |
