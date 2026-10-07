@@ -46,9 +46,7 @@ the same reality as that register, in one number: the engineering is done, the
 human acts are not.
 
 **Third-party coverage at 62.5%** is three outstanding vendor-assurance
-positions: Asana, Anthropic and Composio. Asana/Anthropic remain tied to the
-existing counsel and transfer-basis actions; Composio now has the explicit
-go-live gate in open-actions item 29. It is one of the two KRIs currently in
+positions: Asana, Anthropic and Composio. Asana and Anthropic now also have explicit evidence-closure rows, items 35 and 36, in addition to the existing counsel and transfer-basis actions. Composio retains the explicit go-live gate in open-actions item 29. It is one of the two KRIs currently in
 breach (KRI-04); the other is KRI-10, below. Both are recorded with their
 follow-ups in the [KRI breach ledger](kri-breach-ledger.md).
 
@@ -65,7 +63,7 @@ reports **null with its reason**, and the corresponding KRI-09 stays in the
 appetite register marked *not instrumented*. Instrumenting it is a board act:
 setting target dates on the governance rows of the open-actions register
 (item 17). The remaining maintainer-owned engineering rows (items 20–24 and
-26–28) carry maintainer-set dates already; vendor/governance/assurance items 29–34 remain
+26–28) carry maintainer-set dates already; vendor/governance/assurance items 29–37 remain
 undated until their named human owners set dates. The per-row counter below reports that
 gap rather than inventing a deadline.
 
@@ -82,7 +80,7 @@ as passing. CI enforces that distinction.
 | `obligationsWithoutOwner` | 0 | No orphaned obligation |
 | `obligationsWithoutWatchSource` | 1 | ISO/IEC 42001 — a standards body, not a supervisor feed. Tolerated at ≤ 1 |
 | `obligationsWithoutSourcedCitation` | 21 | Obligations whose article-level `source_citation` (verbatim quote, official URL, locator, named human verifier) is still owed — see the source-citation standard in the [obligation register](obligation-register.md). Closes through open-actions item 5 (counsel). A counter, not a KRI: setting a threshold for it is a Board act |
-| `openActionsWithoutTargetDate` | 23 | Every open action carries an owner and a closing condition; **23 rows currently carry no deadline**. This is the missing input behind KRI-09 (§3) — it counts rows in the [open-actions register](open-actions-register.md) whose `Target date` cell holds no ISO date. Maintainer-owned engineering rows are dated; Board/vendor-governance rows stay undated until the responsible human owner sets a date. |
+| `openActionsWithoutTargetDate` | 26 | Every open action carries an owner and a closing condition; **26 rows currently carry no deadline**. This is the missing input behind KRI-09 (§3) — it counts rows in the [open-actions register](open-actions-register.md) whose `Target date` cell holds no ISO date. Maintainer-owned engineering rows are dated; Board/vendor-governance rows stay undated until the responsible human owner sets a date. |
 | `residualAboveAppetite` | 2 | Risks carried above the residual ceiling of the appetite position that claims them. **R-03** (sanctions false negative) is 10 against RA-01's ceiling of 6; **R-21** (shadow AI) is 12 against RA-04's ceiling of 6 — see §4a |
 | `risksWithoutAppetitePosition` | 0 | Every risk in the register is claimed by exactly one appetite position. A risk claimed by nobody is never scored, and an unscored risk is indistinguishable from a compliant one in a count |
 
