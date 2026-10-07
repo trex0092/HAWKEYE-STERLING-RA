@@ -128,7 +128,7 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Quarterly and on asset change",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "data/ai-assets.json",
         "docs/governance/ai-asset-register.md"
@@ -136,7 +136,10 @@
       "tests": [
         "test/ai-assets.test.js"
       ],
-      "note": "Every registered AI surface carries ownership, risk tier and oversight posture."
+      "note": "The Hawkeye Sterling suite inventory is complete and CI-scanned, but the open-actions register still requires enterprise-wide AI discovery before this organization-level control is fully effective.",
+      "closure_actions": [
+        9
+      ]
     },
     {
       "id": "EAI-ROL-02",
@@ -290,7 +293,7 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Quarterly and on asset change",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "data/ai-assets.json",
         "docs/governance/ai-asset-register.md"
@@ -298,22 +301,29 @@
       "tests": [
         "test/ai-assets.test.js"
       ],
-      "note": "Shadow-AI drift is checked against model API callers."
+      "note": "The repository inventory and system boundary are controlled for Hawkeye Sterling; enterprise-wide extension remains open under item 9, so organization-level AI inventory is not yet complete.",
+      "closure_actions": [
+        9
+      ]
     },
     {
       "id": "EAI-DMG-02",
       "layer": "L4",
-      "name": "Data lineage, minimisation and retention",
+      "name": "Data quality, lineage, minimisation and retention",
       "owner": "MLRO / DPO",
       "operator": "Compliance Engineering",
       "cadence": "Annual and on data-flow change",
       "status": "effective",
       "evidence": [
+        "docs/aims/data-quality-plan.md",
         "docs/governance/data-retention.md",
         "docs/governance/dpia-2026.md"
       ],
-      "tests": [],
-      "note": "Inputs, retention and cross-border considerations are documented."
+      "tests": [
+        "test/data-json.test.js",
+        "test/data-schema.test.js"
+      ],
+      "note": "Data-quality dimensions, source provenance/lineage, minimisation and retention are documented; JSON integrity/schema checks provide repository-level quality gates."
     },
     {
       "id": "EAI-DMG-03",
@@ -340,7 +350,7 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Weekly live evaluation; quarterly bias review; on model change",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/model-validation-2026.md",
         "docs/aims/bias-fairness-testing.md",
@@ -350,7 +360,13 @@
         "test/advisor-assurance.test.js",
         "test/advisor-bias-eval.test.mjs"
       ],
-      "note": "Validation covers governed use of external models rather than claiming validation of the provider's foundation model."
+      "note": "Validation and bias controls exist, but the recorded 2026 Q3 model-validation sign-off is overdue and the scheduled 2026-10-01 bias-eval result is not yet reconciled into the evidence ledger; independent review remains routed to item 8.",
+      "closure_actions": [
+        8,
+        38,
+        39
+      ],
+      "review_by": "2026-09-30"
     },
     {
       "id": "EAI-DMG-05",
