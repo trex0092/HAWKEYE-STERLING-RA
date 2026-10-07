@@ -641,6 +641,10 @@
     {
       "path": "docs/policies/README.md",
       "reason": "The policy pack's index page. It lists instruments and points at them; it is not itself a governing instrument."
+    },
+    {
+      "path": "docs/aims/bcp-exercise-record.md",
+      "reason": "Reusable evidence template for a BCP/vendor-exit drill. It records the result of an exercise but does not set a governing rule, approval authority or standing control requirement; those live in the registered Business Continuity & Resilience Plan and the control-testing calendar."
     }
   ],
   "shadow_policy_note": "No governing instrument exists outside this register. test/policies.test.mjs scans docs/ for filenames carrying policy, procedure, charter, runbook or sop and fails if one is neither registered nor explicitly excluded with a reason — so a procedure cannot be written, relied on, and left unowned and unreviewed."
