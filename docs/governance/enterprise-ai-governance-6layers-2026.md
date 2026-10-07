@@ -94,13 +94,13 @@ Both views point to the same underlying controls. A control should be implemente
 | Keep AI inventory | Machine-readable AI asset register for the Hawkeye Sterling suite; enterprise-wide extension remains open under item 9 |
 | Maintain evidence | [Assurance Coverage Matrix](assurance-coverage-matrix.md) and evidence retention |
 | Preserve decisions | Git/Asana/audit trails, sign-off and override records |
-| Test controls regularly | [AI control testing calendar](ai-control-testing-calendar.md) plus CI/scheduled workflows |
+| Test controls regularly | [AI control testing calendar](ai-control-testing-calendar.md) plus CI/scheduled workflows; `EAI-AUD-07` keeps human review/exercise currency visible and points overdue cycles to the open-actions register |
 | Review vendor assurance | Third-party register and AI-specific vendor view |
 | Map compliance obligations | Obligation register and framework crosswalks |
 | Track remediation | CAPA and open-actions registers |
 | Run internal/external audits | Internal audit programme exists; external conformity assurance is not claimed until commissioned |
 
-**Control IDs:** EAI-AUD-01 through EAI-AUD-06.
+**Control IDs:** EAI-AUD-01 through EAI-AUD-07.
 
 ## Evidence rule
 
