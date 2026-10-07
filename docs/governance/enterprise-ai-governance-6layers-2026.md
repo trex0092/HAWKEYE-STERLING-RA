@@ -80,7 +80,7 @@ Both views point to the same underlying controls. A control should be implemente
 | Track performance | Advisor eval scorecard and live evaluation |
 | Monitor bias | Quarterly bias evaluation and formal cross-script testing |
 | Detect drift | Prompt/tool register drift guards and governance metrics |
-| Apply security controls | CSP/HSTS, CodeQL, Semgrep, Fortify, secret scanning and least privilege; `EAI-MON-03` remains partial for public-history redaction, verified end-user identity and fleet-wide LLM-relay rate limiting under items 1, 20 and 22 |
+| Apply security controls | CSP/HSTS, CodeQL, Semgrep, Fortify, secret scanning and least privilege; `EAI-MON-03` remains partial for public-history redaction, verified end-user identity, fleet-wide LLM-relay rate limiting and the first manual penetration-test cycle under items 1, 20, 22 and 43 |
 | Manage access controls | Tool/connector inventory, server-held credentials and repository protection; verified end-user identity on confidential function endpoints remains open under item 20 and is reported as partial on the generated dashboard |
 | Respond to incidents | AI incident runbook, kill switches and freshness alarms; `EAI-MON-04` remains partial for independent alerting, production telemetry rehearsal, deploy self-heal/rollback and the first AI incident tabletop under items 21, 24, 26 and 31 |
 | Report and improve | Daily governance report, GRC metrics, CAPA and management review |
