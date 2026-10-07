@@ -128,7 +128,7 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Quarterly and on asset change",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "data/ai-assets.json",
         "docs/governance/ai-asset-register.md"
@@ -136,7 +136,10 @@
       "tests": [
         "test/ai-assets.test.js"
       ],
-      "note": "Every registered AI surface carries ownership, risk tier and oversight posture."
+      "note": "The Hawkeye Sterling suite inventory is complete and CI-scanned, but the open-actions register still requires enterprise-wide AI discovery before this organization-level control is fully effective.",
+      "closure_actions": [
+        9
+      ]
     },
     {
       "id": "EAI-ROL-02",
@@ -290,7 +293,7 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Quarterly and on asset change",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "data/ai-assets.json",
         "docs/governance/ai-asset-register.md"
@@ -298,22 +301,29 @@
       "tests": [
         "test/ai-assets.test.js"
       ],
-      "note": "Shadow-AI drift is checked against model API callers."
+      "note": "The repository inventory and system boundary are controlled for Hawkeye Sterling; enterprise-wide extension remains open under item 9, so organization-level AI inventory is not yet complete.",
+      "closure_actions": [
+        9
+      ]
     },
     {
       "id": "EAI-DMG-02",
       "layer": "L4",
-      "name": "Data lineage, minimisation and retention",
+      "name": "Data quality, lineage, minimisation and retention",
       "owner": "MLRO / DPO",
       "operator": "Compliance Engineering",
       "cadence": "Annual and on data-flow change",
       "status": "effective",
       "evidence": [
+        "docs/aims/data-quality-plan.md",
         "docs/governance/data-retention.md",
         "docs/governance/dpia-2026.md"
       ],
-      "tests": [],
-      "note": "Inputs, retention and cross-border considerations are documented."
+      "tests": [
+        "test/data-json.test.js",
+        "test/data-schema.test.js"
+      ],
+      "note": "Data-quality dimensions, source provenance/lineage, minimisation and retention are documented; JSON integrity/schema checks provide repository-level quality gates."
     },
     {
       "id": "EAI-DMG-03",
@@ -340,7 +350,7 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Weekly live evaluation; quarterly bias review; on model change",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/model-validation-2026.md",
         "docs/aims/bias-fairness-testing.md",
@@ -350,7 +360,12 @@
         "test/advisor-assurance.test.js",
         "test/advisor-bias-eval.test.mjs"
       ],
-      "note": "Validation covers governed use of external models rather than claiming validation of the provider's foundation model."
+      "note": "Validation and bias controls exist; the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors, but the recorded 2026 Q3 model-validation sign-off is overdue; independent review remains routed to item 8.",
+      "closure_actions": [
+        8,
+        38
+      ],
+      "review_by": "2026-09-30"
     },
     {
       "id": "EAI-DMG-05",
@@ -372,7 +387,9 @@
       "closure_actions": [
         5,
         11,
-        29
+        29,
+        35,
+        36
       ]
     },
     {
@@ -399,7 +416,7 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Weekly and per build",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/eval-scorecard.md",
         "scripts/advisor-eval.mjs"
@@ -407,7 +424,10 @@
       "tests": [
         "test/advisor-assurance.test.js"
       ],
-      "note": "Offline and live evals provide repeatable behavioural assurance."
+      "note": "Offline assurance remains in CI, but scheduled live Advisor evaluations on 2026-09-28 and 2026-10-05 were incomplete because provider usage and credit limits blocked the governed live suite. No regression was observed, but live behavioural evidence remains incomplete until a successful recovery run.",
+      "closure_actions": [
+        40
+      ]
     },
     {
       "id": "EAI-MON-02",
@@ -435,18 +455,25 @@
       "owner": "Compliance Engineering",
       "operator": "Compliance Engineering",
       "cadence": "Per build and continuous runtime configuration",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
+        "netlify/functions/_auth.js",
         "netlify.toml",
         ".github/workflows/codeql.yml",
         ".github/workflows/semgrep.yml",
-        ".github/workflows/fortify.yml"
+        ".github/workflows/fortify.yml",
+        "docs/governance/open-actions-register.md"
       ],
       "tests": [
         "test/csp.test.mjs",
-        "test/security-headers.test.mjs"
+        "test/security-headers.test.mjs",
+        "test/asana-functions.test.js",
+        "test/property-fuzz.test.js"
       ],
-      "note": "Application and repository security controls are tested independently of model quality."
+      "note": "Application and repository security controls are tested, but production function endpoints do not yet have verified user identity. The current Origin/shared-token gate is explicitly a compensating control; open action 20 adds real JWT/OIDC role-based authentication.",
+      "closure_actions": [
+        20
+      ]
     },
     {
       "id": "EAI-MON-04",
@@ -590,8 +617,38 @@
       "tests": [],
       "note": "No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned.",
       "closure_actions": [
-        10
+        10,
+        37
       ]
+    },
+    {
+      "id": "EAI-AUD-07",
+      "layer": "L6",
+      "name": "Regular control testing and review currency",
+      "owner": "MLRO / Internal Audit",
+      "operator": "Compliance Engineering / control owners",
+      "cadence": "Continuous automation; quarterly and annual human review cycles",
+      "status": "partial",
+      "evidence": [
+        "docs/governance/ai-control-testing-calendar.md",
+        "docs/governance/policy-register.md",
+        "data/compliance-calendar.json",
+        "docs/governance/open-actions-register.md"
+      ],
+      "tests": [
+        "test/policies.test.mjs",
+        "test/compliance-calendar.test.mjs",
+        "test/grc-metrics.test.mjs"
+      ],
+      "closure_actions": [
+        8,
+        14,
+        15,
+        31,
+        38,
+        41
+      ],
+      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle."
     }
   ]
 }

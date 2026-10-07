@@ -5,8 +5,8 @@ basis/safeguard, and DPA status. Owner: MLRO / DPO. Review: annually + on change
 
 | Vendor | Service | Data shared | Direction | Safeguard / DPA | Notes |
 |---|---|---|---|---|---|
-| **Asana** | Customer database (read) + report/case delivery (write) | Customer records, UBOs, screening results | In + Out | Vendor DPA — **confirm on file** | Token is a repo secret; never in browser. System of record. |
-| **Anthropic** | LLM grounded triage (optional) | Subject **name + one public headline** only | Out | Vendor DPA + this DPIA. **Executed: owner attestation 2026-07-16** (recorded in session; execution pack: `anthropic-dpa-execution-pack.md`). Counsel's written transfer-basis confirmation still to be recorded (Asana P26) | Owner reports `vars.LLM_TRIAGE` set to `1` on 2026-07-16 (attestation; no API read surface for repo variables from the recording session). Grounded triage becomes active from the next scheduled run; behaviour to be corroborated on that run's log |
+| **Asana** | Customer database (read) + report/case delivery (write) | Customer records, UBOs, screening results | In + Out | Vendor DPA — **confirm on file** (open-actions item 35) | Token is a repo secret; never in browser. System of record. |
+| **Anthropic** | LLM grounded triage (optional) | Subject **name + one public headline** only | Out | Vendor DPA + this DPIA. **Owner attestation dated 2026-07-16 reports execution, but the repository execution block below remains DRAFT with required fields blank. Treat the DPA as unverified/outstanding until item 36 reconciles the evidence.** Counsel's written transfer-basis confirmation also remains outstanding. | Owner reports `vars.LLM_TRIAGE` set to `1` on 2026-07-16 (attestation; no API read surface for repo variables from the recording session). Runtime enablement is not evidence of DPA execution; the verified legal record controls the vendor-assurance status. |
 | **Google (News RSS)** | Adverse-media search | Subject name + risk terms (query) | Out | Public service; no account; no PII beyond the queried name | No customer record sent |
 | **Wikimedia (Wikidata)** | PEP detection: live per-name lookup, plus the weekly worldwide PEP harvest (`data/pep-worldwide.json`, ~424k office-holders) screened as a bulk net by both engines | Individual name (query, live lookup only) | Out | Public CC0 API; structured data released under CC0 (public domain) — no licence needed | No customer record sent; the bulk net matches on-runner |
 | **OpenSanctions** (`data.opensanctions.org`) | Bulk dataset downloads, all optional: UK/EU/AU/CH and OFAC/UN mirror **fallbacks** (the official publishers' files are primary since 2026-10-03), `peps` PEP/RCA net, `crime` adverse-exposure watchlist, optional `debarment` / `regulatory` adverse nets (OFF unless the `ADVERSE_WATCHLIST_EXTRA` repository variable names them), the `sanctions` worldwide net, `ae_local_terrorists` EOCN drift cross-check, and 28 national-list mirrors in `data/sanctions-extra.json` | **None** — pull-only bulk files; matching is on-runner; no name is ever sent | In | Bulk data is **CC-BY-NC 4.0**; OpenSanctions states that businesses must acquire a data licence. **Licence-free mode:** the repository variable `OPENSANCTIONS_DATA=0` stops every download from this host in both engines (core lists then come from their official publishers only, the worldwide PEP net is the Wikidata harvest, and each switched-off net is named OFF in the report). Unset = on. Per-net kill-switches: `PEP_MIRROR_FALLBACK=0`, `ADVERSE_WATCHLIST=0`, `WORLDWIDE_SANCTIONS=0`, `EOCN_MIRROR_CROSSCHECK=0`. | Every mirror/watchlist result is provenance-marked in the report ("OpenSanctions mirror" / "watchlist") so the audit trail shows which source actually screened; the EOCN cross-check only ALARMS (local curated list stays the screening source). Licence-free mode loses the RCA (relatives / close associates) bulk net and the crime watchlist; the report says so. |
@@ -20,8 +20,8 @@ from the vendor against the firm's contracted plan and recorded here.
 
 | Processor | Processing region (declared) | Status |
 |---|---|---|
-| **Anthropic** | United States (API) | Confirm contracted region/zero-retention terms at DPA signing |
-| **Asana** | US (Asana default; EU data centre available on plan) | **Confirm** the workspace's contracted region |
+| **Anthropic** | United States (API) | Confirm contracted region/zero-retention terms at DPA signing; open-actions item 36 |
+| **Asana** | US (Asana default; EU data centre available on plan) | **Confirm** the workspace's contracted region; open-actions item 35 |
 | **Google (News RSS)** | Global edge; query only (subject name) | No PII record stored; residency N/A |
 | **Wikimedia (Wikidata)** | Global; query only (name) | No PII record stored; residency N/A |
 | **OpenSanctions** | CDN download only — no query, no PII leaves the runner | Pull-only; residency N/A |
@@ -29,8 +29,8 @@ from the vendor against the firm's contracted plan and recorded here.
 | **Composio** | **Confirm contracted processing region** | Keep `COMPOSIO_ENABLED=0` until DPA, subprocessors, retention and UAE PDPL transfer basis are recorded |
 
 ## Actions / gaps
-- [ ] **Confirm Asana DPA** on file and note ref here.
-- [ ] **Sign Anthropic DPA** (authorised signatory) and attach this DPIA. ⚠ The
+- [ ] **Confirm Asana DPA** on file, record the contracted processing region and note the evidence/ref here. Tracked as open-actions item 35.
+- [ ] **Reconcile and verify the Anthropic DPA execution record** (authorised signatory/evidence) and attach this DPIA. The owner attestation and the blank execution block are not treated as equivalent evidence. Tracked as open-actions item 36. ⚠ The
   `ANTHROPIC_API_KEY` secret was wired **ahead of** signature, so on 2026-06-29 the
   triage egress was **gated OFF** (`vars.LLM_TRIAGE` default `0`, applied in the
   screening workflows) to prevent an unauthorised cross-border transfer. **After

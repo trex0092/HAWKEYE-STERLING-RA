@@ -71,6 +71,10 @@ export function validateRegister(reg, actionMarkdown, today = new Date().toISOSt
     if (!layers.has(c.layer)) errors.push(c.id + ': unknown layer ' + String(c.layer));
     if (!c.name || !c.owner || !c.operator || !c.cadence) errors.push(c.id + ': missing name/owner/operator/cadence');
     if (!ALLOWED_STATUS.has(c.status)) errors.push(c.id + ': invalid status ' + String(c.status));
+    if (c.review_by !== undefined) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(c.review_by))) errors.push(c.id + ': review_by must be YYYY-MM-DD');
+      else if (c.status === 'effective' && today > c.review_by) errors.push(c.id + ': effective control review is overdue: ' + c.review_by);
+    }
     if (c.status === 'partial' || c.status === 'open') {
       if (!Array.isArray(c.closure_actions) || c.closure_actions.length === 0) {
         errors.push(c.id + ': incomplete control must name at least one closure_actions item');
