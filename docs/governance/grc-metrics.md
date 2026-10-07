@@ -63,7 +63,7 @@ reports **null with its reason**, and the corresponding KRI-09 stays in the
 appetite register marked *not instrumented*. Instrumenting it is a board act:
 setting target dates on the governance rows of the open-actions register
 (item 17). The remaining maintainer-owned engineering rows (items 20–24 and
-26–28) carry maintainer-set dates already; vendor/governance/assurance items 29–38 and 40–43 remain
+26–28) carry maintainer-set dates already; vendor/governance/assurance items 29–38 and 40–44 remain
 undated until their named human owners set dates. The per-row counter below reports that
 gap rather than inventing a deadline.
 
