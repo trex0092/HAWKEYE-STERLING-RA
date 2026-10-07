@@ -9,7 +9,7 @@
     "sanctionsCovered": 195,
     "adverseMediaCovered": 195,
     "pepCovered": 195,
-    "nationalSanctionsScreened": 45,
+    "nationalSanctionsScreened": 54,
     "dedicatedGoogleNewsEditions": 67
   },
   "countries": [
@@ -186,8 +186,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "identified",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "at-oenb-terror"
+        ]
       },
       "adverseMedia": {
         "covered": true,
@@ -487,8 +489,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "identified",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "bg-dans-mft"
+        ]
       },
       "adverseMedia": {
         "covered": true,
@@ -759,8 +763,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "identified",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ci-centif-1373"
+        ]
       },
       "adverseMedia": {
         "covered": true,
@@ -1109,7 +1115,7 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "identified",
+        "nationalStatus": "assessed-not-loadable",
         "nationalSources": []
       },
       "adverseMedia": {
@@ -1513,8 +1519,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "pending",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "iq-aml-freeze"
+        ]
       },
       "adverseMedia": {
         "covered": true,
@@ -1778,8 +1786,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "identified",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "lb-isf-ntfl"
+        ]
       },
       "adverseMedia": {
         "covered": true,
@@ -2278,8 +2288,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "identified",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "np-moha-prohibited"
+        ]
       },
       "adverseMedia": {
         "covered": true,
@@ -2672,8 +2684,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "not-researched",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "ro-onpcsb-terror"
+        ]
       },
       "adverseMedia": {
         "covered": true,
@@ -2873,8 +2887,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "identified",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "rs-apml-domestic"
+        ]
       },
       "adverseMedia": {
         "covered": true,
@@ -3001,8 +3017,10 @@
       "sanctions": {
         "covered": true,
         "scope": "global-subject-screening",
-        "nationalStatus": "identified",
-        "nationalSources": []
+        "nationalStatus": "screened",
+        "nationalSources": [
+          "so-namlc"
+        ]
       },
       "adverseMedia": {
         "covered": true,
