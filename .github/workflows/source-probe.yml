@@ -58,7 +58,8 @@ jobs:
         env:
           SOURCE_ID: ${{ inputs.source_id }}
         run: |
-          node scripts/source-probe.mjs "${SOURCE_ID:-all-disabled}" .probe
+          mkdir -p .probe
+          node scripts/source-probe.mjs "${SOURCE_ID:-all-disabled}" | tee .probe/source-probe-report.md
           {
             cat .probe/source-probe-report.md
             echo
