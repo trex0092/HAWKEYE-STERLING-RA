@@ -360,11 +360,10 @@
         "test/advisor-assurance.test.js",
         "test/advisor-bias-eval.test.mjs"
       ],
-      "note": "Validation and bias controls exist, but the recorded 2026 Q3 model-validation sign-off is overdue and the scheduled 2026-10-01 bias-eval result is not yet reconciled into the evidence ledger; independent review remains routed to item 8.",
+      "note": "Validation and bias controls exist; the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors, but the recorded 2026 Q3 model-validation sign-off is overdue; independent review remains routed to item 8.",
       "closure_actions": [
         8,
-        38,
-        39
+        38
       ],
       "review_by": "2026-09-30"
     },
@@ -417,7 +416,7 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Weekly and per build",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/eval-scorecard.md",
         "scripts/advisor-eval.mjs"
@@ -425,7 +424,10 @@
       "tests": [
         "test/advisor-assurance.test.js"
       ],
-      "note": "Offline and live evals provide repeatable behavioural assurance."
+      "note": "Offline assurance remains in CI, but scheduled live Advisor evaluations on 2026-09-28 and 2026-10-05 were incomplete because provider usage and credit limits blocked the governed live suite. No regression was observed, but live behavioural evidence remains incomplete until a successful recovery run.",
+      "closure_actions": [
+        40
+      ]
     },
     {
       "id": "EAI-MON-02",
