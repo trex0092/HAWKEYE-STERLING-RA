@@ -480,11 +480,12 @@
         "test/asana-functions.test.js",
         "test/property-fuzz.test.js"
       ],
-      "note": "Application and repository security controls are tested, but three material gaps remain: pre-redaction subject data is still retrievable from public git history until item 1 is executed; production function endpoints lack verified per-user identity/RBAC under item 20; and the billed LLM relay still uses per-instance rather than fleet-wide rate limiting under item 22.",
+      "note": "Application and repository security controls are tested, but four material gaps remain: pre-redaction subject data is still retrievable from public git history until item 1 is executed; production function endpoints lack verified per-user identity/RBAC under item 20; the billed LLM relay still uses per-instance rather than fleet-wide rate limiting under item 22; and the first annual manual penetration test remains outstanding under item 43.",
       "closure_actions": [
         1,
         20,
-        22
+        22,
+        43
       ]
     },
     {
@@ -667,9 +668,10 @@
         31,
         32,
         38,
-        41
+        41,
+        43
       ],
-      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle."
+      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, TFS/watchlist review cycle, and the first annual manual penetration test."
     },
     {
       "id": "EAI-AUD-08",
