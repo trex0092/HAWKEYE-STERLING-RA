@@ -1,0 +1,414 @@
+[
+ {
+  "t": "bg български",
+  "h": "https://finance.ec.europa.eu/financial-crime_bg"
+ },
+ {
+  "t": "nl Nederlands",
+  "h": "https://finance.ec.europa.eu/financial-crime_nl"
+ },
+ {
+  "t": "pt português",
+  "h": "https://finance.ec.europa.eu/financial-crime_pt"
+ },
+ {
+  "t": "sk slovenčina",
+  "h": "https://finance.ec.europa.eu/financial-crime_sk"
+ },
+ {
+  "t": "sl slovenščina",
+  "h": "https://finance.ec.europa.eu/financial-crime_sl"
+ },
+ {
+  "t": "Regulatory process in financial services",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/regulatory-process-financial-services_en"
+ },
+ {
+  "t": "European system of financial supervision",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/european-system-financial-supervision_en"
+ },
+ {
+  "t": "Free movement of capital",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/free-movement-capital_en"
+ },
+ {
+  "t": "Overview of financial services legislation",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/financial-services-legislation/overview-financial-services-legislation_en"
+ },
+ {
+  "t": "Implementing and delegated acts",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/financial-services-legislation/implementing-and-delegated-acts_en"
+ },
+ {
+  "t": "Enforcement of banking and finance law",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/financial-services-legislation/enforcement-and-infringements-banking-and-finance-law_en"
+ },
+ {
+  "t": "Expert groups, comitology and other committees",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/expert-groups-comitology-and-other-committees_en"
+ },
+ {
+  "t": "Consultations",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/consultation_en"
+ },
+ {
+  "t": "Discover more",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision_en"
+ },
+ {
+  "t": "Savings & investments union",
+  "h": "https://finance.ec.europa.eu/regulation-and-supervision/savings-and-investments-union_en"
+ },
+ {
+  "t": "Securities markets",
+  "h": "https://finance.ec.europa.eu/financial-markets/financial-markets-policy/securities-markets_en"
+ },
+ {
+  "t": "Post-trade services",
+  "h": "https://finance.ec.europa.eu/financial-markets/financial-markets-policy/post-trade-services_en"
+ },
+ {
+  "t": "Investment funds",
+  "h": "https://finance.ec.europa.eu/financial-markets/financial-markets-policy/investment-funds_en"
+ },
+ {
+  "t": "Regulating credit rating agencies",
+  "h": "https://finance.ec.europa.eu/financial-markets/financial-markets-policy/regulating-credit-rating-agencies_en"
+ },
+ {
+  "t": "Prudential rules for investment firms",
+  "h": "https://finance.ec.europa.eu/financial-markets/financial-markets-policy/prudential-rules-investment-firms_en"
+ },
+ {
+  "t": "Company reporting",
+  "h": "https://finance.ec.europa.eu/financial-markets/company-reporting-and-auditing/company-reporting_en"
+ },
+ {
+  "t": "Auditing of companies' financial statements",
+  "h": "https://finance.ec.europa.eu/financial-markets/company-reporting-and-auditing/auditing-companies-financial-statements_en"
+ },
+ {
+  "t": "Discover more",
+  "h": "https://finance.ec.europa.eu/financial-markets_en"
+ },
+ {
+  "t": "Corporate sustainability reporting",
+  "h": "https://finance.ec.europa.eu/financial-markets/company-reporting-and-auditing/company-reporting/corporate-sustainability-reporting_en"
+ },
+ {
+  "t": "Prudential requirements",
+  "h": "https://finance.ec.europa.eu/banking/banking-regulation/prudential-requirements_en"
+ },
+ {
+  "t": "Bank recovery and resolution",
+  "h": "https://finance.ec.europa.eu/banking/banking-regulation/bank-recovery-and-resolution_en"
+ },
+ {
+  "t": "Deposit guarantee schemes",
+  "h": "https://finance.ec.europa.eu/banking/banking-regulation/deposit-guarantee-schemes_en"
+ },
+ {
+  "t": "Winding-up of credit institutions",
+  "h": "https://finance.ec.europa.eu/banking/banking-regulation/winding-credit-institutions_en"
+ },
+ {
+  "t": "Macroprudential policy",
+  "h": "https://finance.ec.europa.eu/banking/banking-regulation/macroprudential-policy_en"
+ },
+ {
+  "t": "Covered bonds",
+  "h": "https://finance.ec.europa.eu/banking/banking-regulation/covered-bonds_en"
+ },
+ {
+  "t": "What is the banking union?",
+  "h": "https://finance.ec.europa.eu/banking/banking-union/what-banking-union_en"
+ },
+ {
+  "t": "Single supervisory mechanism",
+  "h": "https://finance.ec.europa.eu/banking/banking-union/single-supervisory-mechanism_en"
+ },
+ {
+  "t": "Single resolution mechanism",
+  "h": "https://finance.ec.europa.eu/banking/banking-union/single-resolution-mechanism_en"
+ },
+ {
+  "t": "European deposit insurance scheme",
+  "h": "https://finance.ec.europa.eu/banking/banking-union/european-deposit-insurance-scheme_en"
+ },
+ {
+  "t": "Sovereign bond-backed securities (SBBS)",
+  "h": "https://finance.ec.europa.eu/banking/banking-union/sovereign-bond-backed-securities-sbbs_en"
+ },
+ {
+  "t": "Non-performing loans (NPLs)",
+  "h": "https://finance.ec.europa.eu/banking/non-performing-loans-npls_en"
+ },
+ {
+  "t": "Supplementary supervision of financial conglomerates",
+  "h": "https://finance.ec.europa.eu/banking/supplementary-supervision-financial-conglomerates_en"
+ },
+ {
+  "t": "Insurance regulation",
+  "h": "https://finance.ec.europa.eu/banking/insurance/insurance-regulation_en"
+ },
+ {
+  "t": "Insurance distribution",
+  "h": "https://finance.ec.europa.eu/banking/insurance/insurance-distribution_en"
+ },
+ {
+  "t": "Motor insurance",
+  "h": "https://finance.ec.europa.eu/banking/insurance/motor-insurance_en"
+ },
+ {
+  "t": "Insurance of climate-related disasters",
+  "h": "https://finance.ec.europa.eu/banking/insurance/insurance-climate-related-disasters_en"
+ },
+ {
+  "t": "Occupational pension funds",
+  "h": "https://finance.ec.europa.eu/banking/pension-funds/occupational-pension-funds_en"
+ },
+ {
+  "t": "Pan-European personal pension product (PEPP)",
+  "h": "https://finance.ec.europa.eu/banking/pension-funds/pan-european-personal-pension-product-pepp_en"
+ },
+ {
+  "t": "Discover more",
+  "h": "https://finance.ec.europa.eu/banking_en"
+ },
+ {
+  "t": "Overview of sustainable finance",
+  "h": "https://finance.ec.europa.eu/sustainable-finance/overview-sustainable-finance_en"
+ },
+ {
+  "t": "EU taxonomy for sustainable activities",
+  "h": "https://finance.ec.europa.eu/sustainable-finance/tools-and-standards/eu-taxonomy-sustainable-activities_en"
+ },
+ {
+  "t": "The European green bond standard – Supporting the transition",
+  "h": "https://finance.ec.europa.eu/sustainable-finance/tools-and-standards/european-green-bond-standard-supporting-transition_en"
+ },
+ {
+  "t": "ESG rating activities",
+  "h": "https://finance.ec.europa.eu/sustainable-finance/tools-and-standards/esg-rating-activities_en"
+ },
+ {
+  "t": "EU labels for benchmarks (climate, ESG) and benchmarks’ ESG disclosures",
+  "h": "https://finance.ec.europa.eu/sustainable-finance/disclosures/eu-labels-benchmarks-climate-esg-and-benchmarks-esg-disclosures_en"
+ },
+ {
+  "t": "Sustainability-related disclosure in the financial services sector",
+  "h": "https://finance.ec.europa.eu/sustainable-finance/disclosures/sustainability-related-disclosure-financial-services-sector_en"
+ },
+ {
+  "t": "Platform on Sustainable Finance",
+  "h": "https://finance.ec.europa.eu/sustainable-finance/platform-sustainable-finance_en"
+ },
+ {
+  "t": "International Platform on Sustainable Finance",
+  "h": "https://finance.ec.europa.eu/sustainable-finance/international-platform-sustainable-finance_en"
+ },
+ {
+  "t": "Discover more",
+  "h": "https://finance.ec.europa.eu/sustainable-finance_en"
+ },
+ {
+  "t": "Overview of digital finance",
+  "h": "https://finance.ec.europa.eu/digital-finance/overview-digital-finance_en"
+ },
+ {
+  "t": "Digital euro",
+  "h": "https://finance.ec.europa.eu/digital-finance/digital-euro_en"
+ },
+ {
+  "t": "Crypto-assets",
+  "h": "https://finance.ec.europa.eu/digital-finance/crypto-assets_en"
+ },
+ {
+  "t": "Cyber resilience",
+  "h": "https://finance.ec.europa.eu/digital-finance/cyber-resilience_en"
+ },
+ {
+  "t": "Framework for financial data access",
+  "h": "https://finance.ec.europa.eu/digital-finance/framework-financial-data-access_en"
+ },
+ {
+  "t": "Discover more",
+  "h": "https://finance.ec.europa.eu/digital-finance_en"
+ },
+ {
+  "t": "Consumer financial services policy",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/retail-financial-services/consumer-financial-services-policy_en"
+ },
+ {
+  "t": "Access to bank accounts",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/retail-financial-services/access-bank-accounts_en"
+ },
+ {
+  "t": "Distance marketing of financial services",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/retail-financial-services/distance-marketing-financial-services_en"
+ },
+ {
+  "t": "Key information documents for packaged retail and insurance-based investment products (PRIIPs)",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/retail-financial-services/key-information-documents-packaged-retail-and-insurance-based-investment-products-priips_en"
+ },
+ {
+  "t": "Increasing consumer involvement in financial service policy-making",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/retail-financial-services/increasing-consumer-involvement-financial-service-policy-making_en"
+ },
+ {
+  "t": "Financial dispute resolution network: FIN-NET",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/retail-financial-services/financial-dispute-resolution-network-fin-net_en"
+ },
+ {
+  "t": "Payment services",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/payment-services/payment-services_en"
+ },
+ {
+  "t": "Single euro payments area (SEPA)",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/payment-services/single-euro-payments-area-sepa_en"
+ },
+ {
+  "t": "Financial literacy",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments/financial-literacy_en"
+ },
+ {
+  "t": "Discover more",
+  "h": "https://finance.ec.europa.eu/consumer-finance-and-payments_en"
+ },
+ {
+  "t": "Overview of sanctions and related resources",
+  "h": "https://finance.ec.europa.eu/eu-and-world/sanctions-restrictive-measures/overview-sanctions-and-related-resources_en"
+ },
+ {
+  "t": "Sanctions adopted following Russia’s military aggression against Ukraine",
+  "h": "https://finance.ec.europa.eu/eu-and-world/sanctions-restrictive-measures/sanctions-adopted-following-russias-military-aggression-against-ukraine_en"
+ },
+ {
+  "t": "Humanitarian assistance in environments subject to EU sanctions",
+  "h": "https://finance.ec.europa.eu/eu-and-world/sanctions-restrictive-measures/humanitarian-assistance-environments-subject-eu-sanctions_en"
+ },
+ {
+  "t": "Contacts on EU sanctions",
+  "h": "https://finance.ec.europa.eu/eu-and-world/sanctions-restrictive-measures/contacts-eu-sanctions_en"
+ },
+ {
+  "t": "Anti-money laundering overview",
+  "h": "https://finance.ec.europa.eu/financial-crime/anti-money-laundering-and-countering-financing-terrorism-overview_en"
+ },
+ {
+  "t": "Anti-money laundering at EU level",
+  "h": "https://finance.ec.europa.eu/financial-crime/anti-money-laundering-and-countering-financing-terrorism-eu-level_en"
+ },
+ {
+  "t": "Anti-money laundering at international level",
+  "h": "https://finance.ec.europa.eu/financial-crime/anti-money-laundering-and-countering-financing-terrorism-international-level_en"
+ },
+ {
+  "t": "Anti-Money Laundering Authority",
+  "h": "https://www.amla.europa.eu/index_en"
+ },
+ {
+  "t": "The international role of the euro",
+  "h": "https://economy-finance.ec.europa.eu/euro/international-role-euro_en"
+ },
+ {
+  "t": "Extraterritoriality (Blocking statute)",
+  "h": "https://finance.ec.europa.eu/eu-and-world/open-strategic-autonomy/extraterritoriality-blocking-statute_en"
+ },
+ {
+  "t": "Equivalence of non-EU financial services frameworks",
+  "h": "https://finance.ec.europa.eu/eu-and-world/equivalence-non-eu-financial-services-frameworks_en"
+ },
+ {
+  "t": "International relations",
+  "h": "https://finance.ec.europa.eu/eu-and-world/international-relations_en"
+ },
+ {
+  "t": "International cooperation",
+  "h": "https://finance.ec.europa.eu/eu-and-world/international-cooperation-financial-regulation-and-capital-movements_en"
+ },
+ {
+  "t": "Discover more",
+  "h": "https://finance.ec.europa.eu/eu-and-world_en"
+ },
+ {
+  "t": "Sanctions against Russia",
+  "h": "https://finance.ec.europa.eu/eu-and-world/sanctions-restrictive-measures/sanctions-adopted-following-russias-military-aggression-against-ukraine_en"
+ },
+ {
+  "t": "EU Economy and Finance",
+  "h": "https://www.linkedin.com/showcase/eu-economy-finance"
+ },
+ {
+  "t": "Commissioner Maria Luís Albuquerque",
+  "h": "https://www.linkedin.com/in/maria-lu%c3%ads-albuquerque-6085a472/"
+ },
+ {
+  "t": "Director-General John Berrigan",
+  "h": "https://be.linkedin.com/in/john-berrigan-31131778"
+ },
+ {
+  "t": "EU Economy and Finance",
+  "h": "https://bsky.app/profile/eu-economy-finance.ec.europa.eu"
+ },
+ {
+  "t": "EU Finance Podcast",
+  "h": "https://finance.ec.europa.eu/eu-finance-podcast-future-finance_en"
+ },
+ {
+  "t": "Finance news hub",
+  "h": "https://finance.ec.europa.eu/finance-news-hub_en"
+ },
+ {
+  "t": "More about Commissioner Albuquerque",
+  "h": "https://commission.europa.eu/about/organisation/college-commissioners/maria-luis-albuquerque_en"
+ },
+ {
+  "t": "Directorate-General for Financial Stability, Financial Services and Capital Markets Union",
+  "h": "https://ec.europa.eu/info/departments/financial-stability-financial-services-and-capital-markets-union_en"
+ },
+ {
+  "t": "Mission and objectives",
+  "h": "https://finance.ec.europa.eu/node/1683"
+ },
+ {
+  "t": "Policy making achievements & milestones 2024-2025",
+  "h": "https://finance.ec.europa.eu/policy-making-achievements-milestones-2024-2025_en"
+ },
+ {
+  "t": "Policy making achievements & milestones 2019-2024",
+  "h": "https://finance.ec.europa.eu/policy-making-achievements-milestones-2019-2024_en"
+ },
+ {
+  "t": "EU sanctions helpdesk",
+  "h": "https://eu-sanctions-compliance-helpdesk.europa.eu/index_en"
+ },
+ {
+  "t": "EU Digital Finance Platform",
+  "h": "https://digital-finance-platform.ec.europa.eu/"
+ },
+ {
+  "t": "Own your future, invest in you!",
+  "h": "https://ec.europa.eu/finance/invest-in-you/"
+ },
+ {
+  "t": "Report an IT vulnerability",
+  "h": "https://commission.europa.eu/legal-notice/vulnerability-disclosure-policy_en"
+ },
+ {
+  "t": "Languages on our websites",
+  "h": "https://commission.europa.eu/languages-our-websites_en"
+ },
+ {
+  "t": "Privacy policy",
+  "h": "https://commission.europa.eu/privacy-policy-websites-managed-european-commission_en"
+ },
+ {
+  "t": "Legal notice",
+  "h": "https://commission.europa.eu/legal-notice_en"
+ },
+ {
+  "t": "Accessibility",
+  "h": "https://finance.ec.europa.eu/accessibility-statement_en"
+ }
+]

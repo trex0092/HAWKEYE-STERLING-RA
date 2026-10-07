@@ -1,0 +1,1022 @@
+[
+ {
+  "t": "Artificial intelligence",
+  "h": "https://www.oecd.org/en/topics/artificial-intelligence.html"
+ },
+ {
+  "t": "Climate mitigation and net-zero transition",
+  "h": "https://www.oecd.org/en/topics/climate-mitigation-and-net-zero-transition.html"
+ },
+ {
+  "t": "Development co-operation",
+  "h": "https://www.oecd.org/en/topics/development-co-operation.html"
+ },
+ {
+  "t": "Gender equality",
+  "h": "https://www.oecd.org/en/topics/gender-equality.html"
+ },
+ {
+  "t": "Global value and supply chains",
+  "h": "https://www.oecd.org/en/topics/global-value-and-supply-chains.html"
+ },
+ {
+  "t": "Tax transparency and international co-operation",
+  "h": "https://www.oecd.org/en/topics/tax-transparency-and-international-co-operation.html"
+ },
+ {
+  "t": "Agricultural policy monitoring",
+  "h": "https://www.oecd.org/en/topics/agricultural-policy-monitoring.html"
+ },
+ {
+  "t": "Agricultural productivity and innovation",
+  "h": "https://www.oecd.org/en/topics/agricultural-productivity-and-innovation.html"
+ },
+ {
+  "t": "Agricultural trade and markets",
+  "h": "https://www.oecd.org/en/topics/agricultural-trade-and-markets.html"
+ },
+ {
+  "t": "Agriculture and sustainability",
+  "h": "https://www.oecd.org/en/topics/agriculture-and-sustainability.html"
+ },
+ {
+  "t": "Fisheries and aquaculture",
+  "h": "https://www.oecd.org/en/topics/fisheries-and-aquaculture.html"
+ },
+ {
+  "t": "Food systems",
+  "h": "https://www.oecd.org/en/topics/food-systems.html"
+ },
+ {
+  "t": "OECD standards for agriculture",
+  "h": "https://www.oecd.org/en/topics/oecd-standards-for-agriculture.html"
+ },
+ {
+  "t": "Explore agriculture and fisheries",
+  "h": "https://www.oecd.org/en/topics/agriculture-and-fisheries.html"
+ },
+ {
+  "t": "Climate adaptation and resilience",
+  "h": "https://www.oecd.org/en/topics/climate-adaptation-and-resilience.html"
+ },
+ {
+  "t": "Finance and investment for climate goals",
+  "h": "https://www.oecd.org/en/topics/finance-and-investment-for-climate-goals.html"
+ },
+ {
+  "t": "Global co-operation on climate",
+  "h": "https://www.oecd.org/en/topics/global-co-operation-on-climate.html"
+ },
+ {
+  "t": "Green technology and innovation",
+  "h": "https://www.oecd.org/en/topics/green-technology-and-innovation.html"
+ },
+ {
+  "t": "Resource efficiency and circular economy",
+  "h": "https://www.oecd.org/en/topics/resource-efficiency-and-circular-economy.html"
+ },
+ {
+  "t": "Explore climate change",
+  "h": "https://www.oecd.org/en/topics/climate-change.html"
+ },
+ {
+  "t": "Critical minerals",
+  "h": "https://www.oecd.org/en/topics/sustainable-mining-for-development.html"
+ },
+ {
+  "t": "Finance for sustainable development",
+  "h": "https://www.oecd.org/en/topics/finance-for-sustainable-development.html"
+ },
+ {
+  "t": "Global and regional development trends",
+  "h": "https://www.oecd.org/en/topics/global-and-regional-development-trends.html"
+ },
+ {
+  "t": "Governance and peace for development",
+  "h": "https://www.oecd.org/en/topics/governance-and-peace-for-development.html"
+ },
+ {
+  "t": "Human development and social inclusion",
+  "h": "https://www.oecd.org/en/topics/human-development-and-social-inclusion.html"
+ },
+ {
+  "t": "Official development assistance (ODA)",
+  "h": "https://www.oecd.org/en/topics/official-development-assistance-oda.html"
+ },
+ {
+  "t": "Sustainable Development Goals (SDGs)",
+  "h": "https://www.oecd.org/en/topics/sustainable-development-goals-sdgs.html"
+ },
+ {
+  "t": "Tax and development",
+  "h": "https://www.oecd.org/en/topics/tax-and-development.html"
+ },
+ {
+  "t": "Urbanisation, infrastructure and development",
+  "h": "https://www.oecd.org/en/topics/urbanisation-infrastructure-and-development.html"
+ },
+ {
+  "t": "Explore development",
+  "h": "https://www.oecd.org/en/topics/development.html"
+ },
+ {
+  "t": "Communication infrastructure and services",
+  "h": "https://www.oecd.org/en/topics/communication-infrastructure-and-services.html"
+ },
+ {
+  "t": "Data flows and governance",
+  "h": "https://www.oecd.org/en/topics/data-flows-and-governance.html"
+ },
+ {
+  "t": "Digital government",
+  "h": "https://www.oecd.org/en/topics/digital-government.html"
+ },
+ {
+  "t": "Digital security",
+  "h": "https://www.oecd.org/en/topics/digital-security.html"
+ },
+ {
+  "t": "Digital transformation",
+  "h": "https://www.oecd.org/en/topics/digital-transformation.html"
+ },
+ {
+  "t": "Online safety and well-being",
+  "h": "https://www.oecd.org/en/topics/online-safety-and-well-being.html"
+ },
+ {
+  "t": "Privacy and data protection",
+  "h": "https://www.oecd.org/en/topics/privacy-and-data-protection.html"
+ },
+ {
+  "t": "Explore digital",
+  "h": "https://www.oecd.org/en/topics/digital.html"
+ },
+ {
+  "t": "Economic policy",
+  "h": "https://www.oecd.org/en/topics/economic-policy.html"
+ },
+ {
+  "t": "Economic surveillance",
+  "h": "https://www.oecd.org/en/topics/economic-surveillance.html"
+ },
+ {
+  "t": "Economy and society",
+  "h": "https://www.oecd.org/en/topics/economy-and-society.html"
+ },
+ {
+  "t": "Financial markets",
+  "h": "https://www.oecd.org/en/topics/financial-markets.html"
+ },
+ {
+  "t": "Global trade and open markets",
+  "h": "https://www.oecd.org/en/topics/global-trade-and-open-markets.html"
+ },
+ {
+  "t": "Productivity and long-term growth",
+  "h": "https://www.oecd.org/en/topics/productivity-and-long-term-growth.html"
+ },
+ {
+  "t": "Sustainable economic growth",
+  "h": "https://www.oecd.org/en/topics/sustainable-economic-growth.html"
+ },
+ {
+  "t": "Explore economy",
+  "h": "https://www.oecd.org/en/topics/economy.html"
+ },
+ {
+  "t": "Adult skills and work",
+  "h": "https://www.oecd.org/en/topics/adult-skills-and-work.html"
+ },
+ {
+  "t": "Education access, participation, and progression",
+  "h": "https://www.oecd.org/en/topics/education-access-participation-and-progression.html"
+ },
+ {
+  "t": "Education economic and social outcomes",
+  "h": "https://www.oecd.org/en/topics/education-economic-and-social-outcomes.html"
+ },
+ {
+  "t": "Education equity",
+  "h": "https://www.oecd.org/en/topics/education-equity.html"
+ },
+ {
+  "t": "Education evaluation and quality assurance",
+  "h": "https://www.oecd.org/en/topics/education-evaluation-and-quality-assurance.html"
+ },
+ {
+  "t": "Education financing",
+  "h": "https://www.oecd.org/en/topics/education-financing.html"
+ },
+ {
+  "t": "Education leadership",
+  "h": "https://www.oecd.org/en/topics/education-leadership.html"
+ },
+ {
+  "t": "Education organisation and governance",
+  "h": "https://www.oecd.org/en/topics/education-organisation-and-governance.html"
+ },
+ {
+  "t": "Future of education and skills",
+  "h": "https://www.oecd.org/en/topics/future-of-education-and-skills.html"
+ },
+ {
+  "t": "Learning environment",
+  "h": "https://www.oecd.org/en/topics/learning-environment.html"
+ },
+ {
+  "t": "Student performance (PISA)",
+  "h": "https://www.oecd.org/en/topics/student-performance-pisa.html"
+ },
+ {
+  "t": "Teachers and educators",
+  "h": "https://www.oecd.org/en/topics/teachers-and-educators.html"
+ },
+ {
+  "t": "Explore education and skills",
+  "h": "https://www.oecd.org/en/topics/education-and-skills.html"
+ },
+ {
+  "t": "Employability",
+  "h": "https://www.oecd.org/en/topics/employability.html"
+ },
+ {
+  "t": "Employment services",
+  "h": "https://www.oecd.org/en/topics/employment-services.html"
+ },
+ {
+  "t": "Future of work",
+  "h": "https://www.oecd.org/en/topics/future-of-work.html"
+ },
+ {
+  "t": "Health and work",
+  "h": "https://www.oecd.org/en/topics/health-and-work.html"
+ },
+ {
+  "t": "Local employment and economic development",
+  "h": "https://www.oecd.org/en/topics/local-employment-and-economic-development.html"
+ },
+ {
+  "t": "Public employment and management",
+  "h": "https://www.oecd.org/en/topics/public-employment-and-management.html"
+ },
+ {
+  "t": "Explore employment",
+  "h": "https://www.oecd.org/en/topics/employment.html"
+ },
+ {
+  "t": "Biodiversity, water and ecosystems",
+  "h": "https://www.oecd.org/en/topics/biodiversity-water-and-ecosystems.html"
+ },
+ {
+  "t": "Chemical safety and biosafety",
+  "h": "https://www.oecd.org/en/topics/chemical-safety-and-biosafety.html"
+ },
+ {
+  "t": "Environment, society and economy",
+  "h": "https://www.oecd.org/en/topics/environment-society-and-economy.html"
+ },
+ {
+  "t": "Environmental policies and evaluation",
+  "h": "https://www.oecd.org/en/topics/environmental-policies-and-evaluation.html"
+ },
+ {
+  "t": "Finance and investment for environmental goals",
+  "h": "https://www.oecd.org/en/topics/finance-and-investment-for-environmental-goals.html"
+ },
+ {
+  "t": "Greening countries, regions and cities",
+  "h": "https://www.oecd.org/en/topics/greening-countries-regions-and-cities.html"
+ },
+ {
+  "t": "Explore environment",
+  "h": "https://www.oecd.org/en/topics/environment.html"
+ },
+ {
+  "t": "Financial consumer protection, education and inclusion",
+  "h": "https://www.oecd.org/en/topics/financial-consumer-protection-and-education.html"
+ },
+ {
+  "t": "Infrastructure",
+  "h": "https://www.oecd.org/en/topics/infrastructure.html"
+ },
+ {
+  "t": "Pensions and insurance",
+  "h": "https://www.oecd.org/en/topics/pensions-and-insurance.html"
+ },
+ {
+  "t": "Responsible business conduct",
+  "h": "https://www.oecd.org/en/topics/responsible-business-conduct.html"
+ },
+ {
+  "t": "Subnational finance and investment",
+  "h": "https://www.oecd.org/en/topics/subnational-finance-and-investment.html"
+ },
+ {
+  "t": "Explore finance and investment",
+  "h": "https://www.oecd.org/en/topics/finance-and-investment.html"
+ },
+ {
+  "t": "Anti-corruption and integrity",
+  "h": "https://www.oecd.org/en/topics/anti-corruption-and-integrity.html"
+ },
+ {
+  "t": "Corporate governance",
+  "h": "https://www.oecd.org/en/topics/corporate-governance.html"
+ },
+ {
+  "t": "Government innovation",
+  "h": "https://www.oecd.org/en/topics/government-innovation.html"
+ },
+ {
+  "t": "Multi-level governance",
+  "h": "https://www.oecd.org/en/topics/multi-level-governance.html"
+ },
+ {
+  "t": "Public finance and budgets",
+  "h": "https://www.oecd.org/en/topics/public-finance-and-budgets.html"
+ },
+ {
+  "t": "Public policymaking",
+  "h": "https://www.oecd.org/en/topics/public-policymaking.html"
+ },
+ {
+  "t": "Public procurement",
+  "h": "https://www.oecd.org/en/topics/public-procurement.html"
+ },
+ {
+  "t": "Regulatory reform",
+  "h": "https://www.oecd.org/en/topics/regulatory-reform.html"
+ },
+ {
+  "t": "Trust and democracy",
+  "h": "https://www.oecd.org/en/topics/trust-and-democracy.html"
+ },
+ {
+  "t": "Explore governance",
+  "h": "https://www.oecd.org/en/topics/governance.html"
+ },
+ {
+  "t": "Chronic diseases",
+  "h": "https://www.oecd.org/en/topics/chronic-diseases.html"
+ },
+ {
+  "t": "Digital health",
+  "h": "https://www.oecd.org/en/topics/digital-health.html"
+ },
+ {
+  "t": "Health inequality and universal health coverage",
+  "h": "https://www.oecd.org/en/topics/health-inequality-and-universal-health-coverage.html"
+ },
+ {
+  "t": "Health spending and financial sustainability",
+  "h": "https://www.oecd.org/en/topics/health-spending-and-financial-sustainability.html"
+ },
+ {
+  "t": "Healthcare quality and outcomes",
+  "h": "https://www.oecd.org/en/topics/health-care-quality-and-outcomes.html"
+ },
+ {
+  "t": "Improving public health",
+  "h": "https://www.oecd.org/en/topics/improving-public-health.html"
+ },
+ {
+  "t": "Pharmaceuticals and medical technologies",
+  "h": "https://www.oecd.org/en/topics/pharmaceuticals-and-medical-technologies.html"
+ },
+ {
+  "t": "The future of health systems",
+  "h": "https://www.oecd.org/en/topics/the-future-of-health-systems.html"
+ },
+ {
+  "t": "Explore health",
+  "h": "https://www.oecd.org/en/topics/health.html"
+ },
+ {
+  "t": "Industrial policy",
+  "h": "https://www.oecd.org/en/topics/industrial-policy.html"
+ },
+ {
+  "t": "Industry sector analysis",
+  "h": "https://www.oecd.org/en/topics/industry-sector-analysis.html"
+ },
+ {
+  "t": "SMEs and entrepreneurship",
+  "h": "https://www.oecd.org/en/topics/smes-and-entrepreneurship.html"
+ },
+ {
+  "t": "Sustainable, green, and inclusive business",
+  "h": "https://www.oecd.org/en/topics/sustainable-green-and-inclusive-business.html"
+ },
+ {
+  "t": "Explore industry, business and entrepreneurship",
+  "h": "https://www.oecd.org/en/topics/industry-business-and-entrepreneurship.html"
+ },
+ {
+  "t": "Regional development",
+  "h": "https://www.oecd.org/en/topics/regional-development.html"
+ },
+ {
+  "t": "Rural development and natural resources",
+  "h": "https://www.oecd.org/en/topics/rural-development.html"
+ },
+ {
+  "t": "Urban development and cities",
+  "h": "https://www.oecd.org/en/topics/urban-development.html"
+ },
+ {
+  "t": "Explore regional, rural and urban development",
+  "h": "https://www.oecd.org/en/topics/regional-rural-and-urban-development.html"
+ },
+ {
+  "t": "Science policy",
+  "h": "https://www.oecd.org/en/topics/science-policy.html"
+ },
+ {
+  "t": "Space economy",
+  "h": "https://www.oecd.org/en/topics/space-economy.html"
+ },
+ {
+  "t": "Technology policy",
+  "h": "https://www.oecd.org/en/topics/technology-policy.html"
+ },
+ {
+  "t": "Explore science, technology and innovation",
+  "h": "https://www.oecd.org/en/topics/science-technology-and-innovation.html"
+ },
+ {
+  "t": "Consumer policy",
+  "h": "https://www.oecd.org/en/topics/consumer-policy.html"
+ },
+ {
+  "t": "Inclusion and equality",
+  "h": "https://www.oecd.org/en/topics/inclusion-and-equality.html"
+ },
+ {
+  "t": "Social policy",
+  "h": "https://www.oecd.org/en/topics/social-policy.html"
+ },
+ {
+  "t": "Well-being and beyond GDP",
+  "h": "https://www.oecd.org/en/topics/well-being-and-beyond-gdp.html"
+ },
+ {
+  "t": "Explore society",
+  "h": "https://www.oecd.org/en/topics/society.html"
+ },
+ {
+  "t": "Base erosion and profit shifting (BEPS)",
+  "h": "https://www.oecd.org/en/topics/base-erosion-and-profit-shifting-beps.html"
+ },
+ {
+  "t": "Consumption taxes",
+  "h": "https://www.oecd.org/en/topics/consumption-taxes.html"
+ },
+ {
+  "t": "Cross-border and international tax",
+  "h": "https://www.oecd.org/en/topics/cross-border-and-international-tax.html"
+ },
+ {
+  "t": "Tax administration",
+  "h": "https://www.oecd.org/en/topics/tax-administration.html"
+ },
+ {
+  "t": "Tax and crime",
+  "h": "https://www.oecd.org/en/topics/tax-and-crime.html"
+ },
+ {
+  "t": "Tax and the environment",
+  "h": "https://www.oecd.org/en/topics/tax-and-the-environment.html"
+ },
+ {
+  "t": "Tax treaties",
+  "h": "https://www.oecd.org/en/topics/tax-treaties.html"
+ },
+ {
+  "t": "Explore taxation",
+  "h": "https://www.oecd.org/en/topics/taxation.html"
+ },
+ {
+  "t": "Digital trade",
+  "h": "https://www.oecd.org/en/topics/digital-trade.html"
+ },
+ {
+  "t": "Export credits",
+  "h": "https://www.oecd.org/en/topics/export-credits.html"
+ },
+ {
+  "t": "Illicit trade",
+  "h": "https://www.oecd.org/en/topics/illicit-trade.html"
+ },
+ {
+  "t": "Inclusive trade",
+  "h": "https://www.oecd.org/en/topics/inclusive-trade.html"
+ },
+ {
+  "t": "Services trade",
+  "h": "https://www.oecd.org/en/topics/services-trade.html"
+ },
+ {
+  "t": "Subsidies and government support",
+  "h": "https://www.oecd.org/en/topics/subsidies-and-government-support.html"
+ },
+ {
+  "t": "Trade and sustainability",
+  "h": "https://www.oecd.org/en/topics/trade-and-sustainability.html"
+ },
+ {
+  "t": "Explore trade",
+  "h": "https://www.oecd.org/en/topics/trade.html"
+ },
+ {
+  "t": "Explore energy",
+  "h": "https://www.oecd.org/en/topics/energy.html"
+ },
+ {
+  "t": "Explore nuclear energy",
+  "h": "https://www.oecd.org/en/topics/nuclear-energy.html"
+ },
+ {
+  "t": "Explore transport",
+  "h": "https://www.oecd.org/en/topics/transport.html"
+ },
+ {
+  "t": "Antigua and Barbuda",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:atg"
+ },
+ {
+  "t": "Bosnia and Herzegovina",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:bih"
+ },
+ {
+  "t": "Brunei Darussalam",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:brn"
+ },
+ {
+  "t": "Burkina Faso",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:bfa"
+ },
+ {
+  "t": "Central African Republic",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:caf"
+ },
+ {
+  "t": "China (People's Republic of)",
+  "h": "https://www.oecd.org/en/countries/china-people-s-republic-of.html"
+ },
+ {
+  "t": "Côte d’Ivoire",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:civ"
+ },
+ {
+  "t": "Democratic People’s Republic of Korea",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:prk"
+ },
+ {
+  "t": "Democratic Republic of the Congo",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:cod"
+ },
+ {
+  "t": "Dominican Republic",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:dom"
+ },
+ {
+  "t": "Equatorial Guinea",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:gnq"
+ },
+ {
+  "t": "European Union",
+  "h": "https://www.oecd.org/en/countries/european-union.html"
+ },
+ {
+  "t": "Guinea-Bissau",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:gnb"
+ },
+ {
+  "t": "Lao People’s Democratic Republic",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:lao"
+ },
+ {
+  "t": "Liechtenstein",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:lie"
+ },
+ {
+  "t": "Marshall Islands",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:mhl"
+ },
+ {
+  "t": "Republic of North Macedonia",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:mkd"
+ },
+ {
+  "t": "Papua New Guinea",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:png"
+ },
+ {
+  "t": "Saint Kitts and Nevis",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:kna"
+ },
+ {
+  "t": "Saint Vincent and the Grenadines",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:vct"
+ },
+ {
+  "t": "Sao Tome and Principe",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:stp"
+ },
+ {
+  "t": "Saudi Arabia",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:sau"
+ },
+ {
+  "t": "Sierra Leone",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:sle"
+ },
+ {
+  "t": "Slovak Republic",
+  "h": "https://www.oecd.org/en/countries/slovak-republic.html"
+ },
+ {
+  "t": "Solomon Islands",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:slb"
+ },
+ {
+  "t": "South Africa",
+  "h": "https://www.oecd.org/en/countries/south-africa.html"
+ },
+ {
+  "t": "Syrian Arab Republic",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:syr"
+ },
+ {
+  "t": "Trinidad and Tobago",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:tto"
+ },
+ {
+  "t": "Turkmenistan",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:tkm"
+ },
+ {
+  "t": "United Arab Emirates",
+  "h": "https://www.oecd.org/en/search.html?orderBy=mostRelevant&page=0&facetTags=oecd-countries:are"
+ },
+ {
+  "t": "United Kingdom",
+  "h": "https://www.oecd.org/en/countries/united-kingdom.html"
+ },
+ {
+  "t": "United States",
+  "h": "https://www.oecd.org/en/countries/united-states.html"
+ },
+ {
+  "t": "Latin America",
+  "h": "https://www.oecd.org/en/regions/latin-america-and-the-caribbean.html"
+ },
+ {
+  "t": "Middle East and North Africa",
+  "h": "https://www.oecd.org/en/regions/middle-east-and-north-africa.html"
+ },
+ {
+  "t": "Southeast Asia",
+  "h": "https://www.oecd.org/en/regions/southeast-asia.html"
+ },
+ {
+  "t": "South East Europe",
+  "h": "https://www.oecd.org/en/regions/south-east-europe.html"
+ },
+ {
+  "t": "Browse all countries & regions",
+  "h": "https://www.oecd.org/en/countries.html"
+ },
+ {
+  "t": "Browse all publications",
+  "h": "https://www.oecd.org/en/publications.html"
+ },
+ {
+  "t": "Reports and research papers",
+  "h": "https://www.oecd.org/en/publications/reports.html"
+ },
+ {
+  "t": "Policy papers and briefs",
+  "h": "https://www.oecd.org/en/publications/briefs.html"
+ },
+ {
+  "t": "Education at a Glance 2026",
+  "h": "https://www.oecd.org/en/publications/education-at-a-glance-2026_b4968bbc-en.html"
+ },
+ {
+  "t": "OECD Economic Outlook, Interim Report",
+  "h": "https://www.oecd.org/en/publications/oecd-economic-outlook-interim-report-september-2026_f751d02b-en.html"
+ },
+ {
+  "t": "Browse all data",
+  "h": "https://www.oecd.org/en/data.html"
+ },
+ {
+  "t": "Dashboards & tools",
+  "h": "https://www.oecd.org/en/data/dashboards-and-tools.html"
+ },
+ {
+  "t": "OECD Data Explorer",
+  "h": "https://www.oecd.org/en/data/datasets/oecd-DE.html"
+ },
+ {
+  "t": "G20 GDP growth (Q2)",
+  "h": "https://www.oecd.org/en/data/insights/statistical-releases/2026/09/g20-gdp-growth-second-quarter-2026.html"
+ },
+ {
+  "t": "Unemployment rates",
+  "h": "https://www.oecd.org/en/data/insights/statistical-releases/2026/09/unemployment-rates-updated-september-2026.html"
+ },
+ {
+  "t": "Explore news and events",
+  "h": "https://www.oecd.org/en/news-events.html"
+ },
+ {
+  "t": "Blogs, videos & podcasts",
+  "h": "https://www.oecd.org/en/blogs.html"
+ },
+ {
+  "t": "Securing the livelihoods of informal economy workers in times of global changes",
+  "h": "https://www.oecd.org/en/events/2026/10/securing-the-livelihoods-of-informal-economy-workers.html"
+ },
+ {
+  "t": "2026 OECD Global forum on building trust and reinforcing democracy",
+  "h": "https://www.oecd-events.org/e/global-forum-on-democracy/en"
+ },
+ {
+  "t": "About the organisation",
+  "h": "https://www.oecd.org/en/about.html"
+ },
+ {
+  "t": "OECD Secretary-General",
+  "h": "https://www.oecd.org/en/about/secretary-general.html"
+ },
+ {
+  "t": "Organisational structure",
+  "h": "https://www.oecd.org/en/about/organisational-structure.html"
+ },
+ {
+  "t": "Members and partners",
+  "h": "https://www.oecd.org/en/about/members-partners.html"
+ },
+ {
+  "t": "OECD and G7, G20, APEC",
+  "h": "https://www.oecd.org/en/about/members-partners.html"
+ },
+ {
+  "t": "Ethics and Integrity",
+  "h": "https://www.oecd.org/en/about/ethics-and-integrity.html"
+ },
+ {
+  "t": "Young associates",
+  "h": "https://www.oecd.org/en/about/careers/young-associates.html"
+ },
+ {
+  "t": "Procurement at the OECD",
+  "h": "https://www.oecd.org/en/about/calls-for-tenders.html"
+ },
+ {
+  "t": "Login on your MyOECD account",
+  "h": "https://contact.oecd.org/login.aspx?lang=en"
+ },
+ {
+  "t": "OECD Guidelines for Multinational Enterprises on Responsible Business Conduct",
+  "h": "https://www.oecd.org/en/publications/oecd-guidelines-for-multinational-enterprises-on-responsible-business-conduct_81f92357-en.html"
+ },
+ {
+  "t": "OECD Due Diligence Guidance for Responsible Business Conduct",
+  "h": "https://www.oecd.org/en/publications/oecd-due-diligence-guidance-for-responsible-business-conduct_15f5f4b3-en.html"
+ },
+ {
+  "t": "Read more about due diligence",
+  "h": "https://www.oecd.org/en/topics/due-diligence-for-responsible-business-conduct.html"
+ },
+ {
+  "t": "Read the Recommendation",
+  "h": "https://legalinstruments.oecd.org/en/instruments/OECD-LEGAL-0486"
+ },
+ {
+  "t": "National Contact Points for Responsible Business Conduct",
+  "h": "https://www.oecd.org/en/networks/national-contact-points-for-responsible-business-conduct.html"
+ },
+ {
+  "t": "Due diligence for responsible business conduct",
+  "h": "https://www.oecd.org/en/topics/due-diligence-for-responsible-business-conduct.html"
+ },
+ {
+  "t": "Global engagement on responsible business conduct",
+  "h": "https://www.oecd.org/en/topics/global-engagement-on-responsible-business-conduct.html"
+ },
+ {
+  "t": "Public policies for responsible business conduct",
+  "h": "https://www.oecd.org/en/topics/public-policies-for-responsible-business-conduct.html"
+ },
+ {
+  "t": "90% of climate finance",
+  "h": "https://www.imf.org/en/Blogs/Articles/2023/11/27/world-needs-more-policy-ambition-private-funds-and-innovation-to-meet-climate-goals"
+ },
+ {
+  "t": "85% of technology investment",
+  "h": "https://www.mckinsey.com/capabilities/strategy-and-corporate-finance/our-insights/a-new-look-at-how-corporations-impact-the-economy-and-households"
+ },
+ {
+  "t": "NCPs Annual Report 2025 (PDF, 2 MB)",
+  "h": "https://www.oecd.org/content/dam/oecd/en/networks/national-contact-points/OECD-2025-Annual-Report-on-NCP-Activity.pdf"
+ },
+ {
+  "t": "Read the Declaration",
+  "h": "https://legalinstruments.oecd.org/en/instruments/OECD-LEGAL-0144"
+ },
+ {
+  "t": "Discover the Guidelines (PDF, 2 MB)",
+  "h": "https://www.oecd.org/content/dam/oecd/en/topics/policy-issues/responsible-business-conduct/OECD-Guidelines-RBC-Flyer.pdf"
+ },
+ {
+  "t": "Responsible agriculture supply chains",
+  "h": "https://www.oecd.org/en/topics/sub-issues/due-diligence-guidance-for-responsible-business-conduct/responsible-agriculture-supply-chains.html"
+ },
+ {
+  "t": "Responsible business conduct, environment and climate change",
+  "h": "https://www.oecd.org/en/topics/sub-issues/due-diligence-guidance-for-responsible-business-conduct/responsible-business-conduct-environment-and-climate-change.html"
+ },
+ {
+  "t": "Responsible business conduct and technology",
+  "h": "https://www.oecd.org/en/topics/sub-issues/due-diligence-guidance-for-responsible-business-conduct/responsible-business-conduct-and-technology.html"
+ },
+ {
+  "t": "Responsible business conduct in the financial sector",
+  "h": "https://www.oecd.org/en/topics/sub-issues/due-diligence-guidance-for-responsible-business-conduct/responsible-business-conduct-in-the-financial-sector.html"
+ },
+ {
+  "t": "Responsible garment and footwear supply chains",
+  "h": "https://www.oecd.org/en/topics/sub-issues/due-diligence-guidance-for-responsible-business-conduct/responsible-garment-and-footwear-supply-chains.html"
+ },
+ {
+  "t": "Responsible mineral supply chains",
+  "h": "https://www.oecd.org/en/topics/sub-issues/due-diligence-guidance-for-responsible-business-conduct/responsible-mineral-supply-chains.html"
+ },
+ {
+  "t": "See all latest insights",
+  "h": "https://www.oecd.org/en/about.html"
+ },
+ {
+  "t": "OECD Responsible Business Outlook 2026",
+  "h": "https://www.oecd.org/en/publications/oecd-responsible-business-outlook-2026_2b15370f-en.html"
+ },
+ {
+  "t": "50th Anniversary Week on Responsible Business Conduct",
+  "h": "https://www.oecd.org/en/events/2026/06/50-years-of-oecd-responsible-business-conduct.html"
+ },
+ {
+  "t": "Hitting the headlines: The ultra-fast fashion business model and responsible business conduct",
+  "h": "https://www.oecd.org/en/blogs/2025/10/hitting-the-headlines-the-ultra-fast-fashion-business-model-and-responsible-business-conduct.html"
+ },
+ {
+  "t": "Second Meeting of Inclusive Platform on Due Diligence Policy Co-operation",
+  "h": "https://www.oecd.org/en/events/2025/10/second-meeting-of-inclusive-platform-on-due-diligence-policy-co-operation.html"
+ },
+ {
+  "t": "2025 OECD Forum on Responsible Mineral Supply Chains",
+  "h": "https://www.oecd.org/en/events/2025/05/oecd-forum-on-responsible-mineral-supply-chains.html"
+ },
+ {
+  "t": "2025 OECD Forum on Due Diligence in the Garment and Footwear Sector",
+  "h": "https://www.oecd.org/en/events/2025/02/2025-oecd-forum-on-due-diligence-in-the-garment-and-footwear-sector.html"
+ },
+ {
+  "t": "OECD Handbook on Living Income and Living Wage Due Diligence",
+  "h": "https://www.oecd.org/en/events/2024/10/launch-of-the-oecd-handbook-on-due-diligence-for-enabling-living-incomes-and-living-wages-in-agriculture-garment-and-footwear-supply-chains.html"
+ },
+ {
+  "t": "Role of responsible business conduct in the global economy",
+  "h": "https://www.oecd.org/en/blogs/2023/02/role-of-responsible-business-conduct-in-the-global-economy.html"
+ },
+ {
+  "t": "Responsible Business Conduct: The new normal for sustainable future",
+  "h": "https://www.oecd.org/en/blogs/2021/06/responsible-business-conduct--the-new-normal-for-sustainable-fut.html"
+ },
+ {
+  "t": "See all publications",
+  "h": "https://www.oecd.org/en/search/publications.html?facetTags=oecd-policy-issues:pi85,oecd-content-types:publications/reports,oecd-content-types:publications/policy-briefs,oecd-content-types:publications/policy-papers,oecd-content-types:publications/working-papers,oecd-content-types:publications/standards-and-guidelines,oecd-policy-subissues:psi277&path=/content/oecd/en/publications"
+ },
+ {
+  "t": "Government involvement in sustainability initiatives",
+  "h": "https://www.oecd.org/en/publications/government-involvement-in-sustainability-initiatives_1e7b2695-en.html"
+ },
+ {
+  "t": "Alignment assessment of the Worldwide Responsible Accredited Production certification with OECD due diligence standards",
+  "h": "https://www.oecd.org/en/publications/alignment-assessment-of-the-worldwide-responsible-accredited-production-certification-with-oecd-due-diligence-standards_a598fc52-en.html"
+ },
+ {
+  "t": "Alignment assessment of the Fair Labor Accreditation for manufacturing with OECD due diligence standards",
+  "h": "https://www.oecd.org/en/publications/alignment-assessment-of-the-fair-labor-accreditation-for-manufacturing-with-oecd-due-diligence-standards_41c07aad-en.html"
+ },
+ {
+  "t": "National Contact Point for Responsible Business Conduct Peer Reviews: Italy 2026",
+  "h": "https://www.oecd.org/en/publications/national-contact-point-for-responsible-business-conduct-peer-reviews-italy-2026_9a262188-en.html"
+ },
+ {
+  "t": "National Contact Point for Responsible Business Conduct Peer Reviews: Uruguay 2026",
+  "h": "https://www.oecd.org/en/publications/national-contact-point-for-responsible-business-conduct-peer-reviews-uruguay-2026_6660bda7-en.html"
+ },
+ {
+  "t": "National Contact Point for Responsible Business Conduct Peer Reviews: Argentina 2026",
+  "h": "https://www.oecd.org/en/publications/national-contact-point-for-responsible-business-conduct-peer-reviews-argentina-2026_6709e39d-en.html"
+ },
+ {
+  "t": "Promoting Responsible Business Conduct through Trade and Investment in the Middle East, North Africa and Türkiye",
+  "h": "https://www.oecd.org/en/publications/promoting-responsible-business-conduct-through-trade-and-investment-in-the-middle-east-north-africa-and-turkiye_520109c0-en.html"
+ },
+ {
+  "t": "National Contact Point for Responsible Business Conduct Peer Reviews: Switzerland 2026",
+  "h": "https://www.oecd.org/en/publications/national-contact-point-for-responsible-business-conduct-peer-reviews-switzerland-2026_afc336ff-en.html"
+ },
+ {
+  "t": "National Contact Point for Responsible Business Conduct Peer Reviews: Austria 2026",
+  "h": "https://www.oecd.org/en/publications/national-contact-point-for-responsible-business-conduct-peer-reviews-austria-2026_e9531bdc-en.html"
+ },
+ {
+  "t": "The business case for engaging with the National Contact Points for Responsible Business Conduct",
+  "h": "https://www.oecd.org/en/publications/the-business-case-for-engaging-with-the-national-contact-points-for-responsible-business-conduct_aaff4c16-en.html"
+ },
+ {
+  "t": "Responsible Business Conduct for a Just Transition",
+  "h": "https://www.oecd.org/en/publications/responsible-business-conduct-for-a-just-transition_ea041d32-en.html"
+ },
+ {
+  "t": "National Contact Point for Responsible Business Conduct Peer Reviews: Norway 2026",
+  "h": "https://www.oecd.org/en/publications/national-contact-point-for-responsible-business-conduct-peer-reviews-norway-2026_db8b0fe5-en.html"
+ },
+ {
+  "t": "Reporting requirements in social and environmental due diligence legislation",
+  "h": "https://www.oecd.org/en/publications/reporting-requirements-in-social-and-environmental-due-diligence-legislation_52f15766-en.html"
+ },
+ {
+  "t": "Mapping social and environmental due diligence legislation",
+  "h": "https://www.oecd.org/en/publications/mapping-social-and-environmental-due-diligence-legislation_bac11241-en.html"
+ },
+ {
+  "t": "National Contact Point for Responsible Business Conduct Peer Reviews: Netherlands 2026",
+  "h": "https://www.oecd.org/en/publications/national-contact-point-for-responsible-business-conduct-peer-reviews-netherlands-2026_7860252e-en.html"
+ },
+ {
+  "t": "National Contact Point for Responsible Business Conduct Peer Reviews: Belgium 2026",
+  "h": "https://www.oecd.org/en/publications/national-contact-point-for-responsible-business-conduct-peer-reviews-belgium-2026_e2bf8576-en.html"
+ },
+ {
+  "t": "OECD Due Diligence Guidance for Responsible AI",
+  "h": "https://www.oecd.org/en/publications/oecd-due-diligence-guidance-for-responsible-ai_41671712-en.html"
+ },
+ {
+  "t": "Due diligence on recycling processes in the garment and footwear sector",
+  "h": "https://www.oecd.org/en/publications/due-diligence-on-recycling-processes-in-the-garment-and-footwear-sector_19beec59-en.html"
+ },
+ {
+  "t": "Due Diligence for Responsible Sand and Silicate Supply Chains",
+  "h": "https://www.oecd.org/en/publications/due-diligence-for-responsible-sand-and-silicate-supply-chains_7be0093e-en.html"
+ },
+ {
+  "t": "Sustainability initiatives for responsible business conduct",
+  "h": "https://www.oecd.org/en/topics/sub-issues/due-diligence-guidance-for-responsible-business-conduct/sustainability-initiatives-for-responsible-business-conduct.html"
+ },
+ {
+  "t": "Corporate sustainability",
+  "h": "https://www.oecd.org/en/topics/corporate-sustainability.html"
+ },
+ {
+  "t": "All Countries",
+  "h": "https://www.oecd.org/en/countries.html"
+ },
+ {
+  "t": "Regional and global engagement",
+  "h": "https://www.oecd.org/en/regions.html"
+ },
+ {
+  "t": "Policy briefs",
+  "h": "https://www.oecd.org/en/publications/briefs.html"
+ },
+ {
+  "t": "Blogs & podcasts",
+  "h": "https://www.oecd.org/en/blogs.html"
+ },
+ {
+  "t": "Accession to the OECD",
+  "h": "https://www.oecd.org/en/about/legal/oecd-accession-process.html"
+ },
+ {
+  "t": "OECD legal framework",
+  "h": "https://www.oecd.org/en/about/legal.html"
+ },
+ {
+  "t": "Web accessibility",
+  "h": "https://www.oecd.org/en/about/web-accessibility.html"
+ },
+ {
+  "t": "Terms & Conditions",
+  "h": "https://www.oecd.org/en/about/terms-conditions.html"
+ },
+ {
+  "t": "Privacy Policy",
+  "h": "https://www.oecd.org/en/about/privacy.html"
+ }
+]

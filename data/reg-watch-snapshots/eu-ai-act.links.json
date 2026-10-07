@@ -1,0 +1,330 @@
+[
+ {
+  "t": "bg български",
+  "h": "https://digital-strategy.ec.europa.eu/bg/policies/regulatory-framework-ai"
+ },
+ {
+  "t": "nl Nederlands",
+  "h": "https://digital-strategy.ec.europa.eu/nl/policies/regulatory-framework-ai"
+ },
+ {
+  "t": "pt português",
+  "h": "https://digital-strategy.ec.europa.eu/pt/policies/regulatory-framework-ai"
+ },
+ {
+  "t": "sk slovenčina",
+  "h": "https://digital-strategy.ec.europa.eu/sk/policies/regulatory-framework-ai"
+ },
+ {
+  "t": "sl slovenščina",
+  "h": "https://digital-strategy.ec.europa.eu/sl/policies/regulatory-framework-ai"
+ },
+ {
+  "t": "Consultations",
+  "h": "https://digital-strategy.ec.europa.eu/en/consultations"
+ },
+ {
+  "t": "Artificial Intelligence",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/artificial-intelligence"
+ },
+ {
+  "t": "European approach to artificial intelligence",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/european-approach-artificial-intelligence"
+ },
+ {
+  "t": "AI Act Single Information platform",
+  "h": "https://ai-act-service-desk.ec.europa.eu/en"
+ },
+ {
+  "t": "AI Continent Action Plan",
+  "h": "https://digital-strategy.ec.europa.eu/en/factpages/ai-continent-action-plan"
+ },
+ {
+  "t": "AI Innovation Package",
+  "h": "https://ec.europa.eu/commission/presscorner/detail/en/ip_24_383"
+ },
+ {
+  "t": "AI Factories",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-factories"
+ },
+ {
+  "t": "AI Act Service Desk",
+  "h": "https://ai-act-service-desk.ec.europa.eu/en"
+ },
+ {
+  "t": "guidelines on prohibited AI practices under the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/commission-publishes-guidelines-prohibited-artificial-intelligence-ai-practices-defined-ai-act"
+ },
+ {
+  "t": "guidelines on the AI system definition of the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/commission-publishes-guidelines-ai-system-definition-facilitate-first-ai-acts-rules-application"
+ },
+ {
+  "t": "Guidelines on the scope of the obligations for providers of GPAI models",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/guidelines-scope-obligations-providers-general-purpose-ai-models-under-ai-act"
+ },
+ {
+  "t": "GPAI Code of Practice",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/contents-code-gpai"
+ },
+ {
+  "t": "Template for the public summary of training content of GPAI models",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/explanatory-notice-and-template-public-summary-training-content-general-purpose-ai-models"
+ },
+ {
+  "t": "Code of Practice on Marking and Labelling of AI-generated Content",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content"
+ },
+ {
+  "t": "set of icons",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/eu-icons-labelling-ai-generated-content"
+ },
+ {
+  "t": "Guidelines on transparency obligations for providers and deployers of certain AI systems",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/guidelines-transparency-ai-generated-content"
+ },
+ {
+  "t": "other guidelines supporting the implementation of the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/supporting-implementation-ai-act-clear-guidelines"
+ },
+ {
+  "t": "supervising and enforcing the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/enforcement-ai-act"
+ },
+ {
+  "t": "Scientific Panel",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-scientific-panel"
+ },
+ {
+  "t": "Advisory Forum",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-advisory-forum"
+ },
+ {
+  "t": "AI Act’s governance",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-act-governance-and-enforcement"
+ },
+ {
+  "t": "action plan on Cybersecurity and AI",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/eu-action-plan-cybersecurity-and-artificial-intelligence"
+ },
+ {
+  "t": "European Union Agency for Cybersecurity (ENISA)",
+  "h": "https://www.enisa.europa.eu/"
+ },
+ {
+  "t": "Digital Package on Simplification",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/digital-rulebook"
+ },
+ {
+  "t": "political agreement",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/eu-agrees-simplify-ai-rules-boost-innovation-and-ban-nudification-apps-protect-citizens"
+ },
+ {
+  "t": "entered into force on 27 July 2026",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/ai-omnibus-enters-force"
+ },
+ {
+  "t": "AI Omnibus Regulation",
+  "h": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744"
+ },
+ {
+  "t": "Any question on the AI Act? Visit our Single Information Platform",
+  "h": "https://ai-act-service-desk.ec.europa.eu/en"
+ },
+ {
+  "t": "Text of the AI Act in all EU official languages",
+  "h": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202401689"
+ },
+ {
+  "t": "General-Purpose AI (GPAI) code of practice",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/contents-code-gpai"
+ },
+ {
+  "t": "Impact assessment of the regulation",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/impact-assessment-regulation-artificial-intelligence"
+ },
+ {
+  "t": "Study supporting the impact assessment",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/study-supporting-impact-assessment-ai-regulation"
+ },
+ {
+  "t": "Questions & Answers on the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/faqs/navigating-ai-act"
+ },
+ {
+  "t": "European AI Office",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-office"
+ },
+ {
+  "t": "Governance and enforcement of the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-act-governance-and-enforcement"
+ },
+ {
+  "t": "Overview of the guidelines on the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/supporting-implementation-ai-act-clear-guidelines"
+ },
+ {
+  "t": "Standardisation of the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-act-standardisation"
+ },
+ {
+  "t": "EDIC for Agri-Food launched to support digital innovation across Europe’s food and agriculture sector",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/edic-agri-food-launched-support-digital-innovation-across-europes-food-and-agriculture-sector"
+ },
+ {
+  "t": "Three in four EU employees faced cyber threats at work, new Eurobarometer finds",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/three-four-eu-employees-faced-cyber-threats-work-new-eurobarometer-finds"
+ },
+ {
+  "t": "Commission seeks feedback on challenges and way forward in the area of effect of technology on copyright",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/commission-seeks-feedback-challenges-and-way-forward-area-effect-technology-copyright"
+ },
+ {
+  "t": "Executive Vice-President Virkkunen in the US for G20 Ministerial meetings",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/executive-vice-president-virkkunen-us-g20-ministerial-meetings"
+ },
+ {
+  "t": "Commission starts enforcing AI Act rules and new transparency requirements on 2 August",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/commission-starts-enforcing-ai-act-rules-and-new-transparency-requirements-2-august"
+ },
+ {
+  "t": "EU launches AI Gigafactories call to boost Europe's computing capacity and unlock more than €30 billion in investment",
+  "h": "https://digital-strategy.ec.europa.eu/en/news/eu-launches-ai-gigafactories-call-boost-europes-computing-capacity-and-unlock-more-eu30-billion"
+ },
+ {
+  "t": "Browse Artificial intelligence",
+  "h": "https://digital-strategy.ec.europa.eu/en/related-content?topic=119"
+ },
+ {
+  "t": "Guidelines on transparency obligations for providers and deployers of AI systems",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems"
+ },
+ {
+  "t": "Commission opinion on the assessment of the Code of Practice on Transparency of AI-generated Content",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/commission-opinion-assessment-code-practice-transparency-ai-generated-content"
+ },
+ {
+  "t": "EU Action Plan on Cybersecurity and Artificial Intelligence",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/eu-action-plan-cybersecurity-and-artificial-intelligence"
+ },
+ {
+  "t": "Study on the EU's strategic digital technologies for the next EU research & innovation programme",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/study-eus-strategic-digital-technologies-next-eu-research-innovation-programme"
+ },
+ {
+  "t": "AI Office publishes frontier AI expert findings on EU competitiveness, sovereignty and security",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/ai-office-publishes-frontier-ai-expert-findings-eu-competitiveness-sovereignty-and-security"
+ },
+ {
+  "t": "New feasibility study for introducing an EU-level registry of Text and Data Mining opt-out",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/new-feasibility-study-introducing-eu-level-registry-text-and-data-mining-opt-out"
+ },
+ {
+  "t": "Factsheet - Action Plan on Cybersecurity and Artificial Intelligence",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/factsheet-action-plan-cybersecurity-and-artificial-intelligence"
+ },
+ {
+  "t": "The Commission internal use of Artificial Intelligence",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/commission-internal-use-artificial-intelligence"
+ },
+ {
+  "t": "Factsheet on the International Digital Strategy for the European Union",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/factsheet-international-digital-strategy-european-union"
+ },
+ {
+  "t": "The rise of the intelligent edge – Insights into MetaOS",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/rise-intelligent-edge-insights-metaos"
+ },
+ {
+  "t": "Living repository to foster learning and exchange on AI literacy",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/living-repository-foster-learning-and-exchange-ai-literacy"
+ },
+ {
+  "t": "Horizon Europe: new projects in AI, Data and Robotics - 2024 Edition",
+  "h": "https://digital-strategy.ec.europa.eu/en/library/horizon-europe-new-projects-ai-data-and-robotics-2024-edition"
+ },
+ {
+  "t": "The enforcement framework of the AI Act",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/enforcement-ai-act"
+ },
+ {
+  "t": "AI talent, skills and literacy",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-talent-skills-and-literacy"
+ },
+ {
+  "t": "AI Act Whistleblower Tool",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-act-whistleblower-tool"
+ },
+ {
+  "t": "AI Act Complaints tool",
+  "h": "https://digital-strategy.ec.europa.eu/en/policies/ai-act-complaints-tool"
+ },
+ {
+  "t": "Print as PDF",
+  "h": "https://digital-strategy.ec.europa.eu/en/node/9745/printable/pdf"
+ },
+ {
+  "t": "Shaping Europe’s digital future",
+  "h": "https://digital-strategy.ec.europa.eu/en"
+ },
+ {
+  "t": "Digital EU on Mastadon",
+  "h": "https://ec.social-network.europa.eu/@digitaleu"
+ },
+ {
+  "t": "Digital EU on LinkedIn",
+  "h": "https://www.linkedin.com/showcase/digital-eu/"
+ },
+ {
+  "t": "Digital EU on Facebook",
+  "h": "https://www.facebook.com/DigitalEU"
+ },
+ {
+  "t": "Digital EU on Youtube",
+  "h": "https://www.youtube.com/c/DigitalEU"
+ },
+ {
+  "t": "Digital EU on Instagram",
+  "h": "https://www.instagram.com/DigitalEU/"
+ },
+ {
+  "t": "Digital EU on X",
+  "h": "https://x.com/DigitalEU"
+ },
+ {
+  "t": "Privacy statement",
+  "h": "https://digital-strategy.ec.europa.eu/en/pages/legal-notice"
+ },
+ {
+  "t": "Copyright notice",
+  "h": "https://digital-strategy.ec.europa.eu/en/pages/legal-notice"
+ },
+ {
+  "t": "About Directorate-General CONNECT",
+  "h": "https://ec.europa.eu/info/departments/communications-networks-content-and-technology_en"
+ },
+ {
+  "t": "Language Policy",
+  "h": "https://digital-strategy.ec.europa.eu/en/pages/legal-notice"
+ },
+ {
+  "t": "Report an IT vulnerability",
+  "h": "https://commission.europa.eu/legal-notice/vulnerability-disclosure-policy_en"
+ },
+ {
+  "t": "Languages on our websites",
+  "h": "https://commission.europa.eu/languages-our-websites_en"
+ },
+ {
+  "t": "Privacy policy",
+  "h": "https://commission.europa.eu/privacy-policy-websites-managed-european-commission_en"
+ },
+ {
+  "t": "Legal notice",
+  "h": "https://commission.europa.eu/legal-notice_en"
+ },
+ {
+  "t": "Accessibility",
+  "h": "https://digital-strategy.ec.europa.eu/en/pages/accessibility"
+ }
+]
