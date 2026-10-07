@@ -102,6 +102,23 @@ Both views point to the same underlying controls. A control should be implemente
 
 **Control IDs:** EAI-AUD-01 through EAI-AUD-08.
 
+## Open actions outside the six-layer AI-control denominator
+
+The open-actions register is broader than this AI-governance crosswalk. The following
+live items remain pending but are intentionally **not** used as closure actions for an
+enterprise AI control, so their absence from the dashboard is not mistaken for closure:
+
+- item 2 is a chase-email workflow that advances items 5 and 6 rather than a control itself;
+- item 3 is a queued release-approval act, while the deployment gate itself is operating;
+- item 6 is deterministic transaction-feed wiring for the wider AML programme;
+- item 7 is firm-wide AML/CFT and sanctions training beyond the AI-control scope;
+- item 18 is approval of the wider AML/CFT/CPF policy pack;
+- item 27 is screening-engine maintainability technical debt;
+- item 28 is Arabic UI linguistic QA/localisation.
+
+They remain authoritative in the [open-actions register](open-actions-register.md) and
+must not be read as complete merely because they are outside this control denominator.
+
 ## Evidence rule
 
 The crosswalk is descriptive. **Current status is never hand-maintained here.** Run:
