@@ -6,11 +6,19 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — completed the second six-layer reconciliation.
+> **Last updated:** 2026-10-07 — completed the third six-layer reconciliation.
+> Vendor-assurance and external-assurance closure paths are now explicit rather
+> than implied by broader counsel/strategy rows: item 35 verifies the Asana DPA
+> and contracted region, item 36 resolves the Anthropic DPA execution-record
+> inconsistency, and item 37 resolves the independent-assurance posture after the
+> ISO/IEC 42001 path decision. No vendor position, audit, certification or human
+> approval is marked complete by this edit.
+>
+> **Previous update (2026-10-07):** completed the second six-layer reconciliation.
 > The residual-risk dashboard already showed two risks above appetite with no
 > dated treatment or exceptional acceptance, but neither had a dedicated closure
 > row. Items 33 and 34 now make those decisions explicit for R-03 and R-21.
-> This edit does not accept either risk and does not invent a deadline.
+> That edit did not accept either risk and did not invent a deadline.
 >
 > **Previous update (2026-10-07):** reconciled the enterprise six-layer governance
 > dashboard with this register. Three human actions that were already stated as
@@ -52,11 +60,11 @@
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
 > (20–24 and 26–28) carry dates under the maintainer's own authority. Items
-> 29–34 are vendor/governance/assurance actions whose deadlines belong to their
+> 29–37 are vendor/governance/assurance actions whose deadlines belong to their
 > named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 23 of 31 undated at this update.
+> per row — 26 of 34 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -91,6 +99,9 @@
 | 32 | Hold and record the first formal AIMS [management review](../aims/management-review.md). The log still shows `_scheduled — Q3 2026_`; the review should follow item 8 so real Internal Audit results are tabled rather than a template being treated as evidence. | MLRO + senior management | The management-review log contains a dated completed row with decisions, actions/owners and next review; only then is `EAI-AUD-03` reconsidered | — | to open |
 | 33 | Resolve above-appetite risk `R-03` (sanctions false-negative risk, residual 10 against RA-01 ceiling 6). The repository must not treat the current quarterly threshold-tuning cadence as a dated treatment plan or as acceptance. | MLRO | Either a dated treatment plan is recorded with owner, target and measurable exit criteria that brings the residual position within appetite, or an authorized exceptional acceptance is recorded in `data/ai-risk-acceptances.json` with decision evidence and review/expiry | — | to open |
 | 34 | Resolve above-appetite risk `R-21` (shadow-AI disclosure risk, residual 12 against RA-04 ceiling 6). Current controls are policy/awareness only and the risk register says periodic operator attestation is still required. | MLRO / DPO | Either a dated mitigation plan is recorded and implemented, including the required operator-attestation control or equivalent stronger control, or an authorized exceptional acceptance is recorded in `data/ai-risk-acceptances.json` with decision evidence and review/expiry | — | to open |
+| 35 | Verify the Asana vendor DPA and contracted processing region. The third-party register still says **confirm on file** and **confirm** for the region, so `EAI-DMG-05` and KRI-04 cannot treat Asana as assessed. | MLRO / DPO | DPA reference/evidence and the contracted processing region are recorded in the third-party register; the safeguard cell no longer contains an unresolved confirmation marker | — | to open |
+| 36 | Resolve the Anthropic DPA execution record. The vendor row records an owner attestation dated 2026-07-16, while the execution block remains explicitly **DRAFT — pending signature** with blank DPA reference, signatory, execution date and processing region. | MLRO / DPO / counsel | The repository records one verified position: either an executed DPA with reference, authorised signatory/date, processing region and transfer basis, or a corrected statement that execution remains pending with the AI path gated as required | — | to open |
+| 37 | Resolve `EAI-AUD-06` independent external assurance after item 10. A Board decision to remain on self-assessment does not equal an external audit; a certification/assurance path requires an actual independent assessor. | Board / MLRO | After item 10, either an independent AI-governance/ISO 42001 assurance engagement is commissioned and its result/evidence recorded, or the control is formally reclassified `not_applicable` with a Board-approved rationale for continued self-assessment | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
