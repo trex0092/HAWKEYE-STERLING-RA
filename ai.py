@@ -45,10 +45,11 @@ def _llm_in_reports() -> bool:
 # provided text, it does NOT generate facts. Even here the raw headline + link is
 # always shown and the result is labelled, so a human verifies — the LLM never
 # replaces the evidence. It still sends a subject name + headline to Anthropic (a
-# cross-border transfer of customer data), so it is FAIL-CLOSED: OFF unless a key
-# is present AND LLM_TRIAGE=1 is set explicitly. This keeps the PDPL gate intact
-# for any non-workflow caller (local/manual run, a new workflow) — the production
-# workflows already set LLM_TRIAGE=0 until the Anthropic DPA is executed.
+# cross-border transfer of customer data), so it is FAIL-CLOSED by default: OFF
+# unless a key is present AND LLM_TRIAGE=1 is set explicitly. Workflows read the
+# repository variable with a default of 0. The code does not prove the live variable
+# value or that vendor/legal prerequisites are complete; governance items 36 and 42
+# reconcile those records.
 LLM_TRIAGE = AI_ENABLED and os.environ.get("LLM_TRIAGE", "0") == "1"
 
 # Hard grounding + PROMPT-SECURITY contract for any model call (UAE "Securing
