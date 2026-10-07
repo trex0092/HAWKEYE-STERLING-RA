@@ -6,13 +6,23 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — completed the fifth six-layer reconciliation.
-> Regular-control-testing currency is now represented as its own enterprise
-> assurance control. Item 41 tracks two in-force instruments whose recorded
-> review dates passed on 2026-09-15 without a completed review record: the TFS
-> name-match procedure and the EOCN/internal-watchlist SOP. The policy-register
-> guard now requires every overdue in-force instrument to point to a live open
-> action instead of allowing an expired review date to remain unowned.
+> **Last updated:** 2026-10-07 — completed the sixth six-layer reconciliation.
+> Item 42 now captures an unresolved go-live-control deviation around adverse-media
+> LLM triage. Code defaults `LLM_TRIAGE` to OFF and the AI impact-assessment
+> checklist requires DPA, transfer, processing, DPIA-acceptance and authorised
+> sign-off before enabling it, but the third-party register records an owner
+> attestation that `LLM_TRIAGE=1` was enabled on 2026-07-16 while the formal DPA
+> execution block and go-live checklist remain incomplete. The repository cannot
+> prove the live variable value, so neither enabled nor disabled production state
+> is inferred.
+>
+> **Previous update (2026-10-07):** completed the fifth six-layer reconciliation.
+> Regular-control-testing currency is represented as its own enterprise assurance
+> control. Item 41 tracks two in-force instruments whose recorded review dates
+> passed on 2026-09-15 without a completed review record: the TFS name-match
+> procedure and the EOCN/internal-watchlist SOP. The policy-register guard requires
+> every overdue in-force instrument to point to a live open action instead of
+> allowing an expired review date to remain unowned.
 >
 > **Previous update (2026-10-07):** completed the fourth six-layer reconciliation.
 > The overdue 2026 Q3 model-validation sign-off remains explicit as item 38.
@@ -79,11 +89,11 @@
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
 > (20–24 and 26–28) carry dates under the maintainer's own authority. Items
-> 29–38 and 40–41 are vendor/governance/assurance actions whose deadlines belong to their
+> 29–38 and 40–42 are vendor/governance/assurance actions whose deadlines belong to their
 > named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 29 of 37 undated at this update.
+> per row — 30 of 38 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -124,6 +134,7 @@
 | 38 | Complete the overdue 2026 Q3 model-validation sign-off. [`model-validation-2026.md`](model-validation-2026.md) states next review **2026-09-30** and its Q3 quarterly row remains pending as of 2026-10-07. | MLRO | The Q3 row is completed with the actual validation run/evidence, findings, MLRO sign-off and date; the document's next-review date moves to the next approved cycle | — | to open |
 | 40 | Restore live Advisor behavioural-evaluation capacity. Scheduled run [36453013672](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/36453013672) on 2026-09-28 was incomplete because the Anthropic account hit its specified API usage limit; scheduled run [37345739408](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/37345739408) on 2026-10-05 was incomplete because the credit balance was too low. Both produced zero regression findings but did not complete the governed 30-case live suite. | Repo owner / MLRO | Restore provider capacity or an approved equivalent live-eval route, dispatch `advisor-eval.yml`, obtain a completed run with zero eval errors, record the recovery in [`eval-scorecard.md`](eval-scorecard.md), and clear the monitoring alert | — | to open |
 | 41 | Complete the overdue 2026-09-15 control reviews for the [TFS name-match procedure](../aims/tfs-name-match-procedure.md) and the [EOCN/internal-watchlist SOP](../aims/eocn-list-update-sop.md). The policy register still carries 2026-09-15 as the next-review date for both instruments; the TFS procedure's event log contains no completed annual tabletop, and `data/internal-watchlist.json` still records its last review as 2026-07-28. | MLRO | Review both instruments against current requirements, perform and record the TFS tabletop, review every internal-watchlist entry or confirm the empty-list position, update the evidence logs/`lastReviewed`, and move each policy-register review date to its next approved cycle | — | to open |
+| 42 | Reconcile the adverse-media LLM-triage go-live control. [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) requires the DPA, PDPL transfer basis, processing/retention terms, DPIA residual-risk acceptance, authorised sign-off and explicit `LLM_TRIAGE=1` before egress; those checklist fields remain blank. The third-party register nevertheless records a 2026-07-16 owner attestation that `LLM_TRIAGE=1` was enabled. Repository code proves only a default-OFF fail-closed gate, not the live variable value. | MLRO / DPO + Repo owner | Verify the current production `LLM_TRIAGE` state. If ON, either complete and evidence every go-live prerequisite immediately or set it to `0` until they are complete. Record the verified runtime state, authorised sign-off and supporting DPA/PDPL evidence consistently across the AI impact assessment, AI asset register, model card and third-party register | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
