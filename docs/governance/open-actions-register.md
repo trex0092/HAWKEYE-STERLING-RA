@@ -6,12 +6,18 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — completed the seventh six-layer reconciliation.
-> Item 43 now tracks the first annual manual penetration test that is already
-> required by the assurance coverage matrix and roadmap but previously had no
-> numbered closure path. Automated ZAP/SAST/DAST coverage is not treated as a
-> substitute for the manual authenticated-flow, business-logic, rate-limit and
-> CORS/origin abuse test.
+> **Last updated:** 2026-10-07 — synchronized the pending-action ledger with
+> Asana after the seventh six-layer reconciliation. Every open row now carries an
+> Asana/system-of-record reference; the remaining `to open` placeholders were
+> created in the HAWKEYE STERLING APP governance section, including the newly
+> explicit triage-go-live and penetration-test actions.
+>
+> **Previous update (2026-10-07):** completed the seventh six-layer reconciliation.
+> Item 43 tracks the first annual manual penetration test that is already required
+> by the assurance coverage matrix and roadmap but previously had no numbered
+> closure path. Automated ZAP/SAST/DAST coverage is not treated as a substitute
+> for the manual authenticated-flow, business-logic, rate-limit and CORS/origin
+> abuse test.
 >
 > **Previous update (2026-10-07):** completed the sixth six-layer reconciliation.
 > Item 42 captures an unresolved go-live-control deviation around adverse-media
