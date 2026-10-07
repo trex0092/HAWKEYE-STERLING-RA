@@ -26,7 +26,7 @@
 | Audit finding closure rate | 95.2% | `data/grc-metrics.json` |
 | Governance drift count | 0 | `data/grc-metrics.json` |
 | Risks above appetite | 2 | `data/grc-metrics.json` |
-| Open actions without target date | 18 | `data/grc-metrics.json` |
+| Open actions without target date | 21 | `data/grc-metrics.json` |
 
 ## Partial and open controls
 
