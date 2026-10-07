@@ -15,7 +15,7 @@
 | L3 · Risk Management | **PARTIAL** | 3 | 2 | 0 | 5 |
 | L4 · Data & Model Governance | **PARTIAL** | 3 | 3 | 0 | 6 |
 | L5 · Monitoring & Controls | **PARTIAL** | 2 | 3 | 0 | 5 |
-| L6 · Audit & Assurance | **PARTIAL** | 3 | 3 | 1 | 7 |
+| L6 · Audit & Assurance | **PARTIAL** | 4 | 3 | 1 | 8 |
 
 ## Repository-derived governance signals
 
