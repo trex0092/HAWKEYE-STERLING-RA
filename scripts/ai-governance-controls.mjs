@@ -47,7 +47,17 @@ function fail(errors) {
 
 export function validateRegister(reg, actionMarkdown, today = new Date().toISOString().slice(0, 10)) {
   const errors = [];
-  const actionIds = new Set([...String(actionMarkdown || '').matchAll(/^\|\s*(\d+)\s*\|/gm)].map((m) => Number(m[1])));
+  const actionText = String(actionMarkdown || '');
+  const actionRows = [...actionText.matchAll(/^\|\s*(\d+)\s*\|.*$/gm)];
+  const actionIds = new Set(actionRows.map((m) => Number(m[1])));
+  for (const m of actionRows) {
+    const row = m[0];
+    const cells = row.split('|').map((x) => x.trim());
+    const asanaRef = cells[cells.length - 2] || '';
+    if (!asanaRef || /^to open$/i.test(asanaRef)) {
+      errors.push('open action ' + m[1] + ': missing Asana/system-of-record reference');
+    }
+  }
   if (reg.schema !== 'hawkeye-sterling.enterprise-ai-controls/v1') errors.push('unexpected control-register schema');
   if (!reg.register_review || !/^\d{4}-\d{2}-\d{2}$/.test(reg.register_review.next_review_by || '')) {
     errors.push('register_review.next_review_by must be YYYY-MM-DD');
