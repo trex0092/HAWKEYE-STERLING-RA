@@ -6,7 +6,14 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-08-04 — the August 2026 full-repo audit opened nine
+> **Last updated:** 2026-10-07 — merged PR #768 closed item 25 after the
+> report-only toolchain run retained its coverage, mypy and mutation artifact
+> (JavaScript line coverage 40.11%, Python line coverage 77%, 25 mypy findings,
+> and 5/5 scoring mutants killed). The same review exposed Composio as an
+> outstanding vendor-assurance gap with no explicit closing row, so item 29 was
+> added rather than leaving KRI-04 without a complete action path.
+>
+> **Previous update (2026-08-04):** the August 2026 full-repo audit opened nine
 > engineering items (20–28) and added the `Target date` column the preamble
 > below had reserved. No pre-existing item changed state.
 >
@@ -29,12 +36,13 @@
 > the governance items (1–18) is the Board's act (item 17) — inventing those
 > dates here would be the exact failure this register exists to prevent — so
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
-> *not instrumented*. The engineering items opened by the August 2026 audit
-> (20–28) are maintainer commitments and carry dates under the maintainer's
-> own authority. The gap stays counted:
+> *not instrumented*. The remaining maintainer-owned engineering items
+> (20–24 and 26–28) carry dates under the maintainer's own authority. Item 29
+> is a vendor-governance/legal gate, so no deadline is invented for the MLRO/DPO.
+> The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 17 of 26 undated at this update.
+> per row — 18 of 26 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -60,10 +68,10 @@
 | 22 | Distributed rate limiting on the LLM relay. [`netlify/functions/_ratelimit.js`](../../netlify/functions/_ratelimit.js) documents that the sliding window is per-instance, not fleet-wide, in front of a billed API key; the fix it names (Netlify Edge rate limiting or a shared store) needs an external account decision. | Repo owner | brain-soul enforces one fleet-wide quota and the `_ratelimit.js` header drops its per-instance caveat | 2027-03-31 | to open |
 | 23 | Server-side persistence tier with an RPO/RTO statement. Assessments live in browser `localStorage`; the only off-device copy is the override-sheet mirror. [`../security/supabase-rls-policies.sql`](../security/supabase-rls-policies.sql) is the ready template; spend and architecture are a firm decision. | Repo owner / Board (spend) | An authenticated sync/backup tier is live and [`../aims/bcp.md`](../aims/bcp.md) states RPO/RTO for assessment data | 2027-06-30 | to open |
 | 24 | Browser and function error telemetry. **Implementation added 2026-10-07:** `telemetry.js` captures browser exceptions/rejections without application state, `client-error-report.js` writes sanitized structured events, and `_telemetry.js` records returned 5xx/uncaught exceptions across every public Netlify function. Regression tests deliberately exercise both log paths. **Still open:** record one production rehearsal for a browser error and one function 500 in the Netlify monitoring trail before calling the control operationally proven. | Repo owner | A deliberate production test error in each surface appears in the monitoring trail | 2026-12-31 | to open |
-| 25 | Toolchain deepening. **Implementation added 2026-10-07:** report-only workflow for c8 JavaScript line coverage, coverage.py Python line coverage, mypy, and a five-mutant spot-check of `test/scoring-golden.test.js`; all reports upload as one retained artifact and none is a merge gate. **Still open until the first workflow artifact is retained and its mutation kill rate is recorded here.** | Repo owner | Coverage and mypy reports publish as CI artifacts; a mutation run of `test/scoring-golden.test.js` is recorded with its kill rate | 2026-10-31 | to open |
 | 26 | Deploy self-heal and rollback automation. The rollback runbook (`docs/security/deploy-rollback-runbook.md`) ships with this hardening cycle; automation extends the control-retry pattern to failed production-deploy runs — today a runner shutdown mid-verification leaves no retry (observed 2026-08-04, exit 143 at poll 35/54). | Repo owner | A failed production-deploy run re-dispatches itself once automatically; a rollback rehearsal is recorded | 2026-10-31 | to open |
 | 27 | Engine maintainability: decompose `screen.py` (6,918 lines) into modules (matching, feeds, Asana I/O, narrative) and take the py/mjs matcher consolidation decision — the dual implementation has needed **six** parity fixes since 2026-07 (#360, #362, #363, #364, #373, #421), the sixth landing 2026-08-06, two days after this item's ADR was first recorded. **Partially addressed 2026-09-09**: [`adr-005-dual-engine-matcher.md`](adr-005-dual-engine-matcher.md) §5 records the consolidation decision (keep both, actively shrink shared-logic surface area per-fix) and moves the revisit trigger up to whichever comes first of a 7th parity PR, `screen.py` crossing 7,500 lines, or 2027-06-30 — replacing the single fixed date with a checkable one. Full decomposition itself is not attempted (correctly a project-scale change, not a same-session one). | Repo owner | `screen.py` decomposed with all suites green, or the moved-up trigger in ADR-005 §5 fires and is acted on | 2027-06-30 | to open |
 | 28 | Console/Advisor Arabic UI chrome. `index.html` carries 59 translated hooks; the console and advisor carry 3–4 each. Extend AR to labels, statuses and empty states on both pages — long-form legal prose stays English per [`../i18n-ar-legal-review.md`](../i18n-ar-legal-review.md). Needs an AR reviewer. | Repo owner + AR reviewer | Both pages render fully in AR chrome with the existing caveat banner scoped to prose only | 2026-12-31 | to open |
+| 29 | Composio vendor-assurance go-live gate. The [third-party register](../aims/third-party-register.md) keeps `COMPOSIO_ENABLED=0` until the DPA, subprocessors, retention, contracted processing region and UAE PDPL transfer basis are confirmed, with approved business-app scopes and connected accounts recorded. | MLRO / DPO + Repo owner | All five vendor-assurance fields plus approved scopes/accounts are recorded in the third-party register; only then may `COMPOSIO_ENABLED=1` | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one

@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Governance metrics and action hygiene.** Closed completed toolchain action 25 on retained CI evidence; added explicit Composio vendor-assurance action 29; aligned the GRC narrative with the generated 62.5% third-party coverage and two above-appetite risks; and refreshed the undated-action signal from 17 to 18 without inventing a human deadline.
+
 - **Operational telemetry + report-only engineering assurance.**
   - Added same-origin browser exception/unhandled-rejection telemetry with strict payload minimisation and rate limiting.
   - Added structured 5xx/exception logging to every public Netlify function without logging request or response bodies.

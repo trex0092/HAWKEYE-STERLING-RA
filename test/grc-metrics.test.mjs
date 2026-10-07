@@ -233,14 +233,23 @@ check('open-actions register carries a Target date column', tdIdx !== -1);
 const regRows = [...register.matchAll(/^\|\s*\d+\s*\|.*$/gm)].map((m) => m[0]);
 check('open-actions register parses (' + regRows.length + ' rows)', regRows.length > 0);
 let dated = 0;
+const datedItems = new Set();
 for (const r of regRows) {
   const num = (r.match(/^\|\s*(\d+)/) || [])[1];
   const cell = (r.split('|')[tdIdx] || '').trim();
   check('item ' + num + ' target-date cell is an ISO date or an explicit em-dash ("' + cell + '")',
     /^(\d{4}-\d{2}-\d{2}|—)$/.test(cell));
-  if (/^\d{4}-\d{2}-\d{2}$/.test(cell)) dated++;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cell)) {
+    dated++;
+    datedItems.add(num);
+  }
 }
-check('at least the August 2026 engineering items carry dates', dated >= 9);
+/* Completed engineering items disappear from the open register, so asserting a
+   fixed count would fail whenever work closes. Pin the still-open maintainer
+   commitments instead; each must keep its explicit date. */
+const openEngineeringItems = ['20', '21', '22', '23', '24', '26', '27', '28'];
+check('every still-open maintainer engineering item carries a target date',
+  openEngineeringItems.every((id) => datedItems.has(id)));
 check('the counter equals the undated rows (' + computed.counters.openActionsWithoutTargetDate + ')',
   computed.counters.openActionsWithoutTargetDate === regRows.length - dated);
 
