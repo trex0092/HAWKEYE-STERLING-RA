@@ -14,7 +14,7 @@
 | L2 · Roles & Accountability | **PARTIAL** | 2 | 2 | 0 | 4 |
 | L3 · Risk Management | **PARTIAL** | 3 | 2 | 0 | 5 |
 | L4 · Data & Model Governance | **PARTIAL** | 3 | 3 | 0 | 6 |
-| L5 · Monitoring & Controls | **PARTIAL** | 3 | 2 | 0 | 5 |
+| L5 · Monitoring & Controls | **PARTIAL** | 2 | 3 | 0 | 5 |
 | L6 · Audit & Assurance | **PARTIAL** | 3 | 2 | 1 | 6 |
 
 ## Repository-derived governance signals
@@ -41,6 +41,7 @@
 | `EAI-DMG-04` Model validation and bias evaluation | L4 | **PARTIAL** | #8, #38 | Validation and bias controls exist; the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors, but the recorded 2026 Q3 model-validation sign-off is overdue; independent review remains routed to item 8. |
 | `EAI-DMG-05` AI and AI-adjacent vendor assurance | L4 | **PARTIAL** | #5, #11, #29, #35, #36 | The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required. |
 | `EAI-MON-01` AI performance and behavioural monitoring | L5 | **PARTIAL** | #40 | Offline assurance remains in CI, but scheduled live Advisor evaluations on 2026-09-28 and 2026-10-05 were incomplete because provider usage and credit limits blocked the governed live suite. No regression was observed, but live behavioural evidence remains incomplete until a successful recovery run. |
+| `EAI-MON-03` Security and access controls | L5 | **PARTIAL** | #20 | Application and repository security controls are tested, but production function endpoints do not yet have verified user identity. The current Origin/shared-token gate is explicitly a compensating control; open action 20 adds real JWT/OIDC role-based authentication. |
 | `EAI-MON-04` Incident detection, response and control freshness | L5 | **PARTIAL** | #31 | Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation. |
 | `EAI-AUD-02` Internal audit programme | L6 | **PARTIAL** | #8 | The programme exists; the open-actions register records the first thematic review as a human action still to complete. |
 | `EAI-AUD-03` Management review and governance decisions | L6 | **PARTIAL** | #32 | Templates and decision rights exist; this register does not fabricate completed meetings or approvals. |
