@@ -98,7 +98,10 @@
       "tests": [
         "test/ai-assets.test.js"
       ],
-      "note": "A repository intake gate is implemented in this change; formal organizational adoption remains a human governance act."
+      "note": "A repository intake gate is implemented in this change; formal organizational adoption remains a human governance act.",
+      "closure_actions": [
+        30
+      ]
     },
     {
       "id": "EAI-POL-04",
@@ -165,7 +168,10 @@
       "tests": [
         "test/policies.test.mjs"
       ],
-      "note": "The charter exists, while the repository's open-actions register still records human ratification actions."
+      "note": "The charter exists, while the repository's open-actions register still records human ratification actions.",
+      "closure_actions": [
+        4
+      ]
     },
     {
       "id": "EAI-ROL-04",
@@ -218,7 +224,12 @@
       "tests": [
         "test/grc-metrics.test.mjs"
       ],
-      "note": "The repository currently reports risks above appetite and does not infer acceptance without a human decision."
+      "note": "The repository currently reports risks above appetite and does not infer acceptance without a human decision.",
+      "closure_actions": [
+        17,
+        33,
+        34
+      ]
     },
     {
       "id": "EAI-RSK-03",
@@ -267,7 +278,10 @@
       "tests": [
         "test/ai-assets.test.js"
       ],
-      "note": "The intake form requires classification and risk tiering; organizational ratification of the new gate remains explicit."
+      "note": "The intake form requires classification and risk tiering; organizational ratification of the new gate remains explicit.",
+      "closure_actions": [
+        30
+      ]
     },
     {
       "id": "EAI-DMG-01",
@@ -354,7 +368,12 @@
       "tests": [
         "test/grc-metrics.test.mjs"
       ],
-      "note": "The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required."
+      "note": "The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required.",
+      "closure_actions": [
+        5,
+        11,
+        29
+      ]
     },
     {
       "id": "EAI-DMG-06",
@@ -445,7 +464,10 @@
       "tests": [
         "test/freshness-check.test.mjs"
       ],
-      "note": "Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation."
+      "note": "Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation.",
+      "closure_actions": [
+        31
+      ]
     },
     {
       "id": "EAI-MON-05",
@@ -496,7 +518,10 @@
         "docs/governance/open-actions-register.md"
       ],
       "tests": [],
-      "note": "The programme exists; the open-actions register records the first thematic review as a human action still to complete."
+      "note": "The programme exists; the open-actions register records the first thematic review as a human action still to complete.",
+      "closure_actions": [
+        8
+      ]
     },
     {
       "id": "EAI-AUD-03",
@@ -511,7 +536,10 @@
         "docs/governance/ai-governance-committee-charter.md"
       ],
       "tests": [],
-      "note": "Templates and decision rights exist; this register does not fabricate completed meetings or approvals."
+      "note": "Templates and decision rights exist; this register does not fabricate completed meetings or approvals.",
+      "closure_actions": [
+        32
+      ]
     },
     {
       "id": "EAI-AUD-04",
@@ -560,7 +588,10 @@
         "docs/governance/open-actions-register.md"
       ],
       "tests": [],
-      "note": "No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned."
+      "note": "No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned.",
+      "closure_actions": [
+        10
+      ]
     }
   ]
 }
