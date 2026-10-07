@@ -13,9 +13,8 @@
    step-summary + artifact for the maintainer; nothing here screens,
    alerts, or writes state.
 
-   Usage: node scripts/source-probe.mjs <source-id|all-disabled> [outdir] */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+   Usage: node scripts/source-probe.mjs <source-id|all-disabled> */
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const REGISTRY_FILES = ['data/sanctions-sources.json', 'data/sanctions-extra.json'];
@@ -427,16 +426,9 @@ async function suiteNewsEditions() {
 async function main(argv) {
   const selector = argv[0];
   if (!selector) { console.error('usage: source-probe.mjs <source-id|all-disabled> [outdir]'); return 2; }
-  const outdir = argv[1] || '.';
   if (SUITES.includes(selector)) {
     const md = selector === 'opensanctions-catalogue' ? await suiteOpenSanctionsCatalogue()
       : selector === 'news-editions' ? await suiteNewsEditions() : await suiteNewsFeeds();
-    mkdirSync(outdir, { recursive: true });
-    // codeql[js/http-to-file-access]: reviewed 2026-10-07, intended diagnostic persistence.
-    // Suite URLs are fixed in code, the workflow selector cannot supply an arbitrary URL, and network
-    // bytes never control the pathname: the report filename is the fixed source-probe-report.md under
-    // the caller-selected artifact directory. Persisting this public diagnostic response is the feature.
-    writeFileSync(join(outdir, 'source-probe-report.md'), md + '\n');
     console.log(md);
     return 0;
   }
@@ -444,12 +436,10 @@ async function main(argv) {
   if (!targets.length) { console.error('source-probe: no probeable source matches "' + selector + '"'); return 2; }
   const results = [];
   for (const s of targets) {
-    console.log('source-probe: ' + s.id + ' → ' + s.url);
+    console.error('source-probe: ' + s.id + ' → ' + s.url);
     results.push(await probeOne(s));
   }
-  mkdirSync(outdir, { recursive: true });
   const md = renderReport(results);
-  writeFileSync(join(outdir, 'source-probe-report.md'), md + '\n');
   console.log(md);
   return 0;
 }
