@@ -44,5 +44,6 @@ can be recovered and operated without the primary administrator.
 
 No completed exercise record is present as of 2026-10-07. Open action 44 requires
 a dated drill that identifies the second operator, records recovery and operating
-steps performed, captures observed RTO, and routes any findings into CAPA/open
-actions. A planned exercise is not treated as operating evidence.
+steps performed, captures observed RTO, routes any findings into CAPA/open
+actions, and records the next annual exercise date. A planned exercise is not
+treated as operating evidence.
