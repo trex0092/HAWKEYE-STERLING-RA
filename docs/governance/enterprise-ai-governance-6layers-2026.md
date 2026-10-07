@@ -3,6 +3,7 @@
 **Owner:** MLRO (accountable) · Compliance Engineering (operational)  
 **Control source of truth:** [`data/ai-controls.json`](../../data/ai-controls.json)  
 **Status dashboard:** [`enterprise-ai-governance-dashboard.md`](enterprise-ai-governance-dashboard.md)  
+**Diagram:** [`../executive/diagrams/d2-enterprise-ai-governance-layers.mmd`](../executive/diagrams/d2-enterprise-ai-governance-layers.mmd)  
 **Review cadence:** Quarterly, and on any material AI asset, provider, model, prompt charter, connector, or data-flow change.
 
 This document adds an **enterprise governance view** over the controls already present in Hawkeye Sterling. It does not replace the existing [six-layer agentic-AI scorecard](agentic-ai-governance-6layers-2026.md), the AIMS risk register, the third-party register, the assurance coverage matrix, or the AI asset register.
