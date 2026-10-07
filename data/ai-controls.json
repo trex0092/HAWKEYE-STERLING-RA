@@ -455,18 +455,23 @@
       "owner": "Compliance Engineering",
       "operator": "Compliance Engineering",
       "cadence": "Per build and continuous runtime configuration",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
+        "netlify/functions/_auth.js",
         "netlify.toml",
         ".github/workflows/codeql.yml",
         ".github/workflows/semgrep.yml",
-        ".github/workflows/fortify.yml"
+        ".github/workflows/fortify.yml",
+        "docs/governance/open-actions-register.md"
       ],
       "tests": [
         "test/csp.test.mjs",
         "test/security-headers.test.mjs"
       ],
-      "note": "Application and repository security controls are tested independently of model quality."
+      "note": "Application and repository security controls are tested, but production function endpoints do not yet have verified user identity. The current Origin/shared-token gate is explicitly a compensating control; open action 20 adds real JWT/OIDC role-based authentication.",
+      "closure_actions": [
+        20
+      ]
     },
     {
       "id": "EAI-MON-04",
