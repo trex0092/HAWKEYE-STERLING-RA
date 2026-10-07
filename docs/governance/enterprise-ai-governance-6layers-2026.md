@@ -40,7 +40,7 @@ Both views point to the same underlying controls. A control should be implemente
 |---|---|
 | Assign AI owner | Every AI surface currently registered in the Hawkeye Sterling suite has an accountable owner in the [AI Asset Register](ai-asset-register.md); enterprise-wide discovery remains open under item 9 of the [open-actions register](open-actions-register.md) |
 | Clarify business ownership | [Operating model](operating-model.md) and [control ownership matrix](ai-control-ownership-matrix.md) |
-| Define legal/governance oversight | [AI Governance Committee Charter](ai-governance-committee-charter.md) |
+| Define legal/governance oversight | [AI Governance Committee Charter](ai-governance-committee-charter.md); formal adoption and the DPO designation determination remain open under items 4 and 13 |
 | Set risk responsibilities | Risk register and risk-appetite ownership |
 | Create escalation paths | [AI Incident Runbook](ai-incident-runbook.md), operating-model escalation |
 
@@ -52,7 +52,7 @@ Both views point to the same underlying controls. A control should be implemente
 |---|---|
 | Identify AI risks | [AIMS AI Risk Register](../aims/ai-risk-register.md) |
 | Classify use cases | [AI use-case intake](ai-use-case-intake.md) plus AI asset risk tier |
-| Assess impact and likelihood | 5×5 inherent/residual scoring, DPIA, stakeholder impact assessment |
+| Assess impact and likelihood | 5×5 inherent/residual scoring, DPIA, stakeholder impact assessment; `EAI-RSK-03` remains partial while item 42 reconciles the adverse-media LLM-triage go-live prerequisites and live configuration |
 | Design mitigations | Control mappings, CAPA and open-actions process |
 | Approve residual risk | [Residual-risk acceptance register](residual-risk-acceptance-register.md); no acceptance is inferred from silence |
 
@@ -64,7 +64,7 @@ Both views point to the same underlying controls. A control should be implemente
 |---|---|
 | Govern data and retention | [Data retention](data-retention.md), DPIA and data-minimisation controls |
 | Maintain data quality and lineage | [Data-quality plan](../aims/data-quality-plan.md), source/version lineage, screening evidence and schema/integrity checks over governed data files |
-| Validate models | [Model validation](model-validation-2026.md), live Advisor evaluation and bias testing; current overdue/reconciliation items are reported by the generated dashboard rather than hidden here |
+| Validate models | [Model validation](model-validation-2026.md), live Advisor evaluation and bias testing; MRM ratification, the overdue Q3 sign-off and independent review remain explicit under items 16, 38 and 8 |
 | Document prompts and models | [Prompt lifecycle register](prompt-lifecycle-register.md), [AI Asset Register](ai-asset-register.md) |
 | Control versions and changes | Prompt fingerprints, pinned routing, PR review and CI guards |
 | Manage access and retention | [Tool & connector register](tool-connector-register.md), server-held credentials, retention rules |
@@ -80,9 +80,9 @@ Both views point to the same underlying controls. A control should be implemente
 | Track performance | Advisor eval scorecard and live evaluation |
 | Monitor bias | Quarterly bias evaluation and formal cross-script testing |
 | Detect drift | Prompt/tool register drift guards and governance metrics |
-| Apply security controls | CSP/HSTS, CodeQL, Semgrep, Fortify, secret scanning and least privilege |
+| Apply security controls | CSP/HSTS, CodeQL, Semgrep, Fortify, secret scanning and least privilege; `EAI-MON-03` remains partial for public-history redaction, verified end-user identity, fleet-wide LLM-relay rate limiting and the first manual penetration-test cycle under items 1, 20, 22 and 43 |
 | Manage access controls | Tool/connector inventory, server-held credentials and repository protection; verified end-user identity on confidential function endpoints remains open under item 20 and is reported as partial on the generated dashboard |
-| Respond to incidents | AI incident runbook, kill switches and freshness alarms |
+| Respond to incidents | AI incident runbook, kill switches and freshness alarms; `EAI-MON-04` remains partial for independent alerting, production telemetry rehearsal, deploy self-heal/rollback and the first AI incident tabletop under items 21, 24, 26 and 31 |
 | Report and improve | Daily governance report, GRC metrics, CAPA and management review |
 
 **Control IDs:** EAI-MON-01 through EAI-MON-05.
@@ -93,14 +93,34 @@ Both views point to the same underlying controls. A control should be implemente
 |---|---|
 | Keep AI inventory | Machine-readable AI asset register for the Hawkeye Sterling suite; enterprise-wide extension remains open under item 9 |
 | Maintain evidence | [Assurance Coverage Matrix](assurance-coverage-matrix.md) and evidence retention |
-| Preserve decisions | Git/Asana/audit trails, sign-off and override records |
+| Preserve decisions | Git/Asana/audit trails, sign-off and override records; `EAI-AUD-04` remains partial until item 23 provides a dedicated authenticated persistence tier plus a documented and rehearsed assessment-data RPO/RTO |
 | Test controls regularly | [AI control testing calendar](ai-control-testing-calendar.md) plus CI/scheduled workflows; `EAI-AUD-07` keeps human review/exercise currency visible and points overdue cycles to the open-actions register |
 | Review vendor assurance | Third-party register and AI-specific vendor view |
-| Map compliance obligations | Obligation register and framework crosswalks |
+| Map compliance obligations | [`EAI-AUD-08`](../../data/ai-controls.json) ties the obligation register, regulatory-watch sources and legal-citation guards into one tested traceability control; article-level legal sourcing remains open under item 5 and is reported as partial |
 | Track remediation | CAPA and open-actions registers |
 | Run internal/external audits | Internal audit programme exists; external conformity assurance is not claimed until commissioned |
 
-**Control IDs:** EAI-AUD-01 through EAI-AUD-07.
+**Control IDs:** EAI-AUD-01 through EAI-AUD-08.
+
+## Open actions outside the six-layer AI-control denominator
+
+The open-actions register is broader than this AI-governance crosswalk. The following
+live items remain pending but are intentionally **not** used as closure actions for an
+enterprise AI control, so their absence from the dashboard is not mistaken for closure:
+
+- item 2 is a chase-email workflow that advances items 5 and 6 rather than a control itself;
+- item 3 is a queued release-approval act, while the deployment gate itself is operating;
+- item 6 is deterministic transaction-feed wiring for the wider AML programme;
+- item 7 is firm-wide AML/CFT and sanctions training beyond the AI-control scope;
+- item 18 is approval of the wider AML/CFT/CPF policy pack;
+- item 27 is screening-engine maintainability technical debt;
+- item 28 is Arabic UI linguistic QA/localisation.
+
+They remain authoritative in the [open-actions register](open-actions-register.md) and
+must not be read as complete merely because they are outside this control denominator.
+The same seven rows are machine-readable in `data/ai-controls.json` under
+`scope_exclusions`; the control validator fails if a live open action is neither
+mapped to an incomplete control nor explicitly excluded with a rationale.
 
 ## Evidence rule
 

@@ -36,8 +36,8 @@ mode. Then the §6 TEST-000 verification before real use.
 - Roles are stored per device; changes are audit-logged.
 
 ## Enabling the AI features (after the DPA)
-1. Sign the Anthropic DPA; confirm the PDPL transfer basis.
-2. Set `LLM_TRIAGE=1` (adverse-media triage) and/or provision `ANTHROPIC_API_KEY`
+1. Verify and record the executed Anthropic DPA, contracted processing terms and PDPL transfer basis. If execution cannot be verified, keep customer-data egress gated and close open actions 36/42 before enabling triage.
+2. Set `LLM_TRIAGE=1` (adverse-media triage) only after the triage go-live checklist is signed, and/or provision `ANTHROPIC_API_KEY`
    for the Advisor. With no key, everything runs deterministic with no egress.
 3. The quarterly advisor bias eval then self-runs.
 

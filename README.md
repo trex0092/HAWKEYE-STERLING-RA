@@ -501,16 +501,22 @@ view is the [roadmap](docs/executive/roadmap.md).
   R-13. An interim manual compensating control was adopted 2026-07-29.
 - **Part of the policy pack is draft.** Two procedures are approved and in
   force; sixteen instruments await Board approval (register item 18).
-- **Function endpoints are effectively public by design.** A static browser
-  app cannot keep a real secret; Origin and shared-token checks deter but do
-  not authenticate - [`netlify/functions/_auth.js`](netlify/functions/_auth.js)
-  states this honestly. Verified identity is register item 20.
-- **Assessments persist on-device only** (`localStorage`); the only off-device
-  copy is the override-sheet mirror. A server-side persistence tier with an
-  RPO/RTO statement is register item 23.
-- **The LLM layer ships disabled.** Every LLM path is fail-closed behind
-  `ANTHROPIC_API_KEY` *plus* an explicit opt-in flag, both default off pending
-  the Anthropic DPA - production behaviour is deterministic-only.
+- **Function endpoints can be effectively public when `APP_SHARED_TOKEN` is unset.**
+  Confidential read relays require `X-App-Token` when the shared token is configured,
+  but that shared bearer secret is still not verified per-user identity or RBAC. The
+  repository does not infer the live environment setting; verified identity is register
+  item 20. See [`netlify/functions/_auth.js`](netlify/functions/_auth.js).
+- **Assessments and the activity log are primarily on-device** (`localStorage`).
+  Asana mirrors provide off-device operational copies of the assessment register,
+  activity log and risk-data overrides, but there is no dedicated authenticated
+  persistence tier with a documented and rehearsed assessment-data RPO/RTO. That
+  remaining preservation gap is register item 23.
+- **LLM runtime state is mixed and must not be inferred from defaults.** The Advisor
+  is an active on-request Anthropic surface. Adverse-media triage code defaults OFF
+  and requires explicit `LLM_TRIAGE=1`, but the repository cannot read the live
+  repo-variable value; the third-party register preserves a 2026-07-16 owner
+  attestation that it was enabled while the formal DPA/go-live evidence remains
+  unresolved. Items 36 and 42 reconcile the legal and runtime records.
 - **Alert delivery is Asana-only.** A delivery failure fails the run loudly,
   but no second channel pages anyone - register item 21.
 - **Arabic coverage is partial.** The assessment screen is fully translated;

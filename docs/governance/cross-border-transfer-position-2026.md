@@ -22,8 +22,8 @@ additionally required, or do the contractual-safeguard bases suffice?**
 | Fact | Evidence |
 |---|---|
 | Data minimised before transfer: only name + headline reach the LLM; tokenised delivery keeps identity on-device where enabled | [DPIA](dpia-2026.md) minimisation rows; [uae-ai-data-laws-2026.md](uae-ai-data-laws-2026.md) row 7 |
-| Anthropic processor terms executed; API data not used for training | [Anthropic DPA execution pack](../aims/anthropic-dpa-execution-pack.md) |
-| Asana processes case metadata under its DPA | [Third-party register](../aims/third-party-register.md) |
+| Anthropic processing terms / no-training position require verification. The execution pack is still DRAFT with execution fields blank, while the third-party register preserves a 2026-07-16 owner attestation of execution. | [Anthropic DPA execution pack](../aims/anthropic-dpa-execution-pack.md); [third-party register](../aims/third-party-register.md); open action 36 |
+| Asana processes case metadata; the DPA evidence and contracted processing region are still marked for confirmation. | [Third-party register](../aims/third-party-register.md); open action 35 |
 | Processing basis is legal obligation (AML/CFT, FDL 10/2025), not consent | DPIA lawful-basis row; [uae-ai-data-laws-2026.md](uae-ai-data-laws-2026.md) rows 1–2 |
 | Transfer-risk assessment recorded, residual Med accepted | DPIA cross-border row |
 

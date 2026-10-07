@@ -68,7 +68,8 @@ const stateSect = (readme.split(/^## System state & known limitations$/m)[1] || 
 check('README carries a "System state & known limitations" section', stateSect.length > 0);
 check('README system-state section links the open-actions register', stateSect.includes('docs/governance/open-actions-register.md'));
 check('README system-state section names the inert transaction monitor', /txn_monitor\.py/.test(stateSect) && /INACTIVE/.test(stateSect));
-check('README system-state section states the endpoints-are-public limitation', /effectively public/.test(stateSect));
+check('README system-state section states the conditional endpoint-auth limitation',
+  /effectively public/i.test(stateSect) && /APP_SHARED_TOKEN/.test(stateSect) && /not verified identity|not verified per-user identity|not verified user identity/i.test(stateSect));
 check('README system-state section states the on-device persistence limit', /localStorage/.test(stateSect));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

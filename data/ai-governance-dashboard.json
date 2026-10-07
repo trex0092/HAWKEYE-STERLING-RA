@@ -5,9 +5,9 @@
   "source_register": "data/ai-controls.json",
   "review_by": "2027-01-07",
   "summary": {
-    "controls": 31,
-    "effective": 16,
-    "partial": 14,
+    "controls": 32,
+    "effective": 14,
+    "partial": 17,
     "open": 1,
     "not_applicable": 0,
     "overall_status": "partial"
@@ -40,8 +40,8 @@
       "name": "Risk Management",
       "purpose": "Identify, classify, assess, mitigate and explicitly treat residual AI risk.",
       "controls": 5,
-      "effective": 3,
-      "partial": 2,
+      "effective": 2,
+      "partial": 3,
       "open": 0,
       "not_applicable": 0,
       "status": "partial"
@@ -72,9 +72,9 @@
       "id": "L6",
       "name": "Audit & Assurance",
       "purpose": "Preserve evidence, test controls, audit governance, track remediation and support independent assurance.",
-      "controls": 7,
-      "effective": 3,
-      "partial": 3,
+      "controls": 8,
+      "effective": 2,
+      "partial": 5,
       "open": 1,
       "not_applicable": 0,
       "status": "partial"
@@ -86,11 +86,12 @@
     "audit_finding_closure_rate": 95.2,
     "governance_drift_count": 0,
     "residual_above_appetite": 2,
-    "open_actions_without_target_date": 29
+    "open_actions_without_target_date": 31
   },
   "interpretation": [
     "Layer status is derived from control-register status plus repository evidence-path validation.",
     "GRC signals are copied from the separately generated data/grc-metrics.json snapshot.",
+    "The GRC control-effectiveness metric measures automated proof-path coverage in the assurance matrix, not the share of enterprise AI controls rated effective.",
     "Green repository evidence does not imply external certification or completion of human approvals."
   ]
 }

@@ -42,7 +42,7 @@ Actions from the URLs in `sanctions-sources.json`.
 | `sanctions-screen-state.json`(`.enc`) | Screening runs: last-seen matches (no re-alert spam) |
 | `screen-delta-state.json`(`.enc`) · `screening-cases-state.json.enc` · `source-coverage-state.json`(`.enc`) · `adverse-media-evidence.json`(`.enc`) · `run-metrics.json`(`.enc`) | The daily screen's delta, case, coverage, evidence and metrics state |
 | `tfs-update-log.json` | TFS list-update timeline (detection → rescreen; MLRO completes publication dates) |
-| `risk-overrides-backup.json` | Monthly commit of the override-sheet mirror (the one off-device copy of officer work) |
+| `risk-overrides-backup.json` | Monthly git copy of the risk-data override mirror. Assessment-register and activity-log operational mirrors also exist in Asana; none of these substitutes for the dedicated authenticated persistence tier and documented/rehearsed RPO/RTO still open under item 23. |
 | `grc-metrics.json` · `board-figures.json` | Generated snapshots — regen with `node scripts/grc-metrics.mjs --write` / `node scripts/board-figures.mjs --write`; CI runs both `--check` modes |
 
 **Encryption.** Every `*.json.enc` is AES-256-GCM (scrypt) via

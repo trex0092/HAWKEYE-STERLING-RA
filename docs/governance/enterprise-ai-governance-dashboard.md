@@ -12,21 +12,21 @@
 |---|---|---:|---:|---:|---:|
 | L1 · Policy | **PARTIAL** | 3 | 1 | 0 | 4 |
 | L2 · Roles & Accountability | **PARTIAL** | 2 | 2 | 0 | 4 |
-| L3 · Risk Management | **PARTIAL** | 3 | 2 | 0 | 5 |
+| L3 · Risk Management | **PARTIAL** | 2 | 3 | 0 | 5 |
 | L4 · Data & Model Governance | **PARTIAL** | 3 | 3 | 0 | 6 |
 | L5 · Monitoring & Controls | **PARTIAL** | 2 | 3 | 0 | 5 |
-| L6 · Audit & Assurance | **PARTIAL** | 3 | 3 | 1 | 7 |
+| L6 · Audit & Assurance | **PARTIAL** | 2 | 5 | 1 | 8 |
 
 ## Repository-derived governance signals
 
 | Signal | Current value | Source |
 |---|---:|---|
-| Control effectiveness rate | 100% | `data/grc-metrics.json` |
+| Automated proof-path coverage (GRC control-effectiveness metric) | 100% | `data/grc-metrics.json` |
 | Third-party assessment coverage | 62.5% | `data/grc-metrics.json` |
 | Audit finding closure rate | 95.2% | `data/grc-metrics.json` |
 | Governance drift count | 0 | `data/grc-metrics.json` |
 | Risks above appetite | 2 | `data/grc-metrics.json` |
-| Open actions without target date | 29 | `data/grc-metrics.json` |
+| Open actions without target date | 31 | `data/grc-metrics.json` |
 
 ## Partial and open controls
 
@@ -34,23 +34,28 @@
 |---|---|---|---|---|
 | `EAI-POL-03` AI use-case approval criteria | L1 | **PARTIAL** | #30 | A repository intake gate is implemented in this change; formal organizational adoption remains a human governance act. |
 | `EAI-ROL-01` Named accountable owner for every AI asset | L2 | **PARTIAL** | #9 | The Hawkeye Sterling suite inventory is complete and CI-scanned, but the open-actions register still requires enterprise-wide AI discovery before this organization-level control is fully effective. |
-| `EAI-ROL-03` AI governance committee and legal oversight | L2 | **PARTIAL** | #4 | The charter exists, while the repository's open-actions register still records human ratification actions. |
+| `EAI-ROL-03` AI governance committee and legal oversight | L2 | **PARTIAL** | #4, #13 | The AI Governance Committee charter and legal-oversight model exist, but formal committee/Board adoption remains open under item 4 and the deploying entity's DPO designation determination remains unminuted under item 13. |
 | `EAI-RSK-02` Risk appetite and residual-risk treatment | L3 | **PARTIAL** | #17, #33, #34 | The repository currently reports risks above appetite and does not infer acceptance without a human decision. |
+| `EAI-RSK-03` Impact and privacy assessment | L3 | **PARTIAL** | #42 | Privacy and stakeholder assessments exist, but the adverse-media LLM-triage go-live checklist remains unsigned while the third-party register records an owner attestation that LLM_TRIAGE=1 was enabled. The live runtime state is not repository-verifiable, so the assessment/control is partial until item 42 reconciles the legal prerequisites, authorised sign-off and production configuration. |
 | `EAI-RSK-05` Use-case classification before deployment | L3 | **PARTIAL** | #30 | The intake form requires classification and risk tiering; organizational ratification of the new gate remains explicit. |
 | `EAI-DMG-01` AI inventory and system boundary | L4 | **PARTIAL** | #9 | The repository inventory and system boundary are controlled for Hawkeye Sterling; enterprise-wide extension remains open under item 9, so organization-level AI inventory is not yet complete. |
-| `EAI-DMG-04` Model validation and bias evaluation | L4 | **PARTIAL** | #8, #38 | Validation and bias controls exist; the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors, but the recorded 2026 Q3 model-validation sign-off is overdue; independent review remains routed to item 8. |
-| `EAI-DMG-05` AI and AI-adjacent vendor assurance | L4 | **PARTIAL** | #5, #11, #29, #35, #36 | The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required. |
+| `EAI-DMG-04` Model validation and bias evaluation | L4 | **PARTIAL** | #8, #16, #38 | Validation and bias controls exist and the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors. However, the MRM framework still awaits ratification under item 16, the 2026 Q3 model-validation sign-off is overdue under item 38, and independent review remains routed to item 8. |
+| `EAI-DMG-05` AI and AI-adjacent vendor assurance | L4 | **PARTIAL** | #5, #11, #29, #35, #36, #42 | The live GRC metric reports outstanding third-party assurance items. In addition, the Anthropic legal/runtime record is internally inconsistent: an owner attestation reports LLM_TRIAGE enabled while the formal DPA execution and go-live checklist remain incomplete. Items 36 and 42 reconcile those records; gated features must remain gated where required. |
 | `EAI-MON-01` AI performance and behavioural monitoring | L5 | **PARTIAL** | #40 | Offline assurance remains in CI, but scheduled live Advisor evaluations on 2026-09-28 and 2026-10-05 were incomplete because provider usage and credit limits blocked the governed live suite. No regression was observed, but live behavioural evidence remains incomplete until a successful recovery run. |
-| `EAI-MON-03` Security and access controls | L5 | **PARTIAL** | #20 | Application and repository security controls are tested, but production function endpoints do not yet have verified user identity. The current Origin/shared-token gate is explicitly a compensating control; open action 20 adds real JWT/OIDC role-based authentication. |
-| `EAI-MON-04` Incident detection, response and control freshness | L5 | **PARTIAL** | #31 | Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation. |
+| `EAI-MON-03` Security and access controls | L5 | **PARTIAL** | #1, #20, #22, #43 | Application and repository security controls are tested, but four material gaps remain: pre-redaction subject data is still retrievable from public git history until item 1 is executed; production function endpoints lack verified per-user identity/RBAC under item 20; the billed LLM relay still uses per-instance rather than fleet-wide rate limiting under item 22; and the first annual manual penetration test remains outstanding under item 43. |
+| `EAI-MON-04` Incident detection, response and control freshness | L5 | **PARTIAL** | #21, #24, #26, #31 | Detection, freshness checks, runbooks and kill switches exist, but incident/control operations are not yet fully proven: item 21 adds an independent non-Asana alert channel, item 24 requires production telemetry rehearsal, item 26 requires deploy self-heal/rollback automation plus rehearsal, and item 31 is the first AI incident-response tabletop. |
 | `EAI-AUD-02` Internal audit programme | L6 | **PARTIAL** | #8 | The programme exists; the open-actions register records the first thematic review as a human action still to complete. |
 | `EAI-AUD-03` Management review and governance decisions | L6 | **PARTIAL** | #32 | Templates and decision rights exist; this register does not fabricate completed meetings or approvals. |
+| `EAI-AUD-04` Preservation of decisions and audit evidence | L6 | **PARTIAL** | #23 | Decision provenance, hash-chained audit records, exports and Asana off-device mirrors exist, but assessments/activity remain primarily browser-local and the repository still lacks a dedicated authenticated persistence tier with a documented and rehearsed assessment-data RPO/RTO. Open action 23 closes that preservation/recovery gap. |
 | `EAI-AUD-06` Independent external assurance | L6 | **OPEN** | #10, #37 | No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned. |
-| `EAI-AUD-07` Regular control testing and review currency | L6 | **PARTIAL** | #8, #14, #15, #31, #38, #41 | Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle. |
+| `EAI-AUD-07` Regular control testing and review currency | L6 | **PARTIAL** | #8, #14, #15, #31, #32, #38, #41, #43 | Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, TFS/watchlist review cycle, and the first annual manual penetration test. |
+| `EAI-AUD-08` Compliance obligation mapping and regulatory traceability | L6 | **PARTIAL** | #5 | The obligation register maps all 21 current obligations to an instrument, owner, controls, evidence, regulatory-watch source and status, but all 21 still carry source_citation.basis = needs-source. Open action 5 is the human legal-sourcing path; CI prevents unsourced article numbers or drafted text from masquerading as law. |
 
 ## Interpretation
 
 This dashboard reports the state represented by the repository. It does not turn a missing human approval, unsigned contract, unperformed audit, or uncommissioned external assessment into a completed control.
+
+The 100% automated proof-path signal is the GRC metric for assurance-matrix rows whose named automated proof artefacts exist. It is not the percentage of enterprise AI controls rated effective; the six-layer counts above are the authoritative status view for that question.
 
 A CI pass proves that the register is internally consistent, its evidence paths exist, its review deadline has not expired, and the generated views match their sources. It does not constitute MLRO, Board, legal, regulator, or external-auditor approval.
 

@@ -60,13 +60,21 @@ PDPL Art. 22–23; (c) log it in `third-party-register.md`. Until then the syste
 no-egress by design.
 
 ## 6. Residual risk & actions
-- **Open action, updated 2026-07-16:** the Anthropic DPA is recorded as executed per
-  the owner's attestation of 2026-07-16 (third-party register row), and the owner
-  reports `LLM_TRIAGE=1` enabled the same day. What remains open: counsel's written
-  confirmation of the transfer basis, to be recorded in the third-party register when
-  received (Asana P26). `REPORT_ALLOW_LLM` stays `0`: generative report prose remains
-  off; only grounded triage (name + one public headline) is enabled by this change.
-- Residual after controls: **Low** (no-egress default; minimisation; masking).
+- **Unresolved legal/runtime record, updated 2026-10-07:** the third-party register
+  preserves a 2026-07-16 owner attestation that the Anthropic DPA was executed and
+  `LLM_TRIAGE=1` was enabled. The formal DPA execution block, however, remains
+  explicitly DRAFT with the reference, signatory, execution date and processing
+  region blank, and the AI impact-assessment go-live checklist is not signed.
+  Repository code proves only that triage defaults to `0` and requires explicit
+  `LLM_TRIAGE=1`; it does not prove the live repo-variable value. Open actions 36
+  and 42 require a verified legal position and verified production configuration.
+- Counsel's written PDPL transfer-basis confirmation also remains open under items
+  5 and 11.
+- `REPORT_ALLOW_LLM` remains `0`: generative report prose is not authorised by
+  this assessment.
+- Residual risk is **not re-accepted by this documentation edit**. The prior Low
+  residual conclusion depends on the go-live safeguards being satisfied and must
+  be reconsidered when item 42 is closed.
 
 ## Evidence
 - Controls in code: `ai._llm_in_reports`, `ai._wrap_untrusted`, `kyc.mask_id`,

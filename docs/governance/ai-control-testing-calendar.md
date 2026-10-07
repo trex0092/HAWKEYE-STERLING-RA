@@ -16,6 +16,7 @@ This calendar consolidates the existing test cadences. It does not invent eviden
 | Tool/connector authorization drift | `test/tool-register.test.mjs` |
 | Enterprise control-register integrity and generated views | `node scripts/ai-governance-controls.mjs --check` |
 | Policy-register ownership/approval consistency | `test/policies.test.mjs` |
+| Obligation mapping, source-citation shape and legal-citation currency | `test/obligations.test.mjs`, `test/legal-citations.test.mjs` |
 | Security scanning | CodeQL, Semgrep, Fortify, gitleaks, dependency review |
 | Assurance evidence path integrity | GRC metrics + enterprise control-register validation |
 
@@ -42,6 +43,7 @@ This calendar consolidates the existing test cadences. It does not invent eviden
 | AI risk-register review | `docs/aims/ai-risk-register.md` |
 | Bias/fairness review | `scripts/advisor-bias-eval.mjs`, bias review log |
 | Provider/vendor assurance review | Third-party register and outstanding conditions |
+| Compliance obligation and legal-source review | Obligation register, Regulatory Watch changes, and `obligationsWithoutSourcedCitation` counter |
 | Access/tool/connector review | Tool & connector register plus permission review |
 | Prompt/model change review | Prompt register and model-validation sign-off |
 | Management review inputs | GRC metrics, CAPA, open actions, incidents and evaluation results |

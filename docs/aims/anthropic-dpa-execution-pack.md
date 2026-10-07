@@ -23,8 +23,15 @@
    Anthropic counter-executes its DPA.
 5. Record the **reference number and execution date** in Schedule C **and** in the
    "Anthropic DPA & cross-border transfer record" block of `third-party-register.md`.
-6. Only then set the GitHub repo variable **`LLM_TRIAGE=1`** to re-enable grounded
+6. Only then set the GitHub repo variable **`LLM_TRIAGE=1`** to enable grounded
    triage. Leave `REPORT_ALLOW_LLM` unset (generative report prose stays off).
+
+> **Control-state warning, 2026-10-07.** The intended sequence above remains the
+> required control. The third-party register nevertheless preserves a 2026-07-16
+> owner attestation that `LLM_TRIAGE=1` was enabled, while Schedule C below is still
+> blank. The repository cannot read the live repo-variable value. Open actions 36
+> and 42 require the legal record and production configuration to be verified and
+> reconciled; this pack does not treat the attestation as execution evidence.
 
 ---
 
@@ -46,7 +53,7 @@
 | **Sub-processors** | Anthropic's infrastructure sub-processors per Anthropic's published list — **obtain and attach** |
 | **Processing location** | United States (Anthropic API) — **confirm contracted region at signing** |
 | **Retention at Processor** | Per Anthropic terms; firm retains no LLM content; **confirm zero-retention / no-training** |
-| **Security (firm side)** | API key held as an encrypted GitHub Actions secret (never in the browser); least-privilege; egress-audited runners (`harden-runner`); the triage egress is gated by `LLM_TRIAGE` and is **OFF until this DPA is executed** |
+| **Security (firm side)** | API key held as an encrypted GitHub Actions secret (never in the browser); least-privilege; egress-audited runners (`harden-runner`); triage requires explicit `LLM_TRIAGE=1` and code defaults to `0`. The live production value is not proven by this repository and is tracked under item 42. |
 | **Controller instructions** | The Processor processes only on the Controller's documented instructions as set out in this Schedule; no generative prose is admitted into filed reports (`REPORT_ALLOW_LLM=0`) |
 
 ---
@@ -59,7 +66,7 @@
 | Item | Position |
 |---|---|
 | **Transfer** | Personal data (name + headline) transferred from the UAE to the Processor in the United States |
-| **Primary basis relied on** | Transfer to a recipient bound by **appropriate contractual safeguards** — i.e. the executed Anthropic DPA incorporating standard data-protection commitments (security, confidentiality, sub-processor control, assistance, deletion) — combined with **data minimisation** (name + one headline only) and the DPIA on file |
+| **Primary basis proposed for counsel confirmation** | Transfer to a recipient bound by **appropriate contractual safeguards**, if and when the Anthropic DPA is verified as executed with the required data-protection commitments, combined with **data minimisation** (name + one headline only) and the DPIA on file. The repository does not currently evidence execution; see item 36. |
 | **Alternative / fallback bases to weigh with counsel** | (a) an applicable **adequacy** determination for the destination, if available; (b) the data subject's **explicit consent** to the specific transfer; (c) transfer **necessary for a legal obligation** (AML/CFT screening) — counsel to confirm which PDPL gateway is the firm's primary reliance and document it here |
 | **Proportionality** | The transfer is limited to what is necessary for the screening purpose; no full record, no special-category data deliberately; human review remains mandatory before any action |
 | **Risk to data subjects** | Low residual: minimal payload, transient processing, no automated decision; assessed in the DPIA (`ai-impact-assessment.md`) |

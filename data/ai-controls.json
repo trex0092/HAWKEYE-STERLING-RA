@@ -171,9 +171,10 @@
       "tests": [
         "test/policies.test.mjs"
       ],
-      "note": "The charter exists, while the repository's open-actions register still records human ratification actions.",
+      "note": "The AI Governance Committee charter and legal-oversight model exist, but formal committee/Board adoption remains open under item 4 and the deploying entity's DPO designation determination remains unminuted under item 13.",
       "closure_actions": [
-        4
+        4,
+        13
       ]
     },
     {
@@ -241,13 +242,18 @@
       "owner": "MLRO / DPO",
       "operator": "Compliance Engineering",
       "cadence": "On new use case, new data flow, new provider and material change",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/dpia-2026.md",
-        "docs/governance/stakeholder-impact-assessment-2026.md"
+        "docs/governance/stakeholder-impact-assessment-2026.md",
+        "docs/aims/ai-impact-assessment.md",
+        "docs/aims/pdpl-data-processing-assessment.md"
       ],
       "tests": [],
-      "note": "Privacy and stakeholder impacts are assessed separately from model performance."
+      "note": "Privacy and stakeholder assessments exist, but the adverse-media LLM-triage go-live checklist remains unsigned while the third-party register records an owner attestation that LLM_TRIAGE=1 was enabled. The live runtime state is not repository-verifiable, so the assessment/control is partial until item 42 reconciles the legal prerequisites, authorised sign-off and production configuration.",
+      "closure_actions": [
+        42
+      ]
     },
     {
       "id": "EAI-RSK-04",
@@ -360,9 +366,10 @@
         "test/advisor-assurance.test.js",
         "test/advisor-bias-eval.test.mjs"
       ],
-      "note": "Validation and bias controls exist; the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors, but the recorded 2026 Q3 model-validation sign-off is overdue; independent review remains routed to item 8.",
+      "note": "Validation and bias controls exist and the 2026-10-01 quarterly bias evaluation passed with 0 findings and 0 eval errors. However, the MRM framework still awaits ratification under item 16, the 2026 Q3 model-validation sign-off is overdue under item 38, and independent review remains routed to item 8.",
       "closure_actions": [
         8,
+        16,
         38
       ],
       "review_by": "2026-09-30"
@@ -383,13 +390,14 @@
       "tests": [
         "test/grc-metrics.test.mjs"
       ],
-      "note": "The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required.",
+      "note": "The live GRC metric reports outstanding third-party assurance items. In addition, the Anthropic legal/runtime record is internally inconsistent: an owner attestation reports LLM_TRIAGE enabled while the formal DPA execution and go-live checklist remain incomplete. Items 36 and 42 reconcile those records; gated features must remain gated where required.",
       "closure_actions": [
         5,
         11,
         29,
         35,
-        36
+        36,
+        42
       ]
     },
     {
@@ -458,10 +466,12 @@
       "status": "partial",
       "evidence": [
         "netlify/functions/_auth.js",
+        "netlify/functions/_ratelimit.js",
         "netlify.toml",
         ".github/workflows/codeql.yml",
         ".github/workflows/semgrep.yml",
         ".github/workflows/fortify.yml",
+        "docs/security/history-scrub-runbook.md",
         "docs/governance/open-actions-register.md"
       ],
       "tests": [
@@ -470,9 +480,12 @@
         "test/asana-functions.test.js",
         "test/property-fuzz.test.js"
       ],
-      "note": "Application and repository security controls are tested, but production function endpoints do not yet have verified user identity. The current Origin/shared-token gate is explicitly a compensating control; open action 20 adds real JWT/OIDC role-based authentication.",
+      "note": "Application and repository security controls are tested, but four material gaps remain: pre-redaction subject data is still retrievable from public git history until item 1 is executed; production function endpoints lack verified per-user identity/RBAC under item 20; the billed LLM relay still uses per-instance rather than fleet-wide rate limiting under item 22; and the first annual manual penetration test remains outstanding under item 43.",
       "closure_actions": [
-        20
+        1,
+        20,
+        22,
+        43
       ]
     },
     {
@@ -491,8 +504,11 @@
       "tests": [
         "test/freshness-check.test.mjs"
       ],
-      "note": "Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation.",
+      "note": "Detection, freshness checks, runbooks and kill switches exist, but incident/control operations are not yet fully proven: item 21 adds an independent non-Asana alert channel, item 24 requires production telemetry rehearsal, item 26 requires deploy self-heal/rollback automation plus rehearsal, and item 31 is the first AI incident-response tabletop.",
       "closure_actions": [
+        21,
+        24,
+        26,
         31
       ]
     },
@@ -575,15 +591,20 @@
       "owner": "MLRO",
       "operator": "Compliance Engineering",
       "cadence": "Continuous",
-      "status": "effective",
+      "status": "partial",
       "evidence": [
         "docs/governance/assurance-coverage-matrix.md",
-        "docs/governance/data-retention.md"
+        "docs/governance/data-retention.md",
+        "docs/governance/backup-recovery.md",
+        "docs/governance/open-actions-register.md"
       ],
       "tests": [
         "test/export-integrity.test.js"
       ],
-      "note": "Decision provenance, audit trails and evidence retention are part of the assurance matrix."
+      "note": "Decision provenance, hash-chained audit records, exports and Asana off-device mirrors exist, but assessments/activity remain primarily browser-local and the repository still lacks a dedicated authenticated persistence tier with a documented and rehearsed assessment-data RPO/RTO. Open action 23 closes that preservation/recovery gap.",
+      "closure_actions": [
+        23
+      ]
     },
     {
       "id": "EAI-AUD-05",
@@ -645,10 +666,66 @@
         14,
         15,
         31,
+        32,
         38,
-        41
+        41,
+        43
       ],
-      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle."
+      "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, TFS/watchlist review cycle, and the first annual manual penetration test."
+    },
+    {
+      "id": "EAI-AUD-08",
+      "layer": "L6",
+      "name": "Compliance obligation mapping and regulatory traceability",
+      "owner": "MLRO / Counsel",
+      "operator": "Compliance Engineering",
+      "cadence": "Continuous on legal change; formal review at least quarterly",
+      "status": "partial",
+      "evidence": [
+        "data/obligations.json",
+        "docs/governance/obligation-register.md",
+        "docs/regulatory-watch.md",
+        "data/grc-metrics.json",
+        "docs/governance/ai-control-testing-calendar.md"
+      ],
+      "tests": [
+        "test/obligations.test.mjs",
+        "test/legal-citations.test.mjs"
+      ],
+      "note": "The obligation register maps all 21 current obligations to an instrument, owner, controls, evidence, regulatory-watch source and status, but all 21 still carry source_citation.basis = needs-source. Open action 5 is the human legal-sourcing path; CI prevents unsourced article numbers or drafted text from masquerading as law.",
+      "closure_actions": [
+        5
+      ]
+    }
+  ],
+  "scope_exclusions": [
+    {
+      "action": 2,
+      "rationale": "Chase-email workflow that advances items 5 and 6; it is an administrative dependency, not a control objective."
+    },
+    {
+      "action": 3,
+      "rationale": "Queued release approval act; the deployment approval gate is operating, so the pending act is not a failed AI-governance control."
+    },
+    {
+      "action": 6,
+      "rationale": "Deterministic transaction-feed wiring for the wider AML programme, outside the enterprise AI-control denominator."
+    },
+    {
+      "action": 7,
+      "rationale": "Firm-wide AML/CFT and sanctions training beyond the AI-control scope."
+    },
+    {
+      "action": 18,
+      "rationale": "Approval of the wider AML/CFT/CPF policy pack, not an AI-specific governance control."
+    },
+    {
+      "action": 27,
+      "rationale": "Screening-engine maintainability technical debt, outside the enterprise AI-governance control set."
+    },
+    {
+      "action": 28,
+      "rationale": "Arabic UI linguistic QA/localisation, outside the enterprise AI-governance control set."
     }
   ]
 }

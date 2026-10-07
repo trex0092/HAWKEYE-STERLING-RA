@@ -47,7 +47,17 @@ function fail(errors) {
 
 export function validateRegister(reg, actionMarkdown, today = new Date().toISOString().slice(0, 10)) {
   const errors = [];
-  const actionIds = new Set([...String(actionMarkdown || '').matchAll(/^\|\s*(\d+)\s*\|/gm)].map((m) => Number(m[1])));
+  const actionText = String(actionMarkdown || '');
+  const actionRows = [...actionText.matchAll(/^\|\s*(\d+)\s*\|.*$/gm)];
+  const actionIds = new Set(actionRows.map((m) => Number(m[1])));
+  for (const m of actionRows) {
+    const row = m[0];
+    const cells = row.split('|').map((x) => x.trim());
+    const asanaRef = cells[cells.length - 2] || '';
+    if (!asanaRef || /^to open$/i.test(asanaRef)) {
+      errors.push('open action ' + m[1] + ': missing Asana/system-of-record reference');
+    }
+  }
   if (reg.schema !== 'hawkeye-sterling.enterprise-ai-controls/v1') errors.push('unexpected control-register schema');
   if (!reg.register_review || !/^\d{4}-\d{2}-\d{2}$/.test(reg.register_review.next_review_by || '')) {
     errors.push('register_review.next_review_by must be YYYY-MM-DD');
@@ -65,6 +75,7 @@ export function validateRegister(reg, actionMarkdown, today = new Date().toISOSt
   for (let i = 1; i <= 6; i++) if (!layers.has('L' + i)) errors.push('missing layer L' + i);
 
   const ids = new Set();
+  const mappedActions = new Set();
   for (const c of reg.controls || []) {
     if (!c.id || ids.has(c.id)) errors.push('missing or duplicate control id: ' + String(c.id));
     ids.add(c.id);
@@ -84,6 +95,7 @@ export function validateRegister(reg, actionMarkdown, today = new Date().toISOSt
           if (!Number.isInteger(action) || action <= 0) errors.push(c.id + ': invalid closure action ' + String(action));
           else if (seenActions.has(action)) errors.push(c.id + ': duplicate closure action ' + action);
           else if (!actionIds.has(action)) errors.push(c.id + ': closure action ' + action + ' is not present in open-actions register');
+          mappedActions.add(action);
           seenActions.add(action);
         }
       }
@@ -99,6 +111,22 @@ export function validateRegister(reg, actionMarkdown, today = new Date().toISOSt
       if (!existsSync(join(ROOT, rel))) errors.push(c.id + ': missing test path ' + rel);
     }
   }
+  const exclusions = new Set();
+  for (const x of reg.scope_exclusions || []) {
+    const action = x && x.action;
+    if (!Number.isInteger(action) || action <= 0) errors.push('scope_exclusions: invalid action ' + String(action));
+    else if (exclusions.has(action)) errors.push('scope_exclusions: duplicate action ' + action);
+    else if (!actionIds.has(action)) errors.push('scope_exclusions: action ' + action + ' is not present in open-actions register');
+    else if (mappedActions.has(action)) errors.push('scope_exclusions: action ' + action + ' is also mapped to a control');
+    if (!x || !String(x.rationale || '').trim()) errors.push('scope_exclusions: action ' + String(action) + ' missing rationale');
+    exclusions.add(action);
+  }
+  for (const action of actionIds) {
+    if (!mappedActions.has(action) && !exclusions.has(action)) {
+      errors.push('open action ' + action + ' is neither mapped to an incomplete AI control nor explicitly scope-excluded');
+    }
+  }
+
   return errors;
 }
 
@@ -174,6 +202,7 @@ export function buildDashboard(reg, grc) {
     interpretation: [
       'Layer status is derived from control-register status plus repository evidence-path validation.',
       'GRC signals are copied from the separately generated data/grc-metrics.json snapshot.',
+      'The GRC control-effectiveness metric measures automated proof-path coverage in the assurance matrix, not the share of enterprise AI controls rated effective.',
       'Green repository evidence does not imply external certification or completion of human approvals.'
     ]
   };
@@ -203,7 +232,7 @@ export function renderDashboard(reg, dashboard) {
     '',
     '| Signal | Current value | Source |',
     '|---|---:|---|',
-    '| Control effectiveness rate | ' + dashboard.governance_signals.control_effectiveness_rate + '% | `data/grc-metrics.json` |',
+    '| Automated proof-path coverage (GRC control-effectiveness metric) | ' + dashboard.governance_signals.control_effectiveness_rate + '% | `data/grc-metrics.json` |',
     '| Third-party assessment coverage | ' + dashboard.governance_signals.third_party_assessment_coverage + '% | `data/grc-metrics.json` |',
     '| Audit finding closure rate | ' + dashboard.governance_signals.audit_finding_closure_rate + '% | `data/grc-metrics.json` |',
     '| Governance drift count | ' + dashboard.governance_signals.governance_drift_count + ' | `data/grc-metrics.json` |',
@@ -224,6 +253,8 @@ export function renderDashboard(reg, dashboard) {
     '## Interpretation',
     '',
     'This dashboard reports the state represented by the repository. It does not turn a missing human approval, unsigned contract, unperformed audit, or uncommissioned external assessment into a completed control.',
+    '',
+    'The 100% automated proof-path signal is the GRC metric for assurance-matrix rows whose named automated proof artefacts exist. It is not the percentage of enterprise AI controls rated effective; the six-layer counts above are the authoritative status view for that question.',
     '',
     'A CI pass proves that the register is internally consistent, its evidence paths exist, its review deadline has not expired, and the generated views match their sources. It does not constitute MLRO, Board, legal, regulator, or external-auditor approval.',
     ''

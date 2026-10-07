@@ -209,8 +209,9 @@ jobs:
           ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID || '1216239131596624' }}
           ONBOARDING_WINDOW_HOURS: ${{ github.event.inputs.window_hours || '26' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # PDPL GATE: held OFF until the Anthropic DPA is executed + transfer basis recorded.
-          # Set repo variable LLM_TRIAGE=1 to re-enable once signed (no code change needed).
+          # PDPL GATE: code defaults OFF; enabling requires explicit repo variable LLM_TRIAGE=1.
+          # Governance intent requires verified DPA/transfer prerequisites first. The repository
+          # cannot infer the live variable value; open actions 36 and 42 reconcile the legal/runtime record.
           LLM_TRIAGE: ${{ vars.LLM_TRIAGE || '0' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'claude-haiku-4-5-20251001' }}
           # FraudLabs SUPPORT SIGNAL (payment-fraud indicator on the contact

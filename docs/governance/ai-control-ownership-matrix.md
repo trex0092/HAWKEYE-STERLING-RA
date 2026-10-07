@@ -14,7 +14,7 @@
 | `EAI-ROL-04` | L2 | Escalation paths and human decision authority | MLRO | Compliance Engineering / operators | Continuous; exercise at least annually | effective |
 | `EAI-RSK-01` | L3 | AI risk identification and scoring | MLRO | Compliance Engineering | Quarterly and on significant change | effective |
 | `EAI-RSK-02` | L3 | Risk appetite and residual-risk treatment | MLRO / Board | Compliance Engineering | Quarterly and on appetite change | partial |
-| `EAI-RSK-03` | L3 | Impact and privacy assessment | MLRO / DPO | Compliance Engineering | On new use case, new data flow, new provider and material change | effective |
+| `EAI-RSK-03` | L3 | Impact and privacy assessment | MLRO / DPO | Compliance Engineering | On new use case, new data flow, new provider and material change | partial |
 | `EAI-RSK-04` | L3 | Mitigation and corrective-action tracking | MLRO | Compliance Engineering | Continuous | effective |
 | `EAI-RSK-05` | L3 | Use-case classification before deployment | MLRO | Compliance Engineering | Per new or materially changed AI use case | partial |
 | `EAI-DMG-01` | L4 | AI inventory and system boundary | MLRO | Compliance Engineering | Quarterly and on asset change | partial |
@@ -31,10 +31,11 @@
 | `EAI-AUD-01` | L6 | Control-to-evidence assurance map | MLRO / Internal Audit | Compliance Engineering | Continuous; review at internal audit | effective |
 | `EAI-AUD-02` | L6 | Internal audit programme | Internal Audit | Internal Audit | At least annual | partial |
 | `EAI-AUD-03` | L6 | Management review and governance decisions | Board / MLRO | AI Governance Committee | Quarterly and on material decision | partial |
-| `EAI-AUD-04` | L6 | Preservation of decisions and audit evidence | MLRO | Compliance Engineering | Continuous | effective |
+| `EAI-AUD-04` | L6 | Preservation of decisions and audit evidence | MLRO | Compliance Engineering | Continuous | partial |
 | `EAI-AUD-05` | L6 | Remediation tracking and closure | MLRO / Internal Audit | Compliance Engineering | Continuous with quarterly review | effective |
 | `EAI-AUD-06` | L6 | Independent external assurance | Board / MLRO | External assessor when commissioned | Optional / Board decision | open |
 | `EAI-AUD-07` | L6 | Regular control testing and review currency | MLRO / Internal Audit | Compliance Engineering / control owners | Continuous automation; quarterly and annual human review cycles | partial |
+| `EAI-AUD-08` | L6 | Compliance obligation mapping and regulatory traceability | MLRO / Counsel | Compliance Engineering | Continuous on legal change; formal review at least quarterly | partial |
 
 The accountable owner retains decision responsibility. The operator maintains or executes the control. A generated row is not evidence that a human approval or review has occurred.
 
