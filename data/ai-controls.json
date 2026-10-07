@@ -649,6 +649,25 @@
         41
       ],
       "note": "Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle."
+    },
+    {
+      "id": "EAI-AUD-08",
+      "layer": "L6",
+      "name": "Compliance obligation mapping and regulatory traceability",
+      "owner": "MLRO / Counsel",
+      "operator": "Compliance Engineering",
+      "cadence": "Continuous on legal change; formal review at least quarterly",
+      "status": "effective",
+      "evidence": [
+        "data/obligations.json",
+        "docs/governance/obligation-register.md",
+        "docs/regulatory-watch.md"
+      ],
+      "tests": [
+        "test/obligations.test.mjs",
+        "test/legal-citations.test.mjs"
+      ],
+      "note": "The obligation register maps each applicable or monitored requirement to its instrument, owner, controls, evidence, regulatory-watch source and current status. CI validates path reachability, citation currency and live closure references for partial obligations."
     }
   ]
 }
