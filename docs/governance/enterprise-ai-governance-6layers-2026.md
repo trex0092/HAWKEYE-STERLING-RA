@@ -96,11 +96,11 @@ Both views point to the same underlying controls. A control should be implemente
 | Preserve decisions | Git/Asana/audit trails, sign-off and override records |
 | Test controls regularly | [AI control testing calendar](ai-control-testing-calendar.md) plus CI/scheduled workflows; `EAI-AUD-07` keeps human review/exercise currency visible and points overdue cycles to the open-actions register |
 | Review vendor assurance | Third-party register and AI-specific vendor view |
-| Map compliance obligations | Obligation register and framework crosswalks |
+| Map compliance obligations | [`EAI-AUD-08`](../../data/ai-controls.json) ties the obligation register, regulatory-watch sources and legal-citation guards into one tested traceability control |
 | Track remediation | CAPA and open-actions registers |
 | Run internal/external audits | Internal audit programme exists; external conformity assurance is not claimed until commissioned |
 
-**Control IDs:** EAI-AUD-01 through EAI-AUD-07.
+**Control IDs:** EAI-AUD-01 through EAI-AUD-08.
 
 ## Evidence rule
 
