@@ -6,13 +6,19 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — reconciled the enterprise six-layer governance
+> **Last updated:** 2026-10-07 — completed the second six-layer reconciliation.
+> The residual-risk dashboard already showed two risks above appetite with no
+> dated treatment or exceptional acceptance, but neither had a dedicated closure
+> row. Items 33 and 34 now make those decisions explicit for R-03 and R-21.
+> This edit does not accept either risk and does not invent a deadline.
+>
+> **Previous update (2026-10-07):** reconciled the enterprise six-layer governance
 > dashboard with this register. Three human actions that were already stated as
 > incomplete in repository evidence, but had no numbered closure row, are now
 > explicit: item 30 adopts the AI use-case intake/classification gate
 > (EAI-POL-03 / EAI-RSK-05), item 31 runs the first AI incident-response
 > tabletop (EAI-MON-04 / R-20), and item 32 records the first formal AIMS
-> management review (EAI-AUD-03). No control was marked complete by this edit.
+> management review (EAI-AUD-03). No control was marked complete by that edit.
 >
 > **Previous update (2026-10-07):** merged PR #768 closed item 25 after the
 > report-only toolchain run retained its coverage, mypy and mutation artifact
@@ -46,11 +52,11 @@
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
 > (20–24 and 26–28) carry dates under the maintainer's own authority. Items
-> 29–32 are vendor/governance/assurance actions whose deadlines belong to their
+> 29–34 are vendor/governance/assurance actions whose deadlines belong to their
 > named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 21 of 29 undated at this update.
+> per row — 23 of 31 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -83,6 +89,8 @@
 | 30 | Formal organizational adoption of the [AI use-case intake and approval gate](ai-use-case-intake.md). The repository gate exists, but `EAI-POL-03` and `EAI-RSK-05` remain **PARTIAL** until the responsible governance body adopts it for organizational use. This is blocked on item 4 for Committee authority. | MLRO / AI Governance Committee (after item 4) | Item 4 is complete and a dated governance record makes the intake/classification gate mandatory for every new or materially changed AI use case; only then are the two control statuses reconsidered | — | to open |
 | 31 | Run the first AI incident-response tabletop against the [AI incident runbook](ai-incident-runbook.md), closing the undrilled mitigation in risk `R-20` and the outstanding exercise condition in `EAI-MON-04`. | MLRO / maintainer | A dated exercise record captures the scenario, decisions, escalation, kill-switch/containment steps and lessons; any findings are entered in CAPA before `EAI-MON-04` is reconsidered | — | to open |
 | 32 | Hold and record the first formal AIMS [management review](../aims/management-review.md). The log still shows `_scheduled — Q3 2026_`; the review should follow item 8 so real Internal Audit results are tabled rather than a template being treated as evidence. | MLRO + senior management | The management-review log contains a dated completed row with decisions, actions/owners and next review; only then is `EAI-AUD-03` reconsidered | — | to open |
+| 33 | Resolve above-appetite risk `R-03` (sanctions false-negative risk, residual 10 against RA-01 ceiling 6). The repository must not treat the current quarterly threshold-tuning cadence as a dated treatment plan or as acceptance. | MLRO | Either a dated treatment plan is recorded with owner, target and measurable exit criteria that brings the residual position within appetite, or an authorized exceptional acceptance is recorded in `data/ai-risk-acceptances.json` with decision evidence and review/expiry | — | to open |
+| 34 | Resolve above-appetite risk `R-21` (shadow-AI disclosure risk, residual 12 against RA-04 ceiling 6). Current controls are policy/awareness only and the risk register says periodic operator attestation is still required. | MLRO / DPO | Either a dated mitigation plan is recorded and implemented, including the required operator-attestation control or equivalent stronger control, or an authorized exceptional acceptance is recorded in `data/ai-risk-acceptances.json` with decision evidence and review/expiry | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
