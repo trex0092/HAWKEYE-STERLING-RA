@@ -15,7 +15,7 @@
 | L3 · Risk Management | **PARTIAL** | 3 | 2 | 0 | 5 |
 | L4 · Data & Model Governance | **PARTIAL** | 3 | 3 | 0 | 6 |
 | L5 · Monitoring & Controls | **PARTIAL** | 2 | 3 | 0 | 5 |
-| L6 · Audit & Assurance | **PARTIAL** | 4 | 3 | 1 | 8 |
+| L6 · Audit & Assurance | **PARTIAL** | 3 | 4 | 1 | 8 |
 
 ## Repository-derived governance signals
 
@@ -46,7 +46,8 @@
 | `EAI-AUD-02` Internal audit programme | L6 | **PARTIAL** | #8 | The programme exists; the open-actions register records the first thematic review as a human action still to complete. |
 | `EAI-AUD-03` Management review and governance decisions | L6 | **PARTIAL** | #32 | Templates and decision rights exist; this register does not fabricate completed meetings or approvals. |
 | `EAI-AUD-06` Independent external assurance | L6 | **OPEN** | #10, #37 | No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned. |
-| `EAI-AUD-07` Regular control testing and review currency | L6 | **PARTIAL** | #8, #14, #15, #31, #38, #41 | Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle. |
+| `EAI-AUD-07` Regular control testing and review currency | L6 | **PARTIAL** | #8, #14, #15, #31, #32, #38, #41 | Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle. |
+| `EAI-AUD-08` Compliance obligation mapping and regulatory traceability | L6 | **PARTIAL** | #5 | The obligation register maps all 21 current obligations to an instrument, owner, controls, evidence, regulatory-watch source and status, but all 21 still carry source_citation.basis = needs-source. Open action 5 is the human legal-sourcing path; CI prevents unsourced article numbers or drafted text from masquerading as law. |
 
 ## Interpretation
 
