@@ -6,7 +6,15 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — merged PR #768 closed item 25 after the
+> **Last updated:** 2026-10-07 — reconciled the enterprise six-layer governance
+> dashboard with this register. Three human actions that were already stated as
+> incomplete in repository evidence, but had no numbered closure row, are now
+> explicit: item 30 adopts the AI use-case intake/classification gate
+> (EAI-POL-03 / EAI-RSK-05), item 31 runs the first AI incident-response
+> tabletop (EAI-MON-04 / R-20), and item 32 records the first formal AIMS
+> management review (EAI-AUD-03). No control was marked complete by this edit.
+>
+> **Previous update (2026-10-07):** merged PR #768 closed item 25 after the
 > report-only toolchain run retained its coverage, mypy and mutation artifact
 > (JavaScript line coverage 40.11%, Python line coverage 77%, 25 mypy findings,
 > and 5/5 scoring mutants killed). The same review exposed Composio as an
@@ -37,12 +45,12 @@
 > dates here would be the exact failure this register exists to prevent — so
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
-> (20–24 and 26–28) carry dates under the maintainer's own authority. Item 29
-> is a vendor-governance/legal gate, so no deadline is invented for the MLRO/DPO.
-> The gap stays counted:
+> (20–24 and 26–28) carry dates under the maintainer's own authority. Items
+> 29–32 are vendor/governance/assurance actions whose deadlines belong to their
+> named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 18 of 26 undated at this update.
+> per row — 21 of 29 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -72,6 +80,9 @@
 | 27 | Engine maintainability: decompose `screen.py` (6,918 lines) into modules (matching, feeds, Asana I/O, narrative) and take the py/mjs matcher consolidation decision — the dual implementation has needed **six** parity fixes since 2026-07 (#360, #362, #363, #364, #373, #421), the sixth landing 2026-08-06, two days after this item's ADR was first recorded. **Partially addressed 2026-09-09**: [`adr-005-dual-engine-matcher.md`](adr-005-dual-engine-matcher.md) §5 records the consolidation decision (keep both, actively shrink shared-logic surface area per-fix) and moves the revisit trigger up to whichever comes first of a 7th parity PR, `screen.py` crossing 7,500 lines, or 2027-06-30 — replacing the single fixed date with a checkable one. Full decomposition itself is not attempted (correctly a project-scale change, not a same-session one). | Repo owner | `screen.py` decomposed with all suites green, or the moved-up trigger in ADR-005 §5 fires and is acted on | 2027-06-30 | to open |
 | 28 | Console/Advisor Arabic UI chrome. **Engineering completed 2026-10-07:** shared `i18n.js` now covers static and JavaScript-rendered navigation, labels, statuses, modes, controls, refresh/error messages and empty states on both pages; persona role captions are localized and the service-worker shell is bumped. Regulatory Q&A answers, tool playbooks, citations and filed-record prose stay English per [`../i18n-ar-legal-review.md`](../i18n-ar-legal-review.md). **Still open for linguistic QA only.** | AR reviewer | Qualified Arabic reviewer checks both live pages in RTL and confirms the chrome terminology; no legal-text translation is required | 2026-12-31 | to open |
 | 29 | Composio vendor-assurance go-live gate. The [third-party register](../aims/third-party-register.md) keeps `COMPOSIO_ENABLED=0` until the DPA, subprocessors, retention, contracted processing region and UAE PDPL transfer basis are confirmed, with approved business-app scopes and connected accounts recorded. | MLRO / DPO + Repo owner | All five vendor-assurance fields plus approved scopes/accounts are recorded in the third-party register; only then may `COMPOSIO_ENABLED=1` | — | to open |
+| 30 | Formal organizational adoption of the [AI use-case intake and approval gate](ai-use-case-intake.md). The repository gate exists, but `EAI-POL-03` and `EAI-RSK-05` remain **PARTIAL** until the responsible governance body adopts it for organizational use. This is blocked on item 4 for Committee authority. | MLRO / AI Governance Committee (after item 4) | Item 4 is complete and a dated governance record makes the intake/classification gate mandatory for every new or materially changed AI use case; only then are the two control statuses reconsidered | — | to open |
+| 31 | Run the first AI incident-response tabletop against the [AI incident runbook](ai-incident-runbook.md), closing the undrilled mitigation in risk `R-20` and the outstanding exercise condition in `EAI-MON-04`. | MLRO / maintainer | A dated exercise record captures the scenario, decisions, escalation, kill-switch/containment steps and lessons; any findings are entered in CAPA before `EAI-MON-04` is reconsidered | — | to open |
+| 32 | Hold and record the first formal AIMS [management review](../aims/management-review.md). The log still shows `_scheduled — Q3 2026_`; the review should follow item 8 so real Internal Audit results are tabled rather than a template being treated as evidence. | MLRO + senior management | The management-review log contains a dated completed row with decisions, actions/owners and next review; only then is `EAI-AUD-03` reconsidered | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
