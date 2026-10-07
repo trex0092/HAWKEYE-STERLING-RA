@@ -15,7 +15,7 @@
 | L3 · Risk Management | **PARTIAL** | 3 | 2 | 0 | 5 |
 | L4 · Data & Model Governance | **PARTIAL** | 3 | 3 | 0 | 6 |
 | L5 · Monitoring & Controls | **PARTIAL** | 2 | 3 | 0 | 5 |
-| L6 · Audit & Assurance | **PARTIAL** | 3 | 2 | 1 | 6 |
+| L6 · Audit & Assurance | **PARTIAL** | 3 | 3 | 1 | 7 |
 
 ## Repository-derived governance signals
 
@@ -26,7 +26,7 @@
 | Audit finding closure rate | 95.2% | `data/grc-metrics.json` |
 | Governance drift count | 0 | `data/grc-metrics.json` |
 | Risks above appetite | 2 | `data/grc-metrics.json` |
-| Open actions without target date | 28 | `data/grc-metrics.json` |
+| Open actions without target date | 29 | `data/grc-metrics.json` |
 
 ## Partial and open controls
 
@@ -46,6 +46,7 @@
 | `EAI-AUD-02` Internal audit programme | L6 | **PARTIAL** | #8 | The programme exists; the open-actions register records the first thematic review as a human action still to complete. |
 | `EAI-AUD-03` Management review and governance decisions | L6 | **PARTIAL** | #32 | Templates and decision rights exist; this register does not fabricate completed meetings or approvals. |
 | `EAI-AUD-06` Independent external assurance | L6 | **OPEN** | #10, #37 | No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned. |
+| `EAI-AUD-07` Regular control testing and review currency | L6 | **PARTIAL** | #8, #14, #15, #31, #38, #41 | Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, AI-incident tabletop, Q3 model-validation sign-off, and the TFS/watchlist review cycle. |
 
 ## Interpretation
 
