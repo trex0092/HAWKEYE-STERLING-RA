@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       source_id:
-        description: "Registry source id to probe, or 'all-disabled' for every disabled source with a URL"
+        description: "Registry source id to probe, 'all-disabled', or a fixed suite: opensanctions-catalogue | news-feeds | news-editions | gkg-sweep"
         required: false
         default: 'all-disabled'
 
@@ -39,11 +39,27 @@ jobs:
         with:
           persist-credentials: false
 
+      # gkg-sweep: run the engine's REAL gkg_sweep (screen.py) over the full
+      # 24-hour window with public-figure names only — measures files read,
+      # articles, languages, runtime and matches before the daily run depends
+      # on it. Nothing is screened against the customer base; nothing posted.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: inputs.source_id == 'gkg-sweep'
+        with:
+          python-version: '3.11'
+      - name: GKG sweep at full volume (diagnostic)
+        if: inputs.source_id == 'gkg-sweep'
+        run: |
+          pip install --quiet --require-hashes -r ci/requirements.txt
+          python scripts/gkg_probe.py | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Probe the selected source(s)
+        if: inputs.source_id != 'gkg-sweep'
         env:
           SOURCE_ID: ${{ inputs.source_id }}
         run: |
-          node scripts/source-probe.mjs "${SOURCE_ID:-all-disabled}" .probe
+          mkdir -p .probe
+          node scripts/source-probe.mjs "${SOURCE_ID:-all-disabled}" | tee .probe/source-probe-report.md
           {
             cat .probe/source-probe-report.md
             echo

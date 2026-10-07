@@ -176,7 +176,7 @@
         "from": "const prompt = [",
         "to": "].join('\\n');"
       },
-      "purpose": "Turns a detected change on a public regulatory source into a short reviewer-facing proposal, grounded in the computed delta, with an explicit SEVERITY line and a do-not-invent-citations instruction.",
+      "purpose": "Turns a detected change on a public regulatory source into a short reviewer-facing proposal, grounded in the computed delta, with an explicit SEVERITY line and a do-not-invent-citations instruction, plus five labelled card lines (what changed, DPMS impact, action, instrument, effective date) shown on the Asana review card.",
       "risk_if_changed_unreviewed": "Dropping the 'do NOT invent article or circular numbers' clause would let fabricated instrument references enter a drafted regulatory proposal.",
       "guards": [
         "Public regulatory text only — no customer data reaches this prompt",
@@ -187,10 +187,10 @@
         "test/reg-watch.test.mjs",
         "test/legal-citations.test.mjs"
       ],
-      "version": 1,
-      "sha256": "79b604047a090a120b8fbacf173eb02ce0c3519aa3c57a3c6d4eb300edf03d79",
-      "approved_on": "2026-07-28",
-      "approved_by": "Compliance Engineering (baseline registration)"
+      "version": 2,
+      "sha256": "1c87e1cdd76e839bdf588371e250c94067b14868d14970c92bef1b84449d880f",
+      "approved_on": "2026-10-03",
+      "approved_by": "Compliance Engineering (v2: adds five labelled card lines — CHANGED / IMPACT / ACTION / INSTRUMENT / EFFECTIVE — grounded only in the delta, the listed new/withdrawn items or the page text, with \"not stated\" where the text is silent; the do-not-invent-numbers clause is unchanged; approval takes effect through the owner-reviewed PR merge, MLRO ratification at the next quarterly review)"
     }
   ],
   "shadow_prompt_note": "No governed prompt exists outside this register. test/prompt-register.test.mjs scans every file that calls the model API and fails CI if such a file has no registered prompt row, so a new surface cannot ship with an unreviewed instruction set. The eval harnesses (scripts/advisor-eval.mjs, scripts/advisor-bias-eval.mjs) and the red-team corpus (test/redteam_injection.py) carry adversarial inputs by design: they are assurance controls over the prompts above, listed in each row's assurance field rather than registered as governed prompts of their own."

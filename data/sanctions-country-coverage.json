@@ -81,12 +81,15 @@
     },
     {
       "country": "Austria",
-      "status": "identified",
-      "note": "Austrian National Bank terrorism-financing regulations (48 targets per the OpenSanctions catalogue); identified via the OpenSanctions dataset catalogue 2026-09-28, official machine-readable publication not yet verified",
+      "status": "screened",
+      "sources": [
+        "at-oenb-terror"
+      ],
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "screened from 2026-10-03: the Austrian National Bank regulations on terrorism-financing restrictions (dataset at_nbter_sanctions, publisher Austrian National Bank) are listed as a member of the OpenSanctions `sanctions` collection with an official publisher (catalogue read by source-probe run 37147223927, 2026-10-03) and parsed on the runner (run 37147471222): 81 names."
     },
     {
       "country": "Azerbaijan",
@@ -226,13 +229,16 @@
     },
     {
       "country": "Bulgaria",
-      "status": "identified",
-      "note": "researched 2026-10-03: the national list is the annex to Council of Ministers Decision No 265/2003 under art. 5(1) of the Law on Measures against the Financing of Terrorism, amended many times, latest by Decision No 606 of 16 August 2024 (State Gazette No 70/2024, repealing section III item 16). The BNB page \"Списък на лица във връзка със ЗМФТРОМУ\" (bnb.bg) publishes a consolidated PDF and separate amendment PDFs (2022, 2023, 2024). Not loaded yet: PDF only, and the consolidated text must be reconciled with every later amendment. Registry entry bg-bnb-lmft (disabled) records this.",
+      "status": "screened",
+      "sources": [
+        "bg-dans-mft"
+      ],
       "baseline": [
         "UN",
         "EU"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "screened from 2026-10-03: the National Terrorism Financing List kept by the State Agency for National Security (dataset bg_mft_national, source dans.bg/bg/28) is listed as a member of the OpenSanctions `sanctions` collection with an official publisher (catalogue read by source-probe run 37147223927, 2026-10-03) and parsed on the runner (run 37147471222): 30 names. This is the maintained list, so the BNB consolidated PDF no longer has to be reconciled with its amendments (registry entry bg-bnb-lmft stays disabled)."
     },
     {
       "country": "Burkina Faso",
@@ -700,13 +706,15 @@
     },
     {
       "country": "Iraq",
-      "status": "pending",
-      "sources": [],
-      "note": "official keyless JSON API (api.aml.iq, 6,284 rows, 10 per page) verified live 2026-09-28; names are Arabic-only and the matcher does not compare Arabic with Latin script, so adding it now would add no real recall",
+      "status": "screened",
+      "sources": [
+        "iq-aml-freeze"
+      ],
       "baseline": [
         "UN"
       ],
-      "fatf": "grey"
+      "fatf": "grey",
+      "note": "screened from 2026-10-03: the AML/CFT Office Terrorist Fund Freezing Lists (dataset iq_aml_list, source aml.iq) are listed as a member of the OpenSanctions `sanctions` collection with an official publisher (catalogue read by source-probe run 37147223927, 2026-10-03) and parsed on the runner (run 37147471222): 14,801 names, Latin and Arabic script. Supersedes the 2026-09-28 note: the direct API (api.aml.iq) is Arabic-only, but this dataset carries Latin-script names the matcher can compare."
     },
     {
       "country": "Ireland",
@@ -1068,12 +1076,15 @@
     },
     {
       "country": "Nepal",
-      "status": "identified",
+      "status": "screened",
+      "sources": [
+        "np-moha-prohibited"
+      ],
       "baseline": [
         "UN"
       ],
       "fatf": "grey",
-      "note": "researched 2026-09-28: a national list exists — the Nepal Rastra Bank \"Guideline on Targeted Financial Sanctions for Financial Institutions\" (nrb.org.np) defines the \"Domestic Terrorist List\" as the national terrorist list published by the Ministry of Home Affairs under UNSCR 1373; the MoHA publication and its format are not yet verified"
+      "note": "screened from 2026-10-03: the Ministry of Home Affairs list of prohibited persons or groups (National Strategy and Action Plan 2076-2081; dataset np_mha_sanctions, source moha.gov.np) is listed as a member of the OpenSanctions `sanctions` collection with an official publisher (catalogue read by source-probe run 37147223927, 2026-10-03) and parsed on the runner (run 37147471222): 18 names."
     },
     {
       "country": "Netherlands",
@@ -1256,11 +1267,15 @@
     },
     {
       "country": "Romania",
-      "status": "not-researched",
+      "status": "screened",
+      "sources": [
+        "ro-onpcsb-terror"
+      ],
       "baseline": [
         "UN",
         "EU"
-      ]
+      ],
+      "note": "screened from 2026-10-03: the list of suspected terrorists under Government Decision No. 1.272/2005 (dataset ro_onpcsb_sanctions, publisher ONPCSB) is listed as a member of the OpenSanctions `sanctions` collection with an official publisher (catalogue read by source-probe run 37147223927, 2026-10-03) and parsed on the runner (run 37147471222): 458 names. The list also carries UN-relayed Iraq entities."
     },
     {
       "country": "Russia",
@@ -1345,11 +1360,14 @@
     },
     {
       "country": "Serbia",
-      "status": "identified",
-      "note": "researched 2026-10-03: the domestic list is set by Government decision under art. 4(1)(1) of the Law on the Restriction of Disposal of Property for the Prevention of Terrorism. The APML page \"Liste označenih lica i pretraživač\" (apml.gov.rs) states the Government adopted the domestic list on 20 December 2018; the linked PDF (apml.gov.rs/uploads/useruploads/Documents/lista oznacenih lica.pdf, decision 05 No 337-12096/2018-1) designates 7 persons convicted of terrorism offences linked to the \"Islamic State\". Not loaded yet: the PDF is a scanned image whose machine-read text garbles the Cyrillic names, so a clean text (e.g. the Official Gazette publication) is needed before the names can be screened as verified; later amendments, if any, are not yet checked.",
+      "status": "screened",
+      "sources": [
+        "rs-apml-domestic"
+      ],
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "screened from 2026-10-03: the APML Domestic List of Designated Persons (dataset rs_apml_domestic, 7 targets) is listed as a member of the OpenSanctions `sanctions` collection with an official publisher (catalogue read by source-probe run 37147223927, 2026-10-03) and parsed on the runner (run 37147471222): 21 names (Latin and Cyrillic). 7 matches the 7 persons in Government decision 05 No 337-12096/2018-1, whose scanned PDF could not be read cleanly on 2026-10-03."
     },
     {
       "country": "Seychelles",

@@ -37,6 +37,7 @@ regexes = [
   '''1218451243658328''',  # section: Follow Ups
   '''1218451960830318''',  # section: Screening Sanctions Update
   '''1218979441933783''',  # section: Screening Adverse Media & PEP's Update
+  '''1218985347982681''',  # section: AI & Platform Governance (live gid, approved in asana-sections.mjs 2026-10-03)
   '''1216239131596624''',  # HR Employees Training/Workshops project, live screening population
   '''1218451989290544''',  # section: FATF list moves (fatf-watchdog.yml, since #525 -- missed at the time)
   '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log) -- RETIRED as a live default by #518, kept only so git history still scans clean

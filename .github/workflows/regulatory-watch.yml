@@ -154,7 +154,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ARCHIVE_SPN_KEYS: ${{ secrets.ARCHIVE_SPN_KEYS }}
-        run: node scripts/reg-draft.mjs
+        run: node scripts/reg-draft.mjs < reg-watch-changes.json
 
       - name: Notify Asana — HAWKEYE STERLING APP + the law-change queue
         id: asana

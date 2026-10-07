@@ -30,20 +30,15 @@
    there's no time window to age out of — skip while it stays open, file
    again the first run after it's closed. */
 import { asana } from './asana-notify.mjs';
-import { requireApprovedSection, verifySection } from './asana-sections.mjs';
+import { requireApprovedSection, verifySection, alertSection } from './asana-sections.mjs';
 
 const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWKEYE STERLING APP */
 const title = process.argv[2];
 const notes = process.argv[3] || '';
 
-function defaultSectionForAlert(value) {
-  const s = String(value || '').toLowerCase();
-  if (/passport|emirates id|\beid\b|licen[cs]e|pending document|proof of address/.test(s)) return '1218451243658328';
-  if (/adverse media|\bpep\b/.test(s)) return '1218979441933783';
-  if (/sanction|screening assurance/.test(s)) return '1218451960830318';
-  return '1218451992088222';
-}
-const SECTION_GID = process.env.ASANA_SECTION_GID || defaultSectionForAlert(title);
+/* Section by title (asana-sections.mjs alertSection): platform-health alerts
+   go to "AI & Platform Governance", not "Regulatory Changes". */
+const SECTION_GID = process.env.ASANA_SECTION_GID || alertSection(title);
 
 if (!process.env.ASANA_ACCESS_TOKEN) { console.error('ASANA_ACCESS_TOKEN missing'); process.exit(1); }
 if (!title) { console.error('usage: node scripts/asana-alert.mjs "<title>" "<notes>"'); process.exit(1); }

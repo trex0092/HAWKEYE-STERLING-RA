@@ -10,6 +10,44 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Sanctions: national-source depth 48 → 54 / 195. Six national sanctions lists added and verified on the runner; two non-financial proscription candidates are recorded but disabled.**
+  - **How they were found.** A new fixed probe suite (`opensanctions-catalogue`, run 37147223927) read the OpenSanctions `sanctions` collection that the daily engine's worldwide net already screens: 95 member datasets, each with its publisher. Six are national sanctions or terrorist-financing lists that increase national-source depth. Two others, Germany and Ireland, are proscription sources rather than financial-sanctions lists; they are retained as disabled research references and are not loaded by the sanctions screen.
+  - **Added.** The six qualifying national sources are enabled with coverage floors. Germany and Ireland remain disabled because loading them as sanctions sources would overstate national financial-sanctions coverage. A second probe (run 37147471222) parsed each one; floors are about 85% of the count.
+
+    | Country | Registry id | Publisher | Names |
+    | --- | --- | --- | --- |
+    | Austria | `at-oenb-terror` | Austrian National Bank | 81 |
+    | Bulgaria | `bg-dans-mft` | State Agency for National Security | 30 |
+    | Serbia | `rs-apml-domestic` | APML (7 persons, matching the 2018 Government decision) | 21 |
+    | Romania | `ro-onpcsb-terror` | ONPCSB, GD 1.272/2005 | 458 |
+    | Nepal | `np-moha-prohibited` | Ministry of Home Affairs | 18 |
+    | Iraq | `iq-aml-freeze` | AML/CFT Office; Latin-script names, unlike the Arabic-only API | 14,801 |
+    | Germany | `de-bfv-banned-orgs` | BfV association bans; proscriptions, not financial sanctions | 31 |
+    | Ireland | `ie-unlawful-orgs` | Offences Against the State Acts orders; proscriptions | 5 |
+
+  - **Not added.** Russia (MFA counter-sanctions), Iran (MFA sanctions list) and Vietnam (MPS terrorist list) are also in the collection. They stay an MLRO decision and get no registry entry.
+  - **Probe.** `scripts/source-probe.mjs` gains two fixed suites, `opensanctions-catalogue` and `news-feeds`, whose URLs are fixed in code. It also accepts several registry ids in one dispatch.
+
+- **Asana: AI and platform cards file under "AI & Platform Governance", not "Regulatory Changes".**
+  - **Cause.** Earlier gids of the "AI & Platform Governance" section had been deleted, so #701/#703 pinned the AI Governance & Platform Report, Advisor Eval, the weekly summary and every fallback platform alert to "Regulatory Changes", where they sat among law changes. The section now exists in the live project (gid 1218985347982681) and is registered as an approved destination in `scripts/asana-sections.mjs`, pinned by gid and never created by name.
+  - **Now filed there:**
+    - the daily AI Governance & Platform Report, Advisor Eval and the weekly summary;
+    - platform-health alerts: production drift, workflow recovery blocked, control stale, function/site down, code scan failed, and morning dispatch / 09:00 delivery guard;
+    - the FATF monitoring-gap alert and the RA ↔ Asana reconciliation;
+    - a Regulatory Watch card that reports only unreachable sources (it is not mirrored to the law-change queue).
+  - **Unchanged.** Law and list changes (Regulatory Watch content changes, FATF list changes, EOCN reviews), screening findings and document follow-ups keep their sections.
+
+- **Regulatory Watch: change cards name the exact publication, link to it, and say what it means.**
+  - **Before.** A card showed long lowercased runs of page text (OFAC on 3 Oct: "department of the treasury read the latest treasury news … menu about ofac history …"), with HTML codes left raw ("treasury&#39;s", "page 3 &hellip;"), and no link to the item that was issued. The AI analysis was written to a file and never reached the card.
+  - **New and withdrawn items.** Every good fetch also snapshots the page's titled links (`data/reg-watch-snapshots/<id>.links.json`). A change lists each new item and each item no longer listed, by its title as printed (original case) and linked to the instrument, e.g. "🆕 New item: Counter Terrorism Designations; Iran-related Designations and Designations Updates". Generic link texts ("Read more", "اقرأ المزيد", page numbers) and tracking/session parameters are ignored. A new item's title also counts toward severity. The first item snapshot of each source is persisted on its first run, so items are listed from the next change.
+  - **Plain text.** HTML character references are decoded in the card's excerpts. Decoding is for display only: fingerprints are unchanged, because Sanctions Watch shares them and every list containing `&amp;` would otherwise fire one false "list changed" alert.
+  - **Provenance.** Each change states which two versions were compared and how each was obtained, e.g. "version of 2026-10-02 (direct fetch) → version of 2026-10-03 (web.archive.org snapshot …)".
+  - **AI analysis on the card.** When the AI step runs, it is given the new and withdrawn items and returns five labelled lines that appear on the card: what changed, impact on a UAE DPMS, action to consider, instrument (number, date, authority) and effective date. A line the text does not support reads "not stated"; a line the model omits stays absent. The card marks it "verify against the source before acting".
+
+- **Regulatory Watch: archive.org reads wait their turn and back off longer, so a rate-limited capture is not reported as an outage.**
+  - **Cause.** On 3 Oct 2026 (run 37145525927) the OECD responsible-business-conduct page answered HTTP 403 directly. archive.org held a capture from 2 Oct, but all three reads of it got HTTP 429 within about 30 s while other sources' archive reads ran in parallel. The source was reported "persistently unreachable" for a 3rd run, opening an Asana monitoring-gap card.
+  - **Fix.** Capture reads are serialized (one archive.org read at a time across all sources), get a 4th attempt on a 15 s linear base, and honour `Retry-After` up to 30 s. A failure that persists is still returned as the failure; no page is ever assumed.
+
 - **Regulatory Watch: no more daily false alerts from re-stamped footers, and change cards show the exact words that moved.**
   - **Cause.** The UAE Ministry of Economy homepage ends with "آخر تحديث للمحتوى بتاريخ: 02 اكتوبر 2026" ("content last updated: …"). That date changes every day, and the noise filter stripped only numeric dates. So the page was filed as a source change on both 3 Oct 2026 runs, with identical-looking excerpts on each side.
   - **Stamp filter.** "Last updated" stamps written with a month name, in English or Arabic, are now stripped. The filter is scoped to the stamp phrase, so a dated entry in a list of actions (e.g. OFAC's "october 02, 2026 - sanctions list updates") remains content.
