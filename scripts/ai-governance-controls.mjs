@@ -19,6 +19,7 @@ const CONTROL_FILE = 'data/ai-controls.json';
 const ACCEPTANCE_FILE = 'data/ai-risk-acceptances.json';
 const GRC_FILE = 'data/grc-metrics.json';
 const RISK_FILE = 'docs/aims/ai-risk-register.md';
+const ACTION_FILE = 'docs/governance/open-actions-register.md';
 const DASHBOARD_JSON = 'data/ai-governance-dashboard.json';
 const DASHBOARD_MD = 'docs/governance/enterprise-ai-governance-dashboard.md';
 const OWNERSHIP_MD = 'docs/governance/ai-control-ownership-matrix.md';
@@ -44,8 +45,9 @@ function fail(errors) {
   process.exitCode = 1;
 }
 
-export function validateRegister(reg, today = new Date().toISOString().slice(0, 10)) {
+export function validateRegister(reg, actionMarkdown, today = new Date().toISOString().slice(0, 10)) {
   const errors = [];
+  const actionIds = new Set([...String(actionMarkdown || '').matchAll(/^\|\s*(\d+)\s*\|/gm)].map((m) => Number(m[1])));
   if (reg.schema !== 'hawkeye-sterling.enterprise-ai-controls/v1') errors.push('unexpected control-register schema');
   if (!reg.register_review || !/^\d{4}-\d{2}-\d{2}$/.test(reg.register_review.next_review_by || '')) {
     errors.push('register_review.next_review_by must be YYYY-MM-DD');
@@ -69,6 +71,21 @@ export function validateRegister(reg, today = new Date().toISOString().slice(0, 
     if (!layers.has(c.layer)) errors.push(c.id + ': unknown layer ' + String(c.layer));
     if (!c.name || !c.owner || !c.operator || !c.cadence) errors.push(c.id + ': missing name/owner/operator/cadence');
     if (!ALLOWED_STATUS.has(c.status)) errors.push(c.id + ': invalid status ' + String(c.status));
+    if (c.status === 'partial' || c.status === 'open') {
+      if (!Array.isArray(c.closure_actions) || c.closure_actions.length === 0) {
+        errors.push(c.id + ': incomplete control must name at least one closure_actions item');
+      } else {
+        const seenActions = new Set();
+        for (const action of c.closure_actions) {
+          if (!Number.isInteger(action) || action <= 0) errors.push(c.id + ': invalid closure action ' + String(action));
+          else if (seenActions.has(action)) errors.push(c.id + ': duplicate closure action ' + action);
+          else if (!actionIds.has(action)) errors.push(c.id + ': closure action ' + action + ' is not present in open-actions register');
+          seenActions.add(action);
+        }
+      }
+    } else if (Array.isArray(c.closure_actions) && c.closure_actions.length) {
+      errors.push(c.id + ': effective/not-applicable control must not carry closure_actions');
+    }
     if (!Array.isArray(c.evidence) || c.evidence.length === 0) errors.push(c.id + ': no evidence paths');
     for (const rel of c.evidence || []) {
       if (/^https?:/i.test(rel)) errors.push(c.id + ': evidence must be a repository path, not URL: ' + rel);
@@ -191,11 +208,12 @@ export function renderDashboard(reg, dashboard) {
     '',
     '## Partial and open controls',
     '',
-    '| Control | Layer | Status | Why it is not fully effective |',
-    '|---|---|---|---|'
+    '| Control | Layer | Status | Closure actions | Why it is not fully effective |',
+    '|---|---|---|---|---|'
   );
   for (const c of reg.controls.filter((c) => c.status === 'partial' || c.status === 'open')) {
-    L.push('| `' + c.id + '` ' + mdCell(c.name) + ' | ' + c.layer + ' | **' + c.status.toUpperCase() + '** | ' + mdCell(c.note) + ' |');
+    const actions = (c.closure_actions || []).map((n) => '#' + n).join(', ');
+    L.push('| `' + c.id + '` ' + mdCell(c.name) + ' | ' + c.layer + ' | **' + c.status.toUpperCase() + '** | ' + mdCell(actions) + ' | ' + mdCell(c.note) + ' |');
   }
   L.push(
     '',
@@ -287,8 +305,9 @@ function main() {
   const acceptances = json(ACCEPTANCE_FILE);
   const grc = json(GRC_FILE);
   const riskMarkdown = read(RISK_FILE);
+  const actionMarkdown = read(ACTION_FILE);
   const errors = [
-    ...validateRegister(reg),
+    ...validateRegister(reg, actionMarkdown),
     ...validateAcceptances(acceptances, riskMarkdown)
   ];
   fail(errors);
