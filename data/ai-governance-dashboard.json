@@ -6,8 +6,8 @@
   "review_by": "2027-01-07",
   "summary": {
     "controls": 30,
-    "effective": 17,
-    "partial": 12,
+    "effective": 16,
+    "partial": 13,
     "open": 1,
     "not_applicable": 0,
     "overall_status": "partial"
@@ -62,8 +62,8 @@
       "name": "Monitoring & Controls",
       "purpose": "Monitor performance, bias, drift, security, incidents and continuous control operation.",
       "controls": 5,
-      "effective": 3,
-      "partial": 2,
+      "effective": 2,
+      "partial": 3,
       "open": 0,
       "not_applicable": 0,
       "status": "partial"
