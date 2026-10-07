@@ -6,8 +6,8 @@
   "review_by": "2027-01-07",
   "summary": {
     "controls": 32,
-    "effective": 17,
-    "partial": 14,
+    "effective": 16,
+    "partial": 15,
     "open": 1,
     "not_applicable": 0,
     "overall_status": "partial"
@@ -73,8 +73,8 @@
       "name": "Audit & Assurance",
       "purpose": "Preserve evidence, test controls, audit governance, track remediation and support independent assurance.",
       "controls": 8,
-      "effective": 4,
-      "partial": 3,
+      "effective": 3,
+      "partial": 4,
       "open": 1,
       "not_applicable": 0,
       "status": "partial"
