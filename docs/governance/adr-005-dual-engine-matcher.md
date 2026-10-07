@@ -91,3 +91,28 @@ surface area*:
 mechanically (`git log --oneline | grep -cE '^\w+ (Matcher:|Parity:)'` and
 `wc -l screen.py` are both one-line checks) at each `screen.py`-touching PR
 review, not on a calendar.
+
+## 6. Decomposition phase 1 — 2026-10-07
+
+The line-count trigger in §5 has now fired independently of the parity-PR count:
+`screen.py` reached **8,951 lines**, above the mandatory-planning threshold of
+7,500. That does not justify a big-bang rewrite of a live AML/CFT engine. It does
+make further passive deferral inconsistent with this ADR.
+
+Phase 1 starts with a deliberately low-risk boundary: pure GDELT GKG windowing,
+row parsing, subject indexing and row-to-subject matching move to
+`screen_gkg.py`. `screen.py` keeps compatibility wrappers, so existing callers
+and `test/engine_test.py` exercise the same public surface. Network I/O, GKG run
+statistics, adverse-risk classification and orchestration remain in
+`screen.py`.
+
+This slice does **not** change the Python/JavaScript sanctions matcher decision in
+§2. It avoids that parity-sensitive surface entirely. The extracted module is
+added to the report-only coverage and mypy measurement so decomposition does not
+create an unmeasured code island. After this first extraction, `screen.py` is
+**8,882 lines**, a net reduction of 69 lines while its existing public GKG API
+remains available through wrappers.
+
+**Next boundary:** continue with cohesive adverse-media orchestration/parsing
+modules before considering the core sanctions matcher. Each phase must preserve
+the full engine suite, matcher parity and recall floors.
