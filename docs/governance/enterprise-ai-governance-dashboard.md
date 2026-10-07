@@ -11,7 +11,7 @@
 | Layer | Status | Effective | Partial | Open | Total |
 |---|---|---:|---:|---:|---:|
 | L1 · Policy | **PARTIAL** | 3 | 1 | 0 | 4 |
-| L2 · Roles & Accountability | **PARTIAL** | 2 | 2 | 0 | 4 |
+| L2 · Roles & Accountability | **PARTIAL** | 1 | 3 | 0 | 4 |
 | L3 · Risk Management | **PARTIAL** | 2 | 3 | 0 | 5 |
 | L4 · Data & Model Governance | **PARTIAL** | 3 | 3 | 0 | 6 |
 | L5 · Monitoring & Controls | **PARTIAL** | 2 | 3 | 0 | 5 |
@@ -26,7 +26,7 @@
 | Audit finding closure rate | 95.2% | `data/grc-metrics.json` |
 | Governance drift count | 0 | `data/grc-metrics.json` |
 | Risks above appetite | 2 | `data/grc-metrics.json` |
-| Open actions without target date | 31 | `data/grc-metrics.json` |
+| Open actions without target date | 32 | `data/grc-metrics.json` |
 
 ## Partial and open controls
 
@@ -35,6 +35,7 @@
 | `EAI-POL-03` AI use-case approval criteria | L1 | **PARTIAL** | #30 | A repository intake gate is implemented in this change; formal organizational adoption remains a human governance act. |
 | `EAI-ROL-01` Named accountable owner for every AI asset | L2 | **PARTIAL** | #9 | The Hawkeye Sterling suite inventory is complete and CI-scanned, but the open-actions register still requires enterprise-wide AI discovery before this organization-level control is fully effective. |
 | `EAI-ROL-03` AI governance committee and legal oversight | L2 | **PARTIAL** | #4, #13 | The AI Governance Committee charter and legal-oversight model exist, but formal committee/Board adoption remains open under item 4 and the deploying entity's DPO designation determination remains unminuted under item 13. |
+| `EAI-ROL-04` Escalation paths and human decision authority | L2 | **PARTIAL** | #31 | Escalation paths, override authority and human decision rights are documented and AI remains advisory, but the first annual incident-response exercise is still open under item 31. |
 | `EAI-RSK-02` Risk appetite and residual-risk treatment | L3 | **PARTIAL** | #17, #33, #34 | The repository currently reports risks above appetite and does not infer acceptance without a human decision. |
 | `EAI-RSK-03` Impact and privacy assessment | L3 | **PARTIAL** | #42 | Privacy and stakeholder assessments exist, but the adverse-media LLM-triage go-live checklist remains unsigned while the third-party register records an owner attestation that LLM_TRIAGE=1 was enabled. The live runtime state is not repository-verifiable, so the assessment/control is partial until item 42 reconciles the legal prerequisites, authorised sign-off and production configuration. |
 | `EAI-RSK-05` Use-case classification before deployment | L3 | **PARTIAL** | #30 | The intake form requires classification and risk tiering; organizational ratification of the new gate remains explicit. |
@@ -48,7 +49,7 @@
 | `EAI-AUD-03` Management review and governance decisions | L6 | **PARTIAL** | #32 | Templates and decision rights exist; this register does not fabricate completed meetings or approvals. |
 | `EAI-AUD-04` Preservation of decisions and audit evidence | L6 | **PARTIAL** | #23 | Decision provenance, hash-chained audit records, exports and Asana off-device mirrors exist, but assessments/activity remain primarily browser-local and the repository still lacks a dedicated authenticated persistence tier with a documented and rehearsed assessment-data RPO/RTO. Open action 23 closes that preservation/recovery gap. |
 | `EAI-AUD-06` Independent external assurance | L6 | **OPEN** | #10, #37 | No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned. |
-| `EAI-AUD-07` Regular control testing and review currency | L6 | **PARTIAL** | #8, #14, #15, #31, #32, #38, #41, #43 | Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, TFS/watchlist review cycle, and the first annual manual penetration test. |
+| `EAI-AUD-07` Regular control testing and review currency | L6 | **PARTIAL** | #8, #14, #15, #31, #32, #38, #41, #43, #44 | Automated controls are tested continuously, but several required human assurance cycles remain outstanding or overdue: first Internal Audit, first backtesting cycle, manual red-team campaign, first formal management review, AI-incident tabletop, Q3 model-validation sign-off, TFS/watchlist review cycle, first annual manual penetration test, and the BCP/vendor-exit exercise with a second trained operator. |
 | `EAI-AUD-08` Compliance obligation mapping and regulatory traceability | L6 | **PARTIAL** | #5 | The obligation register maps all 21 current obligations to an instrument, owner, controls, evidence, regulatory-watch source and status, but all 21 still carry source_citation.basis = needs-source. Open action 5 is the human legal-sourcing path; CI prevents unsourced article numbers or drafted text from masquerading as law. |
 
 ## Interpretation
