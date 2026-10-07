@@ -2180,7 +2180,8 @@ def gkg_file_stamps(end_utc, hours, lag_slots=None):
 
 # Preserve the historical screen.py callable surface while the implementation
 # moves into a dependency-light module.
-_gkg_names = screen_gkg._gkg_names
+_unused_gkg_names = screen_gkg._gkg_names
+_gkg_names = _unused_gkg_names
 parse_gkg_rows = screen_gkg.parse_gkg_rows
 
 def gkg_subject_index(subjects):
