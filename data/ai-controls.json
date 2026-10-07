@@ -212,6 +212,7 @@
       "evidence": [
         "docs/governance/risk-appetite-statement-2026.md",
         "data/grc-metrics.json",
+        "data/ai-risk-acceptances.json",
         "docs/governance/residual-risk-acceptance-register.md"
       ],
       "tests": [
