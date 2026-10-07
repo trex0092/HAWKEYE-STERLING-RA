@@ -997,9 +997,9 @@
       "url": "https://data.opensanctions.org/datasets/latest/de_bfv_extremism/targets.simple.csv",
       "type": "csv",
       "parser": "opensanctions",
-      "enabled": true,
+      "enabled": false,
       "minNames": 26,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Bundesamt für Verfassungsschutz\" (official: true), 13 targets, last change 2026-09-19. These are association bans (Vereinsverbote) of foreign-related extremist organisations, i.e. national proscriptions, not financial sanctions; Germany's financial sanctions remain UN/EU (screened via those lists). Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 31 names (primary names plus aliases); minNames 26 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Bundesamt für Verfassungsschutz\" (official: true), 13 targets, last change 2026-09-19. These are association bans (Vereinsverbote) of foreign-related extremist organisations, i.e. national proscriptions, not financial sanctions; Germany's financial sanctions remain UN/EU (screened via those lists). Recorded 2026-10-03 as a supplementary proscription source. Disabled for sanctions screening because this is a national proscription / association-ban feed, not a financial-sanctions list; keeping it enabled would overstate national sanctions-source depth."
     },
     {
       "id": "ie-unlawful-orgs",
@@ -1008,9 +1008,9 @@
       "url": "https://data.opensanctions.org/datasets/latest/ie_unlawful_organizations/targets.simple.csv",
       "type": "csv",
       "parser": "opensanctions",
-      "enabled": true,
+      "enabled": false,
       "minNames": 4,
-      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"electronic Irish Statute Book\" (official: true), 2 targets, last change 2024-07-11. Proscriptions under the Offences Against the State Acts, not financial sanctions; Ireland imposes no unilateral financial sanctions (UN/EU screened via those lists). Source-probe run 37147471222 (same day, branch claude/stoic-ride-ms3hyp) fetched it (HTTP 200) and the registry parser read 5 names (primary names plus aliases); minNames 4 is about 85% of that, so a truncated feed trips the floor while a few de-listings do not."
+      "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"electronic Irish Statute Book\" (official: true), 2 targets, last change 2024-07-11. Proscriptions under the Offences Against the State Acts, not financial sanctions; Ireland imposes no unilateral financial sanctions (UN/EU screened via those lists). Recorded 2026-10-03 as a supplementary proscription source. Disabled for sanctions screening because this is a national proscription / association-ban feed, not a financial-sanctions list; keeping it enabled would overstate national sanctions-source depth."
     }
   ]
 }
