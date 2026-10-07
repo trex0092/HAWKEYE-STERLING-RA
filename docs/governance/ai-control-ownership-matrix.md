@@ -8,7 +8,7 @@
 | `EAI-POL-02` | L1 | Acceptable-use rules | MLRO | Compliance Engineering | Annual and on material change | effective |
 | `EAI-POL-03` | L1 | AI use-case approval criteria | MLRO | Compliance Engineering | Per new or materially changed AI use case | partial |
 | `EAI-POL-04` | L1 | Regulatory and framework alignment | MLRO | Compliance Engineering | At least annual and on material legal change | effective |
-| `EAI-ROL-01` | L2 | Named accountable owner for every AI asset | MLRO | Compliance Engineering | Quarterly and on asset change | effective |
+| `EAI-ROL-01` | L2 | Named accountable owner for every AI asset | MLRO | Compliance Engineering | Quarterly and on asset change | partial |
 | `EAI-ROL-02` | L2 | Business ownership and operating RACI | MLRO | Compliance Engineering | Annual and on organizational change | effective |
 | `EAI-ROL-03` | L2 | AI governance committee and legal oversight | Board / MLRO | AI Governance Committee | Quarterly and on material governance decision | partial |
 | `EAI-ROL-04` | L2 | Escalation paths and human decision authority | MLRO | Compliance Engineering / operators | Continuous; exercise at least annually | effective |
@@ -17,10 +17,10 @@
 | `EAI-RSK-03` | L3 | Impact and privacy assessment | MLRO / DPO | Compliance Engineering | On new use case, new data flow, new provider and material change | effective |
 | `EAI-RSK-04` | L3 | Mitigation and corrective-action tracking | MLRO | Compliance Engineering | Continuous | effective |
 | `EAI-RSK-05` | L3 | Use-case classification before deployment | MLRO | Compliance Engineering | Per new or materially changed AI use case | partial |
-| `EAI-DMG-01` | L4 | AI inventory and system boundary | MLRO | Compliance Engineering | Quarterly and on asset change | effective |
-| `EAI-DMG-02` | L4 | Data lineage, minimisation and retention | MLRO / DPO | Compliance Engineering | Annual and on data-flow change | effective |
+| `EAI-DMG-01` | L4 | AI inventory and system boundary | MLRO | Compliance Engineering | Quarterly and on asset change | partial |
+| `EAI-DMG-02` | L4 | Data quality, lineage, minimisation and retention | MLRO / DPO | Compliance Engineering | Annual and on data-flow change | effective |
 | `EAI-DMG-03` | L4 | Prompt and model version/change control | MLRO | Compliance Engineering | Per change | effective |
-| `EAI-DMG-04` | L4 | Model validation and bias evaluation | MLRO | Compliance Engineering | Weekly live evaluation; quarterly bias review; on model change | effective |
+| `EAI-DMG-04` | L4 | Model validation and bias evaluation | MLRO | Compliance Engineering | Weekly live evaluation; quarterly bias review; on model change | partial |
 | `EAI-DMG-05` | L4 | AI and AI-adjacent vendor assurance | MLRO / DPO | Compliance Engineering | At onboarding, annually, and on material provider change | partial |
 | `EAI-DMG-06` | L4 | Tool, connector and access governance | MLRO | Compliance Engineering | Quarterly and on connector/permission change | effective |
 | `EAI-MON-01` | L5 | AI performance and behavioural monitoring | MLRO | Compliance Engineering | Weekly and per build | effective |
