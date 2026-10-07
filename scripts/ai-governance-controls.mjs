@@ -65,6 +65,7 @@ export function validateRegister(reg, actionMarkdown, today = new Date().toISOSt
   for (let i = 1; i <= 6; i++) if (!layers.has('L' + i)) errors.push('missing layer L' + i);
 
   const ids = new Set();
+  const mappedActions = new Set();
   for (const c of reg.controls || []) {
     if (!c.id || ids.has(c.id)) errors.push('missing or duplicate control id: ' + String(c.id));
     ids.add(c.id);
@@ -84,6 +85,7 @@ export function validateRegister(reg, actionMarkdown, today = new Date().toISOSt
           if (!Number.isInteger(action) || action <= 0) errors.push(c.id + ': invalid closure action ' + String(action));
           else if (seenActions.has(action)) errors.push(c.id + ': duplicate closure action ' + action);
           else if (!actionIds.has(action)) errors.push(c.id + ': closure action ' + action + ' is not present in open-actions register');
+          mappedActions.add(action);
           seenActions.add(action);
         }
       }
@@ -99,6 +101,22 @@ export function validateRegister(reg, actionMarkdown, today = new Date().toISOSt
       if (!existsSync(join(ROOT, rel))) errors.push(c.id + ': missing test path ' + rel);
     }
   }
+  const exclusions = new Set();
+  for (const x of reg.scope_exclusions || []) {
+    const action = x && x.action;
+    if (!Number.isInteger(action) || action <= 0) errors.push('scope_exclusions: invalid action ' + String(action));
+    else if (exclusions.has(action)) errors.push('scope_exclusions: duplicate action ' + action);
+    else if (!actionIds.has(action)) errors.push('scope_exclusions: action ' + action + ' is not present in open-actions register');
+    else if (mappedActions.has(action)) errors.push('scope_exclusions: action ' + action + ' is also mapped to a control');
+    if (!x || !String(x.rationale || '').trim()) errors.push('scope_exclusions: action ' + String(action) + ' missing rationale');
+    exclusions.add(action);
+  }
+  for (const action of actionIds) {
+    if (!mappedActions.has(action) && !exclusions.has(action)) {
+      errors.push('open action ' + action + ' is neither mapped to an incomplete AI control nor explicitly scope-excluded');
+    }
+  }
+
   return errors;
 }
 
