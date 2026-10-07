@@ -59,6 +59,8 @@ jobs:
         run: node test/crypto-b64.test.mjs
       - name: Run CSP-report function tests
         run: node test/csp-report.test.js
+      - name: Run browser + function error telemetry tests
+        run: node test/telemetry.test.mjs
       - name: Validate CycloneDX SBOM generator
         run: node test/sbom.test.mjs
       - name: Check CHANGELOG format

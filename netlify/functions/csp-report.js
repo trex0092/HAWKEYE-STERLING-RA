@@ -1,3 +1,6 @@
+'use strict';
+const { withFunctionTelemetry } = require('./_telemetry');
+
 /* Content-Security-Policy violation collector. Browsers POST here when a CSP
    directive is violated (via the `report-to` Reporting API and the legacy
    `report-uri` directive — see netlify.toml). Reports are validated, size-capped,
@@ -53,3 +56,6 @@ exports.handler = async (event) => {
   /* Always 204: the browser ignores the response body and should not retry. */
   return { statusCode: 204, body: '' };
 };
+
+/* Structured 5xx/exception telemetry. The wrapper never logs request bodies. */
+exports.handler = withFunctionTelemetry('csp-report', exports.handler);

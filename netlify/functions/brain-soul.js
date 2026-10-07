@@ -1,3 +1,6 @@
+'use strict';
+const { withFunctionTelemetry } = require('./_telemetry');
+
 /* brain-soul.js — Hawkeye Sterling Intelligence Core: Netlify Function
    POST /.netlify/functions/brain-soul
    Body: { mode, persona, question, context }
@@ -1076,3 +1079,6 @@ exports.__internals = {
   simpleHash, buildKnowledgeContext, apiErrorHint, isUsageLimit,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
 };
+
+/* Structured 5xx/exception telemetry. The wrapper never logs request bodies. */
+exports.handler = withFunctionTelemetry('brain-soul', exports.handler);

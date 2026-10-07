@@ -1,3 +1,6 @@
+'use strict';
+const { withFunctionTelemetry } = require('./_telemetry');
+
 /* Creates an Asana task in the HAWKEYE STERLING APP project when an assessment
    is marked Complete. The task is filed into the section matching its risk
    band (LOW / MEDIUM / HIGH / PROHIBITED — created on demand) and assigned,
@@ -389,3 +392,6 @@ function corsHeaders(event) {
 function resp(statusCode, obj, extra) {
   return { statusCode, headers: { 'Content-Type': 'application/json', ...(extra || {}) }, body: JSON.stringify(obj) };
 }
+
+/* Structured 5xx/exception telemetry. The wrapper never logs request bodies. */
+exports.handler = withFunctionTelemetry('asana-task', exports.handler);

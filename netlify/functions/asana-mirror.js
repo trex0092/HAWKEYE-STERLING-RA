@@ -1,3 +1,6 @@
+'use strict';
+const { withFunctionTelemetry } = require('./_telemetry');
+
 /* Two-way mirror of the on-device ASSESSMENT REGISTER and ACTIVITY LOG to Asana,
    so a summary survives off-device and can be pulled back ("disclosed") on any
    device after login.
@@ -280,3 +283,6 @@ function corsHeaders(event) {
 function resp(statusCode, obj, extra) {
   return { statusCode, headers: { 'Content-Type': 'application/json', ...(extra || {}) }, body: JSON.stringify(obj) };
 }
+
+/* Structured 5xx/exception telemetry. The wrapper never logs request bodies. */
+exports.handler = withFunctionTelemetry('asana-mirror', exports.handler);
