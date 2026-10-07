@@ -37,6 +37,8 @@ never missed.
 | 2026-07-20 | schedule | ✅ pass |
 | 2026-07-21 | dispatch ×2 | ❌ fail (fix-verification window) |
 | 2026-07-22 | dispatch ×2 | ✅ recovered |
+| 2026-09-28 | schedule | ❌ incomplete — Anthropic API usage limit blocked the live suite; 0 regressions, 30 eval errors. [run 36453013672](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/36453013672) |
+| 2026-10-05 | schedule | ❌ incomplete — Anthropic credit balance too low; 0 regressions, 1 eval error and 29 cases not attempted. [run 37345739408](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/37345739408) |
 
 ### Advisor bias eval — quarterly
 
@@ -45,7 +47,7 @@ never missed.
 | 2026-06-25 → 06-30 | dispatch ×4 (commissioning) | ✅ pass |
 | 2026-07-01 | schedule (quarterly) | ✅ pass |
 | 2026-07-21/22 | dispatch ×4 | ❌×3 then ✅ recovered |
-| next scheduled | 2026-10-01 | — |
+| 2026-10-01 | schedule | ✅ pass — 0 findings, 0 eval errors. [run 36890910912](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/36890910912) |
 
 ### Per-push CI gates (state, not series)
 
