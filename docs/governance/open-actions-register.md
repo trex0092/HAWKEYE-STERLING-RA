@@ -6,8 +6,15 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — completed the sixth six-layer reconciliation.
-> Item 42 now captures an unresolved go-live-control deviation around adverse-media
+> **Last updated:** 2026-10-07 — completed the seventh six-layer reconciliation.
+> Item 43 now tracks the first annual manual penetration test that is already
+> required by the assurance coverage matrix and roadmap but previously had no
+> numbered closure path. Automated ZAP/SAST/DAST coverage is not treated as a
+> substitute for the manual authenticated-flow, business-logic, rate-limit and
+> CORS/origin abuse test.
+>
+> **Previous update (2026-10-07):** completed the sixth six-layer reconciliation.
+> Item 42 captures an unresolved go-live-control deviation around adverse-media
 > LLM triage. Code defaults `LLM_TRIAGE` to OFF and the AI impact-assessment
 > checklist requires DPA, transfer, processing, DPIA-acceptance and authorised
 > sign-off before enabling it, but the third-party register records an owner
@@ -89,11 +96,11 @@
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
 > (20–24 and 26–28) carry dates under the maintainer's own authority. Items
-> 29–38 and 40–42 are vendor/governance/assurance actions whose deadlines belong to their
+> 29–38 and 40–43 are vendor/governance/assurance actions whose deadlines belong to their
 > named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 30 of 38 undated at this update.
+> per row — 31 of 39 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -135,6 +142,7 @@
 | 40 | Restore live Advisor behavioural-evaluation capacity. Scheduled run [36453013672](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/36453013672) on 2026-09-28 was incomplete because the Anthropic account hit its specified API usage limit; scheduled run [37345739408](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/37345739408) on 2026-10-05 was incomplete because the credit balance was too low. Both produced zero regression findings but did not complete the governed 30-case live suite. | Repo owner / MLRO | Restore provider capacity or an approved equivalent live-eval route, dispatch `advisor-eval.yml`, obtain a completed run with zero eval errors, record the recovery in [`eval-scorecard.md`](eval-scorecard.md), and clear the monitoring alert | — | to open |
 | 41 | Complete the overdue 2026-09-15 control reviews for the [TFS name-match procedure](../aims/tfs-name-match-procedure.md) and the [EOCN/internal-watchlist SOP](../aims/eocn-list-update-sop.md). The policy register still carries 2026-09-15 as the next-review date for both instruments; the TFS procedure's event log contains no completed annual tabletop, and `data/internal-watchlist.json` still records its last review as 2026-07-28. | MLRO | Review both instruments against current requirements, perform and record the TFS tabletop, review every internal-watchlist entry or confirm the empty-list position, update the evidence logs/`lastReviewed`, and move each policy-register review date to its next approved cycle | — | to open |
 | 42 | Reconcile the adverse-media LLM-triage go-live control. [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) requires the DPA, PDPL transfer basis, processing/retention terms, DPIA residual-risk acceptance, authorised sign-off and explicit `LLM_TRIAGE=1` before egress; those checklist fields remain blank. The third-party register nevertheless records a 2026-07-16 owner attestation that `LLM_TRIAGE=1` was enabled. Repository code proves only a default-OFF fail-closed gate, not the live variable value. | MLRO / DPO + Repo owner | Verify the current production `LLM_TRIAGE` state. If ON, either complete and evidence every go-live prerequisite immediately or set it to `0` until they are complete. Record the verified runtime state, authorised sign-off and supporting DPA/PDPL evidence consistently across the AI impact assessment, AI asset register, model card and third-party register | — | to open |
+| 43 | Run and record the first annual manual penetration test of the live application and Netlify functions. The assurance matrix requires testing beyond the automated ZAP baseline, and the roadmap still lists the first annual penetration test as outstanding. | Repo owner / MLRO; independent or suitably qualified tester | A dated report covers authenticated-flow abuse, business-logic abuse, rate-limit bypass, CORS/origin edge cases and relevant confidential-read paths; findings are severity-rated and entered into CAPA/open actions with owners and verification evidence | — | to open |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
