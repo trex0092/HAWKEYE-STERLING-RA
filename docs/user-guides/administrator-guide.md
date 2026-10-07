@@ -45,8 +45,9 @@ mode. Then the §6 TEST-000 verification before real use.
 - **Backups/DR** — the Asana mirror + monthly git commit of risk-data overrides
   are automatic; GitHub/Netlify/Asana form the recovery triangle (see
   [`backup-recovery.md`](../governance/backup-recovery.md)).
-- **BCP drill** — periodically confirm a second person can rotate secrets and
-  operate (closes risk R-17).
+- **BCP drill** — periodically confirm a second trained operator can recover and
+  operate the service without the primary administrator. The first recorded cycle
+  remains open under governance item 44 and is the mitigation path for risk R-17.
 - **Monitoring** — the assurance workflows run themselves (live count in
   [`data/board-figures.json`](../../data/board-figures.json), generated, never
   hand-maintained); the daily AI Governance Report flags any control that stops
