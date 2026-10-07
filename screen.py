@@ -2301,6 +2301,12 @@ def gkg_sweep(subjects, end_utc=None, fetch=None):
     {subject key: [flagged articles]}. `fetch(url) -> bytes|None` is injectable
     for the offline tests; production uses requests with a 404 treated as
     'not published' (missing), anything else as a failure."""
+    # Per-run state. gkg_sweep is also used by dispatch diagnostics and tests,
+    # so a second invocation in the same process must not inherit counters or
+    # language buckets from the previous sweep.
+    _GKG_STATS.update(ran=False, expected=0, read=0, missing=0, failed=0, rows=0,
+                      bad_rows=0, matched_rows=0, flagged=0, subjects=0,
+                      langs={}, hours=GKG_HOURS, deadline_hit=False)
     out = {}
     if not GKG_SWEEP:
         return out
