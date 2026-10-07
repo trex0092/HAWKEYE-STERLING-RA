@@ -6,8 +6,15 @@
 > complete and evidenced (see the hardening checklist Section 7, the
 > third-party register, and the readiness review addendum).
 >
-> **Last updated:** 2026-10-07 — synchronized the pending-action ledger with
-> Asana after the seventh six-layer reconciliation. Every open row now carries an
+> **Last updated:** 2026-10-07 — completed the eighth six-layer reconciliation.
+> Item 44 now tracks the BCP/vendor-exit exercise and second-operator drill that
+> the AI risk register names as the mitigation for R-17 key-person dependency
+> and that the annual control-testing calendar already requires. No completed
+> drill record or second-operator evidence was found, so the gap is opened rather
+> than inferred complete.
+>
+> **Previous update (2026-10-07):** synchronized the pending-action ledger with
+> Asana after the seventh six-layer reconciliation. Every open row carries an
 > Asana/system-of-record reference; the remaining `to open` placeholders were
 > created in the HAWKEYE STERLING APP governance section, including the newly
 > explicit triage-go-live and penetration-test actions.
@@ -102,11 +109,11 @@
 > they carry `—` until R7 is minuted, and KRI-09 (overdue issue rate) stays
 > *not instrumented*. The remaining maintainer-owned engineering items
 > (20–24 and 26–28) carry dates under the maintainer's own authority. Items
-> 29–38 and 40–43 are vendor/governance/assurance actions whose deadlines belong to their
+> 29–38 and 40–44 are vendor/governance/assurance actions whose deadlines belong to their
 > named human owners, so no deadline is invented here. The gap stays counted:
 > `openActionsWithoutTargetDate` in
 > [`../../data/grc-metrics.json`](../../data/grc-metrics.json) now measures
-> per row — 31 of 39 undated at this update.
+> per row — 32 of 40 undated at this update.
 
 | # | Action | Owner | What closes it | Target date | Asana |
 |---|---|---|---|---|---|
@@ -149,6 +156,7 @@
 | 41 | Complete the overdue 2026-09-15 control reviews for the [TFS name-match procedure](../aims/tfs-name-match-procedure.md) and the [EOCN/internal-watchlist SOP](../aims/eocn-list-update-sop.md). The policy register still carries 2026-09-15 as the next-review date for both instruments; the TFS procedure's event log contains no completed annual tabletop, and `data/internal-watchlist.json` still records its last review as 2026-07-28. | MLRO | Review both instruments against current requirements, perform and record the TFS tabletop, review every internal-watchlist entry or confirm the empty-list position, update the evidence logs/`lastReviewed`, and move each policy-register review date to its next approved cycle | — | [OA-41](https://app.asana.com/1/1213645083721316/project/1216203370612914/task/1219253934356440) |
 | 42 | Reconcile the adverse-media LLM-triage go-live control. [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) requires the DPA, PDPL transfer basis, processing/retention terms, DPIA residual-risk acceptance, authorised sign-off and explicit `LLM_TRIAGE=1` before egress; those checklist fields remain blank. The third-party register nevertheless records a 2026-07-16 owner attestation that `LLM_TRIAGE=1` was enabled. Repository code proves only a default-OFF fail-closed gate, not the live variable value. | MLRO / DPO + Repo owner | Verify the current production `LLM_TRIAGE` state. If ON, either complete and evidence every go-live prerequisite immediately or set it to `0` until they are complete. Record the verified runtime state, authorised sign-off and supporting DPA/PDPL evidence consistently across the AI impact assessment, AI asset register, model card and third-party register | — | [OA-42](https://app.asana.com/1/1213645083721316/project/1216203370612914/task/1219253583495667) |
 | 43 | Run and record the first annual manual penetration test of the live application and Netlify functions. The assurance matrix requires testing beyond the automated ZAP baseline, and the roadmap still lists the first annual penetration test as outstanding. | Repo owner / MLRO; independent or suitably qualified tester | A dated report covers authenticated-flow abuse, business-logic abuse, rate-limit bypass, CORS/origin edge cases and relevant confidential-read paths; findings are severity-rated and entered into CAPA/open actions with owners and verification evidence | — | [OA-43](https://app.asana.com/1/1213645083721316/project/1216203370612914/task/1215593499879679) |
+| 44 | Run and record the first BCP/vendor-exit exercise with a second trained operator. Risk `R-17` identifies single-operator dependency and states that mitigation requires a BCP drill in which a second person can rotate secrets and operate the service; the annual control-testing calendar also requires this exercise. No completed exercise record was found. | MLRO / Repo owner; second trained operator | A dated exercise record identifies the second operator, demonstrates recovery/operation and required secret or credential rotation without the primary operator, records observed RTO and any gaps, and routes findings to CAPA/open actions; the BCP evidence and R-17 treatment record are updated | — | [OA-44](https://app.asana.com/1/1213645083721316/project/1216203370612914/task/1219256293828350) |
 
 > Maintenance rule: automation edits this table only to reflect verified state
 > changes (an item closes on evidence, a new item opens with an owner), one
