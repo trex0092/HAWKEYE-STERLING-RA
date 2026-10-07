@@ -40,7 +40,7 @@ Both views point to the same underlying controls. A control should be implemente
 |---|---|
 | Assign AI owner | Every AI surface currently registered in the Hawkeye Sterling suite has an accountable owner in the [AI Asset Register](ai-asset-register.md); enterprise-wide discovery remains open under item 9 of the [open-actions register](open-actions-register.md) |
 | Clarify business ownership | [Operating model](operating-model.md) and [control ownership matrix](ai-control-ownership-matrix.md) |
-| Define legal/governance oversight | [AI Governance Committee Charter](ai-governance-committee-charter.md) |
+| Define legal/governance oversight | [AI Governance Committee Charter](ai-governance-committee-charter.md); formal adoption and the DPO designation determination remain open under items 4 and 13 |
 | Set risk responsibilities | Risk register and risk-appetite ownership |
 | Create escalation paths | [AI Incident Runbook](ai-incident-runbook.md), operating-model escalation |
 
@@ -64,7 +64,7 @@ Both views point to the same underlying controls. A control should be implemente
 |---|---|
 | Govern data and retention | [Data retention](data-retention.md), DPIA and data-minimisation controls |
 | Maintain data quality and lineage | [Data-quality plan](../aims/data-quality-plan.md), source/version lineage, screening evidence and schema/integrity checks over governed data files |
-| Validate models | [Model validation](model-validation-2026.md), live Advisor evaluation and bias testing; current overdue/reconciliation items are reported by the generated dashboard rather than hidden here |
+| Validate models | [Model validation](model-validation-2026.md), live Advisor evaluation and bias testing; MRM ratification, the overdue Q3 sign-off and independent review remain explicit under items 16, 38 and 8 |
 | Document prompts and models | [Prompt lifecycle register](prompt-lifecycle-register.md), [AI Asset Register](ai-asset-register.md) |
 | Control versions and changes | Prompt fingerprints, pinned routing, PR review and CI guards |
 | Manage access and retention | [Tool & connector register](tool-connector-register.md), server-held credentials, retention rules |
