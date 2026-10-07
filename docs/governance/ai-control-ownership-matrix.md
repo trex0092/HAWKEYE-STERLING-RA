@@ -35,6 +35,7 @@
 | `EAI-AUD-05` | L6 | Remediation tracking and closure | MLRO / Internal Audit | Compliance Engineering | Continuous with quarterly review | effective |
 | `EAI-AUD-06` | L6 | Independent external assurance | Board / MLRO | External assessor when commissioned | Optional / Board decision | open |
 | `EAI-AUD-07` | L6 | Regular control testing and review currency | MLRO / Internal Audit | Compliance Engineering / control owners | Continuous automation; quarterly and annual human review cycles | partial |
+| `EAI-AUD-08` | L6 | Compliance obligation mapping and regulatory traceability | MLRO / Counsel | Compliance Engineering | Continuous on legal change; formal review at least quarterly | effective |
 
 The accountable owner retains decision responsibility. The operator maintains or executes the control. A generated row is not evidence that a human approval or review has occurred.
 
