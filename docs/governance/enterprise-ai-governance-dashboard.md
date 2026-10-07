@@ -26,7 +26,7 @@
 | Audit finding closure rate | 95.2% | `data/grc-metrics.json` |
 | Governance drift count | 0 | `data/grc-metrics.json` |
 | Risks above appetite | 2 | `data/grc-metrics.json` |
-| Open actions without target date | 23 | `data/grc-metrics.json` |
+| Open actions without target date | 26 | `data/grc-metrics.json` |
 
 ## Partial and open controls
 
@@ -36,11 +36,11 @@
 | `EAI-ROL-03` AI governance committee and legal oversight | L2 | **PARTIAL** | #4 | The charter exists, while the repository's open-actions register still records human ratification actions. |
 | `EAI-RSK-02` Risk appetite and residual-risk treatment | L3 | **PARTIAL** | #17, #33, #34 | The repository currently reports risks above appetite and does not infer acceptance without a human decision. |
 | `EAI-RSK-05` Use-case classification before deployment | L3 | **PARTIAL** | #30 | The intake form requires classification and risk tiering; organizational ratification of the new gate remains explicit. |
-| `EAI-DMG-05` AI and AI-adjacent vendor assurance | L4 | **PARTIAL** | #5, #11, #29 | The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required. |
+| `EAI-DMG-05` AI and AI-adjacent vendor assurance | L4 | **PARTIAL** | #5, #11, #29, #35, #36 | The live GRC metric reports outstanding third-party assurance items; gated features remain gated where required. |
 | `EAI-MON-04` Incident detection, response and control freshness | L5 | **PARTIAL** | #31 | Detection and response are implemented; the AI risk register records the first tabletop exercise as an outstanding mitigation. |
 | `EAI-AUD-02` Internal audit programme | L6 | **PARTIAL** | #8 | The programme exists; the open-actions register records the first thematic review as a human action still to complete. |
 | `EAI-AUD-03` Management review and governance decisions | L6 | **PARTIAL** | #32 | Templates and decision rights exist; this register does not fabricate completed meetings or approvals. |
-| `EAI-AUD-06` Independent external assurance | L6 | **OPEN** | #10 | No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned. |
+| `EAI-AUD-06` Independent external assurance | L6 | **OPEN** | #10, #37 | No third-party AI governance or ISO 42001 conformity audit is claimed. The repository remains a self-assessed control environment unless and until an external review is commissioned. |
 
 ## Interpretation
 
