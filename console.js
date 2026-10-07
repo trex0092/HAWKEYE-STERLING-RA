@@ -12,6 +12,20 @@
 ══════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const tr = (key, fallback, vars) => {
+  try {
+    if(typeof window!=='undefined' && typeof window.hsT==='function'){
+      const v = window.hsT(key, vars || {});
+      if(v != null) return String(v);
+    }
+  } catch(e){}
+  return fallback;
+};
+const isAr = () => {
+  try { return typeof window!=='undefined' && typeof window.hsGetLang==='function' && window.hsGetLang()==='ar'; }
+  catch(e){ return false; }
+};
+const uiLocale = () => isAr() ? 'ar-AE' : 'en-GB';
 /* Strict-mode shared token (netlify/functions/_auth.js): sends the deploy-time
    <meta name="hsra-app-token"> value as X-App-Token when present. */
 function fnHeaders(){
@@ -25,23 +39,23 @@ function fnHeaders(){
 }
 
 const OPERATORS = [
-  {id:'cypher',  img:'assets/persona-cypher.webp',  pos:'42% 30%', name:'Cypher',  role:'Transaction Monitoring Unit', ac:'255,92,168'},
-  {id:'sterling',img:'assets/persona-sterling.webp',pos:'36% 22%', name:'Sterling',role:'Entity Risk Assessment',     ac:'59,229,208'},
-  {id:'vale',    img:'assets/persona-vale.webp',    pos:'50% 22%', name:'Vale',    role:'KYC & Onboarding',           ac:'120,170,255'},
-  {id:'ember',   img:'assets/persona-ember.webp',   pos:'50% 26%', name:'Ember',   role:'PEP & Adverse Media Screening',  ac:'255,87,87'},
-  {id:'brass',   img:'assets/persona-brass.webp',   pos:'46% 26%', name:'Brass',   role:'Records & Audit',            ac:'247,197,60'},
-  {id:'iris',    img:'assets/persona-iris.webp',    pos:'42% 26%', name:'Iris',    role:'Typologies & Training',      ac:'180,92,255'},
-  {id:'bullion', img:'assets/persona-bullion.webp', pos:'50% 20%', name:'Bullion', role:'Precious Metals & Stones (DPMS)',     ac:'255,90,200'},
-  {id:'cinder',  img:'assets/persona-cinder.webp',  pos:'40% 30%', name:'Cinder',  role:'Terrorism & Proliferation Financing', ac:'70,150,255'},
-  {id:'verde',   img:'assets/persona-verde.webp',   pos:'46% 26%', name:'Verde',   role:'ESG & Human Rights',                  ac:'60,200,130'},
-  {id:'haven',   img:'assets/persona-haven.webp',   pos:'42% 26%', name:'Haven',   role:'Artificial Intelligence',             ac:'230,180,70'},
-  {id:'cobalt',  img:'assets/persona-cobalt.webp', pos:'55% 22%', name:'Cobalt',  role:'Trade-Based ML & Trade Finance',      ac:'235,190,90'},
-  {id:'sentinel',img:'assets/persona-sentinel.webp',pos:'55% 20%', name:'Sentinel',role:'Sanctions Evasion & Watchlists',      ac:'255,70,90'},
-  {id:'lattice', img:'assets/persona-lattice.webp', pos:'55% 18%', name:'Lattice', role:'Beneficial Ownership & UBO',          ac:'90,160,255'},
-  {id:'talon',   img:'assets/persona-talon.webp',   pos:'55% 20%', name:'Talon',   role:'Trade Sanctions & Export Controls',    ac:'170,90,255'},
-  {id:'quartz',  img:'assets/persona-quartz.webp',  pos:'55% 20%', name:'Quartz',  role:'Source of Wealth / Source of Funds',   ac:'60,210,120'},
-  {id:'beacon',  img:'assets/persona-beacon.webp',  pos:'55% 20%', name:'Beacon',  role:'Whistleblowing & Internal Investigations', ac:'255,150,40'},
-  {id:'warden',  img:'assets/persona-warden.webp',  pos:'52% 18%', name:'Warden',  role:'Board & MLRO Governance',              ac:'210,80,200'}
+  {id:'cypher',  img:'assets/persona-cypher.webp',  pos:'42% 30%', name:'Cypher',  role:'Transaction Monitoring Unit', roleAr:'وحدة مراقبة المعاملات', ac:'255,92,168'},
+  {id:'sterling',img:'assets/persona-sterling.webp',pos:'36% 22%', name:'Sterling',role:'Entity Risk Assessment', roleAr:'تقييم مخاطر الكيانات', ac:'59,229,208'},
+  {id:'vale',    img:'assets/persona-vale.webp',    pos:'50% 22%', name:'Vale',    role:'KYC & Onboarding', roleAr:'اعرف عميلك وبدء العلاقة', ac:'120,170,255'},
+  {id:'ember',   img:'assets/persona-ember.webp',   pos:'50% 26%', name:'Ember',   role:'PEP & Adverse Media Screening', roleAr:'فحص الأشخاص المعرّضين سياسياً والإعلام السلبي', ac:'255,87,87'},
+  {id:'brass',   img:'assets/persona-brass.webp',   pos:'46% 26%', name:'Brass',   role:'Records & Audit', roleAr:'السجلات والتدقيق', ac:'247,197,60'},
+  {id:'iris',    img:'assets/persona-iris.webp',    pos:'42% 26%', name:'Iris',    role:'Typologies & Training', roleAr:'الأنماط والتدريب', ac:'180,92,255'},
+  {id:'bullion', img:'assets/persona-bullion.webp', pos:'50% 20%', name:'Bullion', role:'Precious Metals & Stones (DPMS)', roleAr:'المعادن الثمينة والأحجار الكريمة (DPMS)', ac:'255,90,200'},
+  {id:'cinder',  img:'assets/persona-cinder.webp',  pos:'40% 30%', name:'Cinder',  role:'Terrorism & Proliferation Financing', roleAr:'تمويل الإرهاب وانتشار التسلح', ac:'70,150,255'},
+  {id:'verde',   img:'assets/persona-verde.webp',   pos:'46% 26%', name:'Verde',   role:'ESG & Human Rights', roleAr:'البيئة والمجتمع والحوكمة وحقوق الإنسان', ac:'60,200,130'},
+  {id:'haven',   img:'assets/persona-haven.webp',   pos:'42% 26%', name:'Haven',   role:'Artificial Intelligence', roleAr:'الذكاء الاصطناعي', ac:'230,180,70'},
+  {id:'cobalt',  img:'assets/persona-cobalt.webp',  pos:'55% 22%', name:'Cobalt',  role:'Trade-Based ML & Trade Finance', roleAr:'غسل الأموال القائم على التجارة وتمويل التجارة', ac:'235,190,90'},
+  {id:'sentinel',img:'assets/persona-sentinel.webp',pos:'55% 20%', name:'Sentinel',role:'Sanctions Evasion & Watchlists', roleAr:'التهرب من العقوبات وقوائم المراقبة', ac:'255,70,90'},
+  {id:'lattice', img:'assets/persona-lattice.webp', pos:'55% 18%', name:'Lattice', role:'Beneficial Ownership & UBO', roleAr:'الملكية المستفيدة والمالك المستفيد النهائي', ac:'90,160,255'},
+  {id:'talon',   img:'assets/persona-talon.webp',   pos:'55% 20%', name:'Talon',   role:'Trade Sanctions & Export Controls', roleAr:'العقوبات التجارية وضوابط التصدير', ac:'170,90,255'},
+  {id:'quartz',  img:'assets/persona-quartz.webp',  pos:'55% 20%', name:'Quartz',  role:'Source of Wealth / Source of Funds', roleAr:'مصدر الثروة / مصدر الأموال', ac:'60,210,120'},
+  {id:'beacon',  img:'assets/persona-beacon.webp',  pos:'55% 20%', name:'Beacon',  role:'Whistleblowing & Internal Investigations', roleAr:'الإبلاغ عن المخالفات والتحقيقات الداخلية', ac:'255,150,40'},
+  {id:'warden',  img:'assets/persona-warden.webp',  pos:'52% 18%', name:'Warden',  role:'Board & MLRO Governance', roleAr:'حوكمة مجلس الإدارة ومسؤول الإبلاغ عن غسل الأموال', ac:'210,80,200'}
 ];
 
 /* ── Data source: the assessment register (localStorage). Absent (new app) or
@@ -101,8 +115,8 @@ function refreshFromAsana(btn){
     el.textContent = text;
     el.classList.toggle('failed', !!failed);
   };
-  if(btn){ btn.disabled=true; btn.classList.add('spinning'); btn.setAttribute('title','Refreshing…'); }
-  say('Refreshing from Asana…', false);
+  if(btn){ btn.disabled=true; btn.classList.add('spinning'); btn.setAttribute('title',tr('console.refreshing','Refreshing from Asana…')); }
+  say(tr('console.refreshing','Refreshing from Asana…'), false);
   const done = (t, failed) => {
     if(btn){ btn.disabled=false; btn.classList.remove('spinning'); btn.setAttribute('title', t); }
     say(t, failed);
@@ -115,7 +129,7 @@ function refreshFromAsana(btn){
           date:String(r.date||''), nextReview:String(r.nextReview||''), jurisdiction:String(r.jurisdiction||'—'),
           savedAt:String(r.savedAt||'') })).filter(r=>r.ref);
         rerenderConsole();
-        done('Refreshed '+_asanaFetched.length+' from Asana', false);
+        done(tr('console.refreshed','Refreshed '+_asanaFetched.length+' from Asana',{n:_asanaFetched.length}), false);
         /* A clean refresh clears the notice rather than leaving a stale success
            line sitting under a panel it no longer describes. */
         setTimeout(()=>{ const el=document.getElementById('asanaRefreshStatus');
@@ -123,9 +137,9 @@ function refreshFromAsana(btn){
       } else {
         /* Name the consequence, not just the event: the figures on screen are
            now of unknown age, which is the part that matters to an MLRO. */
-        done('⚠ Refresh failed — the figures shown are NOT up to date. Try again.', true);
+        done(tr('console.refreshFailed','⚠ Refresh failed — the figures shown are NOT up to date. Try again.'), true);
       }
-    }).catch(()=> done('⚠ Refresh failed (network) — the figures shown are NOT up to date. Try again.', true));
+    }).catch(()=> done(tr('console.refreshNetworkFailed','⚠ Refresh failed (network) — the figures shown are NOT up to date. Try again.'), true));
 }
 function aggregate(items){
   // Local calendar date, matching app.js toISO(): nextReview is stored as a
@@ -180,7 +194,7 @@ function renderOperator(){
   $('robotImg').style.backgroundImage = "url('"+o.img+"')";
   $('robotImg').style.backgroundPosition = o.pos;
   $('operatorName').textContent = o.name;
-  $('operatorRole').textContent = o.role;
+  $('operatorRole').textContent = isAr() && o.roleAr ? o.roleAr : o.role;
 }
 function applyCssText(root){
   if(!root || !root.querySelectorAll) return;
@@ -202,22 +216,28 @@ function renderOperatorStrip(){
   });
 }
 
-function updateThreat(){ const el=$('threatLevel'); if(!el) return; el.textContent=AGG.threat.label; el.style.color=AGG.threat.color; }
+function updateThreat(){ const el=$('threatLevel'); if(!el) return; el.textContent=tr('console.threat.'+AGG.threat.label.toLowerCase(),AGG.threat.label); el.style.color=AGG.threat.color; }
 
 function renderStats(){
   const a=AGG, prog=state.prog;
-  const alertSub = a.overdue&&a.drafts ? a.overdue+' overdue · '+a.drafts+' draft'
-    : a.overdue ? a.overdue+' review overdue'
-    : a.drafts ? a.drafts+' in draft' : 'none open';
+  const alertSub = a.overdue&&a.drafts
+    ? tr('console.sub.overdueDraft',a.overdue+' overdue · '+a.drafts+' draft',{overdue:a.overdue,drafts:a.drafts})
+    : a.overdue ? tr('console.sub.overdue',a.overdue+' review overdue',{n:a.overdue})
+    : a.drafts ? tr('console.sub.draft',a.drafts+' in draft',{n:a.drafts})
+    : tr('console.sub.noneOpen','none open');
   const tiles=[
-    {label:'Entities Monitored', value:a.n,         color:'#4FD6A0', sub:a.n? a.complete+' complete' : (REG_ENCRYPTED? 'register encrypted' : 'no entities yet')},
-    {label:'Open Alerts',        value:a.openAlerts, color:'#FFAE57', sub:alertSub},
-    {label:'Sanctions Hits',     value:a.prohibited, color:'#FF6B6B', sub:a.prohibited? 'do not onboard' : 'none flagged'},
-    {label:'Cases Cleared',      value:a.complete,   color:'#7FB3E8', sub:a.complete? 'marked complete' : 'none yet'}
+    {label:tr('console.stat.entities','Entities Monitored'), value:a.n, color:'#4FD6A0',
+      sub:a.n ? tr('console.sub.complete',a.complete+' complete',{n:a.complete})
+        : (REG_ENCRYPTED ? tr('console.sub.registerEncrypted','register encrypted') : tr('console.sub.noEntities','no entities yet'))},
+    {label:tr('console.stat.alerts','Open Alerts'), value:a.openAlerts, color:'#FFAE57', sub:alertSub},
+    {label:tr('console.stat.sanctions','Sanctions Hits'), value:a.prohibited, color:'#FF6B6B',
+      sub:a.prohibited ? tr('console.sub.doNotOnboard','do not onboard') : tr('console.sub.noneFlagged','none flagged')},
+    {label:tr('console.stat.cleared','Cases Cleared'), value:a.complete, color:'#7FB3E8',
+      sub:a.complete ? tr('console.sub.markedComplete','marked complete') : tr('console.sub.noneYet','none yet')}
   ];
   $('statTiles').innerHTML = tiles.map(t=>{
-    const v = Math.round(t.value*prog).toLocaleString('en-US');
-    return '<div class="tile"><div class="t-l" data-csstext="color:'+t.color+'">'+t.label+'</div>'
+    const v = Math.round(t.value*prog).toLocaleString(uiLocale());
+    return '<div class="tile"><div class="t-l" data-csstext="color:'+t.color+'">'+esc(t.label)+'</div>'
       + '<div class="t-v">'+v+'</div>'
       + '<div class="t-s" data-csstext="color:'+t.color+'">'+esc(t.sub)+'</div></div>';
   }).join('');
@@ -225,9 +245,9 @@ function renderStats(){
 }
 function renderMix(){
   const a=AGG, prog=state.prog;
-  if(!a.n){ $('riskBars').innerHTML='<div class="empty-note">No assessments yet — the diligence mix appears as entities are filed.</div>'; return; }
+  if(!a.n){ $('riskBars').innerHTML='<div class="empty-note">'+esc(tr('console.mix.empty','No assessments yet — the diligence mix appears as entities are filed.'))+'</div>'; return; }
   const rgb={CDD:'91,155,216',SDD:'255,148,52',EDD:'255,87,87'};
-  const lab={CDD:'CDD · Standard',SDD:'SDD · Enhanced monitoring',EDD:'EDD · Enhanced'};
+  const lab={CDD:tr('console.mix.CDD','CDD · Standard'),SDD:tr('console.mix.SDD','SDD · Enhanced monitoring'),EDD:tr('console.mix.EDD','EDD · Enhanced')};
   $('riskBars').innerHTML = a.mix.map(m=>{
     const c=rgb[m.band], w=(m.pct*prog).toFixed(1);
     const fill="height:100%;border-radius:99px;width:"+w+"%;background:linear-gradient(90deg,rgba("+c+",0.7),rgb("+c+"));box-shadow:0 0 10px rgba("+c+",0.5)";
@@ -238,9 +258,9 @@ function renderMix(){
 }
 function renderJur(){
   const a=AGG, prog=state.prog;
-  if(!a.jurisdictions.length){ $('jurWatch').innerHTML='<div class="empty-note">No jurisdictions yet.</div>'; return; }
+  if(!a.jurisdictions.length){ $('jurWatch').innerHTML='<div class="empty-note">'+esc(tr('console.jur.empty','No jurisdictions yet.'))+'</div>'; return; }
   const maxc=Math.max.apply(null, a.jurisdictions.map(j=>j.count)) || 1;
-  const sev={1:{l:'Low',c:'#7FB3E8',rgb:'91,155,216'},2:{l:'Med',c:'#FFAE57',rgb:'255,148,52'},3:{l:'High',c:'#FF6B6B',rgb:'255,87,87'},4:{l:'Proh',c:'#FF6B6B',rgb:'255,87,87'}};
+  const sev={1:{l:tr('console.sev.low','Low'),c:'#7FB3E8',rgb:'91,155,216'},2:{l:tr('console.sev.med','Med'),c:'#FFAE57',rgb:'255,148,52'},3:{l:tr('console.sev.high','High'),c:'#FF6B6B',rgb:'255,87,87'},4:{l:tr('console.sev.proh','Proh'),c:'#FF6B6B',rgb:'255,87,87'}};
   $('jurWatch').innerHTML = a.jurisdictions.slice(0,6).map(j=>{
     const s=sev[j.worst]||sev[1], w=(j.count/maxc*100*prog).toFixed(1);
     const fill="height:100%;border-radius:99px;width:"+w+"%;background:rgb("+s.rgb+");box-shadow:0 0 8px rgba("+s.rgb+",0.5)";
@@ -254,20 +274,20 @@ function renderAlerts(){
   const a=AGG;
   if(!a.recent.length){
     $('alertStream').innerHTML = REG_ENCRYPTED
-      ? '<div class="empty-note">This device’s register is encrypted — unlock it on the Assessment page to populate the console. Encrypted records are not counted here.</div>'
-      : '<div class="empty-note">No assessments filed yet — file one in the Assessment tab to populate the console.</div>';
+      ? '<div class="empty-note">'+esc(tr('console.alert.encrypted','This device’s register is encrypted — unlock it on the Assessment page to populate the console. Encrypted records are not counted here.'))+'</div>'
+      : '<div class="empty-note">'+esc(tr('console.alert.empty','No assessments filed yet — file one in the Assessment tab to populate the console.'))+'</div>';
     return;
   }
   $('alertStream').innerHTML = a.recent.map((it,i)=>{
     const key = it.prohibited?'PROHIBITED':it.outcome;
     const t=bandTone(key);
     let when='';
-    if(it.savedAt){ try{ when=new Date(it.savedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ when=it.date||''; } }
+    if(it.savedAt){ try{ when=new Date(it.savedAt).toLocaleString(uiLocale(),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ when=it.date||''; } }
     else when=it.date||'';
     const row='animation-delay:'+(0.2+i*0.07).toFixed(2)+'s';
     return '<div class="alert-row" data-csstext="'+row+'">'
       + '<span class="at">'+esc(when)+'</span>'
-      + '<div class="alert-mid"><div class="ae">'+esc(it.entity)+'</div><div class="ay">'+esc(BAND_FULL[key]||key)+'</div></div>'
+      + '<div class="alert-mid"><div class="ae">'+esc(it.entity)+'</div><div class="ay">'+esc(tr('console.band.'+key,BAND_FULL[key]||key))+'</div></div>'
       + '<span class="aj" title="'+esc(it.jurisdiction)+'">'+esc(it.jurisdiction)+'</span>'
       + '<span class="ab" data-csstext="color:'+t.c+';background:'+t.bg+';border-color:'+t.bd+'">'+t.l+'</span></div>';
   }).join('');
@@ -339,6 +359,15 @@ startClock();
   render(); setInterval(render, 1000);
 })();
 
+
+/* Re-render JavaScript-built chrome when the shared language changes. */
+if(typeof window!=='undefined' && window.addEventListener){
+  window.addEventListener('hsra:langchange', function(){
+    rerenderConsole();
+    renderOperator();
+    renderOperatorStrip();
+  });
+}
 
 /* CSP-safe wiring: replaces the former inline onclick on the language toggle.
    hsToggleLang is a global defined in i18n.js (loaded earlier on the page). */
