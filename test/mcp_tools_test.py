@@ -131,6 +131,11 @@ check("kyc: an ID with no expiry recorded is a CDD gap",
 import tempfile as _tf_iw
 with _tf_iw.NamedTemporaryFile("w", suffix=".json", delete=False) as _iwf:
     _iwf.write('{"entries": ["Viktor Bout", ]}')
+_mm = mcp_tools.screen_payment(["Some Designated Person"], parties=[
+    {"role": "originator", "name": "Acme Gold Trading LLC", "country": "AE"},
+    {"role": "beneficiary", "name": "Golden Star Metals Co", "country": "Myanmar"}])
+check("payment: a beneficiary country given as a name (Myanmar) is risk-tiered, never NO MATCH",
+      _mm["payments"][0]["outcome"] != "NO MATCH")
 expect_valueerror("internal watchlist: a list that fails to parse is refused, never reported cleared",
                   lambda: mcp_tools.screen_internal_watchlist("Viktor Bout", path=_iwf.name))
 os.unlink(_iwf.name)
@@ -337,6 +342,12 @@ fa = rpc("resources/read", {"uri": "hawkeye://reference/fatf-assessments"})
 fa_doc = json.loads(fa["result"]["contents"][0]["text"])
 check("resources/read serves the FATF assessments (black + grey, each with a source)",
       {j["list"] for j in fa_doc["jurisdictions"]} == {"black", "grey"} and all(j["source"] for j in fa_doc["jurisdictions"]))
+
+ci = rpc("resources/read", {"uri": "hawkeye://reference/country-indicators"})
+ci_doc = json.loads(ci["result"]["contents"][0]["text"])
+check("resources/read serves the country indicators (every indicator carries a source URL and date)",
+      ci_doc["indicators"] and all(v["source"].startswith("https://") and v["published"]
+                                   for v in ci_doc["indicators"].values()))
 
 pl = rpc("prompts/list")["result"]["prompts"]
 check("prompts/list returns the prompt templates", len(pl) == len(mcp_server.PROMPTS))

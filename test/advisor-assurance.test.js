@@ -272,6 +272,20 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     /This output is decision support, not a decision\. MLRO review required\./.test(b.auditLine) &&
     /model=claude-/.test(b.auditLine));
 
+  // 6a-cache. The charter + knowledge prefix carries a prompt-cache breakpoint
+  // and the persona sits after it, so every persona shares one cached prefix.
+  let sentBody = null;
+  mockFetch(async (url, opts) => { sentBody = JSON.parse(opts.body); return { ok: true, json: async () => ({ content: [{ type: 'text', text: 'NO_MATCH against OFAC SDN as of 2026-06-01. GAPS: none.' }] }) }; });
+  await call(POST({ question: 'Screen Acme Trading FZE.', persona: 'vale' }, { 'x-nf-client-connection-ip': '203.0.113.91' }), 'test-key');
+  const sys = sentBody && sentBody.system;
+  check('handler: the shared charter prefix is sent as a cached system block',
+    Array.isArray(sys) && sys[0].cache_control && sys[0].cache_control.type === 'ephemeral'
+    && sys[0].text === I.SOUL_CHARTER + '\n\n' + I.KNOWLEDGE_CONTEXT);
+  check('handler: the persona follows the breakpoint, outside the cached prefix',
+    Array.isArray(sys) && sys.length === 2 && sys[1].text === I.PERSONA_SUFFIX.vale && !sys[1].cache_control);
+  check('handler: the cached prefix is identical across personas (one cache entry)',
+    I.buildSystemBlocks('sterling')[0].text === I.buildSystemBlocks('cobalt')[0].text);
+
   // 6b. Deep mode routes to the governed model, or reports its downgrade
   r = await call(POST({ question: 'Deep dive.', mode: 'deep' }), 'test-key');
   b = JSON.parse(r.body);

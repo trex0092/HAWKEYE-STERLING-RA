@@ -396,7 +396,8 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
     llm = snap.get("llm_calls", {})
     if llm:
         L.append(f"   LLM usage: {llm.get('attempted',0)} call(s) · "
-                 f"{llm.get('ok',0)} ok · {llm.get('failed',0)} failed")
+                 f"{llm.get('ok',0)} ok · {llm.get('failed',0)} failed"
+                 + (f" · {llm['cached']} reused from cache (not re-billed)" if llm.get("cached") else ""))
         # A tripped AI circuit is a COVERAGE statement, not a footnote: the
         # affected items carry deterministic triage only. Reporting the call
         # counts while staying silent about the ones never made would read as
@@ -406,7 +407,7 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
                      "DETERMINISTIC triage/summaries only (severity floors intact, no finding dropped)")
         if llm.get("skipped"):
             L.append(f"      ⚠ AI circuit OPEN — {llm['skipped']} model call(s) skipped after "
-                     "repeated failures; those items carry DETERMINISTIC triage/summaries only "
+                     "repeated failures or a credit/usage-limit refusal; those items carry DETERMINISTIC triage/summaries only "
                      "(severity floors intact, no finding dropped)")
     if base.get("history_runs"):
         L.append(f"   Baseline: {base['history_runs']} prior run(s); "

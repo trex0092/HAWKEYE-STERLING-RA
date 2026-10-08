@@ -29,6 +29,9 @@ _req.get = lambda *a, **k: None; _req.post = lambda *a, **k: None
 sys.modules["requests"] = _req
 os.environ.setdefault("ASANA_TOKEN", "dummy")
 os.environ.pop("ANTHROPIC_API_KEY", None)
+# No test may write the AI triage cache into the working tree's data/.
+import tempfile as _tf_cache
+os.environ["AI_TRIAGE_CACHE_PATH"] = os.path.join(_tf_cache.mkdtemp(), "ai-triage-cache.json")
 
 def _load(name):
     spec = importlib.util.spec_from_file_location(name, os.path.join(ROOT, name + ".py"))
@@ -741,6 +744,71 @@ try:
 finally:
     ai.LLM_TRIAGE, ai.llm_complete = _saved_triage
 
+# ── ai.py: triage verdict cache (cost control, never a coverage change) ──────
+print("ai.py — triage cache + credit-limit stop-loss")
+import tempfile as _tf
+_cache_dir = _tf.mkdtemp()
+_saved_cache = (ai.LLM_TRIAGE, ai.llm_complete, ai.AI_TRIAGE_CACHE_PATH, dict(ai._TRIAGE_CACHE),
+                ai.LLM_CALLS.get("cached", 0))
+try:
+    ai.LLM_TRIAGE = True
+    ai.AI_TRIAGE_CACHE_PATH = os.path.join(_cache_dir, "ai-triage-cache.json")
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    _calls = []
+    def _fake_llm(*a, **k):
+        _calls.append(1)
+        return '{"is_about_subject": true, "is_adverse": true, "severity": "LOW"}'
+    ai.llm_complete = _fake_llm
+    _art = {"title": "Cacheco gold smuggling probe", "source": "x", "date": "2026-10-01",
+            "categories": ["Fraud / Financial Crime"]}
+    _t1 = ai.triage_adverse("Cacheco", _art)
+    _t2 = ai.triage_adverse("Cacheco", dict(_art))
+    check("an identical headline is sent to the model once, then served from cache",
+          len(_calls) == 1 and _t1 == _t2 and _t2["ai"] is True)
+    _t3 = ai.triage_adverse("Othercorp", dict(_art))
+    check("a different subject is a different cache key (model asked again)", len(_calls) == 2)
+    _floor = ai.triage_adverse("Cacheco", dict(_art, categories=["Terrorism / CFT"]))
+    check("a cached LOW verdict never lowers this run's deterministic floor",
+          len(_calls) == 2 and _floor["severity"] == "CRITICAL")
+    ai.save_triage_cache()
+    _raw = open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8").read()
+    check("the persisted cache holds hashes and verdicts only (no names or headlines)",
+          "Cacheco" not in _raw and "smuggling" not in _raw and '"entries"' in _raw)
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    ai.triage_adverse("Cacheco", dict(_art))
+    check("a fresh run reloads the cache from disk", len(_calls) == 2)
+    _old = json.load(open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8"))
+    for _v in _old["entries"].values():
+        _v["d"] = "2000-01-01"
+    json.dump(_old, open(ai.AI_TRIAGE_CACHE_PATH, "w", encoding="utf-8"))
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=True)
+    ai._triage_cache_get("missing")  # forces the load
+    ai.save_triage_cache()
+    check("entries unused past AI_TRIAGE_CACHE_DAYS are pruned on save",
+          json.load(open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8"))["entries"] == {})
+    open(ai.AI_TRIAGE_CACHE_PATH, "w").write("{not json")
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    ai.triage_adverse("Cacheco", dict(_art))
+    check("an unreadable cache starts empty and the model is still asked", len(_calls) == 3)
+finally:
+    (ai.LLM_TRIAGE, ai.llm_complete, ai.AI_TRIAGE_CACHE_PATH) = _saved_cache[:3]
+    ai._TRIAGE_CACHE.clear(); ai._TRIAGE_CACHE.update(_saved_cache[3])
+    ai.LLM_CALLS["cached"] = _saved_cache[4]
+
+class _Reply:
+    def __init__(self, code, text=""):
+        self.status_code, self.text = code, text
+    def json(self):
+        return {}
+check("a credit-balance 400 is a final refusal",
+      ai._llm_refusal_is_final(_Reply(400, '{"error":{"message":"Your credit balance is too low"}}')))
+check("a usage-limit 400 is a final refusal",
+      ai._llm_refusal_is_final(_Reply(400, "You have reached your specified API usage limits")))
+check("401/403 are final refusals", ai._llm_refusal_is_final(_Reply(401)) and ai._llm_refusal_is_final(_Reply(403)))
+check("a 429 (throttling) is NOT final", not ai._llm_refusal_is_final(_Reply(429, "rate limit")))
+check("a 500/529 is NOT final", not ai._llm_refusal_is_final(_Reply(529, "overloaded")))
+check("an ordinary 400 is NOT final", not ai._llm_refusal_is_final(_Reply(400, "max_tokens too large")))
+
 # ── ai.py: report stays deterministic even if a key were present ──────────────
 print("ai.py — no generative prose in reports")
 check("generative summaries off by default", ai._llm_in_reports() is False)
@@ -1414,6 +1482,31 @@ _mr = payment_screen.monitoring_records(
     screen.safe_xml_fromstring)
 check("register: payment messages with no customer are keyed apart, never pooled into one profile",
       len({r["customer"] for r in _mr}) == 2 and not any("payment_message" in r for r in _mr))
+_pc = {c: payment_screen._party("beneficiary", "X", country=c) for c in ("Myanmar", "North Korea", "MM")}
+check("payment party: a country NAME is never truncated into a different ISO code",
+      _pc["Myanmar"]["country"] == "" and _pc["Myanmar"]["country_name"] == "Myanmar"
+      and _pc["North Korea"]["country"] != "NO" and _pc["MM"]["country"] == "MM")
+_jt = kyc.load_jurisdiction_risk()
+_wire = dict(transaction_id="W1", customer="Acme Gold LLC", date="2026-10-01", amount=200000,
+             currency="AED", direction="out", method="wire")
+def _tm_rules(t):
+    return {a["rule"] for a in txn_monitor.evaluate([t], _jt)["alerts"]}
+check("TM: a wire whose foreign party is only in parties[] (ISO code) raises THRESHOLD and HIGH_RISK_GEO",
+      {"THRESHOLD", "HIGH_RISK_GEO"} <= _tm_rules(dict(_wire, parties=[
+          {"role": "originator", "name": "Acme Gold LLC", "country": "AE"},
+          {"role": "beneficiary", "name": "Tehran Bullion Co", "country": "IR"}])))
+check("TM: counterparty_country given as an ISO code still hits the jurisdiction table",
+      "HIGH_RISK_GEO" in _tm_rules(dict(_wire, counterparty="T", counterparty_country="IR")))
+check("TM: a wire between two UAE parties in parties[] is not international",
+      "THRESHOLD" not in _tm_rules(dict(_wire, parties=[
+          {"role": "originator", "name": "Acme Gold LLC", "country": "AE"},
+          {"role": "beneficiary", "name": "Dubai Co", "country": "AE"}])))
+_lm = {"ofac": {"count": 18000, "date": "2026-07-01", "tier": "core"},
+       "un": {"count": 1000, "date": "2026-10-07", "tier": "core"},
+       "uk": {"count": 0, "date": "", "tier": "core"}}
+_dc = screen.degraded_core_lists(_lm, _dt.date(2026, 10, 8))
+check("payment screening treats a stale core list as degraded, not only an empty one",
+      "UK" in _dc and any(x.startswith("OFAC (stale") for x in _dc) and not any(x.startswith("UN") for x in _dc))
 _cl_n, _cl_b = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []},
     txn_monitor.evaluate([{**_rr[1], "date": "2026-10-01", "amount": 60000, "method": "cash"},
@@ -3764,6 +3857,119 @@ check("kyc: a valid jurisdiction file loads grey/high tiers",
 check("kyc: an alias never resurrects a jurisdiction the file no longer lists",
       "burma" not in _jr and "islamic republic of iran" not in _jr)
 
+print("kyc — public-source country indicators (context only, never scored)")
+import re as _re_ci
+check("kyc: an absent country-indicators file degrades to {} silently",
+      kyc.load_country_indicators(os.path.join(_hdir, "nope.json")) == {})
+_err = _io.StringIO()
+with _ctx.redirect_stderr(_err):
+    _ci_bad = kyc.load_country_indicators(_bad)
+check("kyc: a corrupt country-indicators file degrades to {} AND warns loudly",
+      _ci_bad == {} and "WARN" in _err.getvalue())
+_ci_path = os.path.join(ROOT, "data", "country-indicators.json")
+_ci_doc = json.load(open(_ci_path, encoding="utf-8"))
+_ci = kyc.load_country_indicators(_ci_path)
+check("country indicators: every indicator names its publisher, edition, date and https source",
+      all(v.get("publisher") and v.get("edition") and v.get("published") and v.get("source", "").startswith("https://")
+          for v in _ci_doc["indicators"].values()))
+_app_countries = {c["name"] for c in json.loads(
+    _re_ci.search(r"const COUNTRIES = (\[.*?\]);", open(os.path.join(ROOT, "app.js"), encoding="utf-8").read()).group(1))}
+_ci_entries = (_ci_doc["indicators"]["incsr_major_ml"]["jurisdictions"]
+               + [e for t in _ci_doc["indicators"]["tip_tier"]["tiers"].values() for e in t]
+               + _ci_doc["indicators"]["eu_tax_noncooperative"]["jurisdictions"])
+_ci_unmapped = sorted({e["app"] for e in _ci_entries} - _app_countries)
+check("country indicators: every `app` name is a COUNTRIES name in app.js: " + ", ".join(_ci_unmapped),
+      not _ci_unmapped)
+check("country indicators: no KnowYourCountry or OC Index content is stored",
+      not _re_ci.search(r"knowyourcountry|ocindex", json.dumps(_ci_doc["indicators"]), _re_ci.I))
+check("country indicators: source and app spellings and aliases both resolve (Türkiye / Turkey; Burma / Myanmar)",
+      _ci.get("türkiye") == _ci.get("turkey") and _ci.get("turkey")
+      and any("Tier 3" in x for x in _ci.get("burma", [])) and _ci.get("burma") == _ci.get("myanmar"))
+check("country indicators: Tier 1 and Tier 2 are not shown as context",
+      not any("TIP" in x or "Trafficking" in x for x in _ci.get("united kingdom", [])))
+_ci_lines = kyc.country_indicators_for("Papua New Guinea", ["Russian Federation"], _ci)
+check("country indicators: country and nationality both contribute labelled lines",
+      any(x.startswith("Papua New Guinea: ") and "Tier 3" in x for x in _ci_lines)
+      and any(x.startswith("Russian Federation: ") and "EU tax" in x for x in _ci_lines))
+check("country indicators: a jurisdiction on no list yields no context",
+      kyc.country_indicators_for("Iceland", [], _ci) == [])
+_rr_src = open(os.path.join(ROOT, "ai.py"), encoding="utf-8").read()
+check("country indicators never feed the risk rating (ai.py does not read them)",
+      "country_indicators" not in _rr_src and "country-indicators" not in _rr_src)
+_fe = _ci_doc["indicators"]["fatf_effectiveness"]
+_fe_bad = [e.get("published") for e in _fe["jurisdictions"]
+           if len(e["io"].split()) != 11 or set(e["io"].split()) - {"HE", "SE", "ME", "LE"}
+           or e["high_or_substantial"] != sum(x in ("HE", "SE") for x in e["io"].split())
+           or not _re_ci.match(r"^\d{4}-\d{2}$", e["date"])]
+check("FATF effectiveness: 11 HE/SE/ME/LE ratings per row and the HE+SE count matches: " + ", ".join(map(str, _fe_bad)),
+      not _fe_bad and len(_fe["jurisdictions"]) >= 190)
+_fe_unmapped = sorted({e["app"] for e in _fe["jurisdictions"]} - _app_countries)
+_fe_apps = [e["app"] for e in _fe["jurisdictions"]]
+check("FATF effectiveness: every `app` name is a COUNTRIES name, once: " + ", ".join(_fe_unmapped),
+      not _fe_unmapped and len(_fe_apps) == len(set(_fe_apps)))
+check("FATF effectiveness: carries the CC BY 4.0 citation and the FATF adaptation disclaimer",
+      "CC BY 4.0" in _fe["licence"] and "This is an adaptation of an original work by the Financial Action Task Force" in _fe["licence"])
+check("FATF effectiveness: Türkiye's September 2026 MER (2022 Methodology) supersedes the 2019 one",
+      any(e["app"] == "Turkey" and e["date"] == "2026-09" and e["methodology"] == "2022" for e in _fe["jurisdictions"]))
+
+print("kyc — suggested country score (DRAFT, pending MLRO approval, never scored)")
+check("kyc: an absent suggested-country-score file degrades to {} silently",
+      kyc.load_suggested_country_scores(os.path.join(_hdir, "nope.json")) == {})
+_err = _io.StringIO()
+with _ctx.redirect_stderr(_err):
+    _sc_bad = kyc.load_suggested_country_scores(_bad)
+check("kyc: a corrupt suggested-country-score file degrades to {} AND warns loudly",
+      _sc_bad == {} and "WARN" in _err.getvalue())
+_sc_path = os.path.join(ROOT, "data", "country-score-suggested.json")
+_sc_doc = json.load(open(_sc_path, encoding="utf-8"))
+_sc = kyc.load_suggested_country_scores(_sc_path, _ci_path)
+check("suggested score: one row per COUNTRIES name, each with the current app score",
+      sorted(r["country"] for r in _sc_doc["countries"]) == sorted(_app_countries)
+      and all(r["current"] == c["score"] for c in json.loads(_re_ci.search(r"const COUNTRIES = (\[.*?\]);",
+              open(os.path.join(ROOT, "app.js"), encoding="utf-8").read()).group(1))
+              for r in _sc_doc["countries"] if r["country"] == c["name"]))
+# Re-derive every row from the inputs in Python, so the Node generator and the
+# written method can never drift apart silently.
+_jr = json.load(open(os.path.join(ROOT, "data", "jurisdiction-risk.json"), encoding="utf-8"))
+_fe_by = {e["app"]: e["high_or_substantial"] for e in _fe["jurisdictions"]}
+_inc = {e["app"] for e in _ci_doc["indicators"]["incsr_major_ml"]["jurisdictions"]}
+_tip = {e["app"]: t for t, l in _ci_doc["indicators"]["tip_tier"]["tiers"].items() for e in l}
+_eut = {e["app"] for e in _ci_doc["indicators"]["eu_tax_noncooperative"]["jurisdictions"]}
+
+
+def _sc_expect(name):
+    if name in _jr["high"] or name in _jr["grey"]:
+        return 3
+    if name not in _fe_by:
+        return None
+    n = _fe_by[name]
+    pts = (3 if n <= 1 else 2 if n <= 3 else 1 if n <= 6 else 0) + (2 if name in _inc else 0) \
+        + {"Tier 3": 2, "Tier 2 Watch List": 1}.get(_tip.get(name), 0) + (1 if name in _eut else 0)
+    return 1 if pts <= 2 else 2 if pts <= 5 else 3
+
+
+_sc_wrong = [r["country"] for r in _sc_doc["countries"] if r["suggested"] != _sc_expect(r["country"])]
+check("suggested score: every row matches the written method re-derived in Python: " + ", ".join(_sc_wrong[:10]),
+      not _sc_wrong)
+check("suggested score: every FATF call-for-action or grey-list country is suggested 3",
+      all(_sc[kyc._norm(n)]["suggested"] == 3 for n in _jr["high"] + _jr["grey"]))
+check("suggested score: Turkey 2, India 2, Papua New Guinea 3 (grey list)",
+      _sc["turkey"]["suggested"] == 2 and _sc["india"]["suggested"] == 2
+      and _sc["papua new guinea"]["suggested"] == 3 and _sc["papua new guinea"]["basis"] == "fatf-grey-list")
+check("suggested score: the publisher spelling resolves to the app row (Türkiye / Turkey)",
+      _sc.get("türkiye") is _sc.get("turkey"))
+check("suggested score: a jurisdiction FATF has not rated gets no suggestion and no report line",
+      _sc["greenland"]["suggested"] is None and kyc.suggested_country_score_for("Greenland", [], _sc) == [])
+_sc_lines = kyc.suggested_country_score_for("Turkey", ["India", "Türkiye"], _sc)
+check("suggested score: country and nationality lines show suggested vs current with the reasons, once per country",
+      len(_sc_lines) == 2 and _sc_lines[0].startswith("Turkey: suggested 2 vs current 2 (FATF effectiveness")
+      and _sc_lines[1].startswith("India: suggested 2 vs current 2"))
+check("suggested score: the method is marked DRAFT pending MLRO approval and names no CPI or commercial report input",
+      "DRAFT" in _sc_doc["method"]["status"] and "MLRO" in _sc_doc["method"]["status"]
+      and not _re_ci.search(r"knowyourcountry|ocindex|transparency\.org", json.dumps(_sc_doc), _re_ci.I))
+check("suggested score never feeds the risk rating (ai.py does not read it)",
+      "suggested_country" not in _rr_src and "country-score-suggested" not in _rr_src)
+
 print("screen — EOCN review-age gate (manual-review currency on the TFS list)")
 import datetime as _dt_rev
 _rev_today = _dt_rev.date(2026, 7, 15)
@@ -4958,6 +5164,26 @@ for _ in range(ai.LLM_BREAKER_AFTER * 2):
 check("a fast 500 likewise does not trip it (reachable, and cheap)",
       not ai.llm_circuit_open())
 
+# A CREDIT/USAGE-LIMIT refusal is final for the run: stop at the first one
+# rather than repeat it for every article (557 of 557 on 21 Sep 2026).
+_reset_llm()
+_hits = {"n": 0}
+def _capped(*a, **k):
+    _hits["n"] += 1
+    return _Reply(400, '{"type":"error","error":{"type":"invalid_request_error",'
+                       '"message":"Your credit balance is too low to access the Anthropic API."}}')
+_req.post = _capped
+for _ in range(20):
+    ai.llm_complete("x")
+check("a credit-limit refusal opens the circuit after ONE call", ai.llm_circuit_open() and _hits["n"] == 1)
+check("the remaining calls are skipped and disclosed",
+      ai.LLM_CALLS["skipped"] == 19 and ai.LLM_CALLS["failed"] == 1)
+_lt, ai.LLM_TRIAGE = ai.LLM_TRIAGE, True
+check("the footer names the refusal, not an outage",
+      "refused the key" in ai.governance_footer() and "HTTP 400" in ai.governance_footer())
+ai.LLM_TRIAGE = _lt
+ai._LLM_STATE["reason"] = ""
+
 # An INTERMITTENT outage must never trip it: a reply in between re-arms.
 _reset_llm()
 _seq = {"n": 0}
@@ -5021,6 +5247,8 @@ def _mon_section(llm_calls):
 _mon = _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 12})
 check("the report discloses the open AI circuit and the skipped count",
       "AI circuit OPEN" in _mon and "12 model call(s) skipped" in _mon)
+check("the report shows how many verdicts were reused from the cache",
+      "7 reused from cache" in _mon_section({"attempted": 3, "ok": 3, "failed": 0, "skipped": 0, "cached": 7}))
 check("a run that never tripped the breaker carries no circuit warning",
       "AI circuit OPEN" not in _mon_section({"attempted": 5, "ok": 5, "failed": 0, "skipped": 0}))
 

@@ -6195,6 +6195,15 @@ def stale_core_lists(list_meta, today=None, max_age=None):
             out.append((k, age))
     return sorted(out)
 
+def degraded_core_lists(list_meta, today=None):
+    """Core lists payment screening must treat as degraded: not loaded, or
+    loaded but older than the age limit. Counting only empty lists let a
+    99-day-old OFAC file clear every payment as NO MATCH while the main report
+    flagged the same list as stale."""
+    down = [k.upper() for k, v in (list_meta or {}).items()
+            if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
+    return down + [f"{k.upper()} (stale {a}d)" for k, a in stale_core_lists(list_meta, today)]
+
 # EU FSF is the one core list whose PRIMARY is the OpenSanctions host (webgate's
 # exports drift formats; the mirror's simple shape is what every parser here
 # shares) — so its fallback runs the OTHER way: official webgate XML, with the
@@ -6739,6 +6748,11 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             jur = m.get("jurisdiction") or {}
             if jur.get("reason"):
                 A(f"   Jurisdiction (R.10): {jur['reason']}")
+            if m.get("country_indicators"):
+                A(f"   Country context (not scored): {'; '.join(m['country_indicators'])}")
+            if m.get("suggested_country_score"):
+                A("   Suggested country score (draft method, pending MLRO approval; "
+                  f"not applied): {'; '.join(m['suggested_country_score'])}")
             if m.get("arrangement"):
                 A(f"   Legal arrangement (R.25): {m['arrangement']} — every party screened; "
                   "a sanctioned/PEP party flags the arrangement.")
@@ -8367,10 +8381,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                     log(f"  WARN triage failed for an article ({safe_err(e)}) — deterministic verdict stands")
                     _art["triage"] = {"severity": "LOW", "relevance": "LOW",
                                       "confidence": "LOW", "ai": False}
+    ai.save_triage_cache()  # persisted via the encrypted screen-delta-state branch
     injection_blocked = sum(1 for _n, _a in _triage_work
                             if (_a.get("triage") or {}).get("injection_suspected"))
     pep_links = {p.get("permalink", "") for p in pep_findings}
     jtable = kyc.load_jurisdiction_risk()   # FATF R.10 jurisdiction-risk (maintained list)
+    ctable = kyc.load_country_indicators()  # sourced public indicators (context only, not scored)
+    stable = kyc.load_suggested_country_scores()  # DRAFT suggested country score (display only, pending MLRO)
     _summary_work = []
     for m in possible_matches:
         link = m.get("permalink", "")
@@ -8396,6 +8413,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         nationalities = [i.get("nationality", "") for i in kyc_data.get("individuals", [])]
         jtier, jreason = kyc.jurisdiction_risk_for(m.get("country", ""), nationalities, jtable)
         m["jurisdiction"] = {"tier": jtier, "reason": jreason}
+        m["country_indicators"] = kyc.country_indicators_for(m.get("country", ""), nationalities, ctable)
+        m["suggested_country_score"] = kyc.suggested_country_score_for(m.get("country", ""), nationalities, stable)
         # R.25 — legal-arrangement (trust/foundation/partnership) flag
         m["arrangement"] = kyc_data.get("arrangement_type", "") if kyc_data.get("is_arrangement") else ""
         cdd_gap_count = sum(len(i.get("cdd_gaps", [])) for i in kyc_data.get("individuals", []))
@@ -8530,8 +8549,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         _pay_cfg = _file_cfg or bool(ASANA_PAYMENTS_SECTION_GID)
         _pay_res = None
         if _pay_cfg:
-            _core_down = [k.upper() for k, v in list_meta.items()
-                          if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
+            _core_down = degraded_core_lists(list_meta, run_time)
             _pay_res = payment_screen.screen_feed(
                 _pay_records, all_lists,
                 jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down,
