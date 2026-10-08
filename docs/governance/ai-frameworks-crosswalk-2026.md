@@ -4,8 +4,11 @@ Maps three external AI-ethics/governance frameworks to the controls
 already implemented in this system, so their principles are demonstrably covered
 (not just asserted). Complements the regulatory/standards crosswalks:
 [`nist-ai-rmf-mapping-2026.md`](nist-ai-rmf-mapping-2026.md),
-[`iso-42001-soa-2026.md`](iso-42001-soa-2026.md), and
-[`uae-ai-charter-mapping-2026.md`](uae-ai-charter-mapping-2026.md).
+[`iso-42001-soa-2026.md`](iso-42001-soa-2026.md),
+[`uae-ai-charter-mapping-2026.md`](uae-ai-charter-mapping-2026.md), and
+[`ai-rulebooks-crosswalk-2026.md`](ai-rulebooks-crosswalk-2026.md) (ISO/IEC 27001,
+OSFI E-23, California SB 53, OWASP LLM/Agentic Top 10 and the other rulebooks
+not assessed in this document).
 
 **Owner:** MLRO · Compliance Engineering · **Date:** 2026-06-30 ·
 **Updated:** 2026-07-28 (§C added) ·

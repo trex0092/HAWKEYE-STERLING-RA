@@ -41,6 +41,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | [uae-ai-charter-mapping-2026.md](uae-ai-charter-mapping-2026.md) | 12-principle mapping | UAE AI Charter |
 | [uae-ai-data-laws-2026.md](uae-ai-data-laws-2026.md) | 2026 UAE AI/data-law applicability + Data Office top-10 violation posture map | UAE PDPL; FDL 34/2021; Data Office |
 | [ai-frameworks-crosswalk-2026.md](ai-frameworks-crosswalk-2026.md) | FAST/SUM values + responsible-AI lifecycle orientation | Turing FAST/SUM; EU AI Act |
+| [ai-rulebooks-crosswalk-2026.md](ai-rulebooks-crosswalk-2026.md) | Applicability determinations + control mapping for the rulebooks not assessed elsewhere; transaction-monitoring workflow vs reference model; gap list | ISO/IEC 27001 / 23894 / 42005 / 22989; OSFI E-23; CA SB 53; EU AI Act Arts. 68–69; OWASP LLM + Agentic Top 10; NIS2/DORA/CRA |
 | [agentic-ai-governance-6layers-2026.md](agentic-ai-governance-6layers-2026.md) | Six-layer agentic-AI governance scorecard (incl. Layer 5 human oversight) | Practitioner framework |
 | [enterprise-ai-governance-6layers-2026.md](enterprise-ai-governance-6layers-2026.md) | Enterprise six-layer crosswalk: Policy → Roles → Risk → Data/Model → Monitoring → Audit, mapped to repository evidence | Practitioner enterprise-governance view |
 | [enterprise-ai-governance-dashboard.md](enterprise-ai-governance-dashboard.md) | Generated six-layer status dashboard, including partial/open controls and live GRC signals | Evidence-derived management view |

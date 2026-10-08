@@ -41,12 +41,16 @@ def _validated(plan):
     for item in steps:
         if not isinstance(item, dict) or set(item) != {"tool", "arguments"}:
             raise WorkflowDenied("each step needs only tool and arguments")
-        if item["tool"] not in ALLOWED_TOOLS or not isinstance(item["arguments"], dict):
+        # Type-check before the set lookup: an unhashable tool (list/dict) would
+        # otherwise raise TypeError instead of a fail-closed denial.
+        if (not isinstance(item["tool"], str) or item["tool"] not in ALLOWED_TOOLS
+                or not isinstance(item["arguments"], dict)):
             raise WorkflowDenied("tool not in the approved read-only allowlist")
         try:
             arg_bytes = json.dumps(item["arguments"], ensure_ascii=False,
                                    sort_keys=True, allow_nan=False).encode("utf8")
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, RecursionError):
+            # RecursionError: pathologically nested arguments are a denial too.
             raise WorkflowDenied("arguments not valid JSON")
         if len(arg_bytes) > MAX_ARG_BYTES:
             raise WorkflowDenied("tool argument budget exceeded")
