@@ -398,7 +398,7 @@ def _triage_cache_load():
         _TRIAGE_CACHE["entries"] = {k: v for k, v in ents.items()
                                     if isinstance(v, dict) and "severity" in v}
     except FileNotFoundError:
-        pass
+        pass  # first run (or cache disabled upstream): start with an empty cache
     except Exception as e:
         print(f"  WARN AI triage cache unreadable ({type(e).__name__}) — starting empty; "
               "every headline is sent to the model this run (cost, not coverage)", flush=True)
