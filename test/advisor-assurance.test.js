@@ -24,6 +24,7 @@ function check(name, cond) {
 
 const brain = require(MOD);
 const I = brain.__internals;
+const DATA_BOUNDARY = require(path.join(__dirname, '..', 'netlify', 'functions', '_data-boundary.js'));
 
 console.log('\n— Advisor assurance test (charter integrity · tipping-off red-team · routing) —\n');
 
@@ -414,6 +415,83 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   r = await call(POST({ question: 'Screen UBO with Emirates ID 784-1987-7103817-5.' }), 'test-key');
   b = JSON.parse(r.body);
   check('handler: PII in input is flagged (not blocked)', r.statusCode === 200 && b.ok === true && Array.isArray(b.piiFlagged) && b.piiFlagged.includes('emirates_id') && /pii=emirates_id/.test(b.auditLine));
+
+
+  // 6j-bis. Pre-egress policy is server-selected; every departure path is checked
+  // before the Anthropic API sees it, including deep continuation text.
+  let gate = DATA_BOUNDARY.inspectEgress({
+    question: 'Check passport V9088805',
+    context: 'IBAN AE070331234567890123456',
+    accumulated: 'No additional data'
+  }, 'block');
+  check('PII boundary blocks passport and IBAN without returning input',
+    gate.valid && gate.allow === false && gate.piiTypes.includes('passport') &&
+    gate.piiTypes.includes('iban') && !JSON.stringify({ piiTypes: gate.piiTypes }).includes('V9088805'));
+  gate = DATA_BOUNDARY.inspectEgress({
+    question: 'Emirates ID 784-1987-7103817-5',
+    context: 'IBAN AE070331234567890123456',
+    accumulated: 'Passport V9088805'
+  }, 'redact');
+  check('PII boundary redacts identifiers in question, context and assistant prefill',
+    gate.allow && gate.redacted && !JSON.stringify([gate.question, gate.context, gate.accumulated]).includes('784-1987-7103817-5') &&
+    !gate.context.includes('AE070331234567890123456') && !gate.accumulated.includes('V9088805') &&
+    gate.question.includes('[REDACTED_EMIRATES_ID]'));
+  check('PII boundary rejects unknown configuration fail-closed',
+    DATA_BOUNDARY.inspectEgress({ question: 'test' }, 'invalid').valid === false);
+
+  const originalBoundaryPolicy = process.env.ADVISOR_PII_EGRESS_POLICY;
+  try {
+    let externalCalls = 0;
+    process.env.ADVISOR_PII_EGRESS_POLICY = 'block';
+    mockFetch(async () => { externalCalls++; throw Error('forbidden egress'); });
+    r = await call(POST({
+      question: 'Review Emirates ID 784-1987-7103817-5',
+      context: 'Please advise.'
+    }, { 'x-nf-client-connection-ip': '203.0.113.201' }), 'test-key');
+    b = JSON.parse(r.body);
+    check('PII block policy returns 422 without making any provider call',
+      r.statusCode === 422 && externalCalls === 0 && b.piiEgressPolicy === 'block' &&
+      b.piiFlagged.includes('emirates_id') && !r.body.includes('784-1987-7103817-5'));
+
+    process.env.ADVISOR_PII_EGRESS_POLICY = 'redact';
+    let sent = null;
+    mockFetch(async (_url, opts) => {
+      externalCalls++;
+      sent = JSON.parse(opts.body);
+      return { ok: true, json: async () => ({ content: [{ type: 'text', text: 'Identifier removed.' }] }) };
+    });
+    r = await call(POST({
+      question: 'Review Emirates ID 784-1987-7103817-5',
+      context: 'Account AE070331234567890123456'
+    }, { 'x-nf-client-connection-ip': '203.0.113.202' }), 'test-key');
+    b = JSON.parse(r.body);
+    const sentText = sent && JSON.stringify(sent.messages);
+    check('PII redact policy strips identifier bytes before Anthropic request',
+      r.statusCode === 200 && b.ok === true && b.piiRedacted === true &&
+      b.piiFlagged.includes('emirates_id') && b.piiFlagged.includes('iban') &&
+      !!sentText && !sentText.includes('784-1987-7103817-5') &&
+      !sentText.includes('AE070331234567890123456'));
+    check('PII redact policy emits a reviewer-visible mode in response and audit',
+      b.piiEgressPolicy === 'redact' && /piiPolicy=redact/.test(b.auditLine));
+
+    process.env.ADVISOR_PII_EGRESS_POLICY = 'block';
+    r = await call(POST({
+      question: 'Continue analysis',
+      mode: 'deep', deepContinue: true, deepHop: 1,
+      deepAccumulated: 'Previously included passport V9088805'
+    }, { 'x-nf-client-connection-ip': '203.0.113.203' }), 'test-key');
+    check('PII block also protects assistant-prefill on deep continuation',
+      r.statusCode === 422 && externalCalls === 1);
+
+    process.env.ADVISOR_PII_EGRESS_POLICY = 'nonsense';
+    r = await call(POST({ question: 'Safe subject' },
+      { 'x-nf-client-connection-ip': '203.0.113.204' }), 'test-key');
+    check('invalid PII policy is a 503 without provider egress',
+      r.statusCode === 503 && externalCalls === 1);
+  } finally {
+    if (originalBoundaryPolicy === undefined) delete process.env.ADVISOR_PII_EGRESS_POLICY;
+    else process.env.ADVISOR_PII_EGRESS_POLICY = originalBoundaryPolicy;
+  }
 
   // 6k. Screening answer missing scope/gaps is structure-flagged
   mockFetch(async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'OFAC SDN screening: NO_MATCH, subject is clean.' }] }) }));
