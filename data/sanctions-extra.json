@@ -1024,6 +1024,17 @@
       "minNames": 30
     },
     {
+      "id": "ir-mfa-sanctions",
+      "name": "Iran — Ministry of Foreign Affairs sanctions list",
+      "jurisdiction": "Iran",
+      "url": "https://data.opensanctions.org/datasets/latest/ir_sanctions/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": false,
+      "_note": "STAGED 2026-10-08, kept disabled pending an MLRO policy decision (data/sanctions-country-coverage.json, Iran: requiresMlroPolicyDecision). Iran's Ministry of Foreign Affairs publishes a consolidated sanctions list at sanctionlist.mfa.ir (foreign, mainly US/UK/Israeli, persons and entities under Iran's 2017 and 2020 counter-sanctions laws). The OpenSanctions sanctions-collection catalogue (source-probe run 37772831908, 2026-10-08) lists it as dataset ir_sanctions, publisher 'Iran Ministry of Foreign Affairs', official, 405 entities, last change 2025-05-23. The issuer is on the FATF call-for-action list and its designations target foreign officials and firms, so whether to screen against it is a policy call, not an engineering one. Runner probe 37792821097 (2026-10-08): http 200, text/csv, 77,656 bytes; parser opensanctions read 412 names (e.g. Henry Jackson Society, RAYTHEON, Chevron Corporation, Richard Douglas Clarke); rows show last_seen 2026-10-02 (the mirror is current) and last_change 2025-05-23. The MLRO enables it by setting enabled: true; minNames 290 is about 70% of the probed count. Same CC-BY-NC terms and OPENSANCTIONS_DATA=0 switch as the other OpenSanctions-hosted national lists.",
+      "minNames": 290
+    },
+    {
       "id": "pl-giif-art118",
       "name": "Poland — GIIF list under art. 118 of the AML/CFT Act (Ministry of Finance)",
       "jurisdiction": "Poland",
