@@ -313,3 +313,28 @@ source citations (OA-5), authoritative source verification by counsel/MLRO,
 access and privacy design, retrieved-content prompt-injection testing and
 human sign-off. Retrieval output is untrusted data to a model, not a new
 instruction. Do not infer current law solely from a cached verification date.
+
+---
+
+## 8. Optional fleet-wide LLM quota adapter, NOT an active shared service
+
+`netlify/functions/_shared-quota.js` adds a disabled-by-default quota check
+to the billed Advisor endpoint after its existing per-instance limiter. It
+can only function if IT separately provisions and approves a reliable
+atomic-counter service and configures `SHARED_RATE_LIMIT_ENABLED=1`, a fixed
+HTTPS endpoint, server authorization secret and HMAC key. Each call sends an
+HMAC pseudonym derived from the server-observed client IP and operation,
+plus its limit and time window, not the raw IP, prompt or customer record.
+
+**Fail-closed:** invalid configuration, remote outage, malformed JSON,
+non-atomic/missing approval evidence or a rejected decision cannot be turned
+into an allow result; absent an explicit provider permit the endpoint returns
+HTTP 503 or 429. **The client cannot select quota configuration.** An HMAC
+IP key is still linkable pseudonymous data, so vendor contract, PDPL transfer,
+residency, retention and incident fallback require sign-off.
+
+This is a contract adapter and synthetic test coverage, **not evidence that
+a fleet-wide backend is deployed, that counters are atomic, or that OA-22
+is closed.** Production activation requires a real multi-instance load
+test, operational ownership and alerting for provider downtime.
+
