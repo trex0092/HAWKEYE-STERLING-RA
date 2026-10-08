@@ -5718,6 +5718,65 @@ check("gkg: findings are merged additively (dedupe by title/url) and the stream 
       and "GDELT 24-hour stream INCOMPLETE" in _src_gk)
 
 print()
+
+
+# -- Private transaction-feed completeness validation (never uses real data) --
+print("txn_feed.py - schema, completeness and integrity gates")
+import hashlib
+import tempfile
+import txn_feed
+
+def _txnfeed_error(fn):
+    try:
+        fn()
+    except txn_feed.FeedValidationError:
+        return True
+    return False
+
+with tempfile.TemporaryDirectory() as d:
+    feed_file = os.path.join(d, "synthetic.json")
+    manifest_file = os.path.join(d, "manifest.json")
+    sample = [{
+        "transaction_id": "synthetic-001", "customer": "EXAMPLE ONLY",
+        "date": "2026-10-01", "amount": 100.0, "currency": "AED",
+        "direction": "in", "method": "wire",
+    }]
+    raw = json.dumps(sample).encode("utf-8")
+    with open(feed_file, "wb") as f:
+        f.write(raw)
+    manifest = {
+        "schema": "hawkeye.txn-manifest/v1", "source_id": "synthetic-test",
+        "complete": True, "record_count": 1,
+        "window_start": "2026-10-01", "window_end": "2026-10-01",
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        json.dump(manifest, f)
+    check("valid complete AED transaction batch passes",
+          txn_feed.read_validated_feed(feed_file, manifest_file) == sample)
+    check("missing manifest fails closed", _txnfeed_error(
+          lambda: txn_feed.read_validated_feed(feed_file)))
+    check("manifest count mismatch fails closed", _txnfeed_error(
+          lambda: txn_feed.validate_batch(sample, {**manifest, "record_count": 2})))
+    check("incomplete manifest fails closed", _txnfeed_error(
+          lambda: txn_feed.validate_batch(sample, {**manifest, "complete": False})))
+    check("duplicate transaction IDs fail closed", _txnfeed_error(
+          lambda: txn_feed.validate_batch(sample * 2, {**manifest, "record_count": 2})))
+    check("invalid date fails closed", _txnfeed_error(
+          lambda: txn_feed.validate_batch([{**sample[0], "date": "2026-02-30"}], manifest)))
+    check("amount cannot silently coerce to zero", _txnfeed_error(
+          lambda: txn_feed.validate_batch([{**sample[0], "amount": "bad"}], manifest)))
+    check("non-AED feed is rejected pending approved conversion", _txnfeed_error(
+          lambda: txn_feed.validate_batch([{**sample[0], "currency": "USD"}], manifest)))
+    check("non-finite amount rejected", _txnfeed_error(
+          lambda: txn_feed.validate_batch([{**sample[0], "amount": float("nan")}], manifest)))
+    check("out-of-window transaction rejected", _txnfeed_error(
+          lambda: txn_feed.validate_batch([{**sample[0], "date": "2026-10-02"}], manifest)))
+    with open(feed_file, "wb") as f:
+        f.write(raw + b" ")
+    check("tampered raw export rejected by SHA-256 digest", _txnfeed_error(
+          lambda: txn_feed.read_validated_feed(feed_file, manifest_file)))
+
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
     sys.exit(1)
