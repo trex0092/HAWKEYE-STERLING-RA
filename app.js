@@ -2246,6 +2246,30 @@ function batchParseCsv(text){
 }
 function batchPick(o, keys){ for(const k of keys){ if(o[k]!=null && o[k]!=='') return o[k]; } return ''; }
 function batchYes(v){ return /^(y|yes|true|1)$/i.test(String(v==null?'':v).trim()); }
+/* Screening flags are tri-state. A blank or absent column, or a value that is
+   neither yes nor no ("Potential match", "unknown"), used to score as a clean
+   "No" with no note — an unscreened row read as screened. Absent is still
+   scored No but named in the notes; an unrecognised value is treated as Yes. */
+const BATCH_FLAGS = [
+  ['sanctions_entity', ['sanctions','sanctioned'], 'sanctions'],
+  ['pep', ['pep'], 'PEP'],
+  ['adverse', ['adverse','adverse media'], 'adverse media'],
+  ['tf', ['tf','terrorist','terrorism'], 'TF'],
+  ['pf', ['pf','proliferation'], 'PF'],
+];
+function batchNo(v){ return /^(n|no|false|0|none|nil|clear|negative)$/i.test(String(v==null?'':v).trim()); }
+function batchFlags(o){
+  const flags = {}, flagNotes = [], missing = [];
+  BATCH_FLAGS.forEach(([key, cols, label]) => {
+    const raw = batchPick(o, cols);
+    if(batchYes(raw)) flags[key] = 'Yes';
+    else if(batchNo(raw)) flags[key] = 'No';
+    else if(String(raw).trim()===''){ flags[key] = 'No'; missing.push(label); }
+    else { flags[key] = 'Yes'; flagNotes.push(label + ' value "' + String(raw).trim() + '" not recognised — treated as Yes; confirm'); }
+  });
+  if(missing.length) flagNotes.unshift(missing.join(', ') + ' not supplied — scored as No, not screened');
+  return { flags, flagNotes };
+}
 /* Map a raw CSV row (lower-cased keys) to the engine's input factors. */
 function mapBatchRow(o){
   o = o || {};
@@ -2257,13 +2281,7 @@ function mapBatchRow(o){
     onboard: /^(y|yes|true|1|remote|non.?face)/i.test(String(onboardRaw).trim()) ? 'Yes' : 'No',
     entityYears: batchPick(o, ['entityyears','entity years','years trading','operational history']),
     relYears: batchPick(o, ['relyears','relationship years','relationship duration']),
-    flags: {
-      sanctions_entity: batchYes(batchPick(o, ['sanctions','sanctioned'])) ? 'Yes' : 'No',
-      pep: batchYes(batchPick(o, ['pep'])) ? 'Yes' : 'No',
-      adverse: batchYes(batchPick(o, ['adverse','adverse media'])) ? 'Yes' : 'No',
-      tf: batchYes(batchPick(o, ['tf','terrorist','terrorism'])) ? 'Yes' : 'No',
-      pf: batchYes(batchPick(o, ['pf','proliferation'])) ? 'Yes' : 'No',
-    }
+    ...batchFlags(o)
   };
 }
 /* Score one mapped row through computeAssessment by temporarily swapping the
@@ -2281,6 +2299,7 @@ function scoreBatchRow(m){
     if(m.activity){ s.profile.activity = m.activity; if(!effOf('activities', m.activity)) notes.push('activity not in risk data — scored low'); }
     else notes.push('no activity provided — scored on the default');
     s.profile.onboard = m.onboard;
+    (m.flagNotes || []).forEach(n => notes.push(n));
     const ey = parseInt(m.entityYears, 10); if(!isNaN(ey)) s.profile.entityYears = ey;
     const ry = parseInt(m.relYears, 10); if(!isNaN(ry)) s.profile.relYears = ry;
     if(m.flags){ Object.keys(m.flags).forEach(k => { if(s.questions[k]!==undefined && m.flags[k]==='Yes') s.questions[k]='Yes'; }); }
@@ -2325,7 +2344,8 @@ function renderBatchResults(results){
   const body = results.map(r => {
     const label = r.prohibited ? 'PROHIBITED' : (r.outcome + ' · ' + r.total);
     const cls = batchOutcomeClass(r.prohibited ? 'PROHIBITED' : r.outcome);
-    const note = (r.notes && r.notes.length) ? r.notes.join('; ') : (r.escalations && r.escalations.length ? r.escalations.join('; ') : '');
+    /* Escalations first: a data-quality note must never hide why a row escalated. */
+    const note = (r.escalations || []).concat(r.notes || []).join('; ');
     return '<div class="batch-row">'
       + '<span class="batch-name">'+esc(r.name||'—')+'</span>'
       + '<span class="batch-jur">'+esc(r.jurisdiction||'—')+'</span>'
