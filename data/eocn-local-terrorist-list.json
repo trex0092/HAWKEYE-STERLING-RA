@@ -2,7 +2,7 @@
   "_README": "UAE EOCN Local Terrorist List — maintained in-repo because the Executive Office for Control & Non-Proliferation publishes it ONLY as PDF/Excel behind bot protection (no free machine-readable feed) and this repo is zero-dependency (cannot parse PDF/XLSX). Populate `entries` from the official download at https://www.uaeiec.gov.ae (Local Terrorist List). Each entry is either a plain string or { \"name\": \"…\", \"aliases\": [\"…\"] }. While `entries` is empty the screen reports UAE EOCN coverage as DEGRADED (incomplete) — it is never treated as a clean result. scripts/sanctions-watch.mjs can fingerprint the EOCN page so a change prompts an update here. Update procedure, reconciliation and evidence log: docs/aims/eocn-list-update-sop.md.",
   "source": "https://www.uaeiec.gov.ae (EOCN Local Terrorist List, official PDF)",
   "list": "UAE Local Terrorist List (Cabinet / EOCN designations)",
-  "lastReviewed": "2026-10-05",
+  "lastReviewed": "2026-10-08",
   "populated": true,
   "entries": [
     "KHALIFA MOHD T AL SUBAEY",
@@ -2178,5 +2178,5 @@
   ],
   "note": "Extracted from the official EOCN Local Terrorist List PDF. Includes the LISTED individuals, organizations and entities only; the DELISTED (removed) sections of the PDF are intentionally excluded. Refresh when EOCN amends the list. Arabic-script aliases are omitted (the current matcher normalises to Latin characters).",
   "count": 619,
-  "lastReviewedEvidence": "2026-10-05 reconciliation prepared by eocn-reconcile.yml (run 37305063840): cross-checked against the OpenSanctions ae_local_terrorists mirror (616 designations, sha256 3e0f960f0e684b44…). No divergence — the local list already covers every mirror designation. Mirror-derived, pending MLRO confirmation against the official EOCN publication (https://www.uaeiec.gov.ae): merging this branch to main records that review."
+  "lastReviewedEvidence": "2026-10-08 reconciliation prepared by eocn-reconcile.yml (run 37770796089): cross-checked against the OpenSanctions ae_local_terrorists mirror (616 designations, sha256 a3e44c285f2e9218…). No divergence — the local list already covers every mirror designation. Mirror-derived, pending MLRO confirmation against the official EOCN publication (https://www.uaeiec.gov.ae): merging this branch to main records that review."
 }
