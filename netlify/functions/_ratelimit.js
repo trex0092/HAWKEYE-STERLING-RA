@@ -17,9 +17,11 @@
    So this limiter is a per-instance best-effort throttle — it stops a single
    client from hammering one warm instance (the common brute-force / runaway-
    script case) but is NOT a globally consistent quota across the whole fleet.
-   For hard, distributed enforcement put a shared store in front:
-     • Netlify Edge rate limiting (recommended, platform-native), or
-     • a tiny Upstash Redis INCR keyed by the same `name|ip`.
+   For hard distributed enforcement the Advisor can opt into the separate,
+   fail-closed _shared-quota.js adapter, which requires an independently
+   provisioned and approved ATOMIC shared counter backend.
+   This in-instance limiter still applies even when that adapter is enabled.
+   Do not claim fleet-wide quotas are live without backend activation evidence.
    The limits here are env-tunable so they can be tightened without a redeploy. */
 
 /* key: "name|ip" → array of request timestamps (ms) inside the current window. */
