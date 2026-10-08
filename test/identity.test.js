@@ -10,6 +10,8 @@ const reviewGate = require(path.join(__dirname, '..', 'netlify', 'functions', '_
 
 const mirror = require(path.join(__dirname, '..', 'netlify', 'functions', 'asana-mirror.js'));
 const riskBackup = require(path.join(__dirname, '..', 'netlify', 'functions', 'risk-backup.js'));
+const asanaTask = require(path.join(__dirname, '..', 'netlify', 'functions', 'asana-task.js'));
+const brainSoul = require(path.join(__dirname, '..', 'netlify', 'functions', 'brain-soul.js'));
 
 const envNames = [
   'APP_OIDC_REQUIRED', 'APP_OIDC_ISSUER', 'APP_OIDC_AUDIENCE',
@@ -192,6 +194,39 @@ function event(token, body) {
     result = await riskBackup.handler(event(valid, { sheet: { overrides: {} } }));
     check('only Admin can write risk overrides',
       result.statusCode === 403 && asanaFetches === 0);
+
+    // Extend signed OIDC enforcement to the other sensitive live Netlify
+    // handlers. We never call the actual Asana or Anthropic APIs in tests.
+    result = await asanaTask.handler(event(null, { name: 'Synthetic assessment' }));
+    check('regulated assessment task write requires a signed bearer when OIDC enabled',
+      result.statusCode === 401 && asanaFetches === 0);
+    result = await asanaTask.handler(event(analyst, { name: 'Synthetic assessment' }));
+    check('Analyst is not permitted to complete/write regulated assessment tasks',
+      result.statusCode === 403 && asanaFetches === 0);
+    const spoofed = event(null, { name: 'Synthetic assessment' });
+    spoofed.headers['x-app-role'] = 'Admin';
+    spoofed.headers['x-user-role'] = 'Reviewer-MLRO';
+    result = await asanaTask.handler(spoofed);
+    check('forged browser-side role headers never bypass Asana task identity',
+      result.statusCode === 401 && asanaFetches === 0);
+
+    result = await brainSoul.handler(event(null, { question: 'Synthetic AML question' }));
+    check('Advisor rejects anonymous model requests before any external call',
+      result.statusCode === 401 && asanaFetches === 0);
+    result = await brainSoul.handler(event(tampered, { question: 'Synthetic AML question' }));
+    check('Advisor rejects tampered identity token rather than making an LLM call',
+      result.statusCode === 401 && asanaFetches === 0);
+    const asanaCors = await asanaTask.handler({
+      httpMethod: 'OPTIONS', headers: { origin: 'https://hawkeye-sterling-ra.netlify.app' }
+    });
+    check('Asana task CORS advertises Authorization only to the configured origin',
+      asanaCors.headers && /Authorization/.test(asanaCors.headers['Access-Control-Allow-Headers'] || ''));
+    const advisorCors = await brainSoul.handler({
+      httpMethod: 'OPTIONS', headers: { origin: 'https://hawkeye-sterling-ra.netlify.app' }
+    });
+    check('Advisor CORS advertises Authorization for approved sign-in clients',
+      advisorCors.headers && /Authorization/.test(advisorCors.headers['Access-Control-Allow-Headers'] || ''));
+
 
     delete process.env.APP_OIDC_AUDIENCE;
     const configError = await identity.requireIdentityRole(event(valid), ['Admin']);
