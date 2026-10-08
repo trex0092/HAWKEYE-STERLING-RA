@@ -15,6 +15,7 @@
     ],
     "bands": "0-2 pts = 1 Low, 3-5 pts = 2 Medium, 6-8 pts = 3 High (the bands of the proposal the user approved; dropping the 2-point CPI factor lowers the maximum from 10 to 8)",
     "not_rated": "No suggestion when FATF has not rated the jurisdiction and it is not FATF-listed: the effectiveness factor carries most of the weight, so a score without it would mislead.",
+    "applied": "2026-10-08: the 17 suggestions above the then-current score were applied to COUNTRIES on the approval of Luisa Fernanda (repository owner); no separate MLRO countersignature is recorded. The 53 lower suggestions were not applied (see lower_than_current). Later differences are suggestions only again.",
     "lower_than_current": "A suggestion below the current score is not a recommendation to lower it: the method has no sanctions factor yet, and the MLRO may have reasons the method does not see."
   },
   "inputs": {
@@ -25,8 +26,8 @@
   },
   "summary": {
     "countries": 245,
-    "same": 134,
-    "higher": 17,
+    "same": 151,
+    "higher": 0,
     "lower": 53,
     "not_rated": 41
   },
@@ -239,7 +240,7 @@
     },
     {
       "country": "Barbados",
-      "current": 2,
+      "current": 3,
       "suggested": 3,
       "points": 6,
       "basis": "points",
@@ -248,7 +249,7 @@
         "US INCSR major money-laundering jurisdiction: 2 pts",
         "US TIP Tier 2 Watch List: 1 pt"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Belarus",
@@ -264,7 +265,7 @@
     },
     {
       "country": "Belgium",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 4,
       "basis": "points",
@@ -272,7 +273,7 @@
         "FATF effectiveness 2 of 11 High/Substantial (MER 2025-12, FATF): 2 pts",
         "US INCSR major money-laundering jurisdiction: 2 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Belize",
@@ -310,14 +311,14 @@
     },
     {
       "country": "Bhutan",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 3,
       "basis": "points",
       "factors": [
         "FATF effectiveness 0 of 11 High/Substantial (MER+FUR(s) 2023-08, APG): 3 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Bolivia",
@@ -470,7 +471,7 @@
     },
     {
       "country": "Canada",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 3,
       "basis": "points",
@@ -478,11 +479,11 @@
         "FATF effectiveness 6 of 11 High/Substantial (MER 2026-09, FATF): 1 pt",
         "US INCSR major money-laundering jurisdiction: 2 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Cape Verde",
-      "current": 2,
+      "current": 3,
       "suggested": 3,
       "points": 6,
       "basis": "points",
@@ -491,7 +492,7 @@
         "US INCSR major money-laundering jurisdiction: 2 pts",
         "US TIP Tier 2 Watch List: 1 pt"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Cayman Islands",
@@ -541,7 +542,7 @@
     },
     {
       "country": "China",
-      "current": 2,
+      "current": 3,
       "suggested": 3,
       "points": 6,
       "basis": "points",
@@ -550,7 +551,7 @@
         "US INCSR major money-laundering jurisdiction: 2 pts",
         "US TIP Tier 3: 2 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Christmas Island",
@@ -773,7 +774,7 @@
     },
     {
       "country": "El Salvador",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 5,
       "basis": "points",
@@ -781,7 +782,7 @@
         "FATF effectiveness 1 of 11 High/Substantial (MER 2024-08, GAFILAT): 3 pts",
         "US INCSR major money-laundering jurisdiction: 2 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Equatorial Guinea",
@@ -963,7 +964,7 @@
     },
     {
       "country": "Germany",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 3,
       "basis": "points",
@@ -971,7 +972,7 @@
         "FATF effectiveness 4 of 11 High/Substantial (MER+FUR(s) 2023-12, FATF): 1 pt",
         "US INCSR major money-laundering jurisdiction: 2 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Ghana",
@@ -1158,14 +1159,14 @@
     },
     {
       "country": "Iceland",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 3,
       "basis": "points",
       "factors": [
         "FATF effectiveness 1 of 11 High/Substantial (MER+FUR(s) 2021-09, FATF): 3 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "India",
@@ -1453,14 +1454,14 @@
     },
     {
       "country": "Lithuania",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 3,
       "basis": "points",
       "factors": [
         "FATF effectiveness 1 of 11 High/Substantial (MER+FUR(s) 2023-12, MONEYVAL): 3 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Luxembourg",
@@ -1475,7 +1476,7 @@
     },
     {
       "country": "Macau",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 5,
       "basis": "points",
@@ -1484,7 +1485,7 @@
         "US INCSR major money-laundering jurisdiction: 2 pts",
         "US TIP Tier 3: 2 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Madagascar",
@@ -1589,14 +1590,14 @@
     },
     {
       "country": "Mauritius",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 3,
       "basis": "points",
       "factors": [
         "FATF effectiveness 0 of 11 High/Substantial (MER+FUR(s) 2023-01, ESAAMLG): 3 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Mayotte",
@@ -2279,7 +2280,7 @@
     },
     {
       "country": "South Africa",
-      "current": 2,
+      "current": 3,
       "suggested": 3,
       "points": 6,
       "basis": "points",
@@ -2288,7 +2289,7 @@
         "US INCSR major money-laundering jurisdiction: 2 pts",
         "US TIP Tier 2 Watch List: 1 pt"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "South Korea",
@@ -2349,7 +2350,7 @@
     },
     {
       "country": "St Lucia",
-      "current": 2,
+      "current": 3,
       "suggested": 3,
       "points": 6,
       "basis": "points",
@@ -2358,11 +2359,11 @@
         "US INCSR major money-laundering jurisdiction: 2 pts",
         "US TIP Tier 2 Watch List: 1 pt"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "St Maarten",
-      "current": 2,
+      "current": 3,
       "suggested": 3,
       "points": 7,
       "basis": "points",
@@ -2371,7 +2372,7 @@
         "US INCSR major money-laundering jurisdiction: 2 pts",
         "US TIP Tier 3: 2 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "St Vincent & Gren",
@@ -2652,7 +2653,7 @@
     },
     {
       "country": "United Arab Emirates",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 5,
       "basis": "points",
@@ -2660,7 +2661,7 @@
         "FATF effectiveness 1 of 11 High/Substantial (MER+FUR(s) 2023-07, MENAFATF): 3 pts",
         "US INCSR major money-laundering jurisdiction: 2 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "United Kingdom",
@@ -2698,14 +2699,14 @@
     },
     {
       "country": "Uruguay",
-      "current": 1,
+      "current": 2,
       "suggested": 2,
       "points": 3,
       "basis": "points",
       "factors": [
         "FATF effectiveness 0 of 11 High/Substantial (MER 2020-01, GAFILAT): 3 pts"
       ],
-      "compare": "higher"
+      "compare": "same"
     },
     {
       "country": "Uzbekistan",
