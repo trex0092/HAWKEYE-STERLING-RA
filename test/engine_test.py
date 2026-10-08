@@ -991,6 +991,16 @@ _nobn = payment_screen.parse_mt103(_mt103.replace("1/ACME GENERAL TRADING LLC\n"
 _r16 = payment_screen.screen_payment(_nobn, _ps_lists, **_ps_kw)
 check("a missing beneficiary name is REVIEW — INCOMPLETE (R.16)",
       _r16["outcome"] == "REVIEW — INCOMPLETE (R.16)" and _r16["r16_missing"])
+_short = payment_screen.parse_mt103(_mt103.replace("ACME GENERAL TRADING LLC", "LI")
+                                    .replace("INTMIRTHXXX", "INTMGB2LXXX"))
+_rs = payment_screen.screen_payment(_short, _ps_lists, **_ps_kw)
+check("a supplied party name too short to match is REVIEW — NAME NOT AUTO-SCREENABLE, never NO MATCH",
+      _rs["outcome"] == "REVIEW — NAME NOT AUTO-SCREENABLE" and _rs["severity"] == "HIGH"
+      and _rs["unscreenable"] == ["Beneficiary"]
+      and any("not auto-screenable" in f for f in _rs["findings"]))
+_rsx = payment_screen.screen_payment(_clean, _ps_lists, unscreenable=lambda n: "HARMLESS" in n, **_ps_kw)
+check("the injected unscreenable test also routes a name to manual review (mixed-script net)",
+      _rsx["outcome"] == "REVIEW — NAME NOT AUTO-SCREENABLE")
 _rem = payment_screen.parse_mt103(_clean and _mt103.replace("ACME GENERAL TRADING LLC", "HARMLESS TEXTILES LLC")
                                   .replace("INTMIRTHXXX", "INTMGB2LXXX")
                                   .replace("GOODS PAYMENT", "FREIGHT SEA FALCON SHIPPING COMPANY"))
