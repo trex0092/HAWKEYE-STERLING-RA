@@ -4496,7 +4496,8 @@ def get_all_customers():
             # UNION of every extractor (see _individuals_union) — a recognised
             # SECTION-4 block must not hide Name: lines elsewhere in the note,
             # and parties recorded ONLY on a UBO/Owner line must be screened.
-            individuals = _individuals_union([i["name"] for i in struct_inds], notes)
+            individuals = _individuals_union([i["name"] for i in struct_inds
+                                              if not i.get("unidentified")], notes)
             # Corporate owners/parents named in the note that are NOT natural persons
             # (already in `individuals`) — screened as ENTITY subjects (50%/control).
             entity_owners = [e for e in extract_entity_owners(notes)
@@ -4565,7 +4566,8 @@ def get_all_customers():
                 notes = t.get("notes") or ""
                 kyc_data = kyc.parse_customer(notes)
                 individuals = _individuals_union(
-                    [t["name"]] + [i["name"] for i in kyc_data.get("individuals", [])], notes)
+                    [t["name"]] + [i["name"] for i in kyc_data.get("individuals", [])
+                     if not i.get("unidentified")], notes)
                 employees.append({
                     "gid": t["gid"],
                     "name": t["name"],
