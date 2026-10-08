@@ -7,7 +7,46 @@
    TRUST BOUNDARY: caller must provide the trusted host allowlist and verified
    server-side user role. Never accept these from untrusted browser parameters.
 */
+import { createHash } from 'node:crypto';
+
 const ELIGIBLE_ROLES = new Set(['Analyst', 'Reviewer-MLRO', 'Admin']);
+const TENANT_ID = /^[A-Za-z0-9._:-]{1,96}$/;
+
+/* Defense in depth, NOT comprehensive prompt-injection classification.
+   All retrieved words remain untrusted source DATA, even if no signature is
+   present. Refuse overt instruction/spoofing markers for human resourcing. */
+function suspiciousSourceText(value) {
+  if (typeof value !== 'string') return true;
+  return /[\u0000-\u0008\u000B-\u001F\u007F\u202A-\u202E]/u.test(value) ||
+    /<\s*\/?\s*(?:system|developer|assistant|tool)\s*>/i.test(value) ||
+    /\[\s*\/?INST\s*\]/i.test(value) ||
+    /\b(?:ignore|disregard|override|forget)\s+(?:(?:all|your|the)\s+)?(?:prior|previous|system|developer)\s+(?:instructions?|prompts?|rules?)\b/i.test(value) ||
+    /\b(?:send|exfiltrate)\s+(?:the\s+)?(?:api\s*key|private\s*key|password|secret)\b/i.test(value);
+}
+
+/* Restricted corpus rows must opt in explicitly. The principal's role and
+   tenant ID must come from VERIFIED backend identity, never a browser field.
+   Rows without an access_scope belong ONLY to the current public law register;
+   confidential data must not be added there without explicit scope metadata. */
+function authorizedForScope(accessScope, principal = {}) {
+  if (accessScope == null) return true;
+  if (!accessScope || typeof accessScope !== 'object' || Array.isArray(accessScope)) return false;
+  const keys = Object.keys(accessScope);
+  if (accessScope.visibility === 'public') {
+    return keys.length === 1;
+  }
+  if (accessScope.visibility !== 'tenant' ||
+      keys.some(key => !['visibility', 'tenant_id', 'allowed_roles'].includes(key)) ||
+      keys.length !== 3 ||
+      typeof accessScope.tenant_id !== 'string' || !TENANT_ID.test(accessScope.tenant_id) ||
+      !Array.isArray(accessScope.allowed_roles) ||
+      accessScope.allowed_roles.length === 0 ||
+      accessScope.allowed_roles.length > ELIGIBLE_ROLES.size ||
+      accessScope.allowed_roles.some(role => !ELIGIBLE_ROLES.has(role))) return false;
+  return typeof principal.tenantId === 'string' &&
+    principal.tenantId === accessScope.tenant_id &&
+    accessScope.allowed_roles.includes(principal.role);
+}
 const WORD_RE = /[\p{L}\p{N}]{3,}/gu;
 
 function tokens(s) {
@@ -31,7 +70,7 @@ function sourceHostAllowed(url, approvedHosts) {
   } catch (_) { return false; }
 }
 
-function buildVerifiedLegalCorpus(registry, approvedHosts, asOf) {
+function buildVerifiedLegalCorpus(registry, approvedHosts, asOf, principal = {}) {
   if (!registry || !Array.isArray(registry.obligations) || !dateValid(asOf)) return [];
   const approved = [...new Set((approvedHosts || [])
     .filter(x => typeof x === 'string').map(x => x.trim().toLowerCase()))];
@@ -45,6 +84,8 @@ function buildVerifiedLegalCorpus(registry, approvedHosts, asOf) {
         c.quote.length > 5000 || typeof c.locator !== 'string' || !c.locator.trim() ||
         typeof c.verified_by !== 'string' || !c.verified_by.trim() ||
         !dateValid(c.verified_on) || c.verified_on > asOf ||
+        suspiciousSourceText(c.quote) ||
+        !authorizedForScope(row.access_scope, principal) ||
         !sourceHostAllowed(c.source_url, approved)) continue;
     out.push({
       id: row.id,
@@ -56,7 +97,13 @@ function buildVerifiedLegalCorpus(registry, approvedHosts, asOf) {
       source_url: c.source_url,
       verified_by: c.verified_by,
       verified_on: c.verified_on,
-      control_status: row.status || 'unknown'
+      control_status: row.status || 'unknown',
+      /* Change detection only: a hash is NOT publisher authenticity or
+         an electronic MLRO signature. No customer data is hashed here. */
+      content_sha256: createHash('sha256')
+        .update(JSON.stringify([row.id, c.source_url, c.article, c.quote, c.verified_on]))
+        .digest('hex'),
+      untrusted_source_text: true
     });
   }
   return out;
@@ -70,7 +117,8 @@ function retrieveVerifiedLegal(registry, query, options = {}) {
   }
   const asOf = options.asOf || new Date().toISOString().slice(0, 10);
   if (!dateValid(asOf)) return { status: 'invalid_date', results: [] };
-  const corpus = buildVerifiedLegalCorpus(registry, options.approvedHosts, asOf);
+  const corpus = buildVerifiedLegalCorpus(registry, options.approvedHosts, asOf,
+    { role: options.role, tenantId: options.tenantId });
   const terms = tokens(query);
   if (!terms.length) return { status: 'invalid_query', results: [] };
   const ranked = [];
@@ -91,4 +139,4 @@ function retrieveVerifiedLegal(registry, query, options = {}) {
   };
 }
 
-export { tokens, buildVerifiedLegalCorpus, retrieveVerifiedLegal };
+export { tokens, suspiciousSourceText, authorizedForScope, buildVerifiedLegalCorpus, retrieveVerifiedLegal };

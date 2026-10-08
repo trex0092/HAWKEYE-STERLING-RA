@@ -139,3 +139,27 @@ integration. Caller-supplied `approvedHosts` and `role` cannot establish
 authority if supplied by a browser or LLM. This library has no public endpoint
 and must only be invoked by trusted backend code. Tests:
 `test/obligations.test.mjs`.
+
+
+### Retrieval scope, source content and integrity hardening (staged)
+
+The local library now permits explicitly scoped *future* corpus records through
+`access_scope: { visibility: "tenant", tenant_id: "...", allowed_roles: ["Reviewer-MLRO"] }`.
+A restricted row cannot be returned without both the exact tenant and an allowed
+role. Invalid or incomplete scope metadata is excluded rather than made public.
+Rows without that field are **only appropriate for this existing public legal
+obligation register**; do not place tenant or customer documents into it.
+A future production gateway MUST take role and tenant identity from a verified
+backend principal, never a query parameter or a model-generated claim. This
+library alone is **not an operational tenant-isolation control**.
+
+The library also rejects quoted text containing selected overt prompt-injection,
+role-spoofing or bidirectional Unicode control patterns. All retrieved passages
+remain explicitly marked `untrusted_source_text`; this pattern filter cannot
+detect every malicious instruction and does not replace source review,
+document ingestion isolation, an authenticated retrieval gateway, or model
+red-team evaluation. Each returned citation includes `content_sha256` to
+detect changes to its recorded excerpt; this is a local fingerprint, **not**
+a source-publisher digital signature or a substitute for an immutable evidence
+store. Nothing in this change feeds content to the live Advisor, and OA-5 and
+production governance approvals remain OPEN.
