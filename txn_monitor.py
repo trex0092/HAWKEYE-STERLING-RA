@@ -604,8 +604,8 @@ def rule_amount_not_comparable(txns):
     Register path did not, so "Amount: AED 60,000" was dropped and
     "Currency: USD" with "Amount: 20000" (≈ AED 73,450) was compared to the
     AED 55,000 DPMSR threshold as 20,000 — both silently missing THRESHOLD.
-    Activity records and raw payment messages carry no amount field by design
-    and are not judged here."""
+    Activity records carry no amount by design, and raw payment messages are
+    judged after payment_screen.monitoring_records expands them."""
     out = []
     for t in txns:
         if t.get("activity_only") or t.get("payment_message"):

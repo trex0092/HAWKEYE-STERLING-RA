@@ -1394,6 +1394,26 @@ check("amount rule skips activity records and raw payment messages (no amount fi
       not {"NON_AED_AMOUNT", "AMOUNT_UNREADABLE"} & set(_rules([
           {"customer": "X", "date": "2026-10-01", "activity_only": True},
           {"transaction_id": "M", "payment_message": ":20:X"}])))
+_MT_REG = (":20:REF123\n:32A:261001AED200000,00\n:50K:/1\nACME GOLD TRADING LLC\n"
+           ":52A:EBILAEAD\n:57A:HSBCHKHH\n:59:/2\nPEARL METALS LIMITED\n")
+def _msg_rules(msg):
+    return _rules(payment_screen.monitoring_records(
+        [payment_screen.parse_register_entry("PAY-1", msg)], screen.safe_xml_fromstring))
+check("register: a pasted MT103 for AED 200,000 to a Hong Kong bank raises the DPMSR THRESHOLD",
+      "THRESHOLD" in _msg_rules(_MT_REG))
+check("register: a pasted MT103 between two UAE banks is not an international wire (CDD only)",
+      "THRESHOLD" not in _msg_rules(_MT_REG.replace("HSBCHKHH", "EBILAEAD"))
+      and "CDD_TRIGGER" in _msg_rules(_MT_REG.replace("HSBCHKHH", "EBILAEAD")))
+check("register: a pasted USD MT103 is flagged NON_AED_AMOUNT",
+      "NON_AED_AMOUNT" in _msg_rules(_MT_REG.replace("AED200000", "USD60000")))
+check("register: a pasted message that cannot be parsed is AMOUNT_UNREADABLE, never a silent pass",
+      "AMOUNT_UNREADABLE" in _msg_rules("<not xml"))
+_mr = payment_screen.monitoring_records(
+    [payment_screen.parse_register_entry("PAY-1", _MT_REG),
+     payment_screen.parse_register_entry("PAY-2", _MT_REG.replace("REF123", "REF456"))],
+    screen.safe_xml_fromstring)
+check("register: payment messages with no customer are keyed apart, never pooled into one profile",
+      len({r["customer"] for r in _mr}) == 2 and not any("payment_message" in r for r in _mr))
 _cl_n, _cl_b = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []},
     txn_monitor.evaluate([{**_rr[1], "date": "2026-10-01", "amount": 60000, "method": "cash"},
