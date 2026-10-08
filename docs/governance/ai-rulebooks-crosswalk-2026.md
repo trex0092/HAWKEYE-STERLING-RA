@@ -49,6 +49,10 @@ this document) · **Cadence:** annual, or when a §1 trigger fires.
 | South Korea AI Basic Act (in force 22 Jan 2026) · Japan AI Promotion Act (passed 28 May 2025) · China Interim Measures for Generative AI Services (2023) | National AI laws | **No** | No product, users or market in those jurisdictions | Offering the system to users in those jurisdictions |
 | Council of Europe Framework Convention on AI (CETS No. 225; opened for signature 5 Sep 2024) | Treaty binding on states | **No** — binds ratifying states, not this firm directly | The UAE is not a Council of Europe member. *Entry-into-force status was not confirmed from an official source while this document was written; check the CoE Treaty Office before citing it.* | — |
 | GDPR · CCPA · Brazil LGPD · India DPDP Act 2023 | Data-protection laws | **No** on current facts | No EU/California/Brazil/India data subjects are processed as a target market; UAE PDPL governs (see [`dpia-2026.md`](dpia-2026.md)) | A customer or UBO who is a data subject protected by one of these laws, which needs a per-case DPO view |
+| Colorado SB 26-189 (signed 14 May 2026; effective 1 Jan 2027; replaces SB 24-205, which never took effect) | US state statute | **No** | Covers automated decision-making technology in consequential decisions affecting Colorado consumers; this firm has none. Summarised from law-firm alerts, so check the enacted text before relying on specifics | A Colorado consumer or counterparty |
+| Brazil PL 2338/2023 | Bill, **not law** | **No** | Passed the Senate 10 Dec 2024; still pending in the Chamber of Deputies (latest status from a single secondary source) | Enactment plus a Brazilian market |
+| Saudi SDAIA AI Ethics Principles (adopted 14 Sep 2023) | National principles; risk-tiered | **No** | Apply to entities designing, deploying or using AI in Saudi Arabia; this firm has no Saudi operations | A Saudi establishment or customer base |
+| Singapore Model AI Governance Framework · AI Verify testing toolkit · Japan AI Guidelines for Business v1.1 (METI/MIC, 28 Mar 2025) · UK principles-based approach | Soft law / voluntary tools | No | Guidance with no statute behind it; useful only as benchmarks. *The UK entry was taken from the operator's infographic and not independently verified in this pass* | — |
 | UNESCO Recommendation on the Ethics of AI (23 Nov 2021) · G7 Hiroshima Process Code of Conduct (30 Oct 2023) | Non-binding principles | No | The Hiroshima Code addresses organisations **developing** advanced AI; this firm is a deployer | — |
 
 **Conclusion.** None of these rulebooks binds the system today. The value is the
@@ -170,6 +174,31 @@ any of them there is a separate, one-state-change-per-PR act.
 | G-6 | Vendor frontier-risk evidence | Where the model provider is an SB 53 *large frontier developer*, record its published frontier AI framework as vendor-assurance evidence in [`ai-vendor-assurance.md`](ai-vendor-assurance.md) | Maintainer |
 | G-7 | `agent_orchestrator.py` has no production adapter, and its approval flag is a plain boolean | `netlify/functions/_human-review.js` now gives a signed review-evidence preflight, but by its own header it is not a replay-preventing authorization gateway. Before any production wiring: persist a non-replayable MLRO approval bound to `proposal_digest(plan)` (the orchestrator's docstring requires this) | Maintainer |
 
+## 9. Ten-layer governance stack — self-check (2026-10-08)
+
+A practitioner infographic ("The Full AI Governance Stack", 10 layers)
+claims most teams cover only four or five layers. This section checks each
+layer against this repository: what exists, and what is still open. The open
+items are this repository's own register items, not new obligations.
+
+| # | Layer | What exists here | Still open |
+|---|---|---|---|
+| 1 | Principles & policy | [`ai-policy.md`](ai-policy.md), [`ai-acceptable-use-policy.md`](ai-acceptable-use-policy.md); OECD, UNESCO, G7 and CoE positions in §1 | Board adoption of the policy pack (open action 18) |
+| 2 | Binding law | UAE FDL 10/2025, Cabinet Resolution 134/2025 and PDPL applied; foreign AI laws determined non-binding in §1 | Counsel items 5 (citation mapping) and 11 (cross-border transfer approval) |
+| 3 | Soft law & national guidance | [`uae-ai-charter-mapping-2026.md`](uae-ai-charter-mapping-2026.md); Singapore, Japan, UK and Brazil determined in §1 | None engineering-side |
+| 4 | Standards & frameworks | [`iso-42001-soa-2026.md`](iso-42001-soa-2026.md), [`nist-ai-rmf-mapping-2026.md`](nist-ai-rmf-mapping-2026.md), [`iso-27001-soa-draft-2026.md`](iso-27001-soa-draft-2026.md) (draft); ISO 31000 process in the risk register | ISO 42001 path decision (open action 10); IEEE 7000 not mapped |
+| 5 | Inventory & intake | [`ai-asset-register.md`](ai-asset-register.md) with the shadow-AI scan in `test/ai-assets.test.js`; [`ai-use-case-intake.md`](ai-use-case-intake.md) | Formal adoption of the intake gate (open action 30); extending the register enterprise-wide (open action 9) |
+| 6 | Risk classification & impact | [`eu-ai-act-assessment-2026.md`](eu-ai-act-assessment-2026.md); [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) (with the §9 lifecycle index); [`dpia-2026.md`](dpia-2026.md) | LLM-triage go-live checklist still unticked while production state is unknown (open action 42) |
+| 7 | Technical guardrails | Advisor guards in `brain-soul.js`; `_data-boundary.js`; `_answer-validator.js`; kill switch | Egress guard and output policy both default to *audit* (§8 gap G-4) |
+| 8 | Testing & evaluation | Weekly Advisor eval, quarterly bias eval, CI injection red team (`test/redteam_injection.py`) | Live eval capacity (open action 40); manual red-team round (15); penetration test (43). AI Verify, Fairlearn and AIF360 are not used: the bias test is recall parity on a matcher, not a learned classifier |
+| 9 | Accountability & reporting | [`ai-control-ownership-matrix.md`](ai-control-ownership-matrix.md) (RACI); model cards in [`../models/`](../models/README.md); [`ai-governance-committee-charter.md`](ai-governance-committee-charter.md) | Committee charter adoption and the first Board sitting (open action 4); first management review (32) |
+| 10 | People & competence | [`../aims/competency-records.md`](../aims/competency-records.md); EU AI Act Art. 4 literacy assessed | Training beyond Compliance (open action 7). No AI-governance certification (such as IAPP AIGP) is evidenced |
+
+**Reading.** All ten layers have artefacts in this repository. What is
+missing sits almost entirely with human and Board acts (layers 1, 4, 5, 9 and
+10) and with two default-off engineering settings (layer 7). This is a
+coverage map, not a maturity score.
+
 ## Sources
 
 Primary or official sources where available. Secondary sources are marked.
@@ -190,4 +219,9 @@ Primary or official sources where available. Secondary sources are marked.
 - Council of Europe Framework Convention (CETS 225) — Council of Europe, <https://www.coe.int/en/web/portal/-/council-of-europe-opens-first-ever-global-treaty-on-ai-for-signature>.
 - G7 Hiroshima Process Code of Conduct — European Commission, <https://digital-strategy.ec.europa.eu/en/library/hiroshima-process-international-code-conduct-advanced-ai-systems>.
 - UNESCO Recommendation on the Ethics of AI — adoption reported by JURIST (secondary), <https://www.jurist.org/news/2021/11/un-countries-adopt-first-global-agreement-on-ai-ethics/>.
+- Colorado SB 26-189 — Seyfarth alert (secondary), <https://www.seyfarth.com/news-insights/colorado-enacts-artificial-intelligence-replacement-law.html>.
+- Brazil PL 2338/2023 — CASRAI tracker (secondary), <https://casrai.org/guides/brazil-ai-bill-pl-2338-status>.
+- Japan AI Guidelines for Business v1.1 — Anderson Mōri & Tomotsune (secondary), <https://www.amt-law.com/en/insights/trending-news/trending-news_20250522001_en_001>.
+- SDAIA AI Ethics Principles — Baker McKenzie (secondary), <https://insightplus.bakermckenzie.com/bm/data-technology/saudi-arabia-saudi-data-and-artificial-intelligence-authority-reveals-ai-ethics-principles-20>.
+- AI Verify Foundation — IMDA, <https://www.imda.gov.sg/resources/press-releases-factsheets-and-speeches/press-releases/2023/singapore-launches-ai-verify-foundation>.
 - Prompting material: practitioner infographics supplied by the operator on 2026-10-08 ("The 6 Rulebooks of AI Governance"; "AI Governance Frameworks"; an EU AI Act Article 69 commentary; a transaction-monitoring workflow; a vendor evidence-by-design graphic). They were used to choose scope only. Every fact above is taken from the sources listed, not from the infographics, and no vendor product is endorsed.

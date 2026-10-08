@@ -8440,6 +8440,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         mode_lbl += f" → DEGRADED (0 of {ai.LLM_CALLS['attempted']} LLM calls succeeded; deterministic triage stands)"
     log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
         f"mode={mode_lbl}")
+    if ai.LLM_CALLS.get("ok", 0):
+        _u = ai.LLM_USAGE
+        log(f"AI: billed tokens this run — input {_u['input_tokens']} · output {_u['output_tokens']} · "
+            f"cache read {_u['cache_read_input_tokens']} · cache write {_u['cache_creation_input_tokens']} "
+            f"(model {ai.AI_MODEL})")
     progress("ai-triage-done", flagged=len(possible_matches), clusters=len(related))
 
     _t_ai = time.time()

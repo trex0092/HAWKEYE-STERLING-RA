@@ -319,7 +319,8 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
       b.text === undefined && b.auditLine === undefined && typeof b.deepAccumulated === 'string');
 
     // hop 2: end_turn -> the full text is assembled, guarded and final
-    mockFetch(async () => ({ ok: true, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: ' Part two, concluding.' }] }) }));
+    let hop2Body = null;
+    mockFetch(async (_url, opts) => { hop2Body = JSON.parse(opts.body); return { ok: true, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: ' Part two, concluding.' }] }) }; });
     r = await call(POST({ question: 'Deep dive.', mode: 'deep', deepContinue: true, deepHop: b.deepHop, deepAccumulated: b.deepAccumulated }, contIp), 'test-key');
     const fin = JSON.parse(r.body);
     check('continuation: the final hop returns the assembled text',
@@ -327,6 +328,22 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     check('continuation: the final answer is deep, undegraded',
       fin.effectiveMode === 'deep' && fin.modeDegraded === false && fin.model === I.MODEL_BY_MODE.deep.model);
     check('continuation: the audit line records the hop count', /deepHops=2/.test(fin.auditLine));
+    /* Regression: the resumed hop used to END on an assistant message (a
+       last-turn prefill), which the 4.6+ models, the governed deep model
+       included, reject with HTTP 400. The request must end on a user turn. */
+    const hop2Msgs = (hop2Body && hop2Body.messages) || [];
+    check('continuation: a resumed hop never ends on an assistant prefill (400 on Claude 4.6+)',
+      hop2Msgs.length === 3 && hop2Msgs[2].role === 'user' && hop2Msgs[2].content === I.DEEP_CONTINUE_INSTRUCTION);
+    check('continuation: the prior output is replayed as the middle assistant turn',
+      hop2Msgs[1] && hop2Msgs[1].role === 'assistant' && /Part one of the deep analysis/.test(hop2Msgs[1].content));
+    check('usage tag records billed token counts and nothing else',
+      I.usageTag({ input_tokens: 812, output_tokens: 95, cache_read_input_tokens: 5771, cache_creation_input_tokens: 0, extra: 'x' })
+        === 'tokens=in:812,out:95,cacheRead:5771,cacheWrite:0' &&
+      I.usageTag({ input_tokens: 'NaN', output_tokens: -3 }) === 'tokens=in:0,out:0,cacheRead:0,cacheWrite:0');
+    check('continuation: chunks join with one space only where the seam has none',
+      I.joinContinuation('Part one.', 'Part two') === 'Part one. Part two' &&
+      I.joinContinuation('Part one. ', 'Part two') === 'Part one. Part two' &&
+      I.joinContinuation('Part one', ', then two') === 'Part one, then two');
 
     // Invariant 1: NO UNGUARDED TOKEN EVER LEAVES. A partial whose accumulated
     // text trips the tipping-off guard must be withheld ON THAT HOP -- not
