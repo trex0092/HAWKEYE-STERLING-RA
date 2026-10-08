@@ -183,7 +183,7 @@ check('full results: required from the cutover day onward, never for history (no
     fallback.includes("vars.SECONDARY_ALERT_ENABLED == 'true'") &&
     fallback.includes('needs: check'));
   check('fallback job uses scoped issues:write and avoids Asana token',
-    /^\s{4}issues: write\s*$/m.test(fallback) &&
+    /^\s{6}issues: write\s*$/m.test(fallback) &&
     /node scripts\/github-fallback-alert\.mjs/.test(fallback) &&
     !fallback.includes('ASANA_ACCESS_TOKEN'));
 }
