@@ -3,6 +3,8 @@
    level(): no live Asana project needed, no ASANA_ACCESS_TOKEN needed.
    Usage: node test/delivery-watchdog.test.mjs */
 import { readFileSync } from 'node:fs';
+import { TITLE as FALLBACK_TITLE, sanitizedAlert, findOpenDuplicate,
+  deliverSecondaryAlert } from '../scripts/github-fallback-alert.mjs';
 import { findTodaysReports, TITLE_PREFIX, reportDayToVerify, REPORT_DUE_UTC_HOUR,
   hasFullResults, fullResultsRequired, FULL_RESULTS_SINCE, reportEvidence } from '../scripts/delivery-watchdog.mjs';
 
@@ -113,6 +115,77 @@ check('full results: required from the cutover day onward, never for history (no
   const ss = readFileSync(new URL('../.github/workflows/sanctions-screen.yml', import.meta.url), 'utf8');
   check('guard: sanctions-screen.yml still has the delivery step the guard reads',
     ss.includes('      - name: ' + SANCTIONS_DELIVERY_STEP + '\n        id: delivery\n'));
+}
+
+
+/* GitHub secondary delivery path is intentionally opt-in, separately from
+   the Asana notifier. All tests mock the network and use generic context. */
+{
+  const env = { GITHUB_REPOSITORY: 'example-org/example-repo', GITHUB_RUN_ID: '12345',
+    GITHUB_TOKEN: 'synthetic-test-token-123456', SECONDARY_ALERT_ENABLED: 'true' };
+  const now = new Date('2026-10-08T08:00:00Z');
+  const payload = sanitizedAlert(env, now);
+  check('fallback alert contains run link without names, tokens or financial case data',
+    payload.title === FALLBACK_TITLE &&
+    payload.body.includes('https://github.com/example-org/example-repo/actions/runs/12345') &&
+    !payload.body.includes(env.GITHUB_TOKEN) && /Do not post customer names/.test(payload.body));
+  check('fallback rejects malformed trusted workflow context',
+    (() => { try { sanitizedAlert({ ...env, GITHUB_REPOSITORY: '../evil' }, now); return false; }
+      catch { return true; } })());
+  check('existing open issue matches title but a PR with same title does not',
+    findOpenDuplicate([{ state: 'open', title: FALLBACK_TITLE, number: 7 }])?.number === 7 &&
+    findOpenDuplicate([{ state: 'open', title: FALLBACK_TITLE, pull_request: {} }]) === null);
+  const success = (obj, status = 200) => ({
+    ok: status >= 200 && status < 300, status, json: async () => obj
+  });
+  let called = 0;
+  const fakeFetch = async (url, opts) => {
+    called++;
+    if (opts.method === 'GET') return success([]);
+    return success({ number: 99, html_url: 'https://github.com/example-org/example-repo/issues/99' }, 201);
+  };
+  const off = await deliverSecondaryAlert({
+    env: { ...env, SECONDARY_ALERT_ENABLED: 'false' }, fetchImpl: fakeFetch, now
+  });
+  check('fallback DISABLED by default sends no request and needs no token',
+    off.state === 'DISABLED' && called === 0);
+  const created = await deliverSecondaryAlert({ env, fetchImpl: fakeFetch, now });
+  check('fallback creates one generic issue only after a successful no-duplicate lookup',
+    created.state === 'CREATED' && created.number === 99 && called === 2);
+  const exists = await deliverSecondaryAlert({ env, now, fetchImpl: async (_url, opts) => {
+    called++;
+    if (opts.method !== 'GET') throw Error('duplicate issue creation blocked');
+    return success([{ state: 'open', title: FALLBACK_TITLE, number: 7 }]);
+  } });
+  check('fallback never creates duplicate while an existing alert is open',
+    exists.state === 'ALREADY_OPEN' && exists.number === 7 && called === 3);
+  let wroteOnFailedLookup = false;
+  let failedClosed = false;
+  try {
+    await deliverSecondaryAlert({ env, now, fetchImpl: async (_url, opts) => {
+      if (opts.method === 'POST') wroteOnFailedLookup = true;
+      return success({ message: 'unavailable' }, 503);
+    } });
+  } catch { failedClosed = true; }
+  check('failed GitHub list/authorization never falls through to a speculative POST',
+    failedClosed && !wroteOnFailedLookup);
+  let missingTokenDenied = false;
+  try {
+    await deliverSecondaryAlert({ env: { ...env, GITHUB_TOKEN: '' }, now,
+      fetchImpl: fakeFetch });
+  } catch { missingTokenDenied = true; }
+  check('enabled fallback without a GitHub token fails loudly',
+    missingTokenDenied);
+  const workflow = readFileSync(new URL('../.github/workflows/delivery-watchdog.yml', import.meta.url), 'utf8');
+  const fallback = workflow.slice(workflow.indexOf('\n  github-secondary-alert:'));
+  check('independent issue notifier executes only after failed watchdog and explicit operator opt-in',
+    fallback.includes("needs.check.result == 'failure'") &&
+    fallback.includes("vars.SECONDARY_ALERT_ENABLED == 'true'") &&
+    fallback.includes('needs: check'));
+  check('fallback job uses scoped issues:write and avoids Asana token',
+    /^\s{6}issues: write\s*$/m.test(fallback) &&
+    /node scripts\/github-fallback-alert\.mjs/.test(fallback) &&
+    !fallback.includes('ASANA_ACCESS_TOKEN'));
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
