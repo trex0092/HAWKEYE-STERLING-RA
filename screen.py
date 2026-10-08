@@ -6195,6 +6195,15 @@ def stale_core_lists(list_meta, today=None, max_age=None):
             out.append((k, age))
     return sorted(out)
 
+def degraded_core_lists(list_meta, today=None):
+    """Core lists payment screening must treat as degraded: not loaded, or
+    loaded but older than the age limit. Counting only empty lists let a
+    99-day-old OFAC file clear every payment as NO MATCH while the main report
+    flagged the same list as stale."""
+    down = [k.upper() for k, v in (list_meta or {}).items()
+            if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
+    return down + [f"{k.upper()} (stale {a}d)" for k, a in stale_core_lists(list_meta, today)]
+
 # EU FSF is the one core list whose PRIMARY is the OpenSanctions host (webgate's
 # exports drift formats; the mirror's simple shape is what every parser here
 # shares) — so its fallback runs the OTHER way: official webgate XML, with the
@@ -8530,8 +8539,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         _pay_cfg = _file_cfg or bool(ASANA_PAYMENTS_SECTION_GID)
         _pay_res = None
         if _pay_cfg:
-            _core_down = [k.upper() for k, v in list_meta.items()
-                          if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
+            _core_down = degraded_core_lists(list_meta, run_time)
             _pay_res = payment_screen.screen_feed(
                 _pay_records, all_lists,
                 jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down,

@@ -716,12 +716,49 @@ def _alert(rule, severity, t, detail):
             "transaction_id": t.get("transaction_id", ""), "permalink": t.get("permalink", "")}
 
 
+_AGENT_ROLES = {"ordering_institution", "senders_correspondent", "receivers_correspondent",
+                "intermediary", "account_with_institution"}
+
+
+def _with_counterparty_country(t):
+    """The rules read counterparty_country as a jurisdiction NAME. The feed
+    schema also allows parties[] with ISO alpha-2 countries, which no rule
+    read: an AED 200,000 wire to an Iranian beneficiary in parties[] raised no
+    DPMSR THRESHOLD and no HIGH_RISK_GEO, and counterparty_country "IR" missed
+    the jurisdiction table. Fill the field from parties[] when absent and map
+    an ISO code to the table's name. Returns a copy; the input is untouched."""
+    if not isinstance(t, dict):
+        return t
+    c = str(t.get("counterparty_country") or "").strip()
+    cp = t.get("counterparty")
+    if not c:
+        parties = [p for p in (t.get("parties") or []) if isinstance(p, dict)]
+        foreign = sorted((p for p in parties
+                          if _norm(p.get("country_name") or p.get("country"))
+                          and _norm(p.get("country_name") or p.get("country")) not in HOME_COUNTRIES),
+                         key=lambda p: p.get("role") in _AGENT_ROLES)
+        if not foreign:
+            return t
+        c = str(foreign[0].get("country_name") or foreign[0].get("country")).strip()
+        cp = cp or foreign[0].get("name") or foreign[0].get("bic")
+    if len(c) == 2 and c.isalpha():
+        import payment_screen
+        c = payment_screen.ISO2_TO_JURISDICTION.get(c.upper(), c.upper())
+    if c == t.get("counterparty_country") and cp == t.get("counterparty"):
+        return t
+    out = dict(t, counterparty_country=c)
+    if cp:
+        out["counterparty"] = cp
+    return out
+
+
 def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):
     """Run all rules over ONE customer's transactions. Returns a list of alerts.
     A crashing rule never blocks the others, but its failure is COUNTED (via the
     optional rule_errors dict) so a rule that silently produces no alerts because
     it crashes on every customer is visible, not a silent all-clear."""
     alerts = []
+    txns = [_with_counterparty_country(t) for t in txns]
     for rule in _RULES:
         try:
             if rule is rule_high_risk_counterparty:

@@ -131,6 +131,11 @@ check("kyc: an ID with no expiry recorded is a CDD gap",
 import tempfile as _tf_iw
 with _tf_iw.NamedTemporaryFile("w", suffix=".json", delete=False) as _iwf:
     _iwf.write('{"entries": ["Viktor Bout", ]}')
+_mm = mcp_tools.screen_payment(["Some Designated Person"], parties=[
+    {"role": "originator", "name": "Acme Gold Trading LLC", "country": "AE"},
+    {"role": "beneficiary", "name": "Golden Star Metals Co", "country": "Myanmar"}])
+check("payment: a beneficiary country given as a name (Myanmar) is risk-tiered, never NO MATCH",
+      _mm["payments"][0]["outcome"] != "NO MATCH")
 expect_valueerror("internal watchlist: a list that fails to parse is refused, never reported cleared",
                   lambda: mcp_tools.screen_internal_watchlist("Viktor Bout", path=_iwf.name))
 os.unlink(_iwf.name)
