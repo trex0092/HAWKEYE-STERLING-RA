@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { SCHEMA, ZERO_HASH, sealEvidenceReceipt, verifyEvidenceReceipts } from '../scripts/evidence-receipts.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -88,6 +90,72 @@ const huge = await client.handler({
   headers: { 'x-nf-client-connection-ip': '203.0.113.11' }
 });
 check('oversize telemetry is rejected', huge.statusCode === 413);
+
+
+/* Offline decision-evidence metadata chain. The receipts do NOT contain names,
+   prompt content or customer records, and are not durable until a protected
+   separately owned append-only store preserves the external anchor. */
+const evidenceSecret = 'synthetic-no-production-evidence-hmac-key-0123456789';
+const fakeEvidence = createHash('sha256').update('synthetic-test-only', 'utf8').digest('hex');
+const entry = {
+  schema: SCHEMA, sequence: 1, case_ref: 'CASE-000001',
+  event_time: '2026-10-08T09:00:00.000Z',
+  actor_ref: 'actor:synthetic-001', actor_role: 'Analyst',
+  action: 'REVIEW_REQUESTED', outcome: 'REVIEW_REQUIRED',
+  evidence_hashes: [fakeEvidence], review_receipt_hash: null,
+  prev_hash: ZERO_HASH
+};
+const first = sealEvidenceReceipt(entry, evidenceSecret);
+const second = sealEvidenceReceipt({
+  ...entry, sequence: 2, event_time: '2026-10-08T09:05:00.000Z',
+  actor_ref: 'actor:synthetic-002', actor_role: 'Reviewer-MLRO',
+  action: 'MLRO_REVIEWED', outcome: 'REVIEWED', prev_hash: first.hash
+}, evidenceSecret);
+const verified = verifyEvidenceReceipts([first, second], evidenceSecret, {
+  expectedHeadHash: second.hash, expectedCount: 2
+});
+check('evidence receipt chain accepts metadata-only signed and externally anchored sequence',
+  verified.valid && verified.count === 2 && verified.head_hash === second.hash);
+check('receipt content is metadata only, never raw case evidence',
+  !JSON.stringify([first, second]).includes('synthetic-test-only') &&
+  !Object.hasOwn(first, 'case_notes') &&
+  first.evidence_hashes.length === 1 && first.evidence_hashes[0] === fakeEvidence);
+check('any forged event contents break HMAC and hash integrity',
+  !verifyEvidenceReceipts([{ ...first, outcome: 'DELIVERED' }, second], evidenceSecret).valid);
+check('a modified MAC is rejected',
+  !verifyEvidenceReceipts([{ ...first, hmac: ZERO_HASH }, second], evidenceSecret).valid);
+check('a different verification key cannot validate the original receipts',
+  !verifyEvidenceReceipts([first, second], 'synthetic-different-secret-01234567890123').valid);
+check('reordered receipts fail ordered chain sequence checking',
+  !verifyEvidenceReceipts([second, first], evidenceSecret).valid);
+check('a missing middle or first event breaks the original chain',
+  !verifyEvidenceReceipts([second], evidenceSecret).valid);
+check('an external expected count and head reveal truncation at the end',
+  !verifyEvidenceReceipts([first], evidenceSecret,
+    { expectedCount: 2, expectedHeadHash: second.hash }).valid);
+check('a pure hash chain without a separately retained anchor cannot prove no suffix loss',
+  verifyEvidenceReceipts([first], evidenceSecret).valid === true);
+
+let rejectedNotes = false;
+try { sealEvidenceReceipt({ ...entry, case_notes: 'customer private text' }, evidenceSecret); }
+catch { rejectedNotes = true; }
+check('receipt builder refuses unregistered sensitive metadata fields', rejectedNotes);
+
+let rejectedAction = false;
+try { sealEvidenceReceipt({ ...entry, action: 'FILE_SAR' }, evidenceSecret); }
+catch { rejectedAction = true; }
+check('receipt schema does not permit automatic regulatory filing actions', rejectedAction);
+
+let rejectedName = false;
+try { sealEvidenceReceipt({ ...entry, actor_ref: 'analyst@example.test' }, evidenceSecret); }
+catch { rejectedName = true; }
+check('receipt actor uses a bounded opaque reference, not an email address', rejectedName);
+
+const badTime = sealEvidenceReceipt({
+  ...entry, sequence: 2, event_time: '2026-10-08T08:00:00.000Z', prev_hash: first.hash
+}, evidenceSecret);
+check('a signed but chronologically reversed receipt is rejected',
+  !verifyEvidenceReceipts([first, badTime], evidenceSecret).valid);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

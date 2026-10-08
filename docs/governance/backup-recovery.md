@@ -130,3 +130,32 @@ independently monitored route, delivery/receipt testing and owner sign-off.
 Offline tests in `test/delivery-watchdog.test.mjs` cover gating,
 idempotency, safe payloads, failed GitHub responses and workflow wiring.
 No live issue is created by the test suite.
+
+
+---
+
+## Staged metadata-only evidence receipts, not persistent storage
+
+`scripts/evidence-receipts.mjs` provides pure, zero-dependency helpers
+to seal and verify **metadata-only** case-evidence receipts. They enforce an
+opaque case reference, opaque actor reference, an allowed non-filing action,
+evidence SHA-256 references, UTC timestamp, ordered sequence, previous hash,
+and a keyed HMAC for tamper detection. A separately retained expected head
+digest and event count can reveal truncated or reordered chains. The code
+rejects raw notes, unsupported fields and fabricated filing actions. Its
+offline synthetic regression tests run in `test/telemetry.test.mjs`.
+
+**What this does not provide:** A receipt HMAC is not an independent MLRO
+signature or nonrepudiation. The caller must authenticate the human actor
+and derive their role from a trusted identity system; no browser-provided
+role is evidence. A verifier who has the same symmetric key can fabricate
+receipts, and an attacker who deletes the last records can leave a valid
+prefix. An independent protected anchor, authorized append-only backend,
+time source, key rotation, per-case access control, retention and actual
+restoration exercises are still necessary. This module does not connect to,
+write to, or verify any production store and does not assert source truth.
+
+**OA-23 remains OPEN.** To close it, IT/MLRO must approve an authenticated,
+encrypted persistence backend and retention policy, prove append-only
+integrity including head anchoring, test recovery against formal RPO/RTO
+targets, and retain dated independent verification evidence.
