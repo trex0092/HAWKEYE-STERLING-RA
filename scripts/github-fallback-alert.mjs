@@ -74,7 +74,7 @@ export async function deliverSecondaryAlert({
       method,
       headers: { ...headers, ...(data ? { 'Content-Type': 'application/json' } : {}) },
       body: data ? JSON.stringify(data) : undefined,
-      redirect: 'error', signal: AbortSignal.timeout(15000)
+      redirect: 'error', signal: globalThis.AbortSignal.timeout(15000)
     });
     if (!response.ok) {
       throw Error('GitHub secondary alert API returned HTTP ' + response.status);
