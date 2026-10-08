@@ -47,6 +47,7 @@ export const METHOD = {
   ],
   bands: '0-2 pts = 1 Low, 3-5 pts = 2 Medium, 6-8 pts = 3 High (the bands of the proposal the user approved; dropping the 2-point CPI factor lowers the maximum from 10 to 8)',
   not_rated: 'No suggestion when FATF has not rated the jurisdiction and it is not FATF-listed: the effectiveness factor carries most of the weight, so a score without it would mislead.',
+  applied: '2026-10-08: the 17 suggestions above the then-current score were applied to COUNTRIES on the approval of Luisa Fernanda (repository owner); no separate MLRO countersignature is recorded. The 53 lower suggestions were not applied (see lower_than_current). Later differences are suggestions only again.',
   lower_than_current: 'A suggestion below the current score is not a recommendation to lower it: the method has no sanctions factor yet, and the MLRO may have reasons the method does not see.'
 };
 
