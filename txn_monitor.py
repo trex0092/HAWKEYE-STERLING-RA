@@ -623,6 +623,22 @@ def rule_amount_not_comparable(txns):
     return out
 
 
+def rule_date_unreadable(txns):
+    """A payment whose date the time-window rules cannot read. STRUCTURING,
+    LINKED_THRESHOLD, VELOCITY, rapid pass-through, circular flow, funnel and
+    rapid resale silently skip a record without an ISO date, so three AED
+    52,000 cash payments in three days dated "01/10/2026" raised no
+    STRUCTURING at all. The date is never guessed (day/month order is
+    ambiguous); the payment is flagged so the MLRO sees what was not
+    evaluated. Activity records and raw payment messages are not judged."""
+    return [_alert("DATE_UNREADABLE", "HIGH", t,
+            f"date {str(t.get('date') or '').strip() or 'not recorded'!r} is not YYYY-MM-DD — "
+            "structuring, linked-threshold, velocity and other time-window rules could not "
+            "evaluate this payment; record the date as YYYY-MM-DD")
+            for t in txns
+            if not (t.get("activity_only") or t.get("payment_message")) and not _d(t.get("date"))]
+
+
 def rule_customer_not_in_db(txns):
     """A payment or activity task whose customer matches no Customer Database
     record (set by the daily run's resolver). No CDD file means no profile to
@@ -698,7 +714,7 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
           rule_reference_keyword, rule_personal_account, rule_linked_threshold,
           rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db,
-          rule_amount_not_comparable]
+          rule_amount_not_comparable, rule_date_unreadable]
 
 
 def _any_customer(txns):
