@@ -958,8 +958,7 @@ const handle = async (event) => {
       ? 'Apply SPEED mode: concise structured answer, key facts only, primary recommendation.'
       : 'Apply BALANCED mode: structured sections, cite relevant typologies and red flags, include gaps and next steps.';
 
-  const personaSuffix = PERSONA_SUFFIX[persona] || PERSONA_SUFFIX.sterling;
-  const systemPrompt  = [SOUL_CHARTER, KNOWLEDGE_CONTEXT, personaSuffix].join('\n\n');
+  const systemBlocks  = buildSystemBlocks(persona);
   const userMessage   = modeInstruction + '\n\nQUESTION:\n' + boundary.question + (boundary.context.trim() ? '\n\nCONTEXT:\n' + boundary.context : '');
 
   /* On a resumed hop the prior output is replayed as an assistant prefill so
@@ -987,7 +986,7 @@ const handle = async (event) => {
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
-        system: systemPrompt,
+        system: systemBlocks,
         messages,
       }),
     });
@@ -1128,13 +1127,30 @@ const handle = async (event) => {
 // Non-breaking export of the pure internals so the Advisor's guardrails can be
 // exercised offline (test/advisor-assurance.test.js). Netlify only invokes
 // `exports.handler`; this changes no runtime behaviour.
+/* PROMPT CACHING. The charter + knowledge context (~6.6K tokens) is identical
+   on every Advisor request, yet it was sent as one plain string, so every call
+   paid full input price for it (Anthropic console, Oct 2026: "prompt cache hit
+   rate is low", up to 33% of direct API spend recoverable). It is now its own
+   system block with a cache breakpoint, so repeat calls within the cache
+   window read it at the cached rate; the short persona suffix follows it
+   outside the breakpoint, so all personas share one cached prefix. The text
+   of each governed prompt is unchanged (prompt-register fingerprints). Shared
+   by the eval scripts so they measure exactly what production sends. */
+function buildSystemBlocks(persona) {
+  const personaSuffix = PERSONA_SUFFIX[persona] || PERSONA_SUFFIX.sterling;
+  return [
+    { type: 'text', text: SOUL_CHARTER + '\n\n' + KNOWLEDGE_CONTEXT, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: personaSuffix },
+  ];
+}
+
 exports.__internals = {
   SOUL_CHARTER, KNOWLEDGE_CONTEXT, TIPPING_OFF_PATTERNS, tippingOffGuard,
   PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
   hallucinationGuard, legalCiteGuard, CITE_RECOGNIZED, CITE_REPEALED, injectionGuard, anomalyGuard, qualityScore,
   selectModel, MODEL_BY_MODE, PLATFORM_CAP_MS, ABORT_BUDGET_MS, AFFORDABLE_TOKENS, DEEP_MIN_TOKENS, DEEP_HOP_LIMIT,
   simpleHash, buildKnowledgeContext, apiErrorHint, isUsageLimit,
-  TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX,
+  TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX, buildSystemBlocks,
 };
 
 /* Structured 5xx/exception telemetry. The wrapper never logs request bodies. */
