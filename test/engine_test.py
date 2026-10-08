@@ -5813,6 +5813,97 @@ with tempfile.TemporaryDirectory() as d:
         else:
             os.environ["TXN_FEED_MANIFEST_PATH"] = _previous_manifest
 
+# -- Staged deterministic read-only investigation plan (no model access) --
+print("agent_plan.py - bounded, human-reviewed tool plans")
+import agent_plan
+
+_proposed = {
+    "schema": "hawkeye.readonly-plan/v1",
+    "objective": "Review a wholly synthetic entity without performing actions",
+    "steps": [
+        {"id": "normalize", "tool": "normalize_name",
+         "args": {"name": "SYNTHETIC ENTITY"}, "retries": 0},
+        {"id": "jurisdiction", "tool": "jurisdiction_risk",
+         "args": {"country": "Testland"}, "retries": 0}
+    ],
+}
+_seen = []
+def _normalize_synthetic(args, _state):
+    _seen.append("normalize")
+    return {"normalized": args["name"].lower()}
+def _juris_synthetic(args, state):
+    _seen.append("jurisdiction")
+    return {"country": args["country"], "had_previous_evidence": "normalize" in state}
+
+_handlers = {
+    "normalize_name": _normalize_synthetic,
+    "jurisdiction_risk": _juris_synthetic,
+}
+_res = agent_plan.run_review_plan(
+    _proposed, verified_role="Analyst",
+    authorized_tools=set(_handlers), tool_handlers=_handlers)
+check("read-only plan runs bounded sequential synthetic steps with shared state",
+      _res["status"] == "REVIEW_REQUIRED" and
+      _res["results"]["jurisdiction"]["had_previous_evidence"] is True and
+      _seen == ["normalize", "jurisdiction"])
+check("successful plan never returns permission to file or decide",
+      _res["authorized_for_action"] is False and
+      _res["status"] != "APPROVED")
+check("audited events carry hashes, not raw input names",
+      all(e.get("result_sha256") for e in _res["events"]) and
+      "SYNTHETIC ENTITY" not in json.dumps(_res["events"]))
+check("plan lacking independently verified role is held before any tool call",
+      agent_plan.run_review_plan(
+          _proposed, authorized_tools=set(_handlers),
+          tool_handlers=_handlers)["status"] == "HOLD")
+check("plan lacking a trusted tool registry is held",
+      agent_plan.run_review_plan(
+          _proposed, verified_role="Analyst", authorized_tools=set(),
+          tool_handlers=_handlers)["status"] == "HOLD")
+check("write-capable or unknown tool cannot be run from plan",
+      agent_plan.run_review_plan(
+          {**_proposed, "steps": [{"id": "file", "tool": "file_str",
+           "args": {"name": "X"}, "retries": 0}]},
+          verified_role="Reviewer-MLRO", authorized_tools={"file_str"},
+          tool_handlers={"file_str": lambda *_: {"filed": True}})["status"] == "HOLD")
+check("unsupported step arguments are not passed to executor",
+      agent_plan.run_review_plan(
+          {**_proposed, "steps": [{"id": "n", "tool": "normalize_name",
+           "args": {"name": "SYNTHETIC", "cmd": "file"}, "retries": 0}]},
+          verified_role="Admin", authorized_tools={"normalize_name"},
+          tool_handlers=_handlers)["status"] == "HOLD")
+check("plan refuses excessive fixed call budget",
+      agent_plan.run_review_plan(
+          {**_proposed, "steps": [
+              {"id": "step" + str(i), "tool": "normalize_name",
+               "args": {"name": "EXAMPLE"}, "retries": 1} for i in range(6)]},
+          verified_role="Admin", authorized_tools={"normalize_name"},
+          tool_handlers=_handlers)["status"] == "HOLD")
+_retry_count = {"n": 0}
+def _retry_once(args, state):
+    _retry_count["n"] += 1
+    if _retry_count["n"] == 1:
+        raise RuntimeError("simulated local failure")
+    return {"normalized": args["name"].lower()}
+_retry_plan = {**_proposed, "steps": [
+    {"id": "normalize", "tool": "normalize_name", "args": {"name": "SYNTHETIC"},
+     "retries": 1}]}
+_retry_result = agent_plan.run_review_plan(
+    _retry_plan, verified_role="Analyst",
+    authorized_tools={"normalize_name"},
+    tool_handlers={"normalize_name": _retry_once})
+check("one bounded local retry can recover but still requires human review",
+      _retry_result["status"] == "REVIEW_REQUIRED" and
+      [e["outcome"] for e in _retry_result["events"]] == ["DEGRADED", "OK"])
+check("unrecoverable tool failure degrades, never returns clear",
+      agent_plan.run_review_plan(
+          _retry_plan, verified_role="Admin", authorized_tools={"normalize_name"},
+          tool_handlers={"normalize_name": lambda *_: 1 / 0})["status"] == "DEGRADED")
+check("oversized tool result degrades instead of silently truncating evidence",
+      agent_plan.run_review_plan(
+          _retry_plan, verified_role="Admin", authorized_tools={"normalize_name"},
+          tool_handlers={"normalize_name": lambda *_: "X" * 10000})["status"] == "DEGRADED")
+
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
     sys.exit(1)
