@@ -29,6 +29,9 @@ _req.get = lambda *a, **k: None; _req.post = lambda *a, **k: None
 sys.modules["requests"] = _req
 os.environ.setdefault("ASANA_TOKEN", "dummy")
 os.environ.pop("ANTHROPIC_API_KEY", None)
+# No test may write the AI triage cache into the working tree's data/.
+import tempfile as _tf_cache
+os.environ["AI_TRIAGE_CACHE_PATH"] = os.path.join(_tf_cache.mkdtemp(), "ai-triage-cache.json")
 
 def _load(name):
     spec = importlib.util.spec_from_file_location(name, os.path.join(ROOT, name + ".py"))
@@ -740,6 +743,71 @@ try:
     check("LLM may raise MEDIUM up to CRITICAL", t_up["severity"] == "CRITICAL")
 finally:
     ai.LLM_TRIAGE, ai.llm_complete = _saved_triage
+
+# ── ai.py: triage verdict cache (cost control, never a coverage change) ──────
+print("ai.py — triage cache + credit-limit stop-loss")
+import tempfile as _tf
+_cache_dir = _tf.mkdtemp()
+_saved_cache = (ai.LLM_TRIAGE, ai.llm_complete, ai.AI_TRIAGE_CACHE_PATH, dict(ai._TRIAGE_CACHE),
+                ai.LLM_CALLS.get("cached", 0))
+try:
+    ai.LLM_TRIAGE = True
+    ai.AI_TRIAGE_CACHE_PATH = os.path.join(_cache_dir, "ai-triage-cache.json")
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    _calls = []
+    def _fake_llm(*a, **k):
+        _calls.append(1)
+        return '{"is_about_subject": true, "is_adverse": true, "severity": "LOW"}'
+    ai.llm_complete = _fake_llm
+    _art = {"title": "Cacheco gold smuggling probe", "source": "x", "date": "2026-10-01",
+            "categories": ["Fraud / Financial Crime"]}
+    _t1 = ai.triage_adverse("Cacheco", _art)
+    _t2 = ai.triage_adverse("Cacheco", dict(_art))
+    check("an identical headline is sent to the model once, then served from cache",
+          len(_calls) == 1 and _t1 == _t2 and _t2["ai"] is True)
+    _t3 = ai.triage_adverse("Othercorp", dict(_art))
+    check("a different subject is a different cache key (model asked again)", len(_calls) == 2)
+    _floor = ai.triage_adverse("Cacheco", dict(_art, categories=["Terrorism / CFT"]))
+    check("a cached LOW verdict never lowers this run's deterministic floor",
+          len(_calls) == 2 and _floor["severity"] == "CRITICAL")
+    ai.save_triage_cache()
+    _raw = open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8").read()
+    check("the persisted cache holds hashes and verdicts only (no names or headlines)",
+          "Cacheco" not in _raw and "smuggling" not in _raw and '"entries"' in _raw)
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    ai.triage_adverse("Cacheco", dict(_art))
+    check("a fresh run reloads the cache from disk", len(_calls) == 2)
+    _old = json.load(open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8"))
+    for _v in _old["entries"].values():
+        _v["d"] = "2000-01-01"
+    json.dump(_old, open(ai.AI_TRIAGE_CACHE_PATH, "w", encoding="utf-8"))
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=True)
+    ai._triage_cache_get("missing")  # forces the load
+    ai.save_triage_cache()
+    check("entries unused past AI_TRIAGE_CACHE_DAYS are pruned on save",
+          json.load(open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8"))["entries"] == {})
+    open(ai.AI_TRIAGE_CACHE_PATH, "w").write("{not json")
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    ai.triage_adverse("Cacheco", dict(_art))
+    check("an unreadable cache starts empty and the model is still asked", len(_calls) == 3)
+finally:
+    (ai.LLM_TRIAGE, ai.llm_complete, ai.AI_TRIAGE_CACHE_PATH) = _saved_cache[:3]
+    ai._TRIAGE_CACHE.clear(); ai._TRIAGE_CACHE.update(_saved_cache[3])
+    ai.LLM_CALLS["cached"] = _saved_cache[4]
+
+class _Reply:
+    def __init__(self, code, text=""):
+        self.status_code, self.text = code, text
+    def json(self):
+        return {}
+check("a credit-balance 400 is a final refusal",
+      ai._llm_refusal_is_final(_Reply(400, '{"error":{"message":"Your credit balance is too low"}}')))
+check("a usage-limit 400 is a final refusal",
+      ai._llm_refusal_is_final(_Reply(400, "You have reached your specified API usage limits")))
+check("401/403 are final refusals", ai._llm_refusal_is_final(_Reply(401)) and ai._llm_refusal_is_final(_Reply(403)))
+check("a 429 (throttling) is NOT final", not ai._llm_refusal_is_final(_Reply(429, "rate limit")))
+check("a 500/529 is NOT final", not ai._llm_refusal_is_final(_Reply(529, "overloaded")))
+check("an ordinary 400 is NOT final", not ai._llm_refusal_is_final(_Reply(400, "max_tokens too large")))
 
 # ── ai.py: report stays deterministic even if a key were present ──────────────
 print("ai.py — no generative prose in reports")
@@ -5023,6 +5091,26 @@ for _ in range(ai.LLM_BREAKER_AFTER * 2):
 check("a fast 500 likewise does not trip it (reachable, and cheap)",
       not ai.llm_circuit_open())
 
+# A CREDIT/USAGE-LIMIT refusal is final for the run: stop at the first one
+# rather than repeat it for every article (557 of 557 on 21 Sep 2026).
+_reset_llm()
+_hits = {"n": 0}
+def _capped(*a, **k):
+    _hits["n"] += 1
+    return _Reply(400, '{"type":"error","error":{"type":"invalid_request_error",'
+                       '"message":"Your credit balance is too low to access the Anthropic API."}}')
+_req.post = _capped
+for _ in range(20):
+    ai.llm_complete("x")
+check("a credit-limit refusal opens the circuit after ONE call", ai.llm_circuit_open() and _hits["n"] == 1)
+check("the remaining calls are skipped and disclosed",
+      ai.LLM_CALLS["skipped"] == 19 and ai.LLM_CALLS["failed"] == 1)
+_lt, ai.LLM_TRIAGE = ai.LLM_TRIAGE, True
+check("the footer names the refusal, not an outage",
+      "refused the key" in ai.governance_footer() and "HTTP 400" in ai.governance_footer())
+ai.LLM_TRIAGE = _lt
+ai._LLM_STATE["reason"] = ""
+
 # An INTERMITTENT outage must never trip it: a reply in between re-arms.
 _reset_llm()
 _seq = {"n": 0}
@@ -5086,6 +5174,8 @@ def _mon_section(llm_calls):
 _mon = _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 12})
 check("the report discloses the open AI circuit and the skipped count",
       "AI circuit OPEN" in _mon and "12 model call(s) skipped" in _mon)
+check("the report shows how many verdicts were reused from the cache",
+      "7 reused from cache" in _mon_section({"attempted": 3, "ok": 3, "failed": 0, "skipped": 0, "cached": 7}))
 check("a run that never tripped the breaker carries no circuit warning",
       "AI circuit OPEN" not in _mon_section({"attempted": 5, "ok": 5, "failed": 0, "skipped": 0}))
 

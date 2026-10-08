@@ -22,7 +22,7 @@ DESIGN RULES (governance-first):
 
 No third-party dependencies (uses requests, already required by the engine).
 """
-import os, re, json, unicodedata, threading
+import os, re, json, hashlib, datetime, unicodedata, threading
 
 # ── LLM GATEWAY (opt-in, gated on ANTHROPIC_API_KEY) ──────────────────────────
 AI_MODEL      = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
@@ -106,7 +106,7 @@ def llm_available() -> bool:
 # Usage telemetry (presence-only counts; no prompt/response content retained).
 # Read by monitoring.py to track LLM call volume & failures per run. `skipped`
 # counts calls the circuit breaker below refused to make.
-LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0, "skipped": 0}
+LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0, "skipped": 0, "cached": 0}
 
 # LLM circuit breaker — the mirror of the GDELT / Google News / Bing / Wikidata
 # guards in screen.py, and for the same reason. A degraded Anthropic endpoint
@@ -143,7 +143,7 @@ LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0, "skipped": 0}
 # sharpening on every remaining article while saving no time at all, because
 # those replies were already fast. Throttling is not an outage.
 LLM_BREAKER_AFTER = int(os.environ.get("LLM_BREAKER_AFTER", "5"))
-_LLM_STATE = {"consecutive_failures": 0, "open": False}
+_LLM_STATE = {"consecutive_failures": 0, "open": False, "reason": ""}
 # The triage pass is threaded, so the counters below are shared mutable state.
 # `+=` is not atomic and these numbers are REPORTED — an undercount would
 # understate how degraded a run was, which is the kind of quiet inaccuracy this
@@ -163,11 +163,44 @@ def _llm_unreachable():
         _LLM_STATE["consecutive_failures"] += 1
         if _LLM_STATE["consecutive_failures"] >= LLM_BREAKER_AFTER and not _LLM_STATE["open"]:
             _LLM_STATE["open"] = True
+            _LLM_STATE["reason"] = f"{LLM_BREAKER_AFTER} consecutive failures"
             trip = True
     if trip:
         print(f"  LLM unreachable ({LLM_BREAKER_AFTER} calls in a row) — AI circuit OPEN, "
               "skipping the model for the rest of the run; deterministic triage and "
               "summaries stand (sharpening lost, no finding lost)", flush=True)
+
+# A FINAL refusal is the other case worth stopping for: the key is out of
+# credit, over its spend limit, or no longer valid. Those replies are fast, so
+# they never trip the breaker above, and every one is identical — on 21 Sep
+# 2026 a capped key answered 557 of 557 calls with an error, ~10s of pool time
+# each spent learning nothing new. Unlike a 429 (throttling: the NEXT call may
+# succeed) nothing in this run will change the answer, so the first such reply
+# opens the circuit with its reason. Same defined degrade as the breaker:
+# deterministic triage stands, no finding lost, and the footer says so.
+_FINAL_REFUSAL = re.compile(r"credit balance|usage limit|spend(ing)? limit|billing", re.I)
+
+def _llm_refusal_is_final(r) -> bool:
+    if r.status_code in (401, 403):
+        return True
+    if r.status_code == 400:
+        try:
+            return bool(_FINAL_REFUSAL.search(r.text or ""))
+        except Exception:
+            return False
+    return False
+
+def _llm_stop(reason: str):
+    trip = False
+    with _LLM_LOCK:
+        if not _LLM_STATE["open"]:
+            _LLM_STATE["open"] = True
+            _LLM_STATE["reason"] = reason
+            trip = True
+    if trip:
+        print(f"  LLM refused the key ({reason}: credit/usage limit or invalid key) — "
+              "AI circuit OPEN, skipping the model for the rest of the run; deterministic "
+              "triage and summaries stand (sharpening lost, no finding lost)", flush=True)
 
 def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
     """Single-shot completion. Returns text, or None on any failure / no key.
@@ -195,6 +228,8 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
         if r.status_code != 200:
             with _LLM_LOCK:
                 LLM_CALLS["failed"] += 1
+            if _llm_refusal_is_final(r):
+                _llm_stop(f"HTTP {r.status_code}")
             return None
         data = r.json()
         parts = data.get("content", []) or []
@@ -320,6 +355,104 @@ def _name_relevance(subject: str, title: str):
     overlap = len(st & tt) / len(st)
     return "HIGH" if overlap >= 0.99 else ("MEDIUM" if overlap >= 0.5 else "LOW")
 
+# ── TRIAGE VERDICT CACHE (cost control; never a coverage change) ─────────────
+# Every sweep re-triages EVERY article of every adverse finding, and onboarding
+# re-screens each new customer ~4 times (26h look-back on a 6h schedule), so the
+# same headline was sent to the paid model again and again for the same answer
+# (557 calls on 21 Sep 2026). The verdict depends only on the prompt — subject,
+# headline, source, date — and the model, so it is keyed on a SHA-256 of exactly
+# those. The file holds hashes and enum verdicts only (no names, no headlines)
+# and still rides the encrypted screen-delta-state branch with the other state.
+# Every article is still triaged every run and the deterministic floor is still
+# recomputed each time; only the identical model call is not paid for twice.
+# A missing/unreadable cache is a cost event, not a coverage one: start empty.
+AI_TRIAGE_CACHE_PATH = os.environ.get("AI_TRIAGE_CACHE_PATH", "data/ai-triage-cache.json")
+AI_TRIAGE_CACHE_DAYS = int(os.environ.get("AI_TRIAGE_CACHE_DAYS", "45"))
+_TRIAGE_CACHE = {"loaded": False, "entries": {}, "dirty": False}
+_TRIAGE_CACHE_LOCK = threading.Lock()
+
+def _triage_cache_on() -> bool:
+    return bool(AI_TRIAGE_CACHE_PATH) and AI_TRIAGE_CACHE_PATH != "0"
+
+# The key is the classify template's inputs, exactly as the template reads them,
+# plus the model and the system prompt. Bump _TRIAGE_CACHE_VERSION whenever the
+# "triage-classify-user" template changes (prompt-register.test.mjs forces a
+# review of any such edit), so no verdict outlives the wording that produced it.
+_TRIAGE_CACHE_VERSION = "1"
+
+def _triage_cache_key(subject: str, article: dict) -> str:
+    parts = [_TRIAGE_CACHE_VERSION, AI_MODEL, GROUNDING_SYSTEM, subject or "",
+             article.get("title", ""), article.get("source", "?"),
+             _sanitize_untrusted(article.get("date", "?"), 32)]
+    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
+
+def _triage_cache_load():
+    # Caller holds _TRIAGE_CACHE_LOCK.
+    if _TRIAGE_CACHE["loaded"]:
+        return
+    _TRIAGE_CACHE["loaded"] = True
+    try:
+        with open(AI_TRIAGE_CACHE_PATH, encoding="utf-8") as fh:
+            data = json.load(fh)
+        ents = data.get("entries", {}) if isinstance(data, dict) else {}
+        _TRIAGE_CACHE["entries"] = {k: v for k, v in ents.items()
+                                    if isinstance(v, dict) and "severity" in v}
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"  WARN AI triage cache unreadable ({type(e).__name__}) — starting empty; "
+              "every headline is sent to the model this run (cost, not coverage)", flush=True)
+
+def _triage_cache_get(key: str):
+    if not _triage_cache_on():
+        return None
+    with _TRIAGE_CACHE_LOCK:
+        _triage_cache_load()
+        hit = _TRIAGE_CACHE["entries"].get(key)
+        if hit is None:
+            return None
+        today = datetime.date.today().isoformat()
+        if hit.get("d") != today:
+            hit["d"] = today          # keep entries in use alive past the TTL
+            _TRIAGE_CACHE["dirty"] = True
+        LLM_CALLS["cached"] += 1
+        return {"severity": str(hit.get("severity", "")).upper(),
+                "is_about_subject": bool(hit.get("about")),
+                "is_adverse": bool(hit.get("adverse"))}
+
+def _triage_cache_put(key: str, j: dict):
+    if not _triage_cache_on():
+        return
+    with _TRIAGE_CACHE_LOCK:
+        _triage_cache_load()
+        _TRIAGE_CACHE["entries"][key] = {"severity": j["severity"], "about": j["is_about_subject"],
+                                         "adverse": j["is_adverse"],
+                                         "d": datetime.date.today().isoformat()}
+        _TRIAGE_CACHE["dirty"] = True
+
+def save_triage_cache():
+    """Persist the triage cache, dropping entries unused for AI_TRIAGE_CACHE_DAYS.
+    Never raises: failing to save costs the next run money, never a finding."""
+    if not _triage_cache_on():
+        return
+    with _TRIAGE_CACHE_LOCK:
+        if not _TRIAGE_CACHE["dirty"]:
+            return
+        cutoff = (datetime.date.today() - datetime.timedelta(days=AI_TRIAGE_CACHE_DAYS)).isoformat()
+        ents = {k: v for k, v in _TRIAGE_CACHE["entries"].items() if v.get("d", "") >= cutoff}
+        try:
+            d = os.path.dirname(AI_TRIAGE_CACHE_PATH)
+            if d:
+                os.makedirs(d, exist_ok=True)
+            tmp = AI_TRIAGE_CACHE_PATH + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"v": 1, "entries": ents}, fh, sort_keys=True, separators=(",", ":"))
+            os.replace(tmp, AI_TRIAGE_CACHE_PATH)
+            _TRIAGE_CACHE["entries"], _TRIAGE_CACHE["dirty"] = ents, False
+        except Exception as e:
+            print(f"  WARN AI triage cache not saved ({type(e).__name__}) — next run re-pays "
+                  "those calls (cost, not coverage)", flush=True)
+
 def triage_adverse(subject: str, article: dict):
     """Decision-support triage for one adverse article.
     Deterministic by default; sharpened by the LLM only when a key is present.
@@ -356,7 +489,11 @@ def triage_adverse(subject: str, article: dict):
         out["injection_suspected"] = sorted(set(inj))
         return out
 
-    if LLM_TRIAGE:
+    j = None
+    key = _triage_cache_key(subject, article) if LLM_TRIAGE else None
+    if key:
+        j = _triage_cache_get(key)
+    if LLM_TRIAGE and j is None:
         # Grounded classification ONLY: judge the supplied headline against the
         # supplied name. Untrusted text is wrapped and never treated as instructions.
         prompt = ("Classify the untrusted news headline against the screening subject. "
@@ -372,23 +509,30 @@ def triage_adverse(subject: str, article: dict):
         txt = llm_complete(prompt, system=GROUNDING_SYSTEM, max_tokens=120)
         if txt:
             try:
-                j = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
-                # Clamp the model's severity: (a) to the allowed set — a stray value
-                # like "SEVERE"/"N/A" must never reach the bare dict lookups
-                # downstream; (b) NEVER below the deterministic floor. The LLM may
-                # only SHARPEN (raise) severity, never downgrade — otherwise a
-                # misled or adversarial "NONE" would zero out a CRITICAL article's
-                # risk contribution, breaking the no-downgrade guarantee (MODEL_CARD).
-                sev = str(j.get("severity", severity)).upper()
-                if sev not in _SEV_RANK or _SEV_RANK[sev] < _SEV_RANK[severity]:
-                    sev = severity
-                out.update({
-                    "severity": sev,
-                    "relevance": "HIGH" if j.get("is_about_subject") else "LOW",
-                    "confidence": "HIGH" if j.get("is_about_subject") and j.get("is_adverse") else "LOW",
-                    "ai": True})
+                raw = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
+                j = {"severity": str(raw.get("severity", "")).upper(),
+                     "is_about_subject": bool(raw.get("is_about_subject")),
+                     "is_adverse": bool(raw.get("is_adverse"))}
+                _triage_cache_put(key, j)
             except Exception:
-                pass  # any failure → deterministic result already in `out`
+                j = None  # any failure → deterministic result already in `out`
+    if j is not None:
+        # Clamp the model's severity: (a) to the allowed set — a stray value
+        # like "SEVERE"/"N/A" must never reach the bare dict lookups
+        # downstream; (b) NEVER below the deterministic floor. The LLM may
+        # only SHARPEN (raise) severity, never downgrade — otherwise a
+        # misled or adversarial "NONE" would zero out a CRITICAL article's
+        # risk contribution, breaking the no-downgrade guarantee (MODEL_CARD).
+        # Applied to a cached verdict too: the floor is recomputed every run
+        # from this run's typology buckets, so a cache hit can never lower it.
+        sev = j["severity"] or severity
+        if sev not in _SEV_RANK or _SEV_RANK[sev] < _SEV_RANK[severity]:
+            sev = severity
+        out.update({
+            "severity": sev,
+            "relevance": "HIGH" if j["is_about_subject"] else "LOW",
+            "confidence": "HIGH" if j["is_about_subject"] and j["is_adverse"] else "LOW",
+            "ai": True})
     return out
 
 # ── CUSTOMER RISK RATING (deterministic, explainable) ─────────────────────────
@@ -598,8 +742,11 @@ def governance_footer():
     # actually fell back, is the silent-green this estate forbids — the mode
     # line must describe what happened, not what was switched on.
     if _LLM_STATE["open"] and not _llm_in_reports():
-        mode += (f" — DEGRADED THIS RUN: the model went unreachable and the AI circuit "
-                 f"OPENED after {LLM_BREAKER_AFTER} consecutive failures; "
+        _why = _LLM_STATE.get("reason") or f"{LLM_BREAKER_AFTER} consecutive failures"
+        _what = ("the model refused the key (credit/usage limit or invalid key)"
+                 if _why.startswith("HTTP") else "the model went unreachable")
+        mode += (f" — DEGRADED THIS RUN: {_what} and the AI circuit "
+                 f"OPENED ({_why}); "
                  f"{LLM_CALLS.get('skipped', 0)} call(s) were skipped and those items carry "
                  f"DETERMINISTIC triage only (severity floors intact, no finding dropped)")
     # The breaker only counts an UNREACHABLE endpoint, so a run where every call
