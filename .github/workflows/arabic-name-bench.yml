@@ -1,0 +1,71 @@
+name: Arabic-name matching benchmark
+
+# EXPERIMENTAL, shadow-only, dispatch-only. This is a measurement instrument, not
+# a control.
+#
+# What it measures: whether a Latin-script customer name can meet an
+# Arabic-script-only designation. 304 of the 309 structured entries in
+# data/eocn-local-terrorist-list.json are Arabic-only.
+#
+# How: it scores HAWKEYE's live fuzzy gate and opensanctions/rigour (MIT,
+# Wikidata-derived cross-script name symbols) against official gold pairs. The
+# pairs come from the UN Security Council Consolidated List, where each party
+# carries both its Latin name parts and its NAME_ORIGINAL_SCRIPT.
+#
+# Data handling: the UN file is downloaded on the runner and nothing is
+# committed. rigour is installed from a hash-locked CI-only file
+# (ci/arabic-bench-requirements.txt) and is never imported by the engine, the
+# app or the MCP server.
+#
+# Scope: nothing here touches screening state, cases or Asana. Adopting
+# rigour's symbols in the live matcher would be a separate change governed by
+# the recall-monotone invariant.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  arabic-name-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit  # Stays audit (sudo kept): the ICU headers come from the Ubuntu apt mirrors, which a first run must map before a block list would be honest
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Install ICU headers (rigour's pyicu builds from source)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libicu-dev pkg-config
+
+      - name: Install the engine lock plus the benchmark-only lock
+        run: pip install --quiet --require-hashes -r ci/requirements.txt -r ci/arabic-bench-requirements.txt
+
+      - name: Download the UN Security Council Consolidated List
+        run: curl -fsS --retry 3 -o un-consolidated.xml https://scsanctions.un.org/resources/xml/en/consolidated.xml
+
+      - name: Run the benchmark
+        run: python scripts/arabic-name-bench.py un-consolidated.xml --json arabic-name-bench.json
+
+      - name: Upload the report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: arabic-name-bench-report
+          path: arabic-name-bench.json
+          retention-days: 30
