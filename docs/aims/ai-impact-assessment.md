@@ -46,7 +46,7 @@ draft summaries/STRs (human-reviewed).
   intentionally; adverse-media text may incidentally reference allegations.
 
 ## 3. Necessity & proportionality
-Screening is a **legal obligation** (UAE FDL 26/2021; Cabinet 74/2020; FATF R.6/10/12).
+Screening is a **legal obligation** (UAE FDL 10/2025 and Cabinet Resolution 134/2025, which repealed FDL 20/2018 as amended by FDL 26/2021; Cabinet 74/2020; FATF R.6/10/12).
 Only data necessary for matching is used. The LLM (when enabled) receives **only a
 subject name + a single public headline** — never the full customer record.
 

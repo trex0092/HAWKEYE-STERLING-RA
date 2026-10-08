@@ -34,10 +34,16 @@ const SCAN = [
   'advisor.js', 'console.js', 'app.js', 'i18n.js',
   'netlify/functions/brain-soul.js',
   'docs/AI-GOVERNANCE.md',
+  /* Added when FDL 26/2021 (the amendment repealed together with FDL 20/2018)
+     was found still cited as operative in the daily report and these docs. */
+  'scripts/daily-screen-report.py', 'data/reg-sources.json', 'SECURITY.md',
+  'docs/governance/backup-recovery.md', 'docs/governance/incident-postmortem-template.md',
+  'docs/aims/README.md', 'docs/aims/decommissioning.md', 'docs/aims/competency-records.md',
+  'docs/aims/interested-parties.md', 'docs/aims/ai-impact-assessment.md',
 ];
 
-/* The repealed instruments. */
-const REPEALED = /No\.?\s*\(?20\)?\s+of\s+2018|20\/2018|No\.?\s*\(?10\)?\s+of\s+2019|10\/2019/;
+/* The repealed instruments. FDL 26/2021 amended FDL 20/2018 and fell with it. */
+const REPEALED = /No\.?\s*\(?20\)?\s+of\s+2018|20\/2018|No\.?\s*\(?10\)?\s+of\s+2019|10\/2019|No\.?\s*\(?26\)?\s+of\s+2021|26\/2021/;
 /* A line may reference them only in historical context. */
 const HISTORICAL = /repeal|supersed|formerly|replac/i;
 

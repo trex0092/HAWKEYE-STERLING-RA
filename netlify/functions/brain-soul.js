@@ -561,12 +561,14 @@ const CITE_RECOGNIZED = new Set([
   'CAB 57/2018',  // Cabinet Decision No. (57) of 2018 — cited by the Q&A corpus
   'CAB 57/2020',  // Cabinet Decision No. (57) of 2020 — cited by the Q&A corpus
   'CAB 111/2022', // Cabinet Decision No. (111) of 2022 — cited by the Q&A corpus
-  'FDL 26/2021',  // Federal Decree-Law No. 26 of 2021 — AML amendment law (data/reg-sources.json)
   'FDL 33/2021',  // Federal Decree-Law No. 33 of 2021 — labour law (the Advisor's HR domain)
   'FDL 7/2014',   // Federal Law No. 7 of 2014 — counter-terrorism offences (TF topics)
 ]);
 const CITE_REPEALED = {
   'FDL 20/2018': 'repealed by Federal Decree-Law No. 10 of 2025',
+  // FDL 26/2021 amended FDL 20/2018 and was repealed with it
+  // (docs/research/uae-aml-legal-framework.md): as a CURRENT basis it is stale.
+  'FDL 26/2021': 'amended FDL 20/2018 and was repealed with it by Federal Decree-Law No. 10 of 2025',
   'CAB 10/2019': 'superseded by Cabinet Resolution No. (134) of 2025',
   'FDL 4/2002': 'the original AML law, repealed by Federal Decree-Law No. (20) of 2018 and in turn by FDL 10/2025',
 };

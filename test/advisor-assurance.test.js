@@ -208,6 +208,10 @@ check('cite guard flags a repealed instrument cited as an operative basis',
   I.legalCiteGuard('Your STR duty arises under Federal Decree-Law No. 20 of 2018, Article 9.').length === 1);
 check('cite guard stays quiet when the repealed instrument is historical context',
   I.legalCiteGuard('Federal Decree-Law No. 20 of 2018 was repealed by Federal Decree-Law No. 10 of 2025.').length === 0);
+check('cite guard flags the repealed FDL 26/2021 amendment cited as a current basis',
+  I.legalCiteGuard('Retain records for 10 years under Federal Decree-Law No. 26 of 2021, Article 23.').join() === 'repealed FDL 26/2021');
+check('cite guard stays quiet on FDL 26/2021 as history ("duty formerly FDL 26/2021 Art. 23")',
+  I.legalCiteGuard('Retain 10 years under Federal Decree-Law No. 10 of 2025 (duty formerly FDL 26/2021 Art. 23).').length === 0);
 check('cite guard stays quiet on the vetted operative basis',
   I.legalCiteGuard('File within the deadline set by Cabinet Resolution No. (134) of 2025 under Federal Decree-Law No. 10 of 2025.').length === 0);
 check('cite guard flags an instrument outside the recognised corpus',

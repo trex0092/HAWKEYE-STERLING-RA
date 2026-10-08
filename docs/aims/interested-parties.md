@@ -12,6 +12,6 @@ Parties relevant to the AI management system and their requirements. Review: ann
 | **FATF / international standards** | R.1/6/10/12/18/20/24/25 alignment | Mapped in `../AI-GOVERNANCE.md` + screening features |
 | **Technology providers** (Asana, Anthropic, Google, Wikimedia, GitHub) | Acceptable-use; DPAs | `third-party-register.md` |
 
-**Statutory/contractual requirements:** UAE FDL No. 26 of 2021; Cabinet Decision
+**Statutory/contractual requirements:** UAE FDL No. 10 of 2025 and Cabinet Resolution 134/2025 (repealing FDL 20/2018 as amended by FDL 26/2021); Cabinet Decision
 74/2020 (TFS); UAE PDPL; UAE National AI Strategy 2031 + AI Ethics Principles;
 FATF Recommendations.

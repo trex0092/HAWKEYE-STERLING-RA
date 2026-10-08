@@ -119,7 +119,8 @@ repository's audit trail: the report and correspondence, the reproduction /
 proof-of-concept, relevant logs, the CVSS vector and severity decision, the
 remediating commit/PR, and the post-incident review. Records are retained for at
 least **10 years** (aligning with the firm's AML/CFT record-keeping under UAE
-Federal Decree-Law No. (26) of 2021, Art. 23, applied elsewhere in this repo).
+Federal Decree-Law No. (10) of 2025, applied elsewhere in this repo; the duty was
+formerly FDL 26/2021 Art. 23).
 **No live secrets, tokens, or customer PII are stored in evidence** — sensitive
 values are redacted before they are attached, consistent with the app's
 no-secret-logging posture.
