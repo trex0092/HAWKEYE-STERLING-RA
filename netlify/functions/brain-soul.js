@@ -12,6 +12,7 @@ const { withFunctionTelemetry } = require('./_telemetry');
 const { rateLimit } = require('./_ratelimit');
 const { sharedTokenOk } = require('./_auth');
 const { inspectEgress } = require('./_data-boundary');
+const { inspectAdvisoryOutput } = require('./_answer-validator');
 
 // ── CORS (mirrors asana-task.js) ─────────────────────────────────────────────
 
@@ -921,6 +922,10 @@ const handle = async (event) => {
     ok: false, error: 'Sensitive identifier detected; Advisor input withheld before model egress.',
     piiFlagged: boundary.piiTypes, piiEgressPolicy: boundary.mode
   });
+  /* A typo in a server-controlled strict-output mode must never silently
+     downgrade enforcement or consume an LLM API request. */
+  const preflightOutput = inspectAdvisoryOutput({});
+  if (!preflightOutput.valid) return resp(503, { ok: false, error: 'Advisor output validation policy misconfigured.' });
 
   const { model, maxTokens, effectiveMode, degradedFrom, degradedReason, continuation } = selectModel(mode, deepContinue);
 
@@ -1057,6 +1062,21 @@ const handle = async (event) => {
   const anomFlagged = ok && !tippingOffFlagged ? anomalyGuard(text, ok) : false;
   const quality = ok && !tippingOffFlagged ? qualityScore(text) : 0;
 
+  /* When strict output withholding is approved, do not treat a citation
+     merely repeated from the caller's untrusted input as authoritative.
+     Existing tipping-off withholding always takes precedence over this gate. */
+  const strictCitations = preflightOutput.policy === 'withhold' && ok && !tippingOffFlagged
+    ? legalCiteGuard(text, '') : citeFlagged;
+  const outputReview = inspectAdvisoryOutput({
+    structureFlagged, hallFlagged, citeFlagged: strictCitations, anomFlagged
+  }, preflightOutput.policy);
+  if (outputReview.withheld && ok && !tippingOffFlagged) {
+    text = '[OUTPUT VALIDATION GUARD ACTIVATED — response withheld pending MLRO review. ' +
+      'The requested advice did not satisfy the configured structural, source or anomaly checks. ' +
+      'Consult the underlying authoritative evidence, then retry.]';
+    ok = false;
+  }
+
   const auditLine = 'AUDIT | ' + new Date().toISOString() +
     ' | model=' + model + ' | mode=' + mode +
     (degradedFrom ? ' | modeDegraded=' + degradedFrom + '→' + effectiveMode : '') +
@@ -1064,6 +1084,8 @@ const handle = async (event) => {
     ' | elapsedMs=' + elapsedMs + ' | ok=' + ok +
     ' | hash=' + simpleHash(question) +
     ' | piiPolicy=' + boundary.mode +
+    ' | outputPolicy=' + outputReview.policy +
+    (outputReview.withheld ? ' | outputWithheld=' + outputReview.reasons.join('+') : '') +
     ' | quality=' + quality +
     (piiFlagged.length ? ' | pii=' + piiFlagged.join('+') : '') +
     (structureFlagged ? ' | structureFlagged' : '') +
@@ -1078,6 +1100,8 @@ const handle = async (event) => {
     modeDegradedReason: degradedReason || null,
     model, elapsedMs, tippingOffFlagged,
     piiFlagged, piiEgressPolicy: boundary.mode, piiRedacted: boundary.redacted,
+    outputPolicy: outputReview.policy, outputWithheld: outputReview.withheld,
+    outputValidationReasons: outputReview.reasons,
     structureFlagged, budgetFlagged, latencyFlagged,
     hallFlagged, citeFlagged, injectionFlagged, anomFlagged, quality, auditLine });
 };

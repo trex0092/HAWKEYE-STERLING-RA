@@ -107,3 +107,35 @@ time; CI verifies those ids too.
 [`grc-metrics.md`](grc-metrics.md) ·
 [`open-actions-register.md`](open-actions-register.md) ·
 [`../executive/regulatory-readiness.md`](../executive/regulatory-readiness.md)
+
+---
+
+## 6. Verified-source local retrieval (staged, no model integration)
+
+The zero-dependency library `scripts/verified-legal-retrieval.mjs` can rank
+**human-verified** legal citations that already exist in
+`data/obligations.json`. It is a local, read-only retrieval primitive, **not
+live RAG**, a legal search service, or a verified legal opinion.
+
+The retrieval gate accepts only rows with `source_citation.basis = sourced`,
+a populated article, quoted source text, exact HTTPS source URL, locator,
+verification date, and human verifier. It also requires an independently
+trusted official-publisher hostname allowlist, a server-verified caller role,
+and a valid as-of date. Text is ranked lexically and returned with source IDs
+and verification metadata. No network, model, credentials, vector database,
+or personal data are involved.
+
+**Critical current limitation:** the 21 obligation citations remain
+`needs-source` pending OA-5 counsel/MLRO work. Therefore the corpus of
+verified operative legal passages is empty and retrieval returns
+`insufficient_verified_sources`. This is the intended fail-closed answer.
+Neither an AI model nor code should turn unsourced prose into source text.
+
+**Activation gates:** human source verification, official publication and
+effective-date checking, signed role authorization at a future server
+boundary, independent source-list maintenance, relevance/evidence evaluation,
+prompt-injection handling of retrieved text, and MLRO approval of any RAG
+integration. Caller-supplied `approvedHosts` and `role` cannot establish
+authority if supplied by a browser or LLM. This library has no public endpoint
+and must only be invoked by trusted backend code. Tests:
+`test/obligations.test.mjs`.
