@@ -28,6 +28,8 @@ No third-party dependencies. Deterministic. Human (MLRO) reviews & files.
 import os, re, json, datetime
 from collections import defaultdict
 
+import txn_feed  # stdlib-only validation; never fetches or stores customer data
+
 CASH_REPORT_THRESHOLD = float(os.environ.get("DPMS_CASH_THRESHOLD", "55000"))
 CDD_TRIGGER_THRESHOLD = float(os.environ.get("CDD_TRIGGER_THRESHOLD", "15000"))
 STRUCTURING_BAND      = 0.10   # within 10% under a threshold = "just under"
@@ -77,6 +79,11 @@ def feed_configured():
     return bool(TXN_FEED_PATH and os.path.exists(TXN_FEED_PATH))
 
 
+def _manifest_path(path):
+    """Trusted export completeness manifest, normally adjacent to the export."""
+    return os.environ.get("TXN_FEED_MANIFEST_PATH") or path + ".manifest.json"
+
+
 def feed_parse_error(path=None):
     """True if a feed file is configured and present but cannot be parsed as a
     JSON list of records. A corrupt / truncated feed must NOT read as a quiet
@@ -84,6 +91,15 @@ def feed_parse_error(path=None):
     p = path or TXN_FEED_PATH
     if not p or not os.path.exists(p):
         return False
+    if path is None and TXN_FEED_PATH:
+        # The configured production feed MUST be complete and independently
+        # attested. An untrusted or missing manifest is never a zero-activity
+        # day. Explicit paths remain a legacy offline fixture interface.
+        try:
+            txn_feed.read_validated_feed(p, _manifest_path(p))
+            return False
+        except txn_feed.FeedValidationError:
+            return True
     try:
         with open(p) as f:
             data = json.load(f)
@@ -96,6 +112,11 @@ def load_transactions(path=None):
     """Return the transaction list from the configured feed, or [] if none.
     Never raises, never fabricates. [] means 'no feed' (degrade loudly)."""
     p = path or TXN_FEED_PATH
+    if path is None and TXN_FEED_PATH:
+        # Never silently skip malformed rows for an activated live feed.
+        # Fail loudly on a missing export/manifest, incomplete coverage,
+        # duplicate ID, invalid amount, date, currency or digest mismatch.
+        return txn_feed.read_validated_feed(p, _manifest_path(p))
     if not p or not os.path.exists(p):
         return []
     try:
@@ -701,11 +722,15 @@ def evaluate(transactions, jurisdiction_table=None):
 
 def status_line():
     """One line for the report / monitoring section. Honest about the feed."""
+    if TXN_FEED_PATH and not os.path.exists(TXN_FEED_PATH):
+        return ("Transaction monitoring (R.16): DEGRADED — configured transaction "
+                "feed file is missing; investigate the source/landing zone outage.")
     if feed_configured():
         if feed_parse_error():
-            return ("Transaction monitoring (R.16): DEGRADED — the configured transaction "
-                    "feed could not be parsed (corrupt or truncated JSON). No transactions "
-                    "were screened this run; investigate the feed before relying on it.")
+            return ("Transaction monitoring (R.16): DEGRADED — configured feed or "
+                    "authenticated completeness manifest failed validation. "
+                    "No transactions were screened from this file this run; "
+                    "investigate the source and manifest before relying on it.")
         res = evaluate(load_transactions())
         errs = res.get("rule_errors") or {}
         warn = (f"  ⚠ {sum(errs.values())} rule error(s) [{', '.join(sorted(errs))}] — "

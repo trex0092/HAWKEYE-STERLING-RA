@@ -125,7 +125,7 @@ MITRE ATLAS is already referenced in [`../cybersecurity-skills.md`](../cybersecu
 | LLM06 Excessive Agency · ASI02 Tool Misuse · ASI03 Identity & Privilege Abuse | MCP tools are deterministic and decision-support only; `agent_orchestrator.py` enforces a five-tool read-only allowlist, ≤8 steps, ≤2 replans, a verified MLRO/Admin role and human approval before any dispatch (tests in `test/mcp_tools_test.py`); `McpAgent` can never be issued a secret (`agents.py` credential broker) |
 | LLM07 System Prompt Leakage | The system prompt holds policy, not secrets; keys live in environment settings only (gitleaks) |
 | LLM08 Vector & Embedding Weaknesses | N/A — no vector store or RAG index |
-| LLM09 Misinformation · ASI09 Human-Agent Trust Exploitation | Cited answers, `[AI]` labelling, human decision on every output; citation-accuracy metric ([`citation-accuracy-metric.md`](citation-accuracy-metric.md)) |
+| LLM09 Misinformation · ASI09 Human-Agent Trust Exploitation | Cited answers, `[AI]` labelling, human decision on every output; citation-accuracy metric ([`citation-accuracy-metric.md`](citation-accuracy-metric.md)); Advisor output validation (`netlify/functions/_answer-validator.js`, `ADVISOR_OUTPUT_POLICY`: default *audit*, opt-in *withhold*; it cannot establish that a generated claim is true) |
 | LLM10 Unbounded Consumption · ASI08 Cascading Failures | Rate limiting (`netlify/functions/_ratelimit.js`); budget guard; refusal circuit breaker; degrade-loudly failure paths |
 | ASI07 Insecure Inter-Agent Communication | N/A — no agent-to-agent messaging; the coordinator is local and in-process |
 | ASI10 Rogue Agents | Explicit Advisor kill switch (`brain-soul.js`, [`ai-incident-runbook.md`](ai-incident-runbook.md)); no autonomous agent exists |
@@ -168,7 +168,7 @@ any of them there is a separate, one-state-change-per-PR act.
 | G-4 | OIDC and the Advisor egress guard's *block* mode are both default-off | OIDC is already tracked as [open action 20](open-actions-register.md). No register item was found for switching the egress guard from *audit* to *block*; propose one | MLRO (role mapping, egress mode decision) |
 | G-5 | §5 escalation matrix is a proposal | MLRO adopts it, amends it or rejects it | MLRO |
 | G-6 | Vendor frontier-risk evidence | Where the model provider is an SB 53 *large frontier developer*, record its published frontier AI framework as vendor-assurance evidence in [`ai-vendor-assurance.md`](ai-vendor-assurance.md) | Maintainer |
-| G-7 | `agent_orchestrator.py` has no production adapter | Before any production wiring: persist a non-replayable MLRO approval bound to `proposal_digest(plan)` (the module's own docstring requires this) | Maintainer |
+| G-7 | `agent_orchestrator.py` has no production adapter, and its approval flag is a plain boolean | `netlify/functions/_human-review.js` now gives a signed review-evidence preflight, but by its own header it is not a replay-preventing authorization gateway. Before any production wiring: persist a non-replayable MLRO approval bound to `proposal_digest(plan)` (the orchestrator's docstring requires this) | Maintainer |
 
 ## Sources
 

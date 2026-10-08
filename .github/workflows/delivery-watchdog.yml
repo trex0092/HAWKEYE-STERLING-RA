@@ -72,3 +72,40 @@ jobs:
           node scripts/asana-alert.mjs \
             "DAILY SCREENING REPORT NOT FULLY DELIVERED FOR A DUE DAY -- mandatory sanctions/PEP/adverse-media obligation not evidenced as delivered" \
             "The Delivery Watchdog found, for the most recent DUE day in the screening project (today's report after 18:00 UTC; before that, the previous UTC day's -- a report is not judged before it is due), EITHER no 'Daily AML/CFT Screening Report' task OR (from 2 Oct 2026) a report without its full-results attachments (full-screening-report-*.txt + screening-results-register-*.csv), i.e. only the capped card reached Asana. The run log names the exact date checked and which case applies. This means that day's mandatory sanctions/PEP/adverse-media screening has NOT been evidenced as delivered to the MLRO -- the underlying run (weekly-adverse-media.yml) may have been killed on every attempt that day, or Asana delivery itself failed. Check the run history and consider a manual workflow_dispatch of Daily Screening: $RUN_URL"
+
+  # Second alert destination, separate from Asana, but still hosted by GitHub.
+  # OFF until MLRO/IT accept public-issue disclosure and explicitly configure
+  # the repository variable SECONDARY_ALERT_ENABLED=true.
+  github-secondary-alert:
+    name: Secondary GitHub failure notification
+    needs: check
+    if: ${{ always() && needs.check.result == 'failure' && vars.SECONDARY_ALERT_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Harden the runner (GitHub API only, no Asana access)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Create or reuse a generic GitHub failure issue
+        env:
+          SECONDARY_ALERT_ENABLED: ${{ vars.SECONDARY_ALERT_ENABLED }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/github-fallback-alert.mjs
