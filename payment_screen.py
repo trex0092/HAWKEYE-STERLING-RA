@@ -100,9 +100,17 @@ def bic_country(bic):
 
 def _party(role, name="", bic="", country="", source=""):
     bic = _clean(bic).upper()
-    country = _clean(country).upper()[:2] or bic_country(bic)
-    return {"role": role, "name": _clean(name), "bic": bic, "country": country,
-            "source": source}
+    raw = _clean(country)
+    # Only a 2-letter value is an ISO code. Truncating a name to its first two
+    # letters turned "Myanmar" into MY (Malaysia) and "North Korea" into NO
+    # (Norway), so call-for-action jurisdictions screened as NO MATCH. A name
+    # is kept as country_name, which _jurisdiction_tier resolves.
+    iso = raw.upper() if len(raw) == 2 and raw.isalpha() else ""
+    party = {"role": role, "name": _clean(name), "bic": bic,
+             "country": iso or bic_country(bic), "source": source}
+    if raw and not iso:
+        party["country_name"] = raw
+    return party
 
 
 # ── SWIFT MT103 ───────────────────────────────────────────────────────────────

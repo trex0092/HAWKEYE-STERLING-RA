@@ -1414,6 +1414,31 @@ _mr = payment_screen.monitoring_records(
     screen.safe_xml_fromstring)
 check("register: payment messages with no customer are keyed apart, never pooled into one profile",
       len({r["customer"] for r in _mr}) == 2 and not any("payment_message" in r for r in _mr))
+_pc = {c: payment_screen._party("beneficiary", "X", country=c) for c in ("Myanmar", "North Korea", "MM")}
+check("payment party: a country NAME is never truncated into a different ISO code",
+      _pc["Myanmar"]["country"] == "" and _pc["Myanmar"]["country_name"] == "Myanmar"
+      and _pc["North Korea"]["country"] != "NO" and _pc["MM"]["country"] == "MM")
+_jt = kyc.load_jurisdiction_risk()
+_wire = dict(transaction_id="W1", customer="Acme Gold LLC", date="2026-10-01", amount=200000,
+             currency="AED", direction="out", method="wire")
+def _tm_rules(t):
+    return {a["rule"] for a in txn_monitor.evaluate([t], _jt)["alerts"]}
+check("TM: a wire whose foreign party is only in parties[] (ISO code) raises THRESHOLD and HIGH_RISK_GEO",
+      {"THRESHOLD", "HIGH_RISK_GEO"} <= _tm_rules(dict(_wire, parties=[
+          {"role": "originator", "name": "Acme Gold LLC", "country": "AE"},
+          {"role": "beneficiary", "name": "Tehran Bullion Co", "country": "IR"}])))
+check("TM: counterparty_country given as an ISO code still hits the jurisdiction table",
+      "HIGH_RISK_GEO" in _tm_rules(dict(_wire, counterparty="T", counterparty_country="IR")))
+check("TM: a wire between two UAE parties in parties[] is not international",
+      "THRESHOLD" not in _tm_rules(dict(_wire, parties=[
+          {"role": "originator", "name": "Acme Gold LLC", "country": "AE"},
+          {"role": "beneficiary", "name": "Dubai Co", "country": "AE"}])))
+_lm = {"ofac": {"count": 18000, "date": "2026-07-01", "tier": "core"},
+       "un": {"count": 1000, "date": "2026-10-07", "tier": "core"},
+       "uk": {"count": 0, "date": "", "tier": "core"}}
+_dc = screen.degraded_core_lists(_lm, _dt.date(2026, 10, 8))
+check("payment screening treats a stale core list as degraded, not only an empty one",
+      "UK" in _dc and any(x.startswith("OFAC (stale") for x in _dc) and not any(x.startswith("UN") for x in _dc))
 _cl_n, _cl_b = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []},
     txn_monitor.evaluate([{**_rr[1], "date": "2026-10-01", "amount": 60000, "method": "cash"},
