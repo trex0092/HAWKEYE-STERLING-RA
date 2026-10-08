@@ -12,7 +12,37 @@
    identity and lifecycle, key rotation, immutable evidence, and MLRO approval.
 */
 const crypto = require('node:crypto');
-const { validateCaseProposal } = require('./_answer-validator');
+/* Kept self-contained while the optional Advisor output validator is
+   separately under PR review. A future integration should remove duplication
+   only after a tested, approved common contract is adopted. */
+function validProposal(p, trustedIds) {
+  if (!p || typeof p !== 'object' || Array.isArray(p) ||
+      !Array.isArray(trustedIds) || trustedIds.length > 5000) return false;
+  const keys = ['schema', 'case_id', 'status', 'recommendation', 'findings',
+    'limitations', 'approval_required'];
+  if (Object.keys(p).length !== keys.length ||
+      keys.some(k => !Object.hasOwn(p, k)) ||
+      p.schema !== 'hawkeye.case-proposal/v1' ||
+      p.status !== 'PROPOSED' || p.approval_required !== true ||
+      typeof p.case_id !== 'string' || !/^[A-Za-z0-9._:-]{1,120}$/.test(p.case_id) ||
+      !['review', 'seek_more_evidence', 'escalate_to_mlro'].includes(p.recommendation)) return false;
+  if (!Array.isArray(p.limitations) || !p.limitations.length ||
+      p.limitations.length > 20 ||
+      !p.limitations.every(s => typeof s === 'string' && s.trim().length >= 4 && s.length <= 500)) return false;
+  const allowed = new Set(trustedIds.filter(id => typeof id === 'string' && id.length <= 180));
+  if (!Array.isArray(p.findings) || p.findings.length > 20) return false;
+  const kinds = new Set(['sanctions', 'pep', 'adverse_media', 'customer_due_diligence',
+    'transaction_pattern', 'regulatory_context']);
+  return p.findings.every(f => f && typeof f === 'object' && !Array.isArray(f) &&
+    Object.keys(f).length === 3 &&
+    ['kind', 'summary', 'evidence_ids'].every(k => Object.hasOwn(f, k)) &&
+    kinds.has(f.kind) && typeof f.summary === 'string' &&
+    f.summary.trim().length >= 10 && f.summary.length <= 2000 &&
+    Array.isArray(f.evidence_ids) && f.evidence_ids.length >= 1 &&
+    f.evidence_ids.length <= 8 &&
+    f.evidence_ids.every(id => typeof id === 'string' && allowed.has(id)) &&
+    new Set(f.evidence_ids).size === f.evidence_ids.length);
+}
 
 const REQUIRED_ATTEST = Object.freeze([
   'aud', 'case_id', 'proposal_sha256', 'subject', 'role',
@@ -72,7 +102,7 @@ function assessCaseReviewReadiness(proposal, reviews, context = {}) {
   const reasons = [];
   const digest = digestProposal(proposal);
   if (!digest || !context || !Array.isArray(context.trustedEvidenceIds) ||
-      !validateCaseProposal(proposal, context.trustedEvidenceIds).valid) {
+      !validProposal(proposal, context.trustedEvidenceIds)) {
     reasons.push('unverified_proposal_or_sources');
   }
   const tier = context && context.riskTier;
