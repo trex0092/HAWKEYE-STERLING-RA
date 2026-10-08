@@ -136,3 +136,32 @@ made operational; it ties the executed DPA and PDPL safeguards to enablement.
 
 > Reverting: setting `LLM_TRIAGE` back to `0` (or unsetting the key) stops egress
 > immediately and returns the engine to the fully deterministic state.
+
+## 9. Lifecycle trigger index (ISO/IEC 42005 alignment)
+
+Added 2026-10-08 to close gap G-2 in
+[`../governance/ai-rulebooks-crosswalk-2026.md`](../governance/ai-rulebooks-crosswalk-2026.md) §8.
+ISO/IEC 42005:2025 gives guidance on **when, and at which lifecycle stages**, an
+AI system impact assessment should be performed and how it is documented. This
+index answers that question for this estate by pointing at triggers that
+**already exist**. It adds no new obligation, and it does not quote the
+standard (which is copyrighted and was not consulted verbatim). Ticking §8 is
+still a human act; nothing here changes its state.
+
+| Lifecycle stage | What re-runs this assessment | Where the trigger is defined |
+|---|---|---|
+| **Inception / design** | A new AI surface, provider or model family; new data that can reach a provider; tools, write capability or a new connector | [`ai-use-case-intake.md`](../governance/ai-use-case-intake.md) §"When an intake is mandatory" |
+| **Development / change** | A material edit to a system prompt (purpose, prohibitions or decision boundary) | [`prompt-lifecycle-register.md`](../governance/prompt-lifecycle-register.md) §2 (every edit is a trigger) |
+| **Pre-deployment** | Enabling LLM triage egress (`LLM_TRIAGE=1`) | §8 above (go-live sign-off, fail-closed) |
+| **Operation** | Annual review; any change to the AI system, its scope or its data flows; any change to data sent to third parties | This document's header and §7 |
+| **Operation (incident)** | An AI incident, including one that would be Art. 73-reportable had the EU AI Act applied | [`ai-incident-runbook.md`](../governance/ai-incident-runbook.md); [`eu-ai-act-assessment-2026.md`](../governance/eu-ai-act-assessment-2026.md) §6–§7 |
+| **Operation (jurisdiction)** | EU market exposure or another §7 re-assessment trigger | [`eu-ai-act-assessment-2026.md`](../governance/eu-ai-act-assessment-2026.md) §7 |
+| **Operation (population)** | Drift beyond the monitored stability thresholds | [`population-stability-monitoring.md`](population-stability-monitoring.md) |
+| **Retirement** | Decommissioning an AI surface (records survive the system) | [`decommissioning.md`](decommissioning.md) §1 |
+
+**Documentation coverage.** The assessment's documentation spans four
+artefacts: system description and data (§§1–4), impacts on individuals (§5),
+group-level and discriminatory outcomes (§5a and the
+[Stakeholder Impact Assessment](../governance/stakeholder-impact-assessment-2026.md)),
+and personal-data processing ([DPIA](../governance/dpia-2026.md)). How they divide
+the work is set out in the table at the top of this document.

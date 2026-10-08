@@ -327,7 +327,12 @@ them binds the system; seven gaps are recorded as proposals only. The same chang
 fail-closed contract breaks in `agent_orchestrator.py` and added its first tests. No scored
 control changed.*
 
-Verified at HEAD: 70 workflows · 197 markdown documents under docs/ (164 excluding docs/research/auto).
+*Estate re-verification · 8 October 2026 (later) — one curated document added,
+`docs/governance/iso-27001-soa-draft-2026.md`: a **draft**, unapproved ISO/IEC 27001:2022
+Statement of Applicability. It covers all 93 controls with repository evidence and states plainly
+what this repository does not evidence. No certification is claimed, and no scored control changed.*
+
+Verified at HEAD: 70 workflows · 198 markdown documents under docs/ (165 excluding docs/research/auto).
 
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days

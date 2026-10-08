@@ -10,6 +10,12 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Crosswalk gaps G-1 to G-3 drafted (ISO/IEC 27001, 42005, 22989).**
+  - Added `docs/governance/iso-27001-soa-draft-2026.md`: a **draft, unapproved** ISO/IEC 27001:2022 Annex A Statement of Applicability. It covers all 93 controls, with control titles cross-checked against two published lists, applicability proposals for the MLRO and repository evidence. The tally is 30 ✅, 33 🟡, 20 ❓, 7 inherited and 3 proposed exclusions. Real gaps are named: no classification scheme, no remote-working policy, no endpoint baseline, no independent review. No certification is claimed.
+  - `docs/aims/ai-impact-assessment.md` §9: lifecycle-trigger index (ISO/IEC 42005 alignment) pointing only at triggers that already exist. The §8 sign-offs are untouched.
+  - `docs/governance/risk-glossary.md` §10: 15 AI terms in the repository's own wording, aligned in intent with ISO/IEC 22989 (not quoted).
+  - The crosswalk, governance index, board figures and readiness-review count are updated to match.
+
 - **Repealed FDL 26/2021 no longer cited as current law.** FDL 10/2025 repealed FDL 20/2018 *as amended*, including the FDL 26/2021 amendment (`docs/research/uae-aml-legal-framework.md`), but FDL 26/2021 was still cited as an operative basis in places the earlier migration missed:
   - **Daily screening report** (`scripts/daily-screen-report.py`): its regulatory-basis block cited FDL 26/2021 as "the AML/CFT Law", omitted Cabinet Resolution 134/2025, and called FDL 10/2025 "AML/CFT Amendments"; its retention notice cited "FDL 26/2021, Article 23". Both now match `screen.py`'s already-migrated wording.
   - **Advisor citation guard** (`brain-soul.js`): FDL 26/2021 moved from the recognised set to the repealed map, so citing it as a current basis now raises a CITE chip. History ("duty formerly FDL 26/2021 Art. 23") stays quiet. Two regression checks in `test/advisor-assurance.test.js`.

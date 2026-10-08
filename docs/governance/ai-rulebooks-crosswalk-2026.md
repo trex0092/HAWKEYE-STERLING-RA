@@ -70,15 +70,15 @@ technological).
 | Supplier relationships | [`../aims/third-party-register.md`](../aims/third-party-register.md); [`ai-vendor-assurance.md`](ai-vendor-assurance.md) | ✅ |
 | Backup & continuity | [`backup-recovery.md`](backup-recovery.md); [`../aims/bcp.md`](../aims/bcp.md) | 🟡 first second-operator drill outstanding (open action 44) |
 | Physical controls | Inherited from the hosting providers (Netlify, GitHub); no premises-hosted infrastructure | Inherited |
-| ISMS clauses 4–10 (scope, risk treatment, Statement of Applicability, internal audit, management review) | Partly met **through the AIMS**: [`../aims/internal-audit.md`](../aims/internal-audit.md), [`../aims/management-review.md`](../aims/management-review.md) | ❌ **no ISO 27001 Annex A Statement of Applicability exists** (§8 gap G-1) |
+| ISMS clauses 4–10 (scope, risk treatment, Statement of Applicability, internal audit, management review) | Partly met **through the AIMS**: [`../aims/internal-audit.md`](../aims/internal-audit.md), [`../aims/management-review.md`](../aims/management-review.md) | 🟡 a **draft** Annex A Statement of Applicability now exists: [`iso-27001-soa-draft-2026.md`](iso-27001-soa-draft-2026.md) (not approved; §8 gap G-1) |
 
 ## 3. AI management, risk and impact — ISO/IEC 23894 · 42005 · 22989
 
 | Standard | Closest existing artefact | Status |
 |---|---|---|
 | ISO/IEC 23894 (AI risk management, ISO 31000 process) | [`../aims/ai-risk-register.md`](../aims/ai-risk-register.md) (R-01…R-20) · [`../aims/iso-42001-clause-6-1-mapping.md`](../aims/iso-42001-clause-6-1-mapping.md) · [`risk-appetite-statement-2026.md`](risk-appetite-statement-2026.md) | ✅ the process (identify → analyse → evaluate → treat → monitor) is run; the register is not labelled against 23894 clauses |
-| ISO/IEC 42005 (AI system impact assessment) | [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) (individuals, group-level and discriminatory outcomes, rights) · [`stakeholder-impact-assessment-2026.md`](stakeholder-impact-assessment-2026.md) | 🟡 content overlaps; not structured to 42005's lifecycle-stage triggers (§8 gap G-2) |
-| ISO/IEC 22989 (terminology) | [`risk-glossary.md`](risk-glossary.md) defines **business-risk** terms only | ❌ no AI-vocabulary alignment (§8 gap G-3) |
+| ISO/IEC 42005 (AI system impact assessment) | [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) (individuals, group-level and discriminatory outcomes, rights) · [`stakeholder-impact-assessment-2026.md`](stakeholder-impact-assessment-2026.md) | 🟡 lifecycle-trigger index added: [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) §9 (§8 gap G-2) |
+| ISO/IEC 22989 (terminology) | [`risk-glossary.md`](risk-glossary.md) §§1–9 business-risk terms; §10 AI terms | 🟡 AI-terms section added: [`risk-glossary.md`](risk-glossary.md) §10, in the repository's own wording (§8 gap G-3) |
 
 ## 4. Model risk and validation — OSFI E-23 (benchmark)
 
@@ -162,9 +162,9 @@ any of them there is a separate, one-state-change-per-PR act.
 
 | ID | Gap | Proposed action | Owner (proposed) |
 |---|---|---|---|
-| G-1 | No ISO/IEC 27001 Annex A Statement of Applicability | Draft an Annex A SoA reusing §2, scoped to the web app, engine and MCP server | Maintainer drafts; MLRO approves |
-| G-2 | AI impact assessment not structured to ISO/IEC 42005 | Add a 42005 lifecycle-trigger index to [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) | Maintainer |
-| G-3 | No AI-terminology alignment (ISO/IEC 22989) | Add an AI-terms section to [`risk-glossary.md`](risk-glossary.md) | Maintainer |
+| G-1 | No ISO/IEC 27001 Annex A Statement of Applicability | **Drafted 2026-10-08:** [`iso-27001-soa-draft-2026.md`](iso-27001-soa-draft-2026.md) (all 93 controls; applicability proposals await the MLRO) | Maintainer drafts; MLRO approves |
+| G-2 | AI impact assessment not structured to ISO/IEC 42005 | **Done 2026-10-08:** [`../aims/ai-impact-assessment.md`](../aims/ai-impact-assessment.md) §9 indexes the existing triggers by lifecycle stage | Maintainer |
+| G-3 | No AI-terminology alignment (ISO/IEC 22989) | **Done 2026-10-08:** [`risk-glossary.md`](risk-glossary.md) §10 (15 terms) | Maintainer |
 | G-4 | OIDC and the Advisor egress guard's *block* mode are both default-off | OIDC is already tracked as [open action 20](open-actions-register.md). No register item was found for switching the egress guard from *audit* to *block*; propose one | MLRO (role mapping, egress mode decision) |
 | G-5 | §5 escalation matrix is a proposal | MLRO adopts it, amends it or rejects it | MLRO |
 | G-6 | Vendor frontier-risk evidence | Where the model provider is an SB 53 *large frontier developer*, record its published frontier AI framework as vendor-assurance evidence in [`ai-vendor-assurance.md`](ai-vendor-assurance.md) | Maintainer |
