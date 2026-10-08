@@ -332,7 +332,12 @@ control changed.*
 Statement of Applicability. It covers all 93 controls with repository evidence and states plainly
 what this repository does not evidence. No certification is claimed, and no scored control changed.*
 
-Verified at HEAD: 70 workflows · 198 markdown documents under docs/ (165 excluding docs/research/auto).
+*Estate re-verification · 8 October 2026 (research note) — one curated document added,
+`docs/research/open-source-candidates-2026.md`: 20 open-source repositories checked against the
+gaps this repository records, with licence evidence and adoption mode. Nothing adopted; no scored
+control changed.*
+
+Verified at HEAD: 70 workflows · 199 markdown documents under docs/ (166 excluding docs/research/auto).
 
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days

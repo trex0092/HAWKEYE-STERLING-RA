@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Open-source candidate register.** `docs/research/open-source-candidates-2026.md` checks 20 further repositories against gaps the repo already records. Each row gives licence evidence, marked *secondary* where no LICENSE file was read, and an adoption mode that respects the zero-runtime-dependency rule. Shortlist: IBM AMLSim (synthetic transactions for the inert `txn_monitor.py`), NVIDIA garak (Advisor prompt-injection probes), World Bank WGI via wbgapi (licence-clean corruption input for the country score), fsfe/reuse-tool (draft SoA control 5.32). Nothing is adopted.
+
 - **Crosswalk gaps G-1 to G-3 drafted (ISO/IEC 27001, 42005, 22989).**
   - Added `docs/governance/iso-27001-soa-draft-2026.md`: a **draft, unapproved** ISO/IEC 27001:2022 Annex A Statement of Applicability. It covers all 93 controls, with control titles cross-checked against two published lists, applicability proposals for the MLRO and repository evidence. The tally is 30 ✅, 33 🟡, 20 ❓, 7 inherited and 3 proposed exclusions. Real gaps are named: no classification scheme, no remote-working policy, no endpoint baseline, no independent review. No certification is claimed.
   - `docs/aims/ai-impact-assessment.md` §9: lifecycle-trigger index (ISO/IEC 42005 alignment) pointing only at triggers that already exist. The §8 sign-offs are untouched.
