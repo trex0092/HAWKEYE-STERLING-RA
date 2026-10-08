@@ -3187,6 +3187,18 @@ check("un parser captures DOB + nationality for the primary name",
 check("un alias names inherit the designated party's attributes",
       "TESTPARTY ALIASNAME" in _un_a_names
       and "1962-08-08" in screen.match_context_for("TESTPARTY ALIASNAME"))
+_un_orig_xml = ('<CONSOLIDATED_LIST dateGenerated="2026-10-08"><INDIVIDUALS><INDIVIDUAL>'
+                '<FIRST_NAME>TESTPARTY</FIRST_NAME><SECOND_NAME>ORIGSCRIPT</SECOND_NAME>'
+                '<NAME_ORIGINAL_SCRIPT>محمد عبد الله</NAME_ORIGINAL_SCRIPT>'
+                '<NATIONALITY><VALUE>Testland</VALUE></NATIONALITY>'
+                '</INDIVIDUAL></INDIVIDUALS><ENTITIES><ENTITY><FIRST_NAME>TEST ENTITY</FIRST_NAME>'
+                '<NAME_ORIGINAL_SCRIPT> </NAME_ORIGINAL_SCRIPT></ENTITY></ENTITIES></CONSOLIDATED_LIST>').encode("utf-8")
+_un_o_names, _, _ = screen.parse_un(_un_orig_xml)
+check("un parser indexes NAME_ORIGINAL_SCRIPT, so an Arabic-script customer can meet the designation",
+      "محمد عبد الله" in _un_o_names and "TESTPARTY ORIGSCRIPT" in _un_o_names)
+check("the original-script name inherits the party's attributes",
+      "Testland" in screen.match_context_for("محمد عبد الله"))
+check("a blank NAME_ORIGINAL_SCRIPT adds no name", _un_o_names == {"TESTPARTY ORIGSCRIPT", "محمد عبد الله", "TEST ENTITY"})
 _ofac_attrs_csv = ('1234,"OFAC TESTPARTY",individual,PROG,-0-,-0-,-0-,-0-,-0-,-0-,-0-,'
                    '"DOB 08 Aug 1962; POB Somewhere; nationality Testland; alt. DOB 1955"\n'
                    '5678,"PLAIN TESTPARTY",individual,PROG,-0-,-0-,-0-,-0-,-0-,-0-,-0-,-0-\n'
