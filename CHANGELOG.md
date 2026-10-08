@@ -10,6 +10,10 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **AI rulebooks crosswalk + bounded-coordinator hardening.**
+  - Added `docs/governance/ai-rulebooks-crosswalk-2026.md`: applicability determinations and control mapping for ISO/IEC 27001, 23894, 42005 and 22989, OSFI E-23, California SB 53, EU AI Act Arts. 68–69, the OWASP LLM (2025) and Agentic (2026) Top 10 lists, NIS2/DORA/CRA, the non-EU AI laws and the UNESCO/G7 principles. It also maps the transaction-monitoring workflow against a reference model and lists seven gaps as proposals; no register entry is changed.
+  - Fixed two fail-closed contract breaks in `agent_orchestrator.py`: an unhashable `tool` value raised `TypeError`, and deeply nested arguments raised `RecursionError`. Both now raise `WorkflowDenied`. The module had no tests; `test/mcp_tools_test.py` now covers its allowlist, role and approval gate, step and replan caps, argument budget, failure handling, PII-free events and canonical digest (16 checks).
+
 - **screen.py decomposition, phase 1.** The ADR-005 7,500-line trigger has fired at 8,951 lines. Pure GDELT GKG windowing, parsing, subject indexing and row matching now live in `screen_gkg.py` behind compatibility wrappers; network I/O and adverse-risk orchestration remain unchanged. The new module is included in report-only Python coverage and mypy measurement.
 
 - **Governance metrics and action hygiene.** Closed completed toolchain action 25 on retained CI evidence; added explicit Composio vendor-assurance action 29; aligned the GRC narrative with the generated 62.5% third-party coverage and two above-appetite risks; and refreshed the undated-action signal from 17 to 18 without inventing a human deadline.

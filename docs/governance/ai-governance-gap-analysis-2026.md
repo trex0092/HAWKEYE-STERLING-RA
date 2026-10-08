@@ -260,14 +260,17 @@ offline via `exports.__internals`.
 ## 6. Verified endpoint identity, staged only (2026-10-08)
 
 **OA-20 remains OPEN. No production IdP or browser sign-in is provisioned.**
-The functions `asana-mirror` and `risk-backup` now have a disabled-by-default
-server-side RS256 JWT authorization gate (`netlify/functions/_identity.js`).
+The functions `asana-mirror`, `risk-backup`, `asana-task` and `brain-soul` now
+share a disabled-by-default server-side RS256 JWT authorization gate
+(`netlify/functions/_identity.js`).
 It does not rely on the device role selector for its permissions.
 
 | Endpoint | Permitted signed `hawkeye_role` when enabled |
 |---|---|
 | Firm-wide assessment register and activity mirror, read/write | `Reviewer-MLRO`, `Admin` |
 | Risk-data override backup, write | `Admin` |
+| Completion/creation of an Asana assessment task | `Reviewer-MLRO`, `Admin` |
+| AI Advisor question and context request | `Analyst`, `Reviewer-MLRO`, `Admin` |
 
 When `APP_OIDC_REQUIRED=1`, each endpoint requires a signed bearer access
 token from the configured HTTPS issuer and same-origin JWKS, with verified
@@ -285,3 +288,56 @@ The gateway supports only RS256 signed access JWTs and must not accept ID
 tokens or opaque access tokens. Every new account needs independent authority
 mapping. Other endpoints and tenant isolation remain out of scope for this PR.
 Synthetic unit tests: `node test/identity.test.js`.
+
+---
+
+## 7. Offline verified-source legal retrieval, not yet an Advisor RAG connection
+
+A deterministic lexical retrieval library is staged in
+`scripts/verified-legal-retrieval.mjs`. It reads the existing
+`data/obligations.json` register and only indexes entries whose
+`source_citation.basis` is `sourced`, whose article, official HTTPS URL,
+quote, locator, human verifier and verification date are populated and
+whose official source hostname is explicitly allowlisted by the trusted
+calling backend. Unverified `needs-source` rows are never returned as law.
+
+A caller must supply a **server-verified** role from Analyst, Reviewer-MLRO
+or Admin. Browser-supplied role names or official-source host allowlists
+must not be accepted. Sources verified after the requested as-of date are
+excluded. The library retrieves and ranks cited excerpts locally with no
+network access or external data transfers. If there is no matching,
+eligible evidence, it returns `insufficient_verified_sources`, never
+invented quotations or a model-generated confirmation of legal validity.
+
+**Scope gate:** The module is offline and is **not** yet wired into the
+Advisor's `KNOWLEDGE_CONTEXT`, deployed as a public endpoint or fed to
+Anthropic. Before adding model-facing RAG, complete the 21 obligation
+source citations (OA-5), authoritative source verification by counsel/MLRO,
+access and privacy design, retrieved-content prompt-injection testing and
+human sign-off. Retrieval output is untrusted data to a model, not a new
+instruction. Do not infer current law solely from a cached verification date.
+
+---
+
+## 8. Optional fleet-wide LLM quota adapter, NOT an active shared service
+
+`netlify/functions/_shared-quota.js` adds a disabled-by-default quota check
+to the billed Advisor endpoint after its existing per-instance limiter. It
+can only function if IT separately provisions and approves a reliable
+atomic-counter service and configures `SHARED_RATE_LIMIT_ENABLED=1`, a fixed
+HTTPS endpoint, server authorization secret and HMAC key. Each call sends an
+HMAC pseudonym derived from the server-observed client IP and operation,
+plus its limit and time window, not the raw IP, prompt or customer record.
+
+**Fail-closed:** invalid configuration, remote outage, malformed JSON,
+non-atomic/missing approval evidence or a rejected decision cannot be turned
+into an allow result; absent an explicit provider permit the endpoint returns
+HTTP 503 or 429. **The client cannot select quota configuration.** An HMAC
+IP key is still linkable pseudonymous data, so vendor contract, PDPL transfer,
+residency, retention and incident fallback require sign-off.
+
+This is a contract adapter and synthetic test coverage, **not evidence that
+a fleet-wide backend is deployed, that counters are atomic, or that OA-22
+is closed.** Production activation requires a real multi-instance load
+test, operational ownership and alerting for provider downtime.
+

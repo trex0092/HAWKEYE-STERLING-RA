@@ -99,3 +99,63 @@ export/import code.
 Activity-log appends are serialised in-app (`auditAppend` → `_auditChain`) so
 two near-simultaneous events cannot lose an entry to a read-modify-write race;
 the hash chain therefore stays complete and verifiable.
+
+---
+
+## Secondary screening-delivery failure channel, staged only
+
+The `delivery-watchdog.yml` workflow checks that the due day's daily
+screening report and full-results attachments reached Asana. Its existing
+alert task also goes to Asana, so an Asana outage can hide both the report
+and the incident alert. A second job can create or reuse a generic GitHub
+Issue using `scripts/github-fallback-alert.mjs` on a FAILED watchdog check.
+
+**DEFAULT OFF:** the second job executes only when the repository variable
+`SECONDARY_ALERT_ENABLED` is explicitly set to `true`. It gets a
+job-scoped `issues: write` GitHub token and has **no Asana credential**.
+The issue contains the UTC detection time and workflow-run link, but no
+names, cases, transactions, source secrets, or actual screening results.
+An existing open issue with the exact static title is reused to prevent
+routine duplicates. GitHub lookup outages fail without speculative writes.
+
+**Human activation gate:** GitHub Issues for this repository may be public.
+MLRO/IT must assess whether revealing that a daily compliance delivery was
+unverified is acceptable, determine who will monitor the new issues and
+set an acknowledgment/escalation SLA. Until that is approved, leave the
+variable disabled. A GitHub-hosted issue is independent of Asana as a
+destination but **not independent of GitHub's workflow infrastructure**,
+nor is it a guaranteed paging service. OA-21 still needs a truly
+independently monitored route, delivery/receipt testing and owner sign-off.
+
+Offline tests in `test/delivery-watchdog.test.mjs` cover gating,
+idempotency, safe payloads, failed GitHub responses and workflow wiring.
+No live issue is created by the test suite.
+
+
+---
+
+## Staged metadata-only evidence receipts, not persistent storage
+
+`scripts/evidence-receipts.mjs` provides pure, zero-dependency helpers
+to seal and verify **metadata-only** case-evidence receipts. They enforce an
+opaque case reference, opaque actor reference, an allowed non-filing action,
+evidence SHA-256 references, UTC timestamp, ordered sequence, previous hash,
+and a keyed HMAC for tamper detection. A separately retained expected head
+digest and event count can reveal truncated or reordered chains. The code
+rejects raw notes, unsupported fields and fabricated filing actions. Its
+offline synthetic regression tests run in `test/telemetry.test.mjs`.
+
+**What this does not provide:** A receipt HMAC is not an independent MLRO
+signature or nonrepudiation. The caller must authenticate the human actor
+and derive their role from a trusted identity system; no browser-provided
+role is evidence. A verifier who has the same symmetric key can fabricate
+receipts, and an attacker who deletes the last records can leave a valid
+prefix. An independent protected anchor, authorized append-only backend,
+time source, key rotation, per-case access control, retention and actual
+restoration exercises are still necessary. This module does not connect to,
+write to, or verify any production store and does not assert source truth.
+
+**OA-23 remains OPEN.** To close it, IT/MLRO must approve an authenticated,
+encrypted persistence backend and retention policy, prove append-only
+integrity including head anchoring, test recovery against formal RPO/RTO
+targets, and retain dated independent verification evidence.

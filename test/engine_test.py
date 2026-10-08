@@ -5777,6 +5777,41 @@ with tempfile.TemporaryDirectory() as d:
     check("tampered raw export rejected by SHA-256 digest", _txnfeed_error(
           lambda: txn_feed.read_validated_feed(feed_file, manifest_file)))
 
+    # The production call path must use the SAME validation gate, not the
+    # historical JSON list parser that dropped malformed records silently.
+    _previous_path = txn_monitor.TXN_FEED_PATH
+    _previous_manifest = os.environ.get("TXN_FEED_MANIFEST_PATH")
+    try:
+        txn_monitor.TXN_FEED_PATH = feed_file
+        os.environ["TXN_FEED_MANIFEST_PATH"] = manifest_file
+        with open(feed_file, "wb") as f:
+            f.write(raw)
+        check("configured live file passes manifest validation before screening",
+              txn_monitor.feed_parse_error() is False and
+              txn_monitor.load_transactions() == sample and
+              "ACTIVE" in txn_monitor.status_line())
+        with open(feed_file, "wb") as f:
+            f.write(raw + b" ")
+        check("configured corrupt/altered file reports DEGRADED",
+              txn_monitor.feed_parse_error() is True and
+              "DEGRADED" in txn_monitor.status_line())
+        check("configured corrupt file raises instead of silently dropping rows",
+              _txnfeed_error(txn_monitor.load_transactions))
+        with open(feed_file, "wb") as f:
+            f.write(raw)
+        os.remove(manifest_file)
+        check("configured feed lacking completeness manifest is DEGRADED",
+              txn_monitor.feed_parse_error() is True and
+              "DEGRADED" in txn_monitor.status_line())
+        txn_monitor.TXN_FEED_PATH = os.path.join(d, "missing-file.json")
+        check("configured but missing export is DEGRADED, not INACTIVE",
+              "DEGRADED" in txn_monitor.status_line())
+    finally:
+        txn_monitor.TXN_FEED_PATH = _previous_path
+        if _previous_manifest is None:
+            os.environ.pop("TXN_FEED_MANIFEST_PATH", None)
+        else:
+            os.environ["TXN_FEED_MANIFEST_PATH"] = _previous_manifest
 
 # -- Staged deterministic read-only investigation plan (no model access) --
 print("agent_plan.py - bounded, human-reviewed tool plans")

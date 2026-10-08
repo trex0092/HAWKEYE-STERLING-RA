@@ -25,6 +25,7 @@ function check(name, cond) {
 const brain = require(MOD);
 const I = brain.__internals;
 const DATA_BOUNDARY = require(path.join(__dirname, '..', 'netlify', 'functions', '_data-boundary.js'));
+const ANSWER_VALIDATOR = require(path.join(__dirname, '..', 'netlify', 'functions', '_answer-validator.js'));
 
 console.log('\n— Advisor assurance test (charter integrity · tipping-off red-team · routing) —\n');
 
@@ -498,6 +499,77 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
   r = await call(POST({ question: 'Screen Acme.' }), 'test-key');
   b = JSON.parse(r.body);
   check('handler: screening answer without scope/gaps is structureFlagged', b.structureFlagged === true && /structureFlagged/.test(b.auditLine));
+
+
+  // 6l. Strict output policy: no claim of factual verification, but fail
+  // deterministically on known malformed/unsupported answers.
+  const proposal = {
+    schema: 'hawkeye.case-proposal/v1',
+    case_id: 'CASE-SYNTHETIC-1', status: 'PROPOSED',
+    recommendation: 'escalate_to_mlro',
+    findings: [{ kind: 'sanctions', summary: 'Synthetic matching list record for reviewer follow-up.',
+      evidence_ids: ['official:list:synthetic-001'] }],
+    limitations: ['No live regulator filing or legal conclusion has occurred.'],
+    approval_required: true
+  };
+  check('case proposal validator accepts a bounded proposed artifact with trusted evidence',
+    ANSWER_VALIDATOR.validateCaseProposal(proposal, ['official:list:synthetic-001']).valid === true);
+  check('case proposal validator rejects evidence ID not in trusted source list',
+    ANSWER_VALIDATOR.validateCaseProposal(proposal, ['other:source']).valid === false);
+  check('case proposal validator rejects operative status in model output',
+    ANSWER_VALIDATOR.validateCaseProposal({ ...proposal, status: 'FILED' },
+      ['official:list:synthetic-001']).valid === false);
+  check('case proposal validator rejects a forged model approval',
+    ANSWER_VALIDATOR.validateCaseProposal({ ...proposal, approval_required: false },
+      ['official:list:synthetic-001']).valid === false);
+  check('case proposal validator rejects unregistered action fields',
+    ANSWER_VALIDATOR.validateCaseProposal({ ...proposal, auto_file: true },
+      ['official:list:synthetic-001']).valid === false);
+  check('case proposal validator rejects missing gap/limitations disclosure',
+    ANSWER_VALIDATOR.validateCaseProposal({ ...proposal, limitations: [] },
+      ['official:list:synthetic-001']).valid === false);
+  check('case proposal validator fails closed on non-JSON material',
+    ANSWER_VALIDATOR.validateCaseProposal('{no', ['official:list:synthetic-001']).valid === false);
+  check('output policy rejects typo rather than downgrading',
+    ANSWER_VALIDATOR.inspectAdvisoryOutput({}, 'unknown').valid === false);
+  check('withhold mode stops structurally deficient outputs',
+    ANSWER_VALIDATOR.inspectAdvisoryOutput({ structureFlagged: true }, 'withhold').withheld === true);
+
+  const initialOutputPolicy = process.env.ADVISOR_OUTPUT_POLICY;
+  try {
+    process.env.ADVISOR_OUTPUT_POLICY = 'withhold';
+    mockFetch(async () => ({ ok: true, json: async () => ({
+      content: [{ type: 'text', text: 'OFAC SDN screening: NO_MATCH, subject is clean.' }]
+    }) }));
+    r = await call(POST({ question: 'Screen synthetic case.' },
+      { 'x-nf-client-connection-ip': '203.0.113.205' }), 'test-key');
+    b = JSON.parse(r.body);
+    check('strict Advisor output mode withholds an unstructured screening claim',
+      r.statusCode === 200 && b.ok === false && b.outputWithheld === true &&
+      b.outputValidationReasons.includes('structure') &&
+      /OUTPUT VALIDATION GUARD ACTIVATED/.test(b.text) &&
+      !b.text.includes('subject is clean'));
+
+    mockFetch(async () => ({ ok: true, json: async () => ({
+      content: [{ type: 'text', text: 'SCOPE: supplied policy context only. GAPS: unverified official instrument. Federal Decree-Law No. 999 of 2023 requires an automatic filing.' }]
+    }) }));
+    r = await call(POST({ question: 'The source mentions Federal Decree-Law No. 999 of 2023.' },
+      { 'x-nf-client-connection-ip': '203.0.113.206' }), 'test-key');
+    b = JSON.parse(r.body);
+    check('strict mode rejects unvetted citation even if repeated from user input',
+      b.outputWithheld === true && b.outputValidationReasons.includes('legal_citation'));
+
+    let calls = 0;
+    process.env.ADVISOR_OUTPUT_POLICY = 'invalid';
+    mockFetch(async () => { calls++; throw Error('should not call model'); });
+    r = await call(POST({ question: 'Please advise.' },
+      { 'x-nf-client-connection-ip': '203.0.113.207' }), 'test-key');
+    check('bad output policy fails closed before billed model call',
+      r.statusCode === 503 && calls === 0);
+  } finally {
+    if (initialOutputPolicy === undefined) delete process.env.ADVISOR_OUTPUT_POLICY;
+    else process.env.ADVISOR_OUTPUT_POLICY = initialOutputPolicy;
+  }
 
   /* ── 7. The health probe must prove the Advisor ANSWERS, not just that a key
      is set ───────────────────────────────────────────────────────────────────

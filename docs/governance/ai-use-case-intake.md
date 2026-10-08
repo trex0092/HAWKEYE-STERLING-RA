@@ -112,3 +112,38 @@ After approval:
 5. update the six-layer crosswalk if the control model changes;
 6. set a review trigger and decommissioning condition.
 
+
+---
+
+## Staged signed MLRO review evidence (8 October 2026)
+
+The pure `netlify/functions/_human-review.js` review-readiness preflight
+provides a deterministic check over a **PROPOSED-only** case artifact.
+It only returns `REVIEW_READY` or `HOLD` and always sets
+`approved_for_execution: false`. It **cannot authorize an STR/SAR filing,
+sanctions clearance, asset freeze, case closure or customer onboarding**.
+
+The proposal must match a bounded, recognized schema and reference evidence
+IDs supplied from a trusted backend registry. Signoffs must be detached
+RS256 signatures on the exact proposal SHA-256, case ID, signer identity,
+approved audience, issue/expiry window and unique nonce. Each signer must
+match an independently provisioned **Reviewer-MLRO** public-key identity.
+Signers cannot be the case initiator. HIGH-risk proposals require at least
+two different human MLRO signers; lower-risk reviews require at least one.
+Untrusted or unavailable keys, missing evidence or an unrecognized risk
+tier yield HOLD. This is a **readiness policy proposal**, not a Board-ratified
+approval matrix.
+
+**Critical missing enforcement:** This offline library cannot stop the
+reuse of a valid signed approval. Before any production authority decision,
+a server-side authenticated identity and lifecycle process, centrally
+controlled current public-key register, **durable spent-nonce storage**,
+race-safe idempotency, attestation retention, second-person approval,
+revocation, incident handling and MLRO/Board approval are mandatory.
+These signed test tokens are entirely synthetic. The existing single-device
+UI role selector and shared browser token do not satisfy these prerequisites.
+Human approvals and implementation of the executor remain entirely separate.
+No runtime action endpoint invokes this module today.
+
+Evidence tests are in `test/identity.test.js`. OA-20 and OA-23 remain
+open; do not treat passing tests as operational control closure.

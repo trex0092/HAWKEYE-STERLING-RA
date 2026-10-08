@@ -107,3 +107,59 @@ time; CI verifies those ids too.
 [`grc-metrics.md`](grc-metrics.md) ·
 [`open-actions-register.md`](open-actions-register.md) ·
 [`../executive/regulatory-readiness.md`](../executive/regulatory-readiness.md)
+
+---
+
+## 6. Verified-source local retrieval (staged, no model integration)
+
+The zero-dependency library `scripts/verified-legal-retrieval.mjs` can rank
+**human-verified** legal citations that already exist in
+`data/obligations.json`. It is a local, read-only retrieval primitive, **not
+live RAG**, a legal search service, or a verified legal opinion.
+
+The retrieval gate accepts only rows with `source_citation.basis = sourced`,
+a populated article, quoted source text, exact HTTPS source URL, locator,
+verification date, and human verifier. It also requires an independently
+trusted official-publisher hostname allowlist, a server-verified caller role,
+and a valid as-of date. Text is ranked lexically and returned with source IDs
+and verification metadata. No network, model, credentials, vector database,
+or personal data are involved.
+
+**Critical current limitation:** the 21 obligation citations remain
+`needs-source` pending OA-5 counsel/MLRO work. Therefore the corpus of
+verified operative legal passages is empty and retrieval returns
+`insufficient_verified_sources`. This is the intended fail-closed answer.
+Neither an AI model nor code should turn unsourced prose into source text.
+
+**Activation gates:** human source verification, official publication and
+effective-date checking, signed role authorization at a future server
+boundary, independent source-list maintenance, relevance/evidence evaluation,
+prompt-injection handling of retrieved text, and MLRO approval of any RAG
+integration. Caller-supplied `approvedHosts` and `role` cannot establish
+authority if supplied by a browser or LLM. This library has no public endpoint
+and must only be invoked by trusted backend code. Tests:
+`test/obligations.test.mjs`.
+
+
+### Retrieval scope, source content and integrity hardening (staged)
+
+The local library now permits explicitly scoped *future* corpus records through
+`access_scope: { visibility: "tenant", tenant_id: "...", allowed_roles: ["Reviewer-MLRO"] }`.
+A restricted row cannot be returned without both the exact tenant and an allowed
+role. Invalid or incomplete scope metadata is excluded rather than made public.
+Rows without that field are **only appropriate for this existing public legal
+obligation register**; do not place tenant or customer documents into it.
+A future production gateway MUST take role and tenant identity from a verified
+backend principal, never a query parameter or a model-generated claim. This
+library alone is **not an operational tenant-isolation control**.
+
+The library also rejects quoted text containing selected overt prompt-injection,
+role-spoofing or bidirectional Unicode control patterns. All retrieved passages
+remain explicitly marked `untrusted_source_text`; this pattern filter cannot
+detect every malicious instruction and does not replace source review,
+document ingestion isolation, an authenticated retrieval gateway, or model
+red-team evaluation. Each returned citation includes `content_sha256` to
+detect changes to its recorded excerpt; this is a local fingerprint, **not**
+a source-publisher digital signature or a substitute for an immutable evidence
+store. Nothing in this change feeds content to the live Advisor, and OA-5 and
+production governance approvals remain OPEN.
