@@ -320,6 +320,74 @@ def jurisdiction_risk_for(country, nationalities, table=None):
     return None, ""
 
 
+# ── Public-source country indicators (context only, never scored) ─────────────
+# US INCSR major money-laundering jurisdictions, US TIP Tier 2 Watch List /
+# Tier 3, and the EU tax non-cooperative list (Annex I). Each value is sourced
+# in the file. They are shown next to a hit's jurisdiction so the analyst sees
+# them; they do NOT feed compute_risk_rating — the FATF list above stays the
+# only jurisdiction scoring input. Absent file ⇒ no context; present-but-broken
+# file ⇒ warned loudly.
+COUNTRY_INDICATORS_PATH = os.environ.get(
+    "COUNTRY_INDICATORS_PATH", "data/country-indicators.json")
+
+# TIP tiers shown as context; Tier 1 / Tier 2 are kept in the file only.
+_TIP_SHOWN = ("Tier 2 Watch List", "Tier 3")
+
+
+def load_country_indicators(path=None):
+    """Return {country_norm: [label, ...]} from the sourced indicator file, or {}
+    if absent. Never raises. Both the source's spelling and the app baseline
+    name are indexed, plus the _JURISDICTION_ALIASES short forms."""
+    p = path or COUNTRY_INDICATORS_PATH
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            ind = (json.load(f).get("indicators") or {})
+        out = {}
+
+        def add(entry, label):
+            for nm in {entry.get("published", ""), entry.get("app", "")}:
+                k = _norm(nm)
+                if k and label not in out.setdefault(k, []):
+                    out[k].append(label)
+
+        inc = ind.get("incsr_major_ml") or {}
+        for e in inc.get("jurisdictions", []) or []:
+            add(e, f"US INCSR major money-laundering jurisdiction ({inc.get('edition', '').split(' Volume')[0] or 'INCSR'})")
+        tip = ind.get("tip_tier") or {}
+        for tier in _TIP_SHOWN:
+            for e in (tip.get("tiers") or {}).get(tier, []) or []:
+                add(e, f"US {tip.get('edition', 'TIP Report')}: {tier}")
+        eu = ind.get("eu_tax_noncooperative") or {}
+        for e in eu.get("jurisdictions", []) or []:
+            add(e, f"EU tax non-cooperative list, Annex I ({eu.get('published', '')})")
+        for alias, target in _JURISDICTION_ALIASES.items():
+            if target in out and alias not in out:
+                out[alias] = list(out[target])
+        if not out:
+            _warn(f"country-indicators file '{p}' present but yielded 0 entries — "
+                  "country context is missing this run")
+        return out
+    except Exception as e:
+        _warn(f"country-indicators file '{p}' unreadable ({type(e).__name__}: {e}) — "
+              "country context is missing this run")
+        return {}
+
+
+def country_indicators_for(country, nationalities, table=None):
+    """Return ['<country>: <label>', ...] for the customer country and any
+    nationality; [] when none apply. Context only — never a score input."""
+    table = load_country_indicators() if table is None else table
+    out = []
+    for c in [country] + list(nationalities or []):
+        for label in table.get(_norm(c), []):
+            line = f"{c}: {label}"
+            if line not in out:
+                out.append(line)
+    return out
+
+
 def identity_dossier(individual):
     """One-line, privacy-safe identity summary for the report (R.10 evidence)."""
     rec = individual

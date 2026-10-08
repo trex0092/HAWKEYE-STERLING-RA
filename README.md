@@ -257,6 +257,16 @@ by **09:00 UAE**:
 
 The register's `fatf` field marks each listed country, and the MCP server serves the file as `hawkeye://reference/fatf-assessments`. A test fails if this file, the register and the risk-scoring list [`data/jurisdiction-risk.json`](data/jurisdiction-risk.json) disagree. Update all three after every FATF plenary (February, June and October).
 
+### Other public country indicators (context, not scored)
+
+[`data/country-indicators.json`](data/country-indicators.json) adds three public-source country indicators next to a screening hit's jurisdiction in the daily report ("Country context (not scored)"), and the MCP server serves it as `hawkeye://reference/country-indicators`:
+
+- **US INCSR major money-laundering jurisdictions**: the 80 jurisdictions in the [2025 INCSR Volume II](https://www.state.gov/wp-content/uploads/2025/03/2025-International-Narcotics-Control-Strategy-Volume-2-Accessible.pdf) (March 2025).
+- **US Trafficking in Persons tiers**: the [2025 TIP Report](https://www.state.gov/reports/2025-trafficking-in-persons-report/) tier placements; only Tier 2 Watch List and Tier 3 are shown.
+- **EU list of non-cooperative jurisdictions for tax purposes**: the 10 Annex I jurisdictions adopted by the [Council on 17 February 2026](https://www.consilium.europa.eu/en/press/press-releases/2026/02/17/taxation-council-updates-the-eu-list-of-non-cooperative-jurisdictions-for-tax-purposes/).
+
+These never change the risk score; the FATF list above stays the only jurisdiction scoring input. Commercial country reports (KnowYourCountry, the Organized Crime Index) restrict redistribution, so they are linked, never copied.
+
 ## MCP server (AI-agent access to the engine)
 
 A **Model Context Protocol (MCP)** server exposes the deterministic screening
