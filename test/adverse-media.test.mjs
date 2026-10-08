@@ -277,7 +277,9 @@ check('2026-10-08 audit: fr-CH, te-IN, ml-IN and gu-IN editions are in the matri
   && ['te', 'ml', 'gu'].every(k => Array.isArray(LANG_TERMS[k]) && LANG_TERMS[k].length >= 4)
   && LOCALES.filter(l => ['te', 'ml', 'gu'].includes(l.lang)).every(l => LANG_TERMS[l.lang]));
 check('2026-10-08 audit: rejected fallbacks (served another country\'s edition) stay out of the matrix',
-  ['kn-IN', 'es-CU', 'ru-BY', 'ru-KZ', 'fr-LU', 'de-LU', 'el-CY', 'ar-SY', 'ar-YE', 'pt-MZ']
+  ['kn-IN', 'es-CU', 'ru-BY', 'ru-KZ', 'fr-LU', 'de-LU', 'el-CY', 'ar-SY', 'ar-YE', 'pt-MZ',
+    'es-HN', 'es-SV', 'es-NI', 'es-PR', 'en-JM', 'en-TT', 'en-ZM', 'en-RW', 'en-MW', 'en-BN',
+    'en-FJ', 'en-PG', 'pt-CV']
     .every(id => !LOCALES.some(l => l.id === id)));
 check('a native money-laundering headline escalates to high band in Telugu, Malayalam and Gujarati', [
   ['రమేష్ రెడ్డి', 'రమేష్ రెడ్డి మనీ లాండరింగ్ కేసులో అరెస్ట్'],
