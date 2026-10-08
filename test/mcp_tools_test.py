@@ -338,6 +338,12 @@ fa_doc = json.loads(fa["result"]["contents"][0]["text"])
 check("resources/read serves the FATF assessments (black + grey, each with a source)",
       {j["list"] for j in fa_doc["jurisdictions"]} == {"black", "grey"} and all(j["source"] for j in fa_doc["jurisdictions"]))
 
+ci = rpc("resources/read", {"uri": "hawkeye://reference/country-indicators"})
+ci_doc = json.loads(ci["result"]["contents"][0]["text"])
+check("resources/read serves the country indicators (every indicator carries a source URL and date)",
+      ci_doc["indicators"] and all(v["source"].startswith("https://") and v["published"]
+                                   for v in ci_doc["indicators"].values()))
+
 pl = rpc("prompts/list")["result"]["prompts"]
 check("prompts/list returns the prompt templates", len(pl) == len(mcp_server.PROMPTS))
 pg = rpc("prompts/get", {"name": "adverse_media_triage", "arguments": {"subject": "ACME FZE", "headline": "ACME fined for fraud"}})

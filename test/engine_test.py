@@ -3764,6 +3764,46 @@ check("kyc: a valid jurisdiction file loads grey/high tiers",
 check("kyc: an alias never resurrects a jurisdiction the file no longer lists",
       "burma" not in _jr and "islamic republic of iran" not in _jr)
 
+print("kyc — public-source country indicators (context only, never scored)")
+import re as _re_ci
+check("kyc: an absent country-indicators file degrades to {} silently",
+      kyc.load_country_indicators(os.path.join(_hdir, "nope.json")) == {})
+_err = _io.StringIO()
+with _ctx.redirect_stderr(_err):
+    _ci_bad = kyc.load_country_indicators(_bad)
+check("kyc: a corrupt country-indicators file degrades to {} AND warns loudly",
+      _ci_bad == {} and "WARN" in _err.getvalue())
+_ci_path = os.path.join(ROOT, "data", "country-indicators.json")
+_ci_doc = json.load(open(_ci_path, encoding="utf-8"))
+_ci = kyc.load_country_indicators(_ci_path)
+check("country indicators: every indicator names its publisher, edition, date and https source",
+      all(v.get("publisher") and v.get("edition") and v.get("published") and v.get("source", "").startswith("https://")
+          for v in _ci_doc["indicators"].values()))
+_app_countries = {c["name"] for c in json.loads(
+    _re_ci.search(r"const COUNTRIES = (\[.*?\]);", open(os.path.join(ROOT, "app.js"), encoding="utf-8").read()).group(1))}
+_ci_entries = (_ci_doc["indicators"]["incsr_major_ml"]["jurisdictions"]
+               + [e for t in _ci_doc["indicators"]["tip_tier"]["tiers"].values() for e in t]
+               + _ci_doc["indicators"]["eu_tax_noncooperative"]["jurisdictions"])
+_ci_unmapped = sorted({e["app"] for e in _ci_entries} - _app_countries)
+check("country indicators: every `app` name is a COUNTRIES name in app.js: " + ", ".join(_ci_unmapped),
+      not _ci_unmapped)
+check("country indicators: no KnowYourCountry or OC Index content is stored",
+      not _re_ci.search(r"knowyourcountry|ocindex", json.dumps(_ci_doc["indicators"]), _re_ci.I))
+check("country indicators: source and app spellings and aliases both resolve (Türkiye / Turkey; Burma / Myanmar)",
+      _ci.get("türkiye") == _ci.get("turkey") and _ci.get("turkey")
+      and any("Tier 3" in x for x in _ci.get("burma", [])) and _ci.get("burma") == _ci.get("myanmar"))
+check("country indicators: Tier 1 and Tier 2 are not shown as context",
+      not any("TIP" in x or "Trafficking" in x for x in _ci.get("united kingdom", [])))
+_ci_lines = kyc.country_indicators_for("Papua New Guinea", ["Russian Federation"], _ci)
+check("country indicators: country and nationality both contribute labelled lines",
+      any(x.startswith("Papua New Guinea: ") and "Tier 3" in x for x in _ci_lines)
+      and any(x.startswith("Russian Federation: ") and "EU tax" in x for x in _ci_lines))
+check("country indicators: a jurisdiction on no list yields no context",
+      kyc.country_indicators_for("Iceland", [], _ci) == [])
+_rr_src = open(os.path.join(ROOT, "ai.py"), encoding="utf-8").read()
+check("country indicators never feed the risk rating (ai.py does not read them)",
+      "country_indicators" not in _rr_src and "country-indicators" not in _rr_src)
+
 print("screen — EOCN review-age gate (manual-review currency on the TFS list)")
 import datetime as _dt_rev
 _rev_today = _dt_rev.date(2026, 7, 15)

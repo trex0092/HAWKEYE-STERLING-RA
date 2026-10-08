@@ -744,6 +744,11 @@ RESOURCES = {
         "application/json",
         lambda: _read_json_file("data/fatf-assessments.json"),
     ),
+    "hawkeye://reference/country-indicators": (
+        "Public-source country indicators (US INCSR, US TIP tiers, EU tax list), each sourced; context only, never scored",
+        "application/json",
+        lambda: _read_json_file("data/country-indicators.json"),
+    ),
     "hawkeye://reference/internal-watchlist": (
         "Firm-internal watchlist (declined/known-bad counterparties)",
         "application/json",
