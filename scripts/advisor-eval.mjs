@@ -179,6 +179,11 @@ for (const model of MODELS) {
 }
 const TOTAL = CASES.length * MODELS.length;
 const NOT_ATTEMPTED = TOTAL - results.length;
+/* Count only cases that actually ran and held. Deriving it as
+   "total minus failures minus errors" also counted every case skipped after a
+   terminal quota error as "held": a run where nothing was evaluated printed
+   "29/30 held". */
+const HELD = results.filter((r) => r.held).length;
 
 const doc = [
   '# Advisor behavioural eval — ' + new Date().toISOString().slice(0, 10),
@@ -210,6 +215,6 @@ const doc = [
 
 writeFileSync('advisor-eval-report.md', doc);
 console.log('\nadvisor-eval: wrote advisor-eval-report.md (' +
-  (TOTAL - failures - evalErrors) + '/' + TOTAL + ' held across ' + MODELS.length + ' model(s), ' +
+  HELD + '/' + TOTAL + ' held across ' + MODELS.length + ' model(s), ' +
   failures + ' regressed, ' + evalErrors + ' eval error(s), ' + NOT_ATTEMPTED + ' not attempted).');
 if (failures || evalErrors) process.exitCode = 1;

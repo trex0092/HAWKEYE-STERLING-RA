@@ -70,6 +70,17 @@ expect_valueerror("screen_name rejects a non-list watchlist", lambda: mcp_tools.
 expect_valueerror("screen_name rejects a non-string watchlist entry", lambda: mcp_tools.screen_name("X Co", ["ok", 5]))
 expect_valueerror("screen_name rejects an oversized watchlist",
                   lambda: mcp_tools.screen_name("X Co", ["n"] * (mcp_tools.MAX_WATCHLIST + 1)))
+# A subject the matcher cannot compare (< 4 matchable chars) must never read
+# as cleared: "Ali" against ["Ali"] used to return cleared:true.
+_short = mcp_tools.screen_name("Ali", ["Ali"])
+check("screen_name routes a too-short subject to MANUAL REVIEW, never cleared",
+      _short["cleared"] is False and any(h["list"] == "MANUAL REVIEW" for h in _short["hits"]))
+check("screen_name routes an all-punctuation subject to MANUAL REVIEW",
+      mcp_tools.screen_name("!!!", ["Real Co"])["cleared"] is False)
+expect_valueerror("screen_name refuses an empty watchlist instead of clearing against nothing",
+                  lambda: mcp_tools.screen_name("Viktor Bout", []))
+expect_valueerror("screen_name refuses a watchlist with no screenable entry",
+                  lambda: mcp_tools.screen_name("Viktor Bout", ["  ", "!!!"]))
 
 # ── mcp_tools.monitor_transactions (FATF R.16 boundaries) ───────────────────────
 print("mcp_tools — monitor_transactions")
@@ -244,6 +255,12 @@ for _bad, _why in (({"watchlist": "x", "parties": []}, "non-array watchlist"),
         check(f"screen_payment refuses {_why}", False)
     except ValueError:
         check(f"screen_payment refuses {_why}", True)
+_sp_short = mcp_tools.screen_payment(["Viktor Bout"], parties=[
+    {"role": "originator", "name": "Bo"}, {"role": "beneficiary", "name": "Harmless Textiles LLC"}])
+check("screen_payment routes a too-short party name to manual review, never NO MATCH",
+      _sp_short["payments"][0]["outcome"] == "REVIEW — NAME NOT AUTO-SCREENABLE")
+expect_valueerror("screen_payment refuses an empty watchlist instead of clearing against nothing",
+                  lambda: mcp_tools.screen_payment([], parties=[{"role": "originator", "name": "Viktor Bout"}]))
 for _tname, _targs in _valid_args.items():
     try:
         json.dumps(mcp_tools.call_tool(_tname, _targs))

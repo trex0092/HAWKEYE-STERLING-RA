@@ -595,6 +595,9 @@ check('advisor eval aborts remaining live cases after a provider-wide quota/bill
   /provider-wide quota\/billing failure is terminal/.test(evalSrc)
   && /break evalLoop/.test(evalSrc)
   && /NOT_ATTEMPTED/.test(evalSrc));
+check('advisor eval counts only evaluated cases as held, never the ones skipped after a terminal error',
+  /const HELD = results\.filter\(\(r\) => r\.held\)\.length/.test(evalSrc)
+  && !/TOTAL - failures - evalErrors/.test(evalSrc));
 
 const LIMIT_MSG = 'You have reached your specified API usage limits. You will regain access on 2026-08-01 at 00:00 UTC.';
   check('a 400 carrying a usage-limit body is named as BILLING, not malformed',

@@ -109,7 +109,16 @@ def screen_name(name, watchlist, list_name="watchlist"):
         if norm:
             entries.append((norm, raw))
 
-    hits = screen.screen_name(subject, {lname: entries})
+    if not entries:
+        # Nothing to compare against: "cleared" here would be a clear no list
+        # ever produced.
+        raise ValueError("'watchlist' has no screenable entry — nothing was screened")
+    hits = [_hit_view(h) for h in screen.screen_name(subject, {lname: entries})]
+    if screen._unscreenable(subject):
+        # The matcher skips a name with < 4 matchable characters (and loses
+        # non-Latin script letters), so "Ali" against ["Ali"] came back CLEARED.
+        # Mirror the engine's manual-review net instead of reporting a clear.
+        hits.append(_hit_view(screen._manual_review_hit("SUBJECT", subject, False)))
     return {
         "subject": subject,
         "normalized": screen.normalize(subject),
@@ -117,7 +126,7 @@ def screen_name(name, watchlist, list_name="watchlist"):
         "entries_screened": len(entries),
         "hit_count": len(hits),
         "cleared": len(hits) == 0,
-        "hits": [_hit_view(h) for h in hits],
+        "hits": hits,
         "disposition_note": (
             "CLEARED against the supplied list — this is not a clear against official "
             "sanctions/PEP sources, which must be screened separately."
@@ -168,9 +177,12 @@ def screen_payment(watchlist, message=None, parties=None, remittance_info=None,
         raise ValueError("supply either 'message' (MT103 / pacs.008) or 'parties'")
     if not payments:
         raise ValueError("no payment party could be read from the input")
+    if not entries:
+        raise ValueError("'watchlist' has no screenable entry — nothing was screened")
     results = [payment_screen.screen_payment(p, {lname: entries},
                                              jurisdiction_table=kyc.load_jurisdiction_risk(),
-                                             matcher=screen.screen_name, normalizer=screen.normalize)
+                                             matcher=screen.screen_name, normalizer=screen.normalize,
+                                             unscreenable=screen._unscreenable)
                for p in payments]
     for r in results:
         for party in r["parties"]:
@@ -193,6 +205,8 @@ def screen_internal_watchlist(name, path=None):
     names, status, _meta = screen.parse_internal_watchlist(path)
     entries = [(screen.normalize(x), x) for x in names if screen.normalize(x)]
     hits = screen.screen_name(subject, {"Internal Watchlist": entries}) if entries else []
+    if entries and screen._unscreenable(subject):
+        hits.append(screen._manual_review_hit("SUBJECT", subject, False))
     return {
         "subject": subject,
         "list_status": status,
