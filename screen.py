@@ -6750,6 +6750,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                 A(f"   Jurisdiction (R.10): {jur['reason']}")
             if m.get("country_indicators"):
                 A(f"   Country context (not scored): {'; '.join(m['country_indicators'])}")
+            if m.get("suggested_country_score"):
+                A("   Suggested country score (draft method, pending MLRO approval; "
+                  f"not applied): {'; '.join(m['suggested_country_score'])}")
             if m.get("arrangement"):
                 A(f"   Legal arrangement (R.25): {m['arrangement']} — every party screened; "
                   "a sanctioned/PEP party flags the arrangement.")
@@ -8383,6 +8386,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     pep_links = {p.get("permalink", "") for p in pep_findings}
     jtable = kyc.load_jurisdiction_risk()   # FATF R.10 jurisdiction-risk (maintained list)
     ctable = kyc.load_country_indicators()  # sourced public indicators (context only, not scored)
+    stable = kyc.load_suggested_country_scores()  # DRAFT suggested country score (display only, pending MLRO)
     _summary_work = []
     for m in possible_matches:
         link = m.get("permalink", "")
@@ -8409,6 +8413,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         jtier, jreason = kyc.jurisdiction_risk_for(m.get("country", ""), nationalities, jtable)
         m["jurisdiction"] = {"tier": jtier, "reason": jreason}
         m["country_indicators"] = kyc.country_indicators_for(m.get("country", ""), nationalities, ctable)
+        m["suggested_country_score"] = kyc.suggested_country_score_for(m.get("country", ""), nationalities, stable)
         # R.25 — legal-arrangement (trust/foundation/partnership) flag
         m["arrangement"] = kyc_data.get("arrangement_type", "") if kyc_data.get("is_arrangement") else ""
         cdd_gap_count = sum(len(i.get("cdd_gaps", [])) for i in kyc_data.get("individuals", []))

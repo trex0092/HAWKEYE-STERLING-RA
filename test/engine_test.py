@@ -3828,6 +3828,79 @@ check("country indicators: a jurisdiction on no list yields no context",
 _rr_src = open(os.path.join(ROOT, "ai.py"), encoding="utf-8").read()
 check("country indicators never feed the risk rating (ai.py does not read them)",
       "country_indicators" not in _rr_src and "country-indicators" not in _rr_src)
+_fe = _ci_doc["indicators"]["fatf_effectiveness"]
+_fe_bad = [e.get("published") for e in _fe["jurisdictions"]
+           if len(e["io"].split()) != 11 or set(e["io"].split()) - {"HE", "SE", "ME", "LE"}
+           or e["high_or_substantial"] != sum(x in ("HE", "SE") for x in e["io"].split())
+           or not _re_ci.match(r"^\d{4}-\d{2}$", e["date"])]
+check("FATF effectiveness: 11 HE/SE/ME/LE ratings per row and the HE+SE count matches: " + ", ".join(map(str, _fe_bad)),
+      not _fe_bad and len(_fe["jurisdictions"]) >= 190)
+_fe_unmapped = sorted({e["app"] for e in _fe["jurisdictions"]} - _app_countries)
+_fe_apps = [e["app"] for e in _fe["jurisdictions"]]
+check("FATF effectiveness: every `app` name is a COUNTRIES name, once: " + ", ".join(_fe_unmapped),
+      not _fe_unmapped and len(_fe_apps) == len(set(_fe_apps)))
+check("FATF effectiveness: carries the CC BY 4.0 citation and the FATF adaptation disclaimer",
+      "CC BY 4.0" in _fe["licence"] and "This is an adaptation of an original work by the Financial Action Task Force" in _fe["licence"])
+check("FATF effectiveness: Türkiye's September 2026 MER (2022 Methodology) supersedes the 2019 one",
+      any(e["app"] == "Turkey" and e["date"] == "2026-09" and e["methodology"] == "2022" for e in _fe["jurisdictions"]))
+
+print("kyc — suggested country score (DRAFT, pending MLRO approval, never scored)")
+check("kyc: an absent suggested-country-score file degrades to {} silently",
+      kyc.load_suggested_country_scores(os.path.join(_hdir, "nope.json")) == {})
+_err = _io.StringIO()
+with _ctx.redirect_stderr(_err):
+    _sc_bad = kyc.load_suggested_country_scores(_bad)
+check("kyc: a corrupt suggested-country-score file degrades to {} AND warns loudly",
+      _sc_bad == {} and "WARN" in _err.getvalue())
+_sc_path = os.path.join(ROOT, "data", "country-score-suggested.json")
+_sc_doc = json.load(open(_sc_path, encoding="utf-8"))
+_sc = kyc.load_suggested_country_scores(_sc_path, _ci_path)
+check("suggested score: one row per COUNTRIES name, each with the current app score",
+      sorted(r["country"] for r in _sc_doc["countries"]) == sorted(_app_countries)
+      and all(r["current"] == c["score"] for c in json.loads(_re_ci.search(r"const COUNTRIES = (\[.*?\]);",
+              open(os.path.join(ROOT, "app.js"), encoding="utf-8").read()).group(1))
+              for r in _sc_doc["countries"] if r["country"] == c["name"]))
+# Re-derive every row from the inputs in Python, so the Node generator and the
+# written method can never drift apart silently.
+_jr = json.load(open(os.path.join(ROOT, "data", "jurisdiction-risk.json"), encoding="utf-8"))
+_fe_by = {e["app"]: e["high_or_substantial"] for e in _fe["jurisdictions"]}
+_inc = {e["app"] for e in _ci_doc["indicators"]["incsr_major_ml"]["jurisdictions"]}
+_tip = {e["app"]: t for t, l in _ci_doc["indicators"]["tip_tier"]["tiers"].items() for e in l}
+_eut = {e["app"] for e in _ci_doc["indicators"]["eu_tax_noncooperative"]["jurisdictions"]}
+
+
+def _sc_expect(name):
+    if name in _jr["high"] or name in _jr["grey"]:
+        return 3
+    if name not in _fe_by:
+        return None
+    n = _fe_by[name]
+    pts = (3 if n <= 1 else 2 if n <= 3 else 1 if n <= 6 else 0) + (2 if name in _inc else 0) \
+        + {"Tier 3": 2, "Tier 2 Watch List": 1}.get(_tip.get(name), 0) + (1 if name in _eut else 0)
+    return 1 if pts <= 2 else 2 if pts <= 5 else 3
+
+
+_sc_wrong = [r["country"] for r in _sc_doc["countries"] if r["suggested"] != _sc_expect(r["country"])]
+check("suggested score: every row matches the written method re-derived in Python: " + ", ".join(_sc_wrong[:10]),
+      not _sc_wrong)
+check("suggested score: every FATF call-for-action or grey-list country is suggested 3",
+      all(_sc[kyc._norm(n)]["suggested"] == 3 for n in _jr["high"] + _jr["grey"]))
+check("suggested score: Turkey 2, India 2, Papua New Guinea 3 (grey list)",
+      _sc["turkey"]["suggested"] == 2 and _sc["india"]["suggested"] == 2
+      and _sc["papua new guinea"]["suggested"] == 3 and _sc["papua new guinea"]["basis"] == "fatf-grey-list")
+check("suggested score: the publisher spelling resolves to the app row (Türkiye / Turkey)",
+      _sc.get("türkiye") is _sc.get("turkey"))
+check("suggested score: a jurisdiction FATF has not rated gets no suggestion and no report line",
+      _sc["greenland"]["suggested"] is None and kyc.suggested_country_score_for("Greenland", [], _sc) == [])
+_sc_lines = kyc.suggested_country_score_for("Turkey", ["India", "Türkiye"], _sc)
+check("suggested score: country and nationality lines show suggested vs current with the reasons, once per country",
+      len(_sc_lines) == 2 and _sc_lines[0].startswith("Turkey: suggested 2 vs current 2 (FATF effectiveness")
+      and _sc_lines[1].startswith("India: suggested 2 vs current 2"))
+check("suggested score: the method is marked DRAFT pending MLRO approval and names no CPI or commercial report input",
+      "DRAFT" in _sc_doc["method"]["status"] and "MLRO" in _sc_doc["method"]["status"]
+      and not _re_ci.search(r"knowyourcountry|ocindex|transparency\.org", json.dumps(_sc_doc), _re_ci.I))
+check("suggested score never feeds the risk rating (ai.py does not read it)",
+      "suggested_country" not in _rr_src and "country-score-suggested" not in _rr_src)
 
 print("screen — EOCN review-age gate (manual-review currency on the TFS list)")
 import datetime as _dt_rev

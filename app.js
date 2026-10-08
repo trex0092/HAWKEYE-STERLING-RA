@@ -1295,15 +1295,89 @@ function countryIntelUrl(name) {
   const s = kycSlug(name);
   return s ? KYC_INTEL_BASE + 'country/' + s + '/' : KYC_INTEL_BASE;
 }
+/* Analyst reference only: the jurisdiction's Global Organized Crime Index
+   profile (Global Initiative Against Transnational Organized Crime). No OC
+   Index scores or text are copied into this app or repo - the report is "all
+   rights reserved" and the downloadable dataset states no reuse licence - and
+   the link never feeds the score. The Index covers the 193 UN member states
+   only; for any other jurisdiction the link is hidden. Page slugs follow the
+   kycSlug folding of the COUNTRIES name; the 17 that differ are mapped here
+   (test/country-intel-links.test.mjs proves all 193 profiles are reached once). */
+const OC_INDEX_BASE = 'https://ocindex.net/country/';
+const OC_SLUG_OVERRIDES = {
+  'Bosnia-Herzegovina': 'bosnia-and-herzegovina',
+  'Brunei Darussalam': 'brunei',
+  'Cape Verde': 'cabo-verde',
+  'Central African Republic': 'central-african-republic',
+  'The Democratic Republic Of Congo': 'congo-dem-rep',
+  'Congo (Brazzaville)': 'congo-rep',
+  'Islamic Republic of Iran': 'iran',
+  'North Korea': 'korea-dpr',
+  'South Korea': 'korea-rep',
+  "Lao People's Democratic Republic": 'laos',
+  'Micronesia': 'micronesia-federated-states-of',
+  'Russian Federation': 'russia',
+  'São Tomé & Príncipe': 'sao-tome-and-principe',
+  'St Kitts & Nevis': 'st-kitts-and-nevis',
+  'St Vincent & Gren': 'st-vincent-and-the-grenadines',
+  'Trinidad & Tobago': 'trinidad-and-tobago',
+  'Turkey': 'turkiye'
+};
+const OC_INDEX_SLUGS = new Set(('afghanistan albania algeria andorra angola antigua-and-barbuda argentina armenia australia austria azerbaijan bahamas bahrain bangladesh barbados belarus belgium belize benin bhutan bolivia bosnia-and-herzegovina botswana brazil brunei bulgaria burkina-faso burundi cabo-verde cambodia cameroon canada central-african-republic chad chile china colombia comoros congo-dem-rep congo-rep costa-rica cote-divoire croatia cuba cyprus czech-republic denmark djibouti dominica dominican-republic ecuador egypt el-salvador equatorial-guinea eritrea estonia eswatini ethiopia fiji finland france gabon gambia georgia germany ghana greece grenada guatemala guinea guinea-bissau guyana haiti honduras hungary iceland india indonesia iran iraq ireland israel italy jamaica japan jordan kazakhstan kenya kiribati korea-dpr korea-rep kuwait kyrgyzstan laos latvia lebanon lesotho liberia libya liechtenstein lithuania luxembourg madagascar malawi malaysia maldives mali malta marshall-islands mauritania mauritius mexico micronesia-federated-states-of moldova monaco mongolia montenegro morocco mozambique myanmar namibia nauru nepal netherlands new-zealand nicaragua niger nigeria north-macedonia norway oman pakistan palau panama papua-new-guinea paraguay peru philippines poland portugal qatar romania russia rwanda samoa san-marino sao-tome-and-principe saudi-arabia senegal serbia seychelles sierra-leone singapore slovakia slovenia solomon-islands somalia south-africa south-sudan spain sri-lanka st-kitts-and-nevis st-lucia st-vincent-and-the-grenadines sudan suriname sweden switzerland syria tajikistan tanzania thailand timor-leste togo tonga trinidad-and-tobago tunisia turkiye turkmenistan tuvalu uganda ukraine united-arab-emirates united-kingdom united-states uruguay uzbekistan vanuatu venezuela vietnam yemen zambia zimbabwe').split(' '));
+function ocIndexUrl(name) {
+  const s = Object.prototype.hasOwnProperty.call(OC_SLUG_OVERRIDES, name) ? OC_SLUG_OVERRIDES[name] : kycSlug(name);
+  return OC_INDEX_SLUGS.has(s) ? OC_INDEX_BASE + s : '';
+}
+/* DRAFT suggested country score (data/country-score-suggested.json, generated
+   by scripts/country-score.mjs from FATF ratings and public US/EU lists). It is
+   shown under the jurisdiction for the MLRO to compare with the current score;
+   it never feeds the assessment score, and a load failure says so instead of
+   showing nothing. null = still loading; {} = could not load. */
+let suggestedScores = null;
+function loadSuggestedScores() {
+  if (typeof fetch !== 'function') { suggestedScores = {}; paintSuggestedScore(); return; }
+  fetch('data/country-score-suggested.json', { credentials: 'same-origin' })
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    .then(d => {
+      const m = {};
+      (d.countries || []).forEach(r => { if (r && r.country) m[r.country] = r; });
+      suggestedScores = m;
+    })
+    .catch(() => { suggestedScores = {}; })
+    .then(paintSuggestedScore);
+}
+function paintSuggestedScore() {
+  const el = $('jurisdictionSuggested');
+  if (!el || suggestedScores === null) return;
+  if (!Object.keys(suggestedScores).length) {
+    el.textContent = 'Suggested score (draft): unavailable, the suggestion file could not be loaded.';
+    return;
+  }
+  const r = suggestedScores[state.entity.jurisdiction];
+  if (!r || r.suggested == null) {
+    el.textContent = 'Suggested score (draft): none, this jurisdiction has no FATF rating.';
+    return;
+  }
+  el.textContent = 'Suggested score (draft, pending MLRO approval, not applied): ' + r.suggested + ' · ' + ratingLabel(r.suggested)
+    + (r.compare === 'lower' ? ' (lower than current; not a recommendation to lower)' : '')
+    + '. Basis: ' + (r.factors || []).join('; ') + '.';
+}
 function paintJurisdiction() {
   const intel = $('jurisdictionIntel');
   if (intel) intel.href = countryIntelUrl(state.entity.jurisdiction);
+  const oc = $('jurisdictionOcIndex');
+  if (oc) {
+    const u = ocIndexUrl(state.entity.jurisdiction);
+    oc.hidden = !u;
+    if (u) oc.href = u;
+  }
   const c = effCountry(state.entity.jurisdiction);
   const score = c ? c.score : 1;
   const tag = $('jurisdictionScore');
   tag.className = 'score-tag '+scoreTagClass(score);
   tag.textContent = 'Score: '+score+' · '+ratingLabel(score)+(c && c.overridden ? ' ✱' : '');
   tag.title = ovTitle(c);
+  paintSuggestedScore();
 }
 function paintActivity() {
   const a = effOf('activities', state.profile.activity);
@@ -2452,6 +2526,7 @@ const I18N = {
   'fld.principals': {en:'Principals — Beneficial Owners / Controllers / Directors', ar:'الأطراف الرئيسية — المالكون المستفيدون / المسيطرون / المديرون'},
   'fld.jurisdiction': {en:'Jurisdiction & Incorporation', ar:'الولاية القضائية والتأسيس'},
   'fld.countryIntel': {en:'Country AML profile (KnowYourCountry) ↗', ar:'ملف مخاطر غسل الأموال للدولة (KnowYourCountry) ↗'},
+  'fld.ocIndex': {en:'Organized crime profile (OC Index) ↗', ar:'ملف الجريمة المنظمة للدولة (OC Index) ↗'},
   'fld.activity':     {en:'Business Activity', ar:'النشاط التجاري'},
   'fld.onboard':      {en:'Onboarding Channel', ar:'قناة الإلحاق'},
   'fld.opHistory':    {en:'Operational History — Entity', ar:'السجل التشغيلي — الكيان'},
@@ -2936,6 +3011,7 @@ refreshSelectLabels(); /* add override marks (✱) to the now-built selects */
 initRiskDataPanel();
 initRegisterPanel();
 initLang();
+loadSuggestedScores();
 
 /* (Re)load persisted risk data + draft into the UI. Safe to re-run after the
    device is unlocked, when the encrypted store first becomes readable. */
