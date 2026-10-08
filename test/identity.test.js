@@ -6,6 +6,8 @@
 const crypto = require('node:crypto');
 const path = require('node:path');
 const identity = require(path.join(__dirname, '..', 'netlify', 'functions', '_identity.js'));
+const reviewGate = require(path.join(__dirname, '..', 'netlify', 'functions', '_human-review.js'));
+
 const mirror = require(path.join(__dirname, '..', 'netlify', 'functions', 'asana-mirror.js'));
 const riskBackup = require(path.join(__dirname, '..', 'netlify', 'functions', 'risk-backup.js'));
 
@@ -42,6 +44,86 @@ function event(token, body) {
   return { httpMethod: 'POST', headers: token ? { Authorization: 'Bearer ' + token } : {},
     body: JSON.stringify(body || {}) };
 }
+
+
+/* Signed case review readiness is NOT execution approval. Every test uses
+   ephemeral human keys, synthetic data and an offline trusted key registry. */
+(() => {
+  const p = {
+    schema: 'hawkeye.case-proposal/v1', case_id: 'SYNTHETIC-CASE-1',
+    status: 'PROPOSED', recommendation: 'review',
+    findings: [{ kind: 'sanctions',
+      summary: 'Synthetic official-list candidate needs independent review',
+      evidence_ids: ['synthetic:official:1'] }],
+    limitations: ['No real screening decision has been made.'],
+    approval_required: true
+  };
+  const ka = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const kb = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const trust = {
+    'reviewer-a-key': { subject: 'reviewer-a', role: 'Reviewer-MLRO',
+      public_jwk: ka.publicKey.export({ format: 'jwk' }) },
+    'reviewer-b-key': { subject: 'reviewer-b', role: 'Reviewer-MLRO',
+      public_jwk: kb.publicKey.export({ format: 'jwk' }) }
+  };
+  const epoch = Math.floor(Date.now() / 1000);
+  const base = {
+    trustedEvidenceIds: ['synthetic:official:1'], riskTier: 'LOW',
+    initiator: 'synthetic-analyst', now: epoch, trustedKeys: trust
+  };
+  const digest = reviewGate.digestProposal(p);
+  function signed(subject, keyId, privateKey, override = {}) {
+    const a = {
+      aud: 'hawkeye-case-review', case_id: p.case_id,
+      proposal_sha256: digest, subject, role: 'Reviewer-MLRO',
+      issued_at: epoch - 10, expires_at: epoch + 600,
+      nonce: 'unique-' + keyId, key_id: keyId,
+      ...override
+    };
+    a.signature = crypto.sign('RSA-SHA256',
+      Buffer.from(reviewGate.signedMessage(a)), privateKey).toString('base64url');
+    return a;
+  }
+  const a = signed('reviewer-a', 'reviewer-a-key', ka.privateKey);
+  const b = signed('reviewer-b', 'reviewer-b-key', kb.privateKey);
+  const assess = (proposal, reviews, settings = {}) =>
+    reviewGate.assessCaseReviewReadiness(proposal, reviews, { ...base, ...settings });
+
+  let status = assess(p, [a]);
+  check('signed independent MLRO review can make a low-risk draft review-ready',
+    status.status === 'REVIEW_READY' && status.trusted_review_count === 1);
+  check('review-ready never grants autonomous case execution permission',
+    status.approved_for_execution === false && status.requires_durable_replay_store === true);
+  check('high-risk draft requires two independent MLRO signatures',
+    assess(p, [a], { riskTier: 'HIGH' }).status === 'HOLD' &&
+    assess(p, [a, b], { riskTier: 'HIGH' }).status === 'REVIEW_READY');
+  check('missing signature and empty review set always HOLD',
+    assess(p, []).status === 'HOLD' &&
+    assess(p, [{ ...a, signature: '' }]).status === 'HOLD');
+  check('attempted role escalation is rejected even after signed-byte mutation',
+    assess(p, [{ ...a, role: 'Admin' }]).status === 'HOLD');
+  check('approval bound to one draft is rejected after proposal mutation',
+    assess({ ...p, recommendation: 'escalate_to_mlro' }, [a]).status === 'HOLD');
+  check('one human cannot provide two independent signatures',
+    assess(p, [a, a], { riskTier: 'HIGH' }).status === 'HOLD');
+  check('submitter cannot approve own proposed case',
+    assess(p, [a], { initiator: 'reviewer-a' }).status === 'HOLD');
+  check('untrusted case evidence ID fails before review',
+    assess(p, [a], { trustedEvidenceIds: ['synthetic:unrelated'] }).status === 'HOLD');
+  check('a proposed case cannot spoof a filed/closed state',
+    assess({ ...p, status: 'FILED' }, [a]).status === 'HOLD');
+  check('a forged autonomous filing field invalidates the proposal',
+    assess({ ...p, auto_file_str: true }, [a]).status === 'HOLD');
+  check('unknown risk tier cannot be silently downgraded to LOW',
+    assess(p, [a], { riskTier: 'UNKNOWN' }).status === 'HOLD');
+  check('review trust anchors must be available from server side',
+    assess(p, [a], { trustedKeys: null }).status === 'HOLD');
+  const expired = signed('reviewer-a', 'reviewer-a-key', ka.privateKey, {
+    issued_at: epoch - 7200, expires_at: epoch - 600
+  });
+  check('expired signed reviews cannot unlock a case',
+    assess(p, [expired]).status === 'HOLD');
+})();
 
 (async () => {
   try {
