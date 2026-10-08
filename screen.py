@@ -332,8 +332,6 @@ GNEWS_LOCALES = [
     ("ko",    "KR", "KR:ko", "ko"),
     ("hi",    "IN", "IN:hi", "hi"),
     ("id",    "ID", "ID:id", "id"),
-    ("fa",    "IR", "IR:fa", "fa"),
-    ("ur",    "PK", "PK:ur", "ur"),
     ("nl",    "NL", "NL:nl", "nl"),
     # ── Extended worldwide coverage (weaponised global sweep) ──
     # More MENA / Gulf markets (local Arabic press differs by state)
@@ -345,7 +343,6 @@ GNEWS_LOCALES = [
     ("ar",    "LB", "LB:ar", "ar"),
     ("ar",    "IQ", "IQ:ar", "ar"),
     ("ar",    "MA", "MA:ar", "ar"),
-    ("ar",    "DZ", "DZ:ar", "ar"),
     ("he",    "IL", "IL:he", "he"),
     # More Asia
     ("th",    "TH", "TH:th", "th"),
@@ -379,30 +376,24 @@ GNEWS_LOCALES = [
     ("bg",    "BG", "BG:bg", "bg"),
     ("sr",    "RS", "RS:sr", "sr"),
     # South & Southeast Asia + Sub-Saharan Africa
-    ("tl",    "PH", "PH:tl", "tl"),
-    ("sw",    "KE", "KE:sw", "sw"),
-    ("sw",    "TZ", "TZ:sw", "sw"),
     ("ta",    "IN", "IN:ta", "ta"),
     # ("en-NG", "UG", "UG:en") removed 2026-09-28, with TZ:en above: both keep
     # their ceid but serve one generic international-English feed (0-1/100
     # local sources, 82-94/100 identical to each other; adverse-media.mjs
     # audit). Every removed entry duplicated content another edition already
     # sweeps, so recall is unchanged; the ledger simply stops claiming those
-    # markets. The Swahili KE:sw / TZ:sw editions are untouched.
+    # markets.
+    # Removed 2026-10-08 to match adverse-media.mjs LOCALES, which dropped them on
+    # 2026-09-26 (fa-IR, ur-PK, tl-PH, sw-KE, sw-TZ, az-AZ, kk-KZ, ka-GE, hy-AM,
+    # ne-NP, si-LK, my-MM, km-KH, af-ZA, sq-AL, hr-HR: each silently served a
+    # different edition, with no working hl/gl combination) and ar-DZ on
+    # 2026-10-08 (served EG:ar). Each duplicated a feed another edition already
+    # sweeps, so recall is unchanged; the rotation ledger stops counting them as
+    # markets. Those languages stay covered by the multilingual red-flag terms
+    # and the GDELT sweep.
     # High-risk-region editions (2026-08-05, edition-confirmed languages — mirrors adverse-media.mjs)
-    ("az", "AZ", "AZ:az", "az"),
-    ("kk", "KZ", "KZ:kk", "kk"),
-    ("ka", "GE", "GE:ka", "ka"),
-    ("hy", "AM", "AM:hy", "hy"),
-    ("ne", "NP", "NP:ne", "ne"),
-    ("si", "LK", "LK:si", "si"),
     ("pa", "IN", "IN:pa", "pa"),
     ("mr", "IN", "IN:mr", "mr"),
-    ("my", "MM", "MM:my", "my"),
-    ("km", "KH", "KH:km", "km"),
-    ("af", "ZA", "ZA:af", "af"),
-    ("sq", "AL", "AL:sq", "sq"),
-    ("hr", "HR", "HR:hr", "hr"),
     ("sl", "SI", "SI:sl", "sl"),
     ("lt", "LT", "LT:lt", "lt"),
     ("lv", "LV", "LV:lv", "lv"),
