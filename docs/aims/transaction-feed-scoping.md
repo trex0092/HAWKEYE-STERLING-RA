@@ -148,3 +148,44 @@ These mirror the four questions standing on Asana task
 "[AI GOV] P38: Transaction-monitoring live feed, scoping decision" since
 2026-07-16. None has an answer yet. Until they do, `txn_monitor.py` stays
 INERT by design: no connection, no mock data, no fabricated transactions.
+
+
+## 7. Offline ingestion preflight (engineering safeguard, not production activation)
+
+The private export may be checked offline using the zero-dependency
+txn_feed.py validator and scripts/txn-feed-preflight.py:
+
+    python3 scripts/txn-feed-preflight.py /private/transactions.json /private/manifest.json
+
+The export MUST remain outside this public repository, including CI fixtures,
+Git history and uploaded logs. The preflight prints only the record count,
+date window, source identifier and digest. It does not activate transaction
+monitoring or infer that a source, feed schedule or integration exists.
+
+The independently delivered JSON manifest has this contract:
+
+    {
+      "schema": "hawkeye.txn-manifest/v1",
+      "source_id": "approved-export-source-id",
+      "window_start": "2026-10-01",
+      "window_end": "2026-10-01",
+      "record_count": 0,
+      "complete": true,
+      "sha256": "<sha256 hex digest of the exact raw export bytes>"
+    }
+
+The export producer is accountable for authenticating the manifest and
+attesting that it covers the WHOLE window. SHA-256 verifies consistency
+with the supplied manifest only; a malicious party could substitute both
+files. Every transaction must have a unique, nonempty transaction_id,
+a valid date and a finite nonnegative numeric AED amount. If the ERP
+uses another currency, the owner must approve documented conversion
+before ingestion; the preflight deliberately refuses non-AED records.
+
+CURRENT INTEGRATION STATE: this is a manual preflight and synthetic
+regression coverage only. txn_monitor.py is unchanged and does not
+automatically call the validator. Section 6 remains OPEN. Production activation
+requires an authenticated private feed, an authorized manifest channel,
+a supervised MLRO acceptance run, and a separately reviewed fail-closed
+integration into the screening workflow. This technical addition is not
+evidence of control closure or human approval.
