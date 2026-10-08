@@ -19,6 +19,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
+import { buildVerifiedLegalCorpus, retrieveVerifiedLegal } from '../scripts/verified-legal-retrieval.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let passed = 0, failed = 0;
@@ -173,6 +174,55 @@ check('validator: missing locator fails', citationProblems({ ...goodSourced, loc
 check('validator: an extra or missing key fails', citationProblems({ ...goodSourced, note: 'x' }, '2026-10-02').length > 0
   && citationProblems({ basis: 'needs-source' }).length > 0);
 check('validator: an unknown basis fails', citationProblems({ ...blank, basis: 'ai-drafted' }).length > 0);
+
+
+/* Source-bound retrieval: not one unsourced legal paraphrase may be promoted
+   into an authoritative model citation. Synthetic sourced row only. */
+const syntheticRegistry = { obligations: [
+  {
+    id: 'SYN-01', obligation: 'Verify beneficial owner identity before opening an account',
+    instrument: 'Federal Decree-Law No. 10 of 2025', status: 'partial',
+    source_citation: { ...goodSourced }
+  },
+  {
+    id: 'SYN-02', obligation: 'Verify beneficial owner identity before opening an account',
+    instrument: 'Federal Decree-Law No. 10 of 2025', status: 'met',
+    source_citation: { ...blank }
+  }
+]};
+const trusted = ['uaelegislation.gov.ae'];
+const sourced = buildVerifiedLegalCorpus(syntheticRegistry, trusted, '2026-10-02');
+check('retrieval index includes only verified official citations, never needs-source rows',
+  sourced.length === 1 && sourced[0].id === 'SYN-01');
+const retrieved = retrieveVerifiedLegal(syntheticRegistry, 'beneficial owner identity',
+  { role: 'Analyst', approvedHosts: trusted, asOf: '2026-10-02' });
+check('verified retrieval returns source URL, exact quote, verifier and citation ID',
+  retrieved.status === 'verified_source_matches' && retrieved.results.length === 1 &&
+  retrieved.results[0].id === 'SYN-01' &&
+  retrieved.results[0].quote === goodSourced.quote &&
+  retrieved.results[0].source_url === goodSourced.source_url &&
+  retrieved.results[0].verified_by === 'MLRO');
+check('retrieval refuses unauthorized role rather than serving an index',
+  retrieveVerifiedLegal(syntheticRegistry, 'beneficial owner identity',
+    { role: 'anonymous', approvedHosts: trusted, asOf: '2026-10-02' }).status === 'forbidden');
+check('retrieval requires an independently trusted official host allowlist',
+  retrieveVerifiedLegal(syntheticRegistry, 'beneficial owner identity',
+    { role: 'Analyst', approvedHosts: [], asOf: '2026-10-02' }).status === 'insufficient_verified_sources');
+check('retrieval excludes future-dated human verification evidence',
+  retrieveVerifiedLegal(syntheticRegistry, 'beneficial owner identity',
+    { role: 'Analyst', approvedHosts: trusted, asOf: '2026-09-01' }).results.length === 0);
+check('retrieval rejects nonofficial URL despite a claimed verifier',
+  buildVerifiedLegalCorpus({ obligations: [{
+    ...syntheticRegistry.obligations[0],
+    source_citation: { ...goodSourced, source_url: 'https://evil.example/official-law' }
+  }] }, trusted, '2026-10-02').length === 0);
+check('retrieval emits an explicit insufficiency when no verified text matches',
+  retrieveVerifiedLegal(syntheticRegistry, 'quantum bananas',
+    { role: 'Analyst', approvedHosts: trusted, asOf: '2026-10-02' }).status === 'insufficient_verified_sources');
+check('retrieval never treats the present needs-source obligations as official law',
+  retrieveVerifiedLegal({ obligations: reg.obligations.filter(o => o.source_citation?.basis === 'needs-source') },
+    'customer due diligence', { role: 'Admin', approvedHosts: [...OFFICIAL_HOSTS], asOf: '2026-10-02' })
+    .status === 'insufficient_verified_sources');
 
 /* Coverage: the register must speak to every jurisdictional watch source that
    exists for a reason — a watched UAE supervisor with no obligation attached
