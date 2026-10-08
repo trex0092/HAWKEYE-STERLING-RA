@@ -61,9 +61,18 @@ jobs:
             exit 1
           fi
 
+      - name: Ingest the fixture names (person and business)
+        run: |
+          for src in hb-person hb-business; do
+            curl -fsS -X POST -H 'Content-Type: text/csv' \
+              --data-binary @.watchman/hawkeye-bench.csv \
+              -o ".watchman/ingest-$src.json" \
+              "http://127.0.0.1:8084/v2/ingest/$src"
+          done
+
       - name: Run the benchmark
         run: |
-          node scripts/watchman-bench.mjs run http://127.0.0.1:8084
+          node scripts/watchman-bench.mjs run http://127.0.0.1:8084 .watchman
           {
             cat watchman-bench-report.md
             echo

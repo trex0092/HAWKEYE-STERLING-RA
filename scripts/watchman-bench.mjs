@@ -6,7 +6,7 @@
    repo's OWN frozen screening benchmark (test/fixtures/screening-benchmark):
 
    - every fixture `listed` name is uploaded through Watchman's custom file
-     ingest (POST /v2/ingest/{fileType});
+     ingest (POST /v2/ingest/{fileType}, done with curl by the workflow);
    - every `subject` from the recall pairs (must match) and the hard negatives
      (must NOT match) is sent to GET /v2/search, restricted to that source.
 
@@ -18,7 +18,8 @@
 
    Subcommands:
      dataset <outdir>    write hawkeye-bench.csv + watchman.yml (APP_CONFIG)
-     run <watchman-url>  ingest the fixture names, run the benchmark, print the report
+     run <watchman-url> [dir]  check the ingest responses saved in dir, run the
+                         benchmark, print the report
 */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -114,18 +115,14 @@ async function main(argv) {
   }
   if (cmd === 'run') {
     const base = (argv[1] || 'http://127.0.0.1:8084').replace(/\/$/, '');
+    const dir = argv[2] || '.watchman';
     const { pairs, negs, listed } = loadFixtures();
-    // Rebuilt from the fixtures (same bytes `dataset` writes), so the ingest can
-    // never drift from the names the evaluation counts.
-    const body = buildCsv(listed);
+    // The workflow uploads hawkeye-bench.csv with curl and saves each ingest
+    // response here; this step only verifies them. Degrade loudly: an ingest
+    // that parsed nothing would otherwise read as 0% recall.
     for (const kind of Object.keys(SOURCES)) {
-      const r = await fetch(`${base}/v2/ingest/${SOURCES[kind]}`, {
-        method: 'POST', headers: { 'Content-Type': 'text/csv' }, body,
-      });
-      if (!r.ok) throw new Error(`watchman ingest ${kind} http ${r.status}: ${(await r.text()).slice(0, 200)}`);
-      const d = await r.json();
+      const d = JSON.parse(readFileSync(join(dir, `ingest-${SOURCES[kind]}.json`), 'utf8'));
       const n = (d.entities || []).length;
-      // Degrade loudly: an ingest that parsed nothing would read as 0% recall.
       if (n !== listed.size) throw new Error(`watchman ingest ${kind}: parsed ${n} of ${listed.size} names`);
     }
     const subjects = [...new Set([...pairs, ...negs].map(x => x.subject))];
@@ -149,7 +146,7 @@ async function main(argv) {
     console.log(md);
     return 0;
   }
-  console.error('usage: watchman-bench.mjs dataset <outdir> | run <watchman-url>');
+  console.error('usage: watchman-bench.mjs dataset <outdir> | run <watchman-url> [dir]');
   return 2;
 }
 
