@@ -502,29 +502,45 @@ def _remittance_hits(texts, all_lists, normalizer):
 
 
 def screen_payment(payment, all_lists, *, jurisdiction_table=None, lists_degraded=(),
-                   matcher=None, normalizer=None):
+                   matcher=None, normalizer=None, unscreenable=None):
     """Screen ONE normalised payment. Returns
     {reference, outcome, severity, parties:[...], remittance_hits, findings:[...],
-     r16_missing:[...], provisional}.
+     r16_missing:[...], unscreenable:[...], provisional}.
 
     outcome ∈ STOP — POTENTIAL SANCTIONS MATCH | REVIEW — HIGH-RISK JURISDICTION |
-              REVIEW — INCOMPLETE (R.16) | NO MATCH | NO MATCH — PROVISIONAL
+              REVIEW — NAME NOT AUTO-SCREENABLE | REVIEW — INCOMPLETE (R.16) |
+              NO MATCH | NO MATCH — PROVISIONAL
+
+    `unscreenable` (optional, screen._unscreenable) also routes a name whose
+    script letters normalize() loses to manual review. Without it, a supplied
+    name shorter than 4 matchable characters still does: the matcher skips such
+    names, so a party named "Li" was reported as NO MATCH without ever being
+    compared to a list.
     """
     if matcher is None or normalizer is None:
         raise ValueError("matcher and normalizer are required (screen.screen_name, screen.normalize)")
-    findings, parties_out = [], []
+    findings, parties_out, manual = [], [], []
     max_tier = None
     for p in payment.get("parties", []):
         rec = dict(p)
         rec["label"] = ROLE_LABELS.get(p["role"], p["role"])
-        if p.get("name") and len(normalizer(p["name"])) >= 4:
-            rec["hits"] = matcher(p["name"], all_lists) or []
+        name = p.get("name")
+        short = bool(name) and len(normalizer(name)) < 4
+        if name and not short:
+            rec["hits"] = matcher(name, all_lists) or []
             rec["name_screened"] = True
         else:
             rec["hits"] = []
             rec["name_screened"] = False
             rec["note"] = ("BIC only — name not supplied, so not name-screened; country checked"
-                           if p.get("bic") else "no screenable name supplied")
+                           if p.get("bic") and not name else "no screenable name supplied")
+        if name and (short or (unscreenable is not None and unscreenable(name))):
+            rec["unscreenable"] = True
+            rec["note"] = ("name not auto-screenable (non-Latin script or too short) — "
+                           "screen this party manually against all lists")
+            manual.append(rec["label"])
+            findings.append(f"{rec['label']} \"{name}\" is not auto-screenable — "
+                            "screen manually against all lists")
         tier, where = _jurisdiction_tier(p, jurisdiction_table)
         rec["jurisdiction_tier"] = tier
         rec["jurisdiction"] = where
@@ -550,6 +566,8 @@ def screen_payment(payment, all_lists, *, jurisdiction_table=None, lists_degrade
         outcome, severity = "STOP — POTENTIAL SANCTIONS MATCH", "CRITICAL"
     elif max_tier == "high":
         outcome, severity = "REVIEW — HIGH-RISK JURISDICTION", "HIGH"
+    elif manual:
+        outcome, severity = "REVIEW — NAME NOT AUTO-SCREENABLE", "HIGH"
     elif r16_missing:
         outcome, severity = "REVIEW — INCOMPLETE (R.16)", "HIGH"
     elif max_tier == "grey":
@@ -563,13 +581,13 @@ def screen_payment(payment, all_lists, *, jurisdiction_table=None, lists_degrade
             "currency": payment.get("currency", ""), "outcome": outcome,
             "permalink": payment.get("permalink", ""), "customer": payment.get("customer", ""),
             "severity": severity, "parties": parties_out, "remittance_hits": rem_hits,
-            "findings": findings, "r16_missing": r16_missing,
+            "findings": findings, "r16_missing": r16_missing, "unscreenable": manual,
             "provisional": bool(lists_degraded) and not any_hit,
             "lists_degraded": list(lists_degraded)}
 
 
 def screen_feed(transactions, all_lists, *, jurisdiction_table=None, lists_degraded=(),
-                matcher=None, normalizer=None, xml_parser=None):
+                matcher=None, normalizer=None, xml_parser=None, unscreenable=None):
     """Screen every payment in a transaction feed. A record that cannot be parsed
     is COUNTED (never dropped silently). Returns {n_payments, results, errors}."""
     results, errors = [], []
@@ -582,7 +600,7 @@ def screen_feed(transactions, all_lists, *, jurisdiction_table=None, lists_degra
         for p in pays:
             results.append(screen_payment(p, all_lists, jurisdiction_table=jurisdiction_table,
                                           lists_degraded=lists_degraded, matcher=matcher,
-                                          normalizer=normalizer))
+                                          normalizer=normalizer, unscreenable=unscreenable))
     rank = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
     results.sort(key=lambda r: rank.get(r["severity"], 0), reverse=True)
     return {"n_payments": len(results), "results": results, "errors": errors}

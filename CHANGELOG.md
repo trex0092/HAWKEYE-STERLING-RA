@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Short or non-Latin names no longer read as cleared in payment and MCP screening.** The matcher skips a name with fewer than 4 matchable characters, and `payment_screen.screen_payment` reported such a party as `NO MATCH` / LOW without comparing it to any list; the MCP `hawkeye_screen_name` tool returned `cleared: true` for `"Ali"` against `["Ali"]`, and for any subject against an empty watchlist. Payment parties with a supplied but unscreenable name (the engine's `_unscreenable` net) now yield `REVIEW — NAME NOT AUTO-SCREENABLE` (HIGH) with a manual-screening finding; the MCP name tools add a `MANUAL REVIEW` hit instead of clearing, and `hawkeye_screen_name` / `hawkeye_screen_payment` refuse a watchlist with no screenable entry. Recall only goes up.
+
 - **AI rulebooks crosswalk + bounded-coordinator hardening.**
   - Added `docs/governance/ai-rulebooks-crosswalk-2026.md`: applicability determinations and control mapping for ISO/IEC 27001, 23894, 42005 and 22989, OSFI E-23, California SB 53, EU AI Act Arts. 68–69, the OWASP LLM (2025) and Agentic (2026) Top 10 lists, NIS2/DORA/CRA, the non-EU AI laws and the UNESCO/G7 principles. It also maps the transaction-monitoring workflow against a reference model and lists seven gaps as proposals; no register entry is changed.
   - Fixed two fail-closed contract breaks in `agent_orchestrator.py`: an unhashable `tool` value raised `TypeError`, and deeply nested arguments raised `RecursionError`. Both now raise `WorkflowDenied`. The module had no tests; `test/mcp_tools_test.py` now covers its allowlist, role and approval gate, step and replan caps, argument budget, failure handling, PII-free events and canonical digest (16 checks).
