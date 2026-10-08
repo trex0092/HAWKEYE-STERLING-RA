@@ -18,7 +18,7 @@
 
    Subcommands:
      dataset <outdir>    write hawkeye-bench.csv + watchman.yml (APP_CONFIG)
-     run <watchman-url>  ingest the CSV, run the benchmark, print the report
+     run <watchman-url>  ingest the fixture names, run the benchmark, print the report
 */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -114,9 +114,10 @@ async function main(argv) {
   }
   if (cmd === 'run') {
     const base = (argv[1] || 'http://127.0.0.1:8084').replace(/\/$/, '');
-    const csv = argv[2] || '.watchman/hawkeye-bench.csv';
     const { pairs, negs, listed } = loadFixtures();
-    const body = readFileSync(csv, 'utf8');
+    // Rebuilt from the fixtures (same bytes `dataset` writes), so the ingest can
+    // never drift from the names the evaluation counts.
+    const body = buildCsv(listed);
     for (const kind of Object.keys(SOURCES)) {
       const r = await fetch(`${base}/v2/ingest/${SOURCES[kind]}`, {
         method: 'POST', headers: { 'Content-Type': 'text/csv' }, body,
@@ -148,7 +149,7 @@ async function main(argv) {
     console.log(md);
     return 0;
   }
-  console.error('usage: watchman-bench.mjs dataset <outdir> | run <watchman-url> [csv]');
+  console.error('usage: watchman-bench.mjs dataset <outdir> | run <watchman-url>');
   return 2;
 }
 

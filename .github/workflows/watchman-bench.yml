@@ -63,7 +63,7 @@ jobs:
 
       - name: Run the benchmark
         run: |
-          node scripts/watchman-bench.mjs run http://127.0.0.1:8084 .watchman/hawkeye-bench.csv
+          node scripts/watchman-bench.mjs run http://127.0.0.1:8084
           {
             cat watchman-bench-report.md
             echo
