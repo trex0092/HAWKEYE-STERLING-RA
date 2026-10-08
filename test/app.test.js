@@ -1140,6 +1140,17 @@ check('retention: a filed (registered) assessment is NEVER purged', A.purgeStale
     const blank = A.scoreBatch('name\nNo Factors Co\n')[0];
     check('scoreBatch flags a row with no jurisdiction/activity provided',
       blank.notes.some(n=>/no jurisdiction provided/i.test(n)) && blank.notes.some(n=>/no activity provided/i.test(n)));
+    // sanctions / PEP status that was never supplied, or is not a plain yes/no,
+    // must never read as a clean "No"
+    const unk = A.scoreBatch('name,jurisdiction,activity,sanctions,pep\n'
+      + 'Acme Gold,United Kingdom,Non-Manufactured Precious Metal Trading,Potential match,unknown\n')[0];
+    check('scoreBatch treats an unrecognised sanctions value as Yes, never a clean No',
+      unk.prohibited===true && unk.notes.some(n=>/sanctions value "Potential match" not recognised/.test(n)));
+    const nocol = A.scoreBatch('name,jurisdiction,activity\nAcme Gold,United Kingdom,Non-Manufactured Precious Metal Trading\n')[0];
+    check('scoreBatch names screening flags that were not supplied',
+      nocol.notes.some(n=>/sanctions, PEP, adverse media, TF, PF not supplied/.test(n)));
+    check('scoreBatch accepts an explicit "No" without a note',
+      !results[0].notes.some(n=>/sanctions|PEP value/.test(n)));
   }
 
   /* ── bilingual (EN/AR) interface i18n ── */
