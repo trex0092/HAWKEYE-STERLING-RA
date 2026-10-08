@@ -11,6 +11,7 @@ const { withFunctionTelemetry } = require('./_telemetry');
 
 const { rateLimit } = require('./_ratelimit');
 const { sharedTokenOk } = require('./_auth');
+const { inspectEgress } = require('./_data-boundary');
 
 // ── CORS (mirrors asana-task.js) ─────────────────────────────────────────────
 
@@ -909,6 +910,18 @@ const handle = async (event) => {
   const deepHop = Number.isInteger(body.deepHop) && body.deepHop > 0 ? Math.min(body.deepHop, DEEP_HOP_LIMIT) : 0;
   const accumulated = deepHop > 0 ? String(body.deepAccumulated || '').slice(0, 60000) : '';
 
+  /* Inspect EVERY value that could be passed to the provider, including a
+     client-supplied deep-mode assistant prefill. This boundary never accepts a
+     client-chosen policy. Invalid configuration fails closed before API egress.
+     The default "audit" mode preserves current behavior until the MLRO approves
+     an enforceable block/redact policy and the data-transfer terms are verified. */
+  const boundary = inspectEgress({ question, context, accumulated });
+  if (!boundary.valid) return resp(503, { ok: false, error: 'Advisor data boundary misconfigured.' });
+  if (!boundary.allow) return resp(422, {
+    ok: false, error: 'Sensitive identifier detected; Advisor input withheld before model egress.',
+    piiFlagged: boundary.piiTypes, piiEgressPolicy: boundary.mode
+  });
+
   const { model, maxTokens, effectiveMode, degradedFrom, degradedReason, continuation } = selectModel(mode, deepContinue);
 
   /* The instruction follows the EFFECTIVE mode, not the requested one: asking
@@ -924,13 +937,13 @@ const handle = async (event) => {
 
   const personaSuffix = PERSONA_SUFFIX[persona] || PERSONA_SUFFIX.sterling;
   const systemPrompt  = [SOUL_CHARTER, KNOWLEDGE_CONTEXT, personaSuffix].join('\n\n');
-  const userMessage   = modeInstruction + '\n\nQUESTION:\n' + question + (context.trim() ? '\n\nCONTEXT:\n' + context : '');
+  const userMessage   = modeInstruction + '\n\nQUESTION:\n' + boundary.question + (boundary.context.trim() ? '\n\nCONTEXT:\n' + boundary.context : '');
 
   /* On a resumed hop the prior output is replayed as an assistant prefill so
      the model continues mid-thought. trimEnd() on both what is SENT and what is
      KEPT — the API rejects trailing whitespace in a prefill, and keeping a
      different string from the one sent would desynchronise the resume point. */
-  const priorText = continuation && accumulated ? accumulated.replace(/\s+$/, '') : '';
+  const priorText = continuation && boundary.accumulated ? boundary.accumulated.replace(/\s+$/, '') : '';
   const messages = [{ role: 'user', content: userMessage }];
   if (priorText) messages.push({ role: 'assistant', content: priorText });
 
@@ -1034,7 +1047,7 @@ const handle = async (event) => {
   // budget/latency overrun, hallucination (HALL), prompt-injection (THREAT),
   // output anomaly (ANOM) and an output-quality score (PERF).
   const hasSources = !!context.trim();
-  const piiFlagged = ok ? piiGuard(question + ' ' + context) : [];
+  const piiFlagged = boundary.piiTypes; // Determined BEFORE egress, including deep-mode prefill.
   const structureFlagged = ok && !tippingOffFlagged ? structureGuard(text) : false;
   const budgetFlagged = budgetFlag(elapsedMs, mode);
   const latencyFlagged = budgetFlagged;                       // LAT: latency is a first-class signal
@@ -1050,6 +1063,7 @@ const handle = async (event) => {
     (continuation ? ' | deepHops=' + (deepHop + 1) : '') +
     ' | elapsedMs=' + elapsedMs + ' | ok=' + ok +
     ' | hash=' + simpleHash(question) +
+    ' | piiPolicy=' + boundary.mode +
     ' | quality=' + quality +
     (piiFlagged.length ? ' | pii=' + piiFlagged.join('+') : '') +
     (structureFlagged ? ' | structureFlagged' : '') +
@@ -1063,7 +1077,8 @@ const handle = async (event) => {
   return resp(200, { ok, text, mode, effectiveMode, modeDegraded: !!degradedFrom,
     modeDegradedReason: degradedReason || null,
     model, elapsedMs, tippingOffFlagged,
-    piiFlagged, structureFlagged, budgetFlagged, latencyFlagged,
+    piiFlagged, piiEgressPolicy: boundary.mode, piiRedacted: boundary.redacted,
+    structureFlagged, budgetFlagged, latencyFlagged,
     hallFlagged, citeFlagged, injectionFlagged, anomFlagged, quality, auditLine });
 };
 
