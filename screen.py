@@ -8485,7 +8485,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                               + (f"; ⚠ {_reg_bad} task(s) carried no screenable payment "
                                  "(fill the template or paste the MT103/pacs.008)" if _reg_bad else "")
                               + ".")
-            _tm = txn_monitor.evaluate(_reg)
+            _tm = txn_monitor.evaluate(
+                payment_screen.monitoring_records(_reg, safe_xml_fromstring))
             if _tm["alerts"]:
                 _reg_lines.append(f"Register through the monitoring rules (open entries only): "
                                   f"{len(_tm['alerts'])} alert(s)")
