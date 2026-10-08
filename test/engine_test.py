@@ -1726,6 +1726,12 @@ check("foreign whole-word terms never match on an English prefix",
       screen.match_adverse_keywords("Mitochondria under the microscope") == []
       and screen.match_adverse_keywords("Presorted mail rates rise") == []
       and screen.match_adverse_keywords("Suape port expansion announced") == [])
+check("2026-10-08 audit: Telugu / Malayalam / Gujarati headlines flag money laundering and the editions are swept",
+      all(exp in screen.match_adverse_keywords(t) for t, exp in [
+          ("రమేష్ రెడ్డి మనీ లాండరింగ్ కేసులో అరెస్ట్", "money laundering"),
+          ("സുരേഷ് കുമാർ കള്ളപ്പണം വെളുപ്പിക്കൽ കേസിൽ അറസ്റ്റ്", "money laundering"),
+          ("રમેશ પટેલ મની લોન્ડરિંગ કેસમાં ધરપકડ", "money laundering")])
+      and all(c in [loc[2] for loc in screen.GNEWS_LOCALES] for c in ("CH:fr", "IN:te", "IN:ml", "IN:gu")))
 check("worldwide sweep covers many languages and locales",
       screen.ADVERSE_LANG_COUNT >= 30 and len(screen.GNEWS_LOCALES) >= 60)
 check("ADVERSE_LOCALES accepts 'all' → full matrix",

@@ -407,6 +407,11 @@ GNEWS_LOCALES = [
     ("lt", "LT", "LT:lt", "lt"),
     ("lv", "LV", "LV:lv", "lv"),
     ("et", "EE", "EE:et", "et"),
+    # Audited 2026-10-08 (see the matching note in adverse-media.mjs LOCALES)
+    ("fr", "CH", "CH:fr", "fr"),
+    ("te", "IN", "IN:te", "te"),
+    ("ml", "IN", "IN:ml", "ml"),
+    ("gu", "IN", "IN:gu", "gu"),
 ]
 # Derived URL templates ({query} is filled per-request via .format). The literal
 # {query} is preserved; hl/gl/ceid are baked in per locale.
@@ -790,6 +795,20 @@ LANG_KEYWORDS = {
     "mk": {  # Macedonian
         "перење пари": "money laundering", "измама": "fraud", "санкции": "sanction", "тероризам": "terrorism", "финансирање на тероризам": "terrorist financing", "поткуп": "bribery", "корупција": "corruption", "проневера": "embezzle", "уапсен": "arrest", "осуден": "convict", "трговија со луѓе": "human trafficking", "криумчарење": "smuggl",
     },
+    # Added 2026-10-08 with the te-IN / ml-IN / gu-IN editions; mirrors adverse-media.mjs
+    # LANG_TERMS (terms counted in those editions' own headlines, see the note there).
+    "te": {  # Telugu
+        "మనీ లాండరింగ్": "money laundering", "మోసం": "fraud", "అవినీతి": "corruption",
+        "అరెస్ట్": "arrest", "అరెస్టు": "arrest",
+    },
+    "ml": {  # Malayalam
+        "കള്ളപ്പണം വെളുപ്പിക്കൽ": "money laundering", "തട്ടിപ്പ്": "fraud",
+        "അഴിമതി": "corruption", "അറസ്റ്റ്": "arrest",
+    },
+    "gu": {  # Gujarati
+        "મની લોન્ડરિંગ": "money laundering", "છેતરપિંડી": "fraud", "કૌભાંડ": "fraud",
+        "ધરપકડ": "arrest", "દોષિત": "convict",
+    },
 }
 
 # One merged native-term → English-canonical map across every native language
@@ -818,7 +837,10 @@ _NONLATIN_RE = re.compile(
     "\u0900-\u097f"    # Devanagari (hi/ne/mr)
     "\u0980-\u09ff"    # Bengali (bn)
     "\u0a00-\u0a7f"    # Gurmukhi (pa)
+    "\u0a80-\u0aff"    # Gujarati (gu)
     "\u0b80-\u0bff"    # Tamil (ta)
+    "\u0c00-\u0c7f"    # Telugu (te)
+    "\u0d00-\u0d7f"    # Malayalam (ml)
     "\u0d80-\u0dff"    # Sinhala (si)
     "\u0e00-\u0e7f"    # Thai (th)
     "\u0e80-\u0eff"    # Lao (lo)

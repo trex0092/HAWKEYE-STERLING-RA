@@ -1011,6 +1011,17 @@
       "enabled": false,
       "minNames": 4,
       "_note": "ADDED 2026-10-03. Source-probe run 37147223927 (GitHub runner, 2026-10-03, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"electronic Irish Statute Book\" (official: true), 2 targets, last change 2024-07-11. Proscriptions under the Offences Against the State Acts, not financial sanctions; Ireland imposes no unilateral financial sanctions (UN/EU screened via those lists). Recorded 2026-10-03 as a supplementary proscription source. Disabled for sanctions screening because this is a national proscription / association-ban feed, not a financial-sanctions list; keeping it enabled would overstate national sanctions-source depth."
+    },
+    {
+      "id": "ps-pma-local-freezing",
+      "name": "Palestine — PMA Local Freezing List",
+      "jurisdiction": "Palestine",
+      "url": "https://data.opensanctions.org/datasets/latest/ps_local_freezing/targets.simple.csv",
+      "type": "csv",
+      "parser": "opensanctions",
+      "enabled": false,
+      "_note": "STAGED 2026-10-08, disabled until a runner probe proves it. The Palestine Monetary Authority publishes a 'Local Freezing List' (pma.ps/en/Legislation/AMLCFT/LocalFreezingList) of persons sanctioned by the Security Council Resolutions Enforcing Committee formed under Decree No. (14) of 2015 (see data/sanctions-country-coverage.json, Palestine). OpenSanctions lists a ps_local_freezing dataset as a child of its sanctions collection (index.json fetched 2026-10-08); its row count, freshness and publisher metadata are NOT yet verified. Enable only after source-probe.yml shows real rows, and set minNames from the observed count. Same CC-BY-NC terms and OPENSANCTIONS_DATA=0 switch as the other OpenSanctions-hosted national lists.",
+      "minNames": 1
     }
   ]
 }

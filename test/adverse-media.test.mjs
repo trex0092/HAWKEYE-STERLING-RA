@@ -272,6 +272,21 @@ check('a strong native predicate (Georgian money laundering) escalates to high b
   scoreAdverseMedia('გიორგი', [{ title: 'გიორგი ფულის გათეთრება ბრალდებით დააკავეს', link: 'http://g/1' }], ALL_TERMS).band === 'high');
 check('a terms-only language with no Google News edition still scores via GDELT titles (Somali)',
   scoreAdverseMedia('Cabdi Xasan', [{ title: 'Cabdi Xasan oo lagu xiray dhaqidda lacagta', link: 'http://so/1' }], ALL_TERMS).hit === true);
+check('2026-10-08 audit: fr-CH, te-IN, ml-IN and gu-IN editions are in the matrix with their own term lists',
+  ['fr-CH', 'te-IN', 'ml-IN', 'gu-IN'].every(id => LOCALES.some(l => l.id === id))
+  && ['te', 'ml', 'gu'].every(k => Array.isArray(LANG_TERMS[k]) && LANG_TERMS[k].length >= 4)
+  && LOCALES.filter(l => ['te', 'ml', 'gu'].includes(l.lang)).every(l => LANG_TERMS[l.lang]));
+check('2026-10-08 audit: rejected fallbacks (served another country\'s edition) stay out of the matrix',
+  ['kn-IN', 'es-CU', 'ru-BY', 'ru-KZ', 'fr-LU', 'de-LU', 'el-CY', 'ar-SY', 'ar-YE', 'pt-MZ']
+    .every(id => !LOCALES.some(l => l.id === id)));
+check('a native money-laundering headline escalates to high band in Telugu, Malayalam and Gujarati', [
+  ['రమేష్ రెడ్డి', 'రమేష్ రెడ్డి మనీ లాండరింగ్ కేసులో అరెస్ట్'],
+  ['സുരേഷ് കുമാർ', 'സുരേഷ് കുമാർ കള്ളപ്പണം വെളുപ്പിക്കൽ കേസിൽ അറസ്റ്റ്'],
+  ['રમેશ પટેલ', 'રમેશ પટેલ મની લોન્ડરિંગ કેસમાં ધરપકડ'],
+].every(([name, title]) => scoreAdverseMedia(name, [{ title, link: 'http://in/1' }], ALL_TERMS).band === 'high'));
+check('REGRESSION: a native-script Indic name is not shredded by normalisation (Hindi name, Hindi headline)',
+  scoreAdverseMedia('राम कुमार', [{ title: 'राम कुमार मनी लॉन्ड्रिंग मामले में गिरफ्तार', link: 'http://in/2' }], ALL_TERMS).hit === true
+  && scoreAdverseMedia('राम कुमार', [{ title: 'श्याम वर्मा मनी लॉन्ड्रिंग मामले में गिरफ्तार', link: 'http://in/3' }], ALL_TERMS).hit === false);
 
 /* ── Bing News — the THIRD global backbone (independent rate-limit pool) ── */
 check('bingNewsUrl targets the Bing News RSS endpoint with quoted name + risk terms',

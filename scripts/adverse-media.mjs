@@ -309,7 +309,18 @@ export const LANG_TERMS = {
     // terms directly verified against these sources, not further generic vocabulary.
     'noziedzīgi iegūtu līdzekļu legalizācija', 'terorisma un proliferācijas finansēšana', 'pamatotas aizdomas'],
   et: ['rahapesu', 'pettus', 'sanktsioonid', 'terrorism', 'terrorismi rahastamine', 'altkäemaks', 'korruptsioon', 'omastamine', 'vahistatud', 'süüdi mõistetud', 'inimkaubandus', 'salakaubavedu'],
-  mk: ['перење пари', 'измама', 'санкции', 'тероризам', 'финансирање на тероризам', 'поткуп', 'корупција', 'проневера', 'уапсен', 'осуден', 'трговија со луѓе', 'криумчарење']
+  mk: ['перење пари', 'измама', 'санкции', 'тероризам', 'финансирање на тероризам', 'поткуп', 'корупција', 'проневера', 'уапсен', 'осуден', 'трговија со луѓе', 'криумчарење'],
+  /* Added 2026-10-08 with the te-IN, ml-IN and gu-IN Google News editions. Deliberately small:
+     each term below was counted in the headlines those editions actually returned on 2026-10-08
+     (the audit fetch, query = the money-laundering term), not taken from a dictionary. Counts:
+     te (71 items): మనీ లాండరింగ్ 14, అరెస్ట్ 5, అరెస్టు 2, మోసం 1, అవినీతి 1;
+     ml (96 items): കള്ളപ്പണം വെളുപ്പിക്കൽ 28, തട്ടിപ്പ് 2, അറസ്റ്റ് 2, അഴിമതി 1;
+     gu (100 items): મની લોન્ડરિંગ 43, કૌભાંડ 8, ધરપકડ 6, છેતરપિંડી 5, દોષિત 1.
+     Sanctions / terrorism / bribery terms are not added for these languages yet: the audit
+     feeds did not exercise them, and an unverified term is worse than none. */
+  te: ['మనీ లాండరింగ్', 'మోసం', 'అవినీతి', 'అరెస్ట్', 'అరెస్టు'],
+  ml: ['കള്ളപ്പണം വെളുപ്പിക്കൽ', 'തട്ടിപ്പ്', 'അഴിമതി', 'അറസ്റ്റ്'],
+  gu: ['મની લોન્ડરિંગ', 'છેતરપિંડી', 'કૌભાંડ', 'ધરપકડ', 'દોષિત']
 };
 
 /* Union of every language's terms — the term set used when scoring the merged,
@@ -360,7 +371,8 @@ const STRONG_LIST = [
   'pinigų plovimas', 'sankcijos', 'terorizmas', 'terorizmo finansavimas',
   'naudas atmazgāšana', 'sankcijas', 'terorisms', 'terorisma finansēšana',
   'rahapesu', 'sanktsioonid', 'terrorism', 'terrorismi rahastamine',
-  'перење пари', 'санкции', 'тероризам', 'финансирање на тероризам'
+  'перење пари', 'санкции', 'тероризам', 'финансирање на тероризам',
+  'మనీ లాండరింగ్', 'കള്ളപ്പണം വെളുപ്പിക്കൽ', 'મની લોન્ડરિંગ'
 ];
 const STRONG_TERMS = new Set(STRONG_LIST);
 
@@ -530,6 +542,28 @@ export const LOCALES = [
   { id: 'es-US', hl: 'es-419', gl: 'US', ceid: 'US:es-419', lang: 'es' },
   { id: 'en-MY', hl: 'en-MY', gl: 'MY', ceid: 'MY:en', lang: 'en' },
   { id: 'fr-MA', hl: 'fr', gl: 'MA', ceid: 'MA:fr', lang: 'fr' },
+
+  /* AUDITED 2026-10-08: same method as 2026-09-28 (final ceid must equal the requested one,
+     the country's own press must be present, and the article set must differ from an
+     already-confirmed edition of the same language fetched with the same query). Accepted:
+       fr-CH  kept CH:fr; 50/100 sources on .ch (24heures, rts, letemps, 20min); 39/100 overlap
+              with FR:fr (query "blanchiment")
+       te-IN  kept IN:te; 71 items, 49/71 from Telugu outlets (andhrajyothy, samayam, ap7am);
+              no other Telugu edition exists to compare against
+       ml-IN  kept IN:ml; 96 items, 56/96 from Malayalam outlets (doolnews, mathrubhumi, manorama)
+       gu-IN  kept IN:gu; 100 items, 78/100 from Gujarati outlets (divyabhaskar, tv9gujarati)
+     Tried and REJECTED (silently served another edition, or a generic feed):
+       kn-IN (-> IN:hi, 0 items); es-CU (ceid kept, 3/100 .cu, 77/100 identical to US:es-419);
+       ru-BY, ru-KZ, uz-UZ, mn-MN (-> RU:ru); fr-LU, fr-DZ, fr-TN, fr-CM (-> FR:fr);
+       de-LU (-> DE:de); is-IS, en-MT, en-NP, en-MM, en-KH (-> US:en); el-CY (-> GR:el);
+       ar-DZ, ar-LY, ar-SY, ar-YE, ar-SD, ar-PS (-> EG:ar); es-GT, es-BO, es-PY (-> US:es-419);
+       pt-MZ (-> PT:pt-150).
+     Not yet tested: es-HN, es-SV, es-NI, es-PR, en-JM, en-TT, en-ZM, en-RW, en-MW, en-BN,
+       en-FJ, en-PG, pt-CV. Do not re-add a rejected id without new evidence. */
+  { id: 'fr-CH', hl: 'fr', gl: 'CH', ceid: 'CH:fr', lang: 'fr' },
+  { id: 'te-IN', hl: 'te', gl: 'IN', ceid: 'IN:te', lang: 'te' },
+  { id: 'ml-IN', hl: 'ml', gl: 'IN', ceid: 'IN:ml', lang: 'ml' },
+  { id: 'gu-IN', hl: 'gu', gl: 'IN', ceid: 'IN:gu', lang: 'gu' },
 ];
 
 /* The locale set to sweep this run — all of LOCALES unless narrowed by the
@@ -846,7 +880,11 @@ function normalize(s) {
     .toLowerCase()
     // Keep letters/numbers of ANY script (Latin + Arabic + Cyrillic + CJK + …);
     // previously [^a-z0-9] silently dropped all non-Latin, defeating cross-script matching.
-    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    // Keep the remaining combining marks (\p{M}) too: Indic and Southeast-Asian scripts
+    // write vowels and the virama as marks, so treating them as separators shredded
+    // "राम" into "र म" and a native-script name never reached the >=2-char token
+    // filter in scoreAdverseMedia (found 2026-10-08 while adding te/ml/gu).
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ').trim();
 }
 
 /* Parse a GDELT DOC 2.0 artlist JSON response → [{ title, link, source, date }],

@@ -10,6 +10,12 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Worldwide coverage: countries researched 134 → 168 / 195, adverse-media editions 79 → 83, languages 61 → 64.**
+  - **Sanctions research.** All 61 countries with no recorded research were researched on 2026-10-08 against their FIU, central-bank, ministry and gazette sites. 34 now carry a cited outcome: 28 assessed-not-loadable (the official TFS page only implements the UN list, or the law allows a national list but none is published) and 6 identified (Bosnia and Herzegovina, Eswatini, Iran, Kuwait, Mongolia, Syria). Eswatini, Iran, Syria and Yemen (still unresearched) are flagged as MLRO policy decisions. The other 27 keep `not-researched` with a dated note of what was tried. National-source depth stays 54 / 195: no new list is loaded until a runner probe proves it. Palestine's PMA Local Freezing List is staged disabled for that probe.
+  - **Google News editions.** 31 candidate editions were tested with the 2026-09-28 method. fr-CH, te-IN, ml-IN and gu-IN pass; 27 were rejected because Google silently served another country's edition. The country count stays 69. Worldwide reach (195 / 195) still comes from GDELT and Bing News.
+  - **Telugu, Malayalam and Gujarati risk terms** (JS and Python), limited to terms counted in those editions' own headlines.
+  - **Fix: native-script Indic names never matched in the JS adverse-media scorer.** Normalisation turned vowel signs and the virama into spaces, so "राम कुमार" became single letters and no headline could match the name. Combining marks are now kept. Regression check added.
+
 - **screen.py decomposition, phase 1.** The ADR-005 7,500-line trigger has fired at 8,951 lines. Pure GDELT GKG windowing, parsing, subject indexing and row matching now live in `screen_gkg.py` behind compatibility wrappers; network I/O and adverse-risk orchestration remain unchanged. The new module is included in report-only Python coverage and mypy measurement.
 
 - **Governance metrics and action hygiene.** Closed completed toolchain action 25 on retained CI evidence; added explicit Composio vendor-assurance action 29; aligned the GRC narrative with the generated 62.5% third-party coverage and two above-appetite risks; and refreshed the undated-action signal from 17 to 18 without inventing a human deadline.
