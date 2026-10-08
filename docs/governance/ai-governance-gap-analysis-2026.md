@@ -260,14 +260,17 @@ offline via `exports.__internals`.
 ## 6. Verified endpoint identity, staged only (2026-10-08)
 
 **OA-20 remains OPEN. No production IdP or browser sign-in is provisioned.**
-The functions `asana-mirror` and `risk-backup` now have a disabled-by-default
-server-side RS256 JWT authorization gate (`netlify/functions/_identity.js`).
+The functions `asana-mirror`, `risk-backup`, `asana-task` and `brain-soul` now
+share a disabled-by-default server-side RS256 JWT authorization gate
+(`netlify/functions/_identity.js`).
 It does not rely on the device role selector for its permissions.
 
 | Endpoint | Permitted signed `hawkeye_role` when enabled |
 |---|---|
 | Firm-wide assessment register and activity mirror, read/write | `Reviewer-MLRO`, `Admin` |
 | Risk-data override backup, write | `Admin` |
+| Completion/creation of an Asana assessment task | `Reviewer-MLRO`, `Admin` |
+| AI Advisor question and context request | `Analyst`, `Reviewer-MLRO`, `Admin` |
 
 When `APP_OIDC_REQUIRED=1`, each endpoint requires a signed bearer access
 token from the configured HTTPS issuer and same-origin JWKS, with verified

@@ -12,6 +12,7 @@ const { withFunctionTelemetry } = require('./_telemetry');
 const { rateLimit } = require('./_ratelimit');
 const { enforceSharedQuota } = require('./_shared-quota');
 const { sharedTokenOk } = require('./_auth');
+const { requireIdentityRole } = require('./_identity');
 const { inspectEgress } = require('./_data-boundary');
 const { inspectAdvisoryOutput } = require('./_answer-validator');
 
@@ -38,7 +39,7 @@ function corsHeaders(event) {
   if (origin && originAllowed(event)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-App-Token';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-App-Token, Authorization';
     headers['Access-Control-Max-Age'] = '86400';
   }
   return headers;
@@ -870,6 +871,14 @@ const handle = async (event) => {
   if (event.httpMethod !== 'POST') return resp(405, { ok: false, error: 'method not allowed' });
   if (!originAllowed(event)) return resp(403, { ok: false, error: 'origin not allowed' });
   if (!sharedTokenOk(event)) return resp(401, { ok: false, error: 'missing or invalid X-App-Token' });
+  /* Staged authenticated per-user access. The device's role selector,
+     Origin header and shared browser token cannot prove who initiated this
+     AI Advisor request. No production change unless APP_OIDC_REQUIRED=1. */
+  const identity = await requireIdentityRole(event, ['Analyst', 'Reviewer-MLRO', 'Admin']);
+  if (!identity.ok) return resp(identity.statusCode, {
+    ok: false,
+    error: identity.statusCode === 503 ? 'identity verifier unavailable' : 'verified identity and role required'
+  });
 
   /* Per-IP rate limit — SENSITIVE/COSTLY endpoint (calls the Anthropic API per
      request). Much stricter than the Asana endpoints: default 10 req/min,
