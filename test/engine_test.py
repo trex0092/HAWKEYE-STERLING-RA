@@ -1379,6 +1379,21 @@ check("CUSTOMER_NOT_IN_DB: fires only when the resolver found no customer record
       "CUSTOMER_NOT_IN_DB" in _rules([{**_rr[2], "date": "2026-10-01", "amount": 1}])
       and "CUSTOMER_NOT_IN_DB" not in _rules([{**_rr[1], "date": "2026-10-01", "amount": 1}])
       and "CUSTOMER_NOT_IN_DB" not in _rules([{"customer": "X", "date": "2026-10-01", "amount": 1}]))
+def _reg_rules(amount, currency):
+    return _rules([payment_screen.parse_register_entry("TX-AMT", (
+        f"Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: {amount}\nCurrency: {currency}\n"
+        "Direction: in\nMethod: cash\nOriginator: Some Person\nBeneficiary: Example Trading LLC\n"))])
+check("register: a USD cash amount is flagged NON_AED_AMOUNT, never compared to AED thresholds as-is",
+      "NON_AED_AMOUNT" in _reg_rules("20000", "USD"))
+check("register: an amount the parser cannot read is AMOUNT_UNREADABLE, never silently dropped",
+      "AMOUNT_UNREADABLE" in _reg_rules("AED 60,000", "AED"))
+check("register: a readable AED amount raises neither data-quality alert (THRESHOLD still fires)",
+      {"NON_AED_AMOUNT", "AMOUNT_UNREADABLE"}.isdisjoint(_reg_rules("60,000", "AED"))
+      and "THRESHOLD" in _reg_rules("60,000", "AED"))
+check("amount rule skips activity records and raw payment messages (no amount field by design)",
+      not {"NON_AED_AMOUNT", "AMOUNT_UNREADABLE"} & set(_rules([
+          {"customer": "X", "date": "2026-10-01", "activity_only": True},
+          {"transaction_id": "M", "payment_message": ":20:X"}])))
 _cl_n, _cl_b = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []},
     txn_monitor.evaluate([{**_rr[1], "date": "2026-10-01", "amount": 60000, "method": "cash"},

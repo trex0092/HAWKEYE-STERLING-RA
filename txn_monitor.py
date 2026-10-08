@@ -25,7 +25,7 @@ THRESHOLDS (UAE DPMS context — tune in config):
   • AED 15,000  — CDD trigger for occasional transactions.
 No third-party dependencies. Deterministic. Human (MLRO) reviews & files.
 """
-import os, re, json, datetime
+import os, re, json, math, datetime
 from collections import defaultdict
 
 import txn_feed  # stdlib-only validation; never fetches or stores customer data
@@ -587,6 +587,42 @@ def rule_cash_no_source_of_funds(txns):
             and _amt(t) >= CDD_TRIGGER_THRESHOLD and t.get("source_of_funds_verified") is False]
 
 
+def _amount_readable(t):
+    v = t.get("amount")
+    if v is None or isinstance(v, bool):
+        return False
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(f) and f >= 0
+
+
+def rule_amount_not_comparable(txns):
+    """A payment whose amount the AED-denominated rules cannot use. The file
+    feed refuses these at ingestion (txn_feed.validate_batch); the Payments
+    Register path did not, so "Amount: AED 60,000" was dropped and
+    "Currency: USD" with "Amount: 20000" (≈ AED 73,450) was compared to the
+    AED 55,000 DPMSR threshold as 20,000 — both silently missing THRESHOLD.
+    Activity records and raw payment messages carry no amount field by design
+    and are not judged here."""
+    out = []
+    for t in txns:
+        if t.get("activity_only") or t.get("payment_message"):
+            continue
+        cur = _norm(t.get("currency"))
+        if not _amount_readable(t):
+            out.append(_alert("AMOUNT_UNREADABLE", "HIGH", t,
+                "amount missing or not a number — threshold, structuring and CDD rules "
+                "could not evaluate this payment; record the AED amount as digits"))
+        elif cur and cur != "aed":
+            out.append(_alert("NON_AED_AMOUNT", "HIGH", t,
+                f"amount {_amt(t):,.2f} recorded in {cur.upper()} — the DPMSR / CDD thresholds "
+                "are in AED, so they were not reliably applied; convert with an approved "
+                "documented rate and assess against AED 55,000 (POL-19 §3)"))
+    return out
+
+
 def rule_customer_not_in_db(txns):
     """A payment or activity task whose customer matches no Customer Database
     record (set by the daily run's resolver). No CDD file means no profile to
@@ -661,7 +697,8 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_profile_deviation, rule_circular_flow, rule_new_geography,
           rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
           rule_reference_keyword, rule_personal_account, rule_linked_threshold,
-          rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db]
+          rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db,
+          rule_amount_not_comparable]
 
 
 def _any_customer(txns):
