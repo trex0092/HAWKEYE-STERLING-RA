@@ -284,6 +284,12 @@ check('a native money-laundering headline escalates to high band in Telugu, Mala
   ['സുരേഷ് കുമാർ', 'സുരേഷ് കുമാർ കള്ളപ്പണം വെളുപ്പിക്കൽ കേസിൽ അറസ്റ്റ്'],
   ['રમેશ પટેલ', 'રમેશ પટેલ મની લોન્ડરિંગ કેસમાં ધરપકડ'],
 ].every(([name, title]) => scoreAdverseMedia(name, [{ title, link: 'http://in/1' }], ALL_TERMS).band === 'high'));
+check('every audited JS edition is also swept by the Python daily screen (screen.py GNEWS_LOCALES)', (() => {
+  const src = readFileSync(new URL('../screen.py', import.meta.url), 'utf8');
+  const block = src.slice(src.indexOf('GNEWS_LOCALES = ['), src.indexOf('\n]', src.indexOf('GNEWS_LOCALES = [')));
+  const py = new Set([...block.matchAll(/^\s*\("[^"]+",\s*"[A-Z]+",\s*"([^"]+)"/gm)].map(m => m[1]));
+  return py.size >= 80 && LOCALES.every(l => py.has(l.ceid));
+})());
 check('REGRESSION: a native-script Indic name is not shredded by normalisation (Hindi name, Hindi headline)',
   scoreAdverseMedia('राम कुमार', [{ title: 'राम कुमार मनी लॉन्ड्रिंग मामले में गिरफ्तार', link: 'http://in/2' }], ALL_TERMS).hit === true
   && scoreAdverseMedia('राम कुमार', [{ title: 'श्याम वर्मा मनी लॉन्ड्रिंग मामले में गिरफ्तार', link: 'http://in/3' }], ALL_TERMS).hit === false);

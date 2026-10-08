@@ -1210,9 +1210,12 @@
     },
     {
       "country": "Palestine",
-      "status": "identified",
+      "status": "pending",
       "baseline": [],
-      "note": "researched 2026-09-28: a national list exists — the Palestine Monetary Authority \"Local Freezing List\" (pma.ps/en/Legislation/AMLCFT/LocalFreezingList) of persons sanctioned by the Security Council Resolutions Enforcing Committee formed under Decree No. (14) of 2015, with transfer prohibitions (AML/CFT Decree-Law No. 39 of 2022, ffu.ps). Not a UN member, so no UN baseline row; page format and name count not yet verified by a runner probe"
+      "note": "researched 2026-09-28: a national list exists — the Palestine Monetary Authority \"Local Freezing List\" (pma.ps/en/Legislation/AMLCFT/LocalFreezingList) of persons sanctioned by the Security Council Resolutions Enforcing Committee formed under Decree No. (14) of 2015, with transfer prohibitions (AML/CFT Decree-Law No. 39 of 2022, ffu.ps). Not a UN member, so no UN baseline row; staged as ps-pma-local-freezing (OpenSanctions mirror of this list); runner probe 37766292738 on 2026-10-08 read 38 name strings, but the mirror's rows were last seen 2026-04-30, so it stays disabled until the feed is current (see the note in data/sanctions-extra.json)",
+      "sources": [
+        "ps-pma-local-freezing"
+      ]
     },
     {
       "country": "Panama",

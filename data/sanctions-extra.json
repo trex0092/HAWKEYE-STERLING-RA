@@ -1020,8 +1020,8 @@
       "type": "csv",
       "parser": "opensanctions",
       "enabled": false,
-      "_note": "STAGED 2026-10-08, disabled until a runner probe proves it. The Palestine Monetary Authority publishes a 'Local Freezing List' (pma.ps/en/Legislation/AMLCFT/LocalFreezingList) of persons sanctioned by the Security Council Resolutions Enforcing Committee formed under Decree No. (14) of 2015 (see data/sanctions-country-coverage.json, Palestine). OpenSanctions lists a ps_local_freezing dataset as a child of its sanctions collection (index.json fetched 2026-10-08); its row count, freshness and publisher metadata are NOT yet verified. Enable only after source-probe.yml shows real rows, and set minNames from the observed count. Same CC-BY-NC terms and OPENSANCTIONS_DATA=0 switch as the other OpenSanctions-hosted national lists.",
-      "minNames": 1
+      "_note": "STAGED 2026-10-08, kept disabled. The Palestine Monetary Authority publishes a 'Local Freezing List' (pma.ps/en/Legislation/AMLCFT/LocalFreezingList) of persons sanctioned by the Security Council Resolutions Enforcing Committee formed under Decree No. (14) of 2015 (see data/sanctions-country-coverage.json, Palestine). Runner probe 37766292738 (2026-10-08): http 200, text/csv, 2,689 bytes; parser opensanctions read 38 name strings (names plus aliases), e.g. 'Basel Khaled Hussein Eid'; rows carry dataset 'Palestine Monetary Authority Local Freezing List' and sanctions 'Decree No. (14) of 2015 Concerning the Enforcement of Security Council Resolutions' (designations dated 2016-03-07 and 2018-02-26). NOT enabled because every sampled row shows last_seen 2026-04-30 and last_change 2024-03-18: the mirror has not re-read the PMA page for about five months, so loading it would report a national list as screened on data that may be stale. Enable (minNames 30) once last_seen is current again or the PMA page is read directly. Same CC-BY-NC terms and OPENSANCTIONS_DATA=0 switch as the other OpenSanctions-hosted national lists.",
+      "minNames": 30
     }
   ]
 }

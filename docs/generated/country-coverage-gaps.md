@@ -4,7 +4,7 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 
 ## How to read this
 
-- **Sanctions status** is the register's own status. `not-researched` = no outcome recorded (27). `identified` = list known, file not verified (38). `pending` = candidate recorded, not loaded (1). `assessed-not-loadable` = researched, cannot be loaded (75). `screened` = national list loaded (54).
+- **Sanctions status** is the register's own status. `not-researched` = no outcome recorded (27). `identified` = list known, file not verified (37). `pending` = candidate recorded, not loaded (2). `assessed-not-loadable` = researched, cannot be loaded (75). `screened` = national list loaded (54).
 - **AM edition** = whether a dedicated Google News country edition exists in the adverse-media matrix. `no` does not mean zero adverse-media coverage: GDELT and Bing News sweeps are global and name-scoped.
 - **Partial note** = a not-researched country that already has a partial research note in the register.
 - **PEP** is intentionally omitted per country because the current PEP artifact's country field is not reliable enough for a defensible country-by-country statement.
@@ -68,11 +68,12 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 | Tonga | no | yes |
 | Tuvalu | no | yes |
 
-## Sanctions: list known but file not verified (38) and pending (1)
+## Sanctions: list known but file not verified (37) and pending (2)
 
 | Country | Status | AM edition |
 |---|---|---|
 | Belize | pending | no |
+| Palestine | pending | no |
 | Albania | identified | no |
 | Algeria | identified | no |
 | Armenia | identified | no |
@@ -94,7 +95,6 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 | Mozambique | identified | no |
 | Niger | identified | no |
 | Oman | identified | yes |
-| Palestine | identified | no |
 | Republic of Korea | identified | yes |
 | Russia | identified | yes |
 | Rwanda | identified | no |

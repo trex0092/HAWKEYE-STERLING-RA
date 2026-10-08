@@ -407,6 +407,17 @@ GNEWS_LOCALES = [
     ("lt", "LT", "LT:lt", "lt"),
     ("lv", "LV", "LV:lv", "lv"),
     ("et", "EE", "EE:et", "et"),
+    # Verified in adverse-media.mjs audits 2026-09-27 / 2026-09-28 but never mirrored
+    # here, so the daily Python screen did not sweep them (added 2026-10-08).
+    ("en-NZ", "NZ", "NZ:en", "en"),
+    ("nl", "BE", "BE:nl", "nl"),
+    ("fr", "BE", "BE:fr", "fr"),
+    ("en-IE", "IE", "IE:en", "en"),
+    ("en-CA", "CA", "CA:en", "en"),
+    ("de", "AT", "AT:de", "de"),
+    ("es-419", "US", "US:es-419", "es"),
+    ("en-MY", "MY", "MY:en", "en"),
+    ("fr", "MA", "MA:fr", "fr"),
     # Audited 2026-10-08 (see the matching note in adverse-media.mjs LOCALES)
     ("fr", "CH", "CH:fr", "fr"),
     ("te", "IN", "IN:te", "te"),
