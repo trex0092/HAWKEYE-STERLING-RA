@@ -23,9 +23,13 @@ const crypto = require('node:crypto');
 const net = require('node:net');
 const { clientIp } = require('./_ratelimit');
 
-function enabled() {
-  return /^(1|true|yes|on)$/i.test(String(process.env.SHARED_RATE_LIMIT_ENABLED || ''));
+function gateMode() {
+  const configured = String(process.env.SHARED_RATE_LIMIT_ENABLED || '').trim().toLowerCase();
+  if (['', '0', 'false', 'no', 'off'].includes(configured)) return 'off';
+  if (['1', 'true', 'yes', 'on'].includes(configured)) return 'on';
+  return 'invalid';
 }
+function enabled() { return gateMode() === 'on'; }
 
 function config() {
   const value = String(process.env.SHARED_RATE_LIMIT_URL || '').trim();
@@ -36,7 +40,7 @@ function config() {
   const host = parsed.hostname.toLowerCase();
   if (parsed.protocol !== 'https:' || !host.includes('.') ||
       net.isIP(host) || /(?:^|\.)localhost$|(?:^|\.)local$/.test(host) ||
-      parsed.username || parsed.password || parsed.hash ||
+      parsed.username || parsed.password || parsed.hash || parsed.search ||
       (parsed.port && parsed.port !== '443') ||
       (token.length < 24 || keySecret.length < 24) ||
       token.length > 512 || keySecret.length > 512) return null;
@@ -65,7 +69,9 @@ function quotaDenied(retrySeconds, limit) {
 }
 
 async function enforceSharedQuota(event, options = {}) {
-  if (!enabled()) return null;
+  const mode = gateMode();
+  if (mode === 'off') return null;
+  if (mode !== 'on') return errorResponse();
   const c = config();
   const name = options.name;
   const limit = options.limit;
