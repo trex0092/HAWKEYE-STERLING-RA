@@ -284,6 +284,8 @@ The same file also holds each jurisdiction's **FATF effectiveness ratings** (the
 
 Points give 0-2 = 1 Low, 3-5 = 2 Medium, 6-8 = 3 High. A jurisdiction FATF has not rated, and that is not FATF-listed, gets no suggestion. The weights were chosen when the method was proposed; no source sets them. Transparency International's Corruption Perceptions Index was proposed but is left out because TI's terms (CC BY-ND 4.0, no commercial use) do not allow it here. The method has no sanctions factor yet, so a suggestion below the current score is not a recommendation to lower it. `npm test` fails if the committed file drifts from its inputs (`node scripts/country-score.mjs --write` regenerates it).
 
+On 2026-10-08 the 17 suggestions above the then-current score were applied to the country list, on the approval of Luisa Fernanda (repository owner); no separate MLRO countersignature is recorded. The 53 lower suggestions were not applied: 39 of them would take a country off score 3, which also switches off the OECD Annex II escalation for artisanal (ASM) gold from that country.
+
 ## MCP server (AI-agent access to the engine)
 
 A **Model Context Protocol (MCP)** server exposes the deterministic screening
