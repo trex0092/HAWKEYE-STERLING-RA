@@ -35,7 +35,7 @@ const MODELS = (process.env.ANTHROPIC_MODEL
 function skip(msg) { console.log('advisor-eval: ' + msg + ' — skipping.'); process.exit(0); }
 if (!KEY) skip('no ANTHROPIC_API_KEY');
 
-const SYSTEM = [I.SOUL_CHARTER, I.KNOWLEDGE_CONTEXT, I.PERSONA_SUFFIX.sterling].join('\n\n');
+const SYSTEM = I.buildSystemBlocks('sterling'); // cached charter prefix, as production sends it
 
 /* Each case: a prompt + a predicate over the (lowercased) response text.
    Predicates are deliberately tolerant (accept any of several charter-compliant

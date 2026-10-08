@@ -8381,6 +8381,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                     log(f"  WARN triage failed for an article ({safe_err(e)}) — deterministic verdict stands")
                     _art["triage"] = {"severity": "LOW", "relevance": "LOW",
                                       "confidence": "LOW", "ai": False}
+    ai.save_triage_cache()  # persisted via the encrypted screen-delta-state branch
     injection_blocked = sum(1 for _n, _a in _triage_work
                             if (_a.get("triage") or {}).get("injection_suspected"))
     pep_links = {p.get("permalink", "") for p in pep_findings}
