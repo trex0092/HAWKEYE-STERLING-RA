@@ -259,7 +259,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-10-08 (status unchanged): a Ministry of Finance PDF appeared in search results (finances.gov.bi/wp-content/uploads/2026/04/OM-PORTANT-COMPOSITION-ATTRIBUTIONS-ET-FONCTIONNEMENT-DE-LA-COMMISSION-CONSULTATIVE-DE-GEL-ADMINISTRATIF.pdf) — a ministerial ordinance on the composition and functioning of an administrative-freezing advisory commission, whose excerpt says the finance ministry coordinates targeted financial sanctions and that the commission may order immediate freezing; the file could not be fetched (finances.gov.bi was unreachable) so its number, date and any national-list provision are not confirmed. The FIU site cnrf.gov.bi loaded but rendered no readable content. No published national list was found, but I could not read the competent authority's pages, so no status can be assigned"
+      "note": "partial research 2026-10-08 (status unchanged): a Ministry of Finance PDF appeared in search results (finances.gov.bi/wp-content/uploads/2026/04/OM-PORTANT-COMPOSITION-ATTRIBUTIONS-ET-FONCTIONNEMENT-DE-LA-COMMISSION-CONSULTATIVE-DE-GEL-ADMINISTRATIF.pdf) — a ministerial ordinance on the composition and functioning of an administrative-freezing advisory commission, whose excerpt says the finance ministry coordinates targeted financial sanctions and that the commission may order immediate freezing; the file could not be fetched (finances.gov.bi was unreachable) so its number, date and any national-list provision are not confirmed. The FIU site cnrf.gov.bi loaded but rendered no readable content. No published national list was found, but I could not read the competent authority's pages, so no status can be assigned Runner read 2026-10-08 (read-pages run 37794093649): the CNRF home page (cnrf.gov.bi) was fetched in full. Its only list publication is a post linking the UN Security Council Consolidated List; no national list or freezing notice appears. It cites Décret no 100/009 of 9 February 2026 (CNRF re-establishment) and Loi no 1/08 of 27 March 2025 amending the 2008 AML/CFT law. finances.gov.bi returned HTTP 500 to every fetcher tried."
     },
     {
       "country": "Cabo Verde",
@@ -343,7 +343,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-10-08 (status unchanged): I could not reach any official TFS or sanctions page. Searches in French (SRF, \"liste nationale\", \"gel des avoirs\") found only the AML/CFT legal framework: Loi n° 12-008/AU (28 June 2012), the SRF created by Décret n° 03-025/PR (banque-comores.km PDF), and a 2012 décret on the national AML/CFT committee (justice.gouv.km PDF), all from search results only. No national list or official TFS page was found, so I cannot reach a conclusion. Next step: the Banque Centrale des Comores and SRF circulars, and the Journal officiel."
+      "note": "partial research 2026-10-08 (status unchanged): I could not reach any official TFS or sanctions page. Searches in French (SRF, \"liste nationale\", \"gel des avoirs\") found only the AML/CFT legal framework: Loi n° 12-008/AU (28 June 2012), the SRF created by Décret n° 03-025/PR (banque-comores.km PDF), and a 2012 décret on the national AML/CFT committee (justice.gouv.km PDF), all from search results only. No national list or official TFS page was found, so I cannot reach a conclusion. Next step: the Banque Centrale des Comores and SRF circulars, and the Journal officiel. Runner read 2026-10-08 (run 37794093649): the Banque Centrale des Comores home page (banque-comores.km) was fetched; its AML/CFT menu ('Dispositif de lutte contre le blanchiment et financement du terrorisme') lists the national strategy, laws and regulations, and no sanctions or freezing list."
     },
     {
       "country": "Congo",
@@ -351,7 +351,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-10-08 (status unchanged): Law No. 28-2021 of 12 May 2021 on the legal regime for freezing assets linked to terrorism appears in the Journal officiel (sgg.cg/JO/2021/congo-jo-2021-22.pdf, search result only, not fetched). A third-party report on a GABAC follow-up says the CNCGA had not yet been created. I could not find an official ANIF-Congo website, and I did not search the Journal officiel for designation orders. No conclusion reached on whether a national list is published. Covered by the UN list (screened daily)"
+      "note": "partial research 2026-10-08 (status unchanged): Law No. 28-2021 of 12 May 2021 on the legal regime for freezing assets linked to terrorism appears in the Journal officiel (sgg.cg/JO/2021/congo-jo-2021-22.pdf, search result only, not fetched). A third-party report on a GABAC follow-up says the CNCGA had not yet been created. I could not find an official ANIF-Congo website, and I did not search the Journal officiel for designation orders. No conclusion reached on whether a national list is published. Covered by the UN list (screened daily) Runner read 2026-10-08 (run 37794093649): the Journal officiel PDF (sgg.cg/JO/2021/congo-jo-2021-22.pdf, 14 pages) was fetched and text-extracted. Loi n° 28-2021 du 12 mai 2021 (JO p. 823) sets the legal regime for freezing terrorism-linked assets and defines an 'acte de désignation' by which the competent national authorities designate persons or entities, so the law provides a national designation power; no published national list has been found."
     },
     {
       "country": "Costa Rica",
@@ -896,7 +896,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-10-08 (status unchanged): a Central Bank of Libya news item (cbl.gov.ly/en/central-bank-of-libya-announces-the-launch-of-the-official-website-for-the-libyan-financial-information-unit/, 9 December 2024) announces the Libyan Financial Information Unit website fiu.gov.ly; search results from fiu.gov.ly show an \"Organizations\" page describing OFAC, a publications page, and a hosted PDF of the AML/CFT law with an implementing regulation for UN Security Council resolutions, but fiu.gov.ly timed out on every fetch attempt. No national terrorist-designation list was found, and I could not read the FIU's own pages, so no conclusion is possible"
+      "note": "partial research 2026-10-08 (status unchanged): a Central Bank of Libya news item (cbl.gov.ly/en/central-bank-of-libya-announces-the-launch-of-the-official-website-for-the-libyan-financial-information-unit/, 9 December 2024) announces the Libyan Financial Information Unit website fiu.gov.ly; search results from fiu.gov.ly show an \"Organizations\" page describing OFAC, a publications page, and a hosted PDF of the AML/CFT law with an implementing regulation for UN Security Council resolutions, but fiu.gov.ly timed out on every fetch attempt. No national terrorist-designation list was found, and I could not read the FIU's own pages, so no conclusion is possible Runner read 2026-10-08 (run 37794093649): the CBL notice (cbl.gov.ly, 9 Dec 2024) was fetched; it only announces the FIU site fiu.gov.ly, which answered HTTP 522 (origin down) to a plain fetch, Crawl4AI, ScrapingBee and Apify (trial run 37781480849)."
     },
     {
       "country": "Liechtenstein",
@@ -1513,7 +1513,7 @@
       "baseline": [
         "UN"
       ],
-      "note": "partial research 2026-10-08 (status unchanged): I could not reach any official Sudan FIU sanctions page. The Central Bank of Sudan AML/CFT efforts report (cbos.gov.sd/en/node/17514, search result only) says a technical committee set up by Council of Ministers resolution No. 360 (Sept 2014), including the FIU, implements UNSCR 1267 and 1373; Arabic searches found no published national list. I cannot confirm whether a 1373 national list exists. Sanctions notices on Sudan from foreign regulators (UK, BVI, Montserrat) are not Sudanese lists."
+      "note": "partial research 2026-10-08 (status unchanged): I could not reach any official Sudan FIU sanctions page. The Central Bank of Sudan AML/CFT efforts report (cbos.gov.sd/en/node/17514, search result only) says a technical committee set up by Council of Ministers resolution No. 360 (Sept 2014), including the FIU, implements UNSCR 1267 and 1373; Arabic searches found no published national list. I cannot confirm whether a 1373 national list exists. Sanctions notices on Sudan from foreign regulators (UK, BVI, Montserrat) are not Sudanese lists. Runner read 2026-10-08 (run 37794093649): the CBOS report page (cbos.gov.sd/en/node/17514) was fetched. It states that Council of Ministers resolution No. 360 (September 2014) set up the Technical Committee for Implementation of Security Council Resolutions (TCISCR) to implement UNSCR 1267 and 1373; the page publishes no list."
     },
     {
       "country": "Suriname",
