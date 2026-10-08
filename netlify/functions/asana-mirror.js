@@ -15,6 +15,7 @@ const { withFunctionTelemetry } = require('./_telemetry');
    (same CORS, origin guard and API helper conventions). */
 const { rateLimit } = require('./_ratelimit');
 const { dataTokenOk } = require('./_auth');
+const { requireIdentityRole } = require('./_identity');
 const DEFAULT_PROJECT_GID = '1216203370612914'; /* HAWKEYE STERLING APP */
 const REG_TASK = 'ASSESSMENT REGISTER (auto-backup)';
 const LOG_TASK = 'ACTIVITY LOG (auto-backup)';
@@ -108,6 +109,15 @@ const handle = async (event) => {
   /* Per-IP rate limit (normal endpoint): default 100 req/min, tunable via env. */
   const limited = rateLimit(event, { name: 'asana-mirror', limit: Number(process.env.RATE_LIMIT_DEFAULT) || 100, windowMs: 60000 });
   if (limited) return limited;
+  /* Optional identity gate: do not infer a signed user role from the browser's
+     local role selector. When APP_OIDC_REQUIRED=1, only a server-verified
+     IdP access token with an authorized role may reach the all-user register and activity-log mirror. */
+  const identity = await requireIdentityRole(event, ['Reviewer-MLRO', 'Admin']);
+  if (!identity.ok) return resp(identity.statusCode, {
+    ok: false,
+    error: identity.statusCode === 503 ? 'identity verifier unavailable' : 'verified identity and role required'
+  });
+
 
   const token = process.env.ASANA_ACCESS_TOKEN;
   if (!token) return resp(500, { ok: false, error: 'ASANA_ACCESS_TOKEN not configured' });
@@ -275,7 +285,7 @@ function corsHeaders(event) {
   if (origin && originAllowed(event)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-App-Token';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-App-Token, Authorization';
     headers['Access-Control-Max-Age'] = '86400';
   }
   return headers;
