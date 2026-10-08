@@ -1462,6 +1462,24 @@ check("amount rule skips activity records and raw payment messages (no amount fi
       not {"NON_AED_AMOUNT", "AMOUNT_UNREADABLE"} & set(_rules([
           {"customer": "X", "date": "2026-10-01", "activity_only": True},
           {"transaction_id": "M", "payment_message": ":20:X"}])))
+def _dated_cash(dates):
+    return _rules([{"customer": "Acme", "method": "cash", "currency": "AED", "direction": "in",
+                    "amount": 52000, "date": d, "transaction_id": f"T{i}"}
+                   for i, d in enumerate(dates)])
+check("three AED 52,000 cash payments in 3 days with ISO dates raise STRUCTURING, no date alert",
+      "STRUCTURING" in _dated_cash(["2026-10-01", "2026-10-02", "2026-10-03"])
+      and "DATE_UNREADABLE" not in _dated_cash(["2026-10-01", "2026-10-02", "2026-10-03"]))
+check("the same payments dated DD/MM/YYYY are DATE_UNREADABLE, never a silent structuring miss",
+      "DATE_UNREADABLE" in _dated_cash(["01/10/2026", "02/10/2026", "03/10/2026"]))
+check("an undated payment is DATE_UNREADABLE",
+      "DATE_UNREADABLE" in _dated_cash([None]) and "DATE_UNREADABLE" in _dated_cash([""]))
+check("register: 'Date: 01/10/2026' on a Payments Register task is DATE_UNREADABLE",
+      "DATE_UNREADABLE" in _rules([payment_screen.parse_register_entry("TX-D", (
+          "Customer: Gold Buyer LLC\nDate: 01/10/2026\nAmount: 60,000\nCurrency: AED\n"
+          "Direction: in\nMethod: cash\nOriginator: Some Person\nBeneficiary: Example Trading LLC\n"))]))
+check("date rule skips activity records and raw payment messages",
+      "DATE_UNREADABLE" not in _rules([{"customer": "X", "activity_only": True},
+                                       {"transaction_id": "M", "payment_message": ":20:X"}]))
 _MT_REG = (":20:REF123\n:32A:261001AED200000,00\n:50K:/1\nACME GOLD TRADING LLC\n"
            ":52A:EBILAEAD\n:57A:HSBCHKHH\n:59:/2\nPEARL METALS LIMITED\n")
 def _msg_rules(msg):
@@ -5261,6 +5279,34 @@ for _k in ai.LLM_CALLS:
     ai.LLM_CALLS[_k] = 0      # a healthy run starts from fresh counters
 check("and makes no degraded claim on a healthy run",
       "DEGRADED THIS RUN" not in ai.governance_footer())
+
+# ── ai.py: egress PII masking (UAE PDPL data minimisation) ───────────────────
+# Every prompt is masked inside llm_complete itself, so no caller can skip it.
+# Checksums gate the numeric types: a date, an amount or a list reference must
+# reach the model untouched, or triage would be judging mangled evidence.
+print("\nai.py — egress PII masking")
+_red = ai.redact_identifiers(
+    "Mail a.b@example.ae, EID 784-1990-1234567-1, IBAN AE07 0331 2345 6789 0123 456, "
+    "card 4111 1111 1111 1111, call +971 50 123 4567 or 050 123 4567.")
+for _tok in ("[EMAIL]", "[EMIRATES_ID]", "[IBAN]", "[CARD]", "[PHONE]"):
+    check(f"redact_identifiers masks {_tok}", _tok in _red)
+check("no raw identifier survives masking",
+      not any(x in _red for x in ("a.b@example.ae", "1234567-1", "AE07", "4111", "123 4567")))
+_keep = "Gold dealer fined AED 1,250,000 on 2026-10-08; SDN ref 12345; IBAN AE00 1234 5678 9012 3456 789"
+check("dates, amounts, references and checksum-invalid IBANs pass through unchanged",
+      ai.redact_identifiers(_keep) == _keep)
+check("names are never masked (grounded triage needs the subject)",
+      ai.redact_identifiers("Subject: Mohammed Al Hashimi") == "Subject: Mohammed Al Hashimi")
+_reset_llm()
+_sent = {}
+def _capture(*a, **k):
+    _sent.update(k.get("json") or {})
+    return _Resp(200, "ok")
+_req.post = _capture
+ai.llm_complete("Headline: contact fraud@example.com", system="IBAN AE07 0331 2345 6789 0123 456")
+check("llm_complete masks the prompt before it leaves the runner",
+      "fraud@example.com" not in json.dumps(_sent) and "[EMAIL]" in json.dumps(_sent))
+check("llm_complete masks the system prompt too", "[IBAN]" in _sent.get("system", ""))
 
 _req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
 os.environ.pop("ANTHROPIC_API_KEY", None)
