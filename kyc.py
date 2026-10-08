@@ -169,17 +169,17 @@ _INDIV_HDR = re.compile(
 
 # Field labels inside an individual block.
 _FIELDS = {
-    "name":        re.compile(r"Name\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "nationality": re.compile(r"Nationality\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "shares":      re.compile(r"Shares?\s*%?\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "id_number":   re.compile(r"Passport\s*/?\s*ID\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "passport_expiry": re.compile(r"Passport\s*Expiry\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "dob":         re.compile(r"Date\s*of\s*Birth\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "gender":      re.compile(r"Gender\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "emirates_id": re.compile(r"Emirates\s*ID\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "eid_expiry":  re.compile(r"EID\s*Expiry\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "proof_of_address": re.compile(r"Proof\s*of\s*Address\s*[:\-]\s*(.+)", re.IGNORECASE),
-    "pep_status":  re.compile(r"PEP\s*Status\s*[:\-]\s*(.+)", re.IGNORECASE),
+    "name":        re.compile(r"Name\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "nationality": re.compile(r"Nationality\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "shares":      re.compile(r"Shares?\s*%?\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "id_number":   re.compile(r"Passport\s*/?\s*ID\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "passport_expiry": re.compile(r"Passport\s*Expiry\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "dob":         re.compile(r"Date\s*of\s*Birth\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "gender":      re.compile(r"Gender\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "emirates_id": re.compile(r"Emirates\s*ID\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "eid_expiry":  re.compile(r"EID\s*Expiry\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "proof_of_address": re.compile(r"Proof\s*of\s*Address\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "pep_status":  re.compile(r"PEP\s*Status\s*[:\-][ \t]*(.+)", re.IGNORECASE),
 }
 
 _SHARE_NUM = re.compile(r"(\d+(?:\.\d+)?)\s*%")
@@ -242,6 +242,8 @@ def cdd_gaps(rec, today=None):
         gaps.append("date of birth not recorded")
     if not _present(rec.get("proof_of_address")):
         gaps.append("proof of address not obtained")
+    if _present(rec.get("id_number")) and not _present(rec.get("passport_expiry")):
+        gaps.append("passport/ID expiry date not recorded")
     # Expiry checks. A PRESENT but unparseable expiry is a GAP, never silently
     # treated as valid (module contract: "a field we cannot parse is a GAP").
     for fld, label in (("passport_expiry", "passport/ID"), ("eid_expiry", "Emirates ID")):
@@ -279,9 +281,16 @@ def parse_customer(notes, today=None):
     inds = []
     for role, block in _split_individual_blocks(notes):
         rec = parse_individual(role, block)
-        if len(rec.get("name", "")) < 3:
+        named = len(rec.get("name", "")) >= 3
+        # A block with no usable name is dropped only when it records nothing
+        # at all (an unfilled template slot). "Name: NA" on a 60% UBO used to
+        # vanish with its gaps, and the note then read as complete CDD.
+        if not named and not any(_present(rec.get(k)) for k in _FIELDS if k != "name"):
             continue
         rec["cdd_gaps"] = cdd_gaps(rec, today)
+        if not named:
+            rec["unidentified"] = True
+            rec["cdd_gaps"].insert(0, "party name not recorded — party is unidentified")
         inds.append(rec)
     out["individuals"] = inds
     # R.25 — is this customer a legal arrangement?

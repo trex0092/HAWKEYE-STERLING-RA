@@ -111,6 +111,29 @@ check("kyc masks the ID number (last 3 only)", kres["individuals"][0]["id_masked
       and "1234" not in kres["individuals"][0]["id_masked"])
 check("kyc flags missing DOB / proof-of-address as CDD gaps", kres["total_cdd_gaps"] >= 2 and kres["cdd_complete"] is False)
 expect_valueerror("kyc rejects a non-string note", lambda: mcp_tools.analyze_kyc_note(None))
+_full = ("SECTION 4\nIndividual 1 — Director\nName: Ahmed Khan\nNationality: Pakistan\n"
+         "Passport/ID: AB1234567\nPassport Expiry: 2030-01-01\nDate of Birth: 1980-01-01\n"
+         "Proof of Address: Obtained\n")
+check("kyc: a fully documented director is complete CDD",
+      mcp_tools.analyze_kyc_note(_full)["cdd_complete"] is True)
+_na = mcp_tools.analyze_kyc_note(_full + "Individual 2 — UBO\nName: NA\nShares %: 60%\n")
+check("kyc: a 60% UBO recorded as 'Name: NA' is kept as an unidentified-party gap, never dropped",
+      _na["individual_count"] == 2 and _na["cdd_complete"] is False
+      and any("unidentified" in g for p in _na["individuals"] for g in p["cdd_gaps"]))
+_blank = mcp_tools.analyze_kyc_note(_full + "Individual 2 — Shareholder\nName:\nNationality: Iran\n")
+check("kyc: a blank Name: line never takes the next line as the name",
+      all(not p["name"].lower().startswith("nationality") for p in _blank["individuals"])
+      and _blank["cdd_complete"] is False)
+check("kyc: an unfilled template block (header only) adds no party",
+      mcp_tools.analyze_kyc_note(_full + "Individual 2 — Secretary\n")["individual_count"] == 1)
+check("kyc: an ID with no expiry recorded is a CDD gap",
+      mcp_tools.analyze_kyc_note(_full.replace("Passport Expiry: 2030-01-01\n", ""))["cdd_complete"] is False)
+import tempfile as _tf_iw
+with _tf_iw.NamedTemporaryFile("w", suffix=".json", delete=False) as _iwf:
+    _iwf.write('{"entries": ["Viktor Bout", ]}')
+expect_valueerror("internal watchlist: a list that fails to parse is refused, never reported cleared",
+                  lambda: mcp_tools.screen_internal_watchlist("Viktor Bout", path=_iwf.name))
+os.unlink(_iwf.name)
 
 # ── mcp_tools.jurisdiction_risk ─────────────────────────────────────────────────────
 print("mcp_tools — jurisdiction_risk")

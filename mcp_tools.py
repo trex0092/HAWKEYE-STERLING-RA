@@ -203,6 +203,11 @@ def screen_internal_watchlist(name, path=None):
     degraded/failed screen."""
     subject = _req_str(name, "name")
     names, status, _meta = screen.parse_internal_watchlist(path)
+    if status.startswith("PARSE ERROR"):
+        # An unreadable list was never screened; reporting cleared would be a
+        # silent pass. Only an empty or unconfigured list is a valid clear.
+        raise ValueError("internal watchlist could not be parsed — nothing was screened; "
+                         "fix data/internal-watchlist.json")
     entries = [(screen.normalize(x), x) for x in names if screen.normalize(x)]
     hits = screen.screen_name(subject, {"Internal Watchlist": entries}) if entries else []
     if entries and screen._unscreenable(subject):
