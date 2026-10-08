@@ -16,6 +16,7 @@ Actions from the URLs in `sanctions-sources.json`.
 | `internal-watchlist.json` | The firm's own watchlist, screened alongside the official lists |
 | `sanctions-extra.json` | Curated additions that the fetched lists don't carry yet |
 | `jurisdiction-risk.json` | Country risk table used by KYC scoring (kyc.py) and the app |
+| `country-indicators.json` | Public-source country context shown next to a screening hit (US INCSR major money-laundering jurisdictions, US TIP Tier 2 Watch List / Tier 3, EU tax list Annex I), each with publisher, edition, date and source URL. **Never scored** |
 | `phonetic-tables.json` · `translit-groups.json` · `corporate-stopwords.json` | Matcher reference data: phonetics, transliteration groups, corporate-suffix stopwords — recall-relevant, so changes must keep the benchmark floors (`test/fixtures/screening-benchmark/`) |
 | `source-credibility.json` | Adverse-media source weighting |
 

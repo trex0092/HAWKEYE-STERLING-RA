@@ -6737,6 +6737,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             jur = m.get("jurisdiction") or {}
             if jur.get("reason"):
                 A(f"   Jurisdiction (R.10): {jur['reason']}")
+            if m.get("country_indicators"):
+                A(f"   Country context (not scored): {'; '.join(m['country_indicators'])}")
             if m.get("arrangement"):
                 A(f"   Legal arrangement (R.25): {m['arrangement']} — every party screened; "
                   "a sanctioned/PEP party flags the arrangement.")
@@ -8369,6 +8371,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                             if (_a.get("triage") or {}).get("injection_suspected"))
     pep_links = {p.get("permalink", "") for p in pep_findings}
     jtable = kyc.load_jurisdiction_risk()   # FATF R.10 jurisdiction-risk (maintained list)
+    ctable = kyc.load_country_indicators()  # sourced public indicators (context only, not scored)
     _summary_work = []
     for m in possible_matches:
         link = m.get("permalink", "")
@@ -8394,6 +8397,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         nationalities = [i.get("nationality", "") for i in kyc_data.get("individuals", [])]
         jtier, jreason = kyc.jurisdiction_risk_for(m.get("country", ""), nationalities, jtable)
         m["jurisdiction"] = {"tier": jtier, "reason": jreason}
+        m["country_indicators"] = kyc.country_indicators_for(m.get("country", ""), nationalities, ctable)
         # R.25 — legal-arrangement (trust/foundation/partnership) flag
         m["arrangement"] = kyc_data.get("arrangement_type", "") if kyc_data.get("is_arrangement") else ""
         cdd_gap_count = sum(len(i.get("cdd_gaps", [])) for i in kyc_data.get("individuals", []))

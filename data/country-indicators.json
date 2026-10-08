@@ -1,0 +1,1140 @@
+{
+  "_README": "Public-source country indicators shown as CONTEXT next to a screening hit's jurisdiction. They never change the risk score or the FATF jurisdiction bump (data/jurisdiction-risk.json stays the only scoring input); any scoring use is an MLRO decision. Each indicator carries its publisher, edition, publication date and source URL; values are transcribed from the publisher's own document, never from a commercial country-risk report (KnowYourCountry and the Organized Crime Index restrict redistribution, so they are linked, not copied). `published` is the name as the source prints it; `app` is the matching name in the COUNTRIES baseline in app.js (test/engine_test.py pins every `app` name to that list). Review when a new edition appears: INCSR Vol. II (each March), TIP Report (yearly), EU tax list (each February and October).",
+  "retrieved": "2026-10-08",
+  "indicators": {
+    "incsr_major_ml": {
+      "label": "US INCSR major money laundering jurisdiction",
+      "publisher": "US Department of State, Bureau for International Narcotics and Law Enforcement Affairs",
+      "edition": "2025 INCSR Volume II: Money Laundering (covers 2024)",
+      "published": "2025-03",
+      "source": "https://www.state.gov/wp-content/uploads/2025/03/2025-International-Narcotics-Control-Strategy-Volume-2-Accessible.pdf",
+      "note": "Transcribed from Volume II's 'Countries and Jurisdictions' table of contents (pp. 2-5). Its opening entries match the report's own 'Major Money Laundering Jurisdictions in 2024' list as quoted by the US Embassy Tirana copy of the same report; the remaining entries were not cross-checked against that list. The report states that inclusion in Volume II is not an indication that a jurisdiction is not making strong AML efforts. No 2026 edition was found when this file was built.",
+      "jurisdictions": [
+        {
+          "published": "Afghanistan",
+          "app": "Afghanistan"
+        },
+        {
+          "published": "Albania",
+          "app": "Albania"
+        },
+        {
+          "published": "Algeria",
+          "app": "Algeria"
+        },
+        {
+          "published": "Antigua and Barbuda",
+          "app": "Antigua and Barbuda"
+        },
+        {
+          "published": "Argentina",
+          "app": "Argentina"
+        },
+        {
+          "published": "Aruba",
+          "app": "Aruba"
+        },
+        {
+          "published": "The Bahamas",
+          "app": "Bahamas"
+        },
+        {
+          "published": "Barbados",
+          "app": "Barbados"
+        },
+        {
+          "published": "Belgium",
+          "app": "Belgium"
+        },
+        {
+          "published": "Belize",
+          "app": "Belize"
+        },
+        {
+          "published": "Bolivia",
+          "app": "Bolivia"
+        },
+        {
+          "published": "Brazil",
+          "app": "Brazil"
+        },
+        {
+          "published": "British Virgin Islands",
+          "app": "British Virgin Islands"
+        },
+        {
+          "published": "Burma",
+          "app": "Myanmar"
+        },
+        {
+          "published": "Cabo Verde",
+          "app": "Cape Verde"
+        },
+        {
+          "published": "Cambodia",
+          "app": "Cambodia"
+        },
+        {
+          "published": "Canada",
+          "app": "Canada"
+        },
+        {
+          "published": "Cayman Islands",
+          "app": "Cayman Islands"
+        },
+        {
+          "published": "China, People's Republic of",
+          "app": "China"
+        },
+        {
+          "published": "Colombia",
+          "app": "Colombia"
+        },
+        {
+          "published": "Costa Rica",
+          "app": "Costa Rica"
+        },
+        {
+          "published": "Curaçao",
+          "app": "Curacao"
+        },
+        {
+          "published": "Cyprus",
+          "app": "Cyprus"
+        },
+        {
+          "published": "Dominica",
+          "app": "Dominica"
+        },
+        {
+          "published": "Dominican Republic",
+          "app": "Dominican Republic"
+        },
+        {
+          "published": "Ecuador",
+          "app": "Ecuador"
+        },
+        {
+          "published": "El Salvador",
+          "app": "El Salvador"
+        },
+        {
+          "published": "Germany",
+          "app": "Germany"
+        },
+        {
+          "published": "Ghana",
+          "app": "Ghana"
+        },
+        {
+          "published": "Guatemala",
+          "app": "Guatemala"
+        },
+        {
+          "published": "Guinea-Bissau",
+          "app": "Guinea Bissau"
+        },
+        {
+          "published": "Guyana",
+          "app": "Guyana"
+        },
+        {
+          "published": "Haiti",
+          "app": "Haiti"
+        },
+        {
+          "published": "Honduras",
+          "app": "Honduras"
+        },
+        {
+          "published": "Hong Kong",
+          "app": "Hong Kong"
+        },
+        {
+          "published": "India",
+          "app": "India"
+        },
+        {
+          "published": "Indonesia",
+          "app": "Indonesia"
+        },
+        {
+          "published": "Iran",
+          "app": "Islamic Republic of Iran"
+        },
+        {
+          "published": "Iraq",
+          "app": "Iraq"
+        },
+        {
+          "published": "Italy",
+          "app": "Italy"
+        },
+        {
+          "published": "Jamaica",
+          "app": "Jamaica"
+        },
+        {
+          "published": "Kazakhstan",
+          "app": "Kazakhstan"
+        },
+        {
+          "published": "Kenya",
+          "app": "Kenya"
+        },
+        {
+          "published": "Kyrgyzstan",
+          "app": "Kyrgyzstan"
+        },
+        {
+          "published": "Laos",
+          "app": "Lao People's Democratic Republic"
+        },
+        {
+          "published": "Liberia",
+          "app": "Liberia"
+        },
+        {
+          "published": "Macau",
+          "app": "Macau"
+        },
+        {
+          "published": "Malaysia",
+          "app": "Malaysia"
+        },
+        {
+          "published": "Mexico",
+          "app": "Mexico"
+        },
+        {
+          "published": "Mozambique",
+          "app": "Mozambique"
+        },
+        {
+          "published": "Netherlands",
+          "app": "Netherlands"
+        },
+        {
+          "published": "Nicaragua",
+          "app": "Nicaragua"
+        },
+        {
+          "published": "Nigeria",
+          "app": "Nigeria"
+        },
+        {
+          "published": "Pakistan",
+          "app": "Pakistan"
+        },
+        {
+          "published": "Panama",
+          "app": "Panama"
+        },
+        {
+          "published": "Paraguay",
+          "app": "Paraguay"
+        },
+        {
+          "published": "Peru",
+          "app": "Peru"
+        },
+        {
+          "published": "Philippines",
+          "app": "Philippines"
+        },
+        {
+          "published": "Saint Kitts and Nevis",
+          "app": "St Kitts & Nevis"
+        },
+        {
+          "published": "Saint Lucia",
+          "app": "St Lucia"
+        },
+        {
+          "published": "Saint Vincent and the Grenadines",
+          "app": "St Vincent & Gren"
+        },
+        {
+          "published": "Senegal",
+          "app": "Senegal"
+        },
+        {
+          "published": "Sint Maarten",
+          "app": "St Maarten"
+        },
+        {
+          "published": "South Africa",
+          "app": "South Africa"
+        },
+        {
+          "published": "Spain",
+          "app": "Spain"
+        },
+        {
+          "published": "Suriname",
+          "app": "Suriname"
+        },
+        {
+          "published": "Syria",
+          "app": "Syria"
+        },
+        {
+          "published": "Taiwan",
+          "app": "Taiwan"
+        },
+        {
+          "published": "Tajikistan",
+          "app": "Tajikistan"
+        },
+        {
+          "published": "Tanzania",
+          "app": "Tanzania"
+        },
+        {
+          "published": "Thailand",
+          "app": "Thailand"
+        },
+        {
+          "published": "Trinidad and Tobago",
+          "app": "Trinidad & Tobago"
+        },
+        {
+          "published": "Türkiye",
+          "app": "Turkey"
+        },
+        {
+          "published": "Turkmenistan",
+          "app": "Turkmenistan"
+        },
+        {
+          "published": "Ukraine",
+          "app": "Ukraine"
+        },
+        {
+          "published": "United Arab Emirates",
+          "app": "United Arab Emirates"
+        },
+        {
+          "published": "United Kingdom",
+          "app": "United Kingdom"
+        },
+        {
+          "published": "Uzbekistan",
+          "app": "Uzbekistan"
+        },
+        {
+          "published": "Venezuela",
+          "app": "Venezuela"
+        },
+        {
+          "published": "Vietnam",
+          "app": "Vietnam"
+        }
+      ]
+    },
+    "tip_tier": {
+      "label": "US Trafficking in Persons Report tier",
+      "publisher": "US Department of State, Office to Monitor and Combat Trafficking in Persons",
+      "edition": "2025 Trafficking in Persons Report",
+      "published": "2025-09-29",
+      "source": "https://www.state.gov/reports/2025-trafficking-in-persons-report/",
+      "note": "Tier placements list. Only Tier 2 Watch List and Tier 3 are shown as context; Tier 1 and Tier 2 are kept for completeness. 'Special Case' jurisdictions are not transcribed. No 2026 report had been published when this file was built (the State Department's request for information for it is dated 2026-01-14).",
+      "tiers": {
+        "Tier 1": [
+          {
+            "published": "Argentina",
+            "app": "Argentina"
+          },
+          {
+            "published": "Australia",
+            "app": "Australia"
+          },
+          {
+            "published": "Austria",
+            "app": "Austria"
+          },
+          {
+            "published": "Bahamas, The",
+            "app": "Bahamas"
+          },
+          {
+            "published": "Bahrain",
+            "app": "Bahrain"
+          },
+          {
+            "published": "Belgium",
+            "app": "Belgium"
+          },
+          {
+            "published": "Canada",
+            "app": "Canada"
+          },
+          {
+            "published": "Chile",
+            "app": "Chile"
+          },
+          {
+            "published": "Cyprus",
+            "app": "Cyprus"
+          },
+          {
+            "published": "Czechia",
+            "app": "Czech Republic"
+          },
+          {
+            "published": "Denmark",
+            "app": "Denmark"
+          },
+          {
+            "published": "Estonia",
+            "app": "Estonia"
+          },
+          {
+            "published": "Finland",
+            "app": "Finland"
+          },
+          {
+            "published": "France",
+            "app": "France"
+          },
+          {
+            "published": "Georgia",
+            "app": "Georgia"
+          },
+          {
+            "published": "Germany",
+            "app": "Germany"
+          },
+          {
+            "published": "Guyana",
+            "app": "Guyana"
+          },
+          {
+            "published": "Iceland",
+            "app": "Iceland"
+          },
+          {
+            "published": "Korea, Republic of",
+            "app": "South Korea"
+          },
+          {
+            "published": "Lithuania",
+            "app": "Lithuania"
+          },
+          {
+            "published": "Luxembourg",
+            "app": "Luxembourg"
+          },
+          {
+            "published": "Netherlands",
+            "app": "Netherlands"
+          },
+          {
+            "published": "Philippines",
+            "app": "Philippines"
+          },
+          {
+            "published": "Poland",
+            "app": "Poland"
+          },
+          {
+            "published": "Seychelles",
+            "app": "Seychelles"
+          },
+          {
+            "published": "Singapore",
+            "app": "Singapore"
+          },
+          {
+            "published": "Slovenia",
+            "app": "Slovenia"
+          },
+          {
+            "published": "Spain",
+            "app": "Spain"
+          },
+          {
+            "published": "Suriname",
+            "app": "Suriname"
+          },
+          {
+            "published": "Sweden",
+            "app": "Sweden"
+          },
+          {
+            "published": "Taiwan",
+            "app": "Taiwan"
+          },
+          {
+            "published": "United Kingdom",
+            "app": "United Kingdom"
+          },
+          {
+            "published": "United States",
+            "app": "United States"
+          }
+        ],
+        "Tier 2": [
+          {
+            "published": "Albania",
+            "app": "Albania"
+          },
+          {
+            "published": "Angola",
+            "app": "Angola"
+          },
+          {
+            "published": "Antigua and Barbuda",
+            "app": "Antigua and Barbuda"
+          },
+          {
+            "published": "Armenia",
+            "app": "Armenia"
+          },
+          {
+            "published": "Aruba",
+            "app": "Aruba"
+          },
+          {
+            "published": "Azerbaijan",
+            "app": "Azerbaijan"
+          },
+          {
+            "published": "Bangladesh",
+            "app": "Bangladesh"
+          },
+          {
+            "published": "Belize",
+            "app": "Belize"
+          },
+          {
+            "published": "Benin",
+            "app": "Benin"
+          },
+          {
+            "published": "Bhutan",
+            "app": "Bhutan"
+          },
+          {
+            "published": "Bosnia and Herzegovina",
+            "app": "Bosnia-Herzegovina"
+          },
+          {
+            "published": "Botswana",
+            "app": "Botswana"
+          },
+          {
+            "published": "Bulgaria",
+            "app": "Bulgaria"
+          },
+          {
+            "published": "Burundi",
+            "app": "Burundi"
+          },
+          {
+            "published": "Cameroon",
+            "app": "Cameroon"
+          },
+          {
+            "published": "Central African Republic",
+            "app": "Central African Republic"
+          },
+          {
+            "published": "Colombia",
+            "app": "Colombia"
+          },
+          {
+            "published": "Comoros",
+            "app": "Comoros"
+          },
+          {
+            "published": "Costa Rica",
+            "app": "Costa Rica"
+          },
+          {
+            "published": "Côte d’Ivoire",
+            "app": "Cote D'Ivoire"
+          },
+          {
+            "published": "Croatia",
+            "app": "Croatia"
+          },
+          {
+            "published": "Curaçao",
+            "app": "Curacao"
+          },
+          {
+            "published": "Dominican Republic",
+            "app": "Dominican Republic"
+          },
+          {
+            "published": "Ecuador",
+            "app": "Ecuador"
+          },
+          {
+            "published": "Egypt",
+            "app": "Egypt"
+          },
+          {
+            "published": "El Salvador",
+            "app": "El Salvador"
+          },
+          {
+            "published": "Equatorial Guinea",
+            "app": "Equatorial Guinea"
+          },
+          {
+            "published": "Eswatini",
+            "app": "Eswatini"
+          },
+          {
+            "published": "Ethiopia",
+            "app": "Ethiopia"
+          },
+          {
+            "published": "Gabon",
+            "app": "Gabon"
+          },
+          {
+            "published": "Gambia, The",
+            "app": "Gambia"
+          },
+          {
+            "published": "Ghana",
+            "app": "Ghana"
+          },
+          {
+            "published": "Greece",
+            "app": "Greece"
+          },
+          {
+            "published": "Guatemala",
+            "app": "Guatemala"
+          },
+          {
+            "published": "Guinea",
+            "app": "Guinea"
+          },
+          {
+            "published": "Guinea-Bissau",
+            "app": "Guinea Bissau"
+          },
+          {
+            "published": "Honduras",
+            "app": "Honduras"
+          },
+          {
+            "published": "Hungary",
+            "app": "Hungary"
+          },
+          {
+            "published": "India",
+            "app": "India"
+          },
+          {
+            "published": "Indonesia",
+            "app": "Indonesia"
+          },
+          {
+            "published": "Iraq",
+            "app": "Iraq"
+          },
+          {
+            "published": "Ireland",
+            "app": "Ireland"
+          },
+          {
+            "published": "Israel",
+            "app": "Israel"
+          },
+          {
+            "published": "Italy",
+            "app": "Italy"
+          },
+          {
+            "published": "Jamaica",
+            "app": "Jamaica"
+          },
+          {
+            "published": "Japan",
+            "app": "Japan"
+          },
+          {
+            "published": "Jordan",
+            "app": "Jordan"
+          },
+          {
+            "published": "Kazakhstan",
+            "app": "Kazakhstan"
+          },
+          {
+            "published": "Kenya",
+            "app": "Kenya"
+          },
+          {
+            "published": "Kosovo",
+            "app": "Kosovo"
+          },
+          {
+            "published": "Kuwait",
+            "app": "Kuwait"
+          },
+          {
+            "published": "Latvia",
+            "app": "Latvia"
+          },
+          {
+            "published": "Lebanon",
+            "app": "Lebanon"
+          },
+          {
+            "published": "Lesotho",
+            "app": "Lesotho"
+          },
+          {
+            "published": "Madagascar",
+            "app": "Madagascar"
+          },
+          {
+            "published": "Malawi",
+            "app": "Malawi"
+          },
+          {
+            "published": "Malaysia",
+            "app": "Malaysia"
+          },
+          {
+            "published": "Mali",
+            "app": "Mali"
+          },
+          {
+            "published": "Malta",
+            "app": "Malta"
+          },
+          {
+            "published": "Marshall Islands",
+            "app": "Marshall Islands"
+          },
+          {
+            "published": "Mauritania",
+            "app": "Mauritania"
+          },
+          {
+            "published": "Mauritius",
+            "app": "Mauritius"
+          },
+          {
+            "published": "Mexico",
+            "app": "Mexico"
+          },
+          {
+            "published": "Micronesia, Federated States of",
+            "app": "Micronesia"
+          },
+          {
+            "published": "Moldova",
+            "app": "Moldova"
+          },
+          {
+            "published": "Mongolia",
+            "app": "Mongolia"
+          },
+          {
+            "published": "Montenegro",
+            "app": "Montenegro"
+          },
+          {
+            "published": "Morocco",
+            "app": "Morocco"
+          },
+          {
+            "published": "Mozambique",
+            "app": "Mozambique"
+          },
+          {
+            "published": "Namibia",
+            "app": "Namibia"
+          },
+          {
+            "published": "New Zealand",
+            "app": "New Zealand"
+          },
+          {
+            "published": "Nigeria",
+            "app": "Nigeria"
+          },
+          {
+            "published": "North Macedonia",
+            "app": "North Macedonia"
+          },
+          {
+            "published": "Norway",
+            "app": "Norway"
+          },
+          {
+            "published": "Oman",
+            "app": "Oman"
+          },
+          {
+            "published": "Pakistan",
+            "app": "Pakistan"
+          },
+          {
+            "published": "Palau",
+            "app": "Palau"
+          },
+          {
+            "published": "Panama",
+            "app": "Panama"
+          },
+          {
+            "published": "Paraguay",
+            "app": "Paraguay"
+          },
+          {
+            "published": "Peru",
+            "app": "Peru"
+          },
+          {
+            "published": "Portugal",
+            "app": "Portugal"
+          },
+          {
+            "published": "Qatar",
+            "app": "Qatar"
+          },
+          {
+            "published": "Romania",
+            "app": "Romania"
+          },
+          {
+            "published": "Saint Vincent and the Grenadines",
+            "app": "St Vincent & Gren"
+          },
+          {
+            "published": "Saudi Arabia",
+            "app": "Saudi Arabia"
+          },
+          {
+            "published": "Senegal",
+            "app": "Senegal"
+          },
+          {
+            "published": "Serbia",
+            "app": "Serbia"
+          },
+          {
+            "published": "Sierra Leone",
+            "app": "Sierra Leone"
+          },
+          {
+            "published": "Slovakia",
+            "app": "Slovakia"
+          },
+          {
+            "published": "Sri Lanka",
+            "app": "Sri Lanka"
+          },
+          {
+            "published": "Switzerland",
+            "app": "Switzerland"
+          },
+          {
+            "published": "Tajikistan",
+            "app": "Tajikistan"
+          },
+          {
+            "published": "Tanzania",
+            "app": "Tanzania"
+          },
+          {
+            "published": "Thailand",
+            "app": "Thailand"
+          },
+          {
+            "published": "Timor-Leste",
+            "app": "Timor-Leste"
+          },
+          {
+            "published": "Togo",
+            "app": "Togo"
+          },
+          {
+            "published": "Tonga",
+            "app": "Tonga"
+          },
+          {
+            "published": "Trinidad and Tobago",
+            "app": "Trinidad & Tobago"
+          },
+          {
+            "published": "Turkey (Türkiye)",
+            "app": "Turkey"
+          },
+          {
+            "published": "Uganda",
+            "app": "Uganda"
+          },
+          {
+            "published": "Ukraine",
+            "app": "Ukraine"
+          },
+          {
+            "published": "United Arab Emirates",
+            "app": "United Arab Emirates"
+          },
+          {
+            "published": "Uruguay",
+            "app": "Uruguay"
+          },
+          {
+            "published": "Uzbekistan",
+            "app": "Uzbekistan"
+          },
+          {
+            "published": "Vietnam",
+            "app": "Vietnam"
+          },
+          {
+            "published": "Zambia",
+            "app": "Zambia"
+          }
+        ],
+        "Tier 2 Watch List": [
+          {
+            "published": "Algeria",
+            "app": "Algeria"
+          },
+          {
+            "published": "Barbados",
+            "app": "Barbados"
+          },
+          {
+            "published": "Bolivia",
+            "app": "Bolivia"
+          },
+          {
+            "published": "Brazil",
+            "app": "Brazil"
+          },
+          {
+            "published": "Brunei",
+            "app": "Brunei Darussalam"
+          },
+          {
+            "published": "Burkina Faso",
+            "app": "Burkina Faso"
+          },
+          {
+            "published": "Cabo Verde",
+            "app": "Cape Verde"
+          },
+          {
+            "published": "Congo, Democratic Republic of the",
+            "app": "The Democratic Republic Of Congo"
+          },
+          {
+            "published": "Congo, Republic of",
+            "app": "Congo (Brazzaville)"
+          },
+          {
+            "published": "Djibouti",
+            "app": "Djibouti"
+          },
+          {
+            "published": "Fiji",
+            "app": "Fiji"
+          },
+          {
+            "published": "Hong Kong S.A.R.",
+            "app": "Hong Kong"
+          },
+          {
+            "published": "Kyrgyzstan",
+            "app": "Kyrgyzstan"
+          },
+          {
+            "published": "Liberia",
+            "app": "Liberia"
+          },
+          {
+            "published": "Maldives",
+            "app": "Maldives"
+          },
+          {
+            "published": "Nepal",
+            "app": "Nepal"
+          },
+          {
+            "published": "Niger",
+            "app": "Niger"
+          },
+          {
+            "published": "Rwanda",
+            "app": "Rwanda"
+          },
+          {
+            "published": "Saint Lucia",
+            "app": "St Lucia"
+          },
+          {
+            "published": "Solomon Islands",
+            "app": "Solomon Islands"
+          },
+          {
+            "published": "South Africa",
+            "app": "South Africa"
+          },
+          {
+            "published": "Tunisia",
+            "app": "Tunisia"
+          },
+          {
+            "published": "Turkmenistan",
+            "app": "Turkmenistan"
+          },
+          {
+            "published": "Vanuatu",
+            "app": "Vanuatu"
+          },
+          {
+            "published": "Zimbabwe",
+            "app": "Zimbabwe"
+          }
+        ],
+        "Tier 3": [
+          {
+            "published": "Afghanistan",
+            "app": "Afghanistan"
+          },
+          {
+            "published": "Belarus",
+            "app": "Belarus"
+          },
+          {
+            "published": "Burma",
+            "app": "Myanmar"
+          },
+          {
+            "published": "Cambodia",
+            "app": "Cambodia"
+          },
+          {
+            "published": "Chad",
+            "app": "Chad"
+          },
+          {
+            "published": "China",
+            "app": "China"
+          },
+          {
+            "published": "Cuba",
+            "app": "Cuba"
+          },
+          {
+            "published": "Eritrea",
+            "app": "Eritrea"
+          },
+          {
+            "published": "Iran",
+            "app": "Islamic Republic of Iran"
+          },
+          {
+            "published": "Korea, Democratic Republic of",
+            "app": "North Korea"
+          },
+          {
+            "published": "Laos",
+            "app": "Lao People's Democratic Republic"
+          },
+          {
+            "published": "Macau S.A.R.",
+            "app": "Macau"
+          },
+          {
+            "published": "Nicaragua",
+            "app": "Nicaragua"
+          },
+          {
+            "published": "Papua New Guinea",
+            "app": "Papua New Guinea"
+          },
+          {
+            "published": "Russia",
+            "app": "Russian Federation"
+          },
+          {
+            "published": "Sint Maarten",
+            "app": "St Maarten"
+          },
+          {
+            "published": "South Sudan",
+            "app": "South Sudan"
+          },
+          {
+            "published": "Sudan",
+            "app": "Sudan"
+          },
+          {
+            "published": "Syria",
+            "app": "Syria"
+          },
+          {
+            "published": "Venezuela",
+            "app": "Venezuela"
+          }
+        ]
+      }
+    },
+    "eu_tax_noncooperative": {
+      "label": "EU list of non-cooperative jurisdictions for tax purposes (Annex I)",
+      "publisher": "Council of the European Union",
+      "edition": "Council conclusions of 17 February 2026 (ST 5869/26)",
+      "published": "2026-02-17",
+      "source": "https://www.consilium.europa.eu/en/press/press-releases/2026/02/17/taxation-council-updates-the-eu-list-of-non-cooperative-jurisdictions-for-tax-purposes/",
+      "note": "Annex I only (10 jurisdictions). The Council's next revision was scheduled for October 2026; re-check after it. Annex II (state of play) is not transcribed.",
+      "jurisdictions": [
+        {
+          "published": "American Samoa",
+          "app": "American Samoa"
+        },
+        {
+          "published": "Anguilla",
+          "app": "Anguilla"
+        },
+        {
+          "published": "Guam",
+          "app": "Guam"
+        },
+        {
+          "published": "Palau",
+          "app": "Palau"
+        },
+        {
+          "published": "Panama",
+          "app": "Panama"
+        },
+        {
+          "published": "Russia",
+          "app": "Russian Federation"
+        },
+        {
+          "published": "Turks and Caicos Islands",
+          "app": "Turks & Caicos"
+        },
+        {
+          "published": "US Virgin Islands",
+          "app": "United States Virgin Islands"
+        },
+        {
+          "published": "Vanuatu",
+          "app": "Vanuatu"
+        },
+        {
+          "published": "Viet Nam",
+          "app": "Vietnam"
+        }
+      ]
+    }
+  }
+}

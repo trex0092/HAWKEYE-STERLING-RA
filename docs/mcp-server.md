@@ -81,6 +81,7 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | --- | --- |
 | `hawkeye://reference/jurisdiction-risk` | The maintained higher-risk jurisdiction list. |
 | `hawkeye://reference/fatf-assessments` | FATF black/grey lists with each jurisdiction's action-plan assessment, quoted from the FATF statements with source URLs. |
+| `hawkeye://reference/country-indicators` | Public-source country context (US INCSR major money-laundering jurisdictions, US TIP tiers, EU tax list Annex I), each with publisher, edition, date and source URL. Never scored. |
 | `hawkeye://reference/internal-watchlist` | The firm-internal watchlist file. |
 
 ## Prompts
