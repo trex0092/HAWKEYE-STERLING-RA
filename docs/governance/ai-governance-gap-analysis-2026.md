@@ -254,3 +254,34 @@ offline via `exports.__internals`.
 > `docs/governance/` plus the technical controls above (encryption, audit, role
 > gating, transparency notice, data-subject export/erasure). They are documentation-
 > and-control posture, not a single code path.
+
+---
+
+## 6. Verified endpoint identity, staged only (2026-10-08)
+
+**OA-20 remains OPEN. No production IdP or browser sign-in is provisioned.**
+The functions `asana-mirror` and `risk-backup` now have a disabled-by-default
+server-side RS256 JWT authorization gate (`netlify/functions/_identity.js`).
+It does not rely on the device role selector for its permissions.
+
+| Endpoint | Permitted signed `hawkeye_role` when enabled |
+|---|---|
+| Firm-wide assessment register and activity mirror, read/write | `Reviewer-MLRO`, `Admin` |
+| Risk-data override backup, write | `Admin` |
+
+When `APP_OIDC_REQUIRED=1`, each endpoint requires a signed bearer access
+token from the configured HTTPS issuer and same-origin JWKS, with verified
+audience, expiry, issued time, bounded lifetime, subject and role. A missing
+token returns 401, disallowed role 403, and missing IdP/JWKS configuration
+or key-service outage 503. The existing shared-token control remains additional
+defence when configured; it is not proof of individual identity. Default
+`APP_OIDC_REQUIRED=0` retains the old endpoint behaviour.
+
+**Do not enable in production** until MLRO/IT approval, IdP procurement and
+role provisioning, browser OAuth/OIDC access-token acquisition, logout and
+expiry handling, user offboarding, privacy/vendor review, and supervised tests
+of authorization failures, signing-key rotation and restore workflows.
+The gateway supports only RS256 signed access JWTs and must not accept ID
+tokens or opaque access tokens. Every new account needs independent authority
+mapping. Other endpoints and tenant isolation remain out of scope for this PR.
+Synthetic unit tests: `node test/identity.test.js`.
