@@ -10,6 +10,7 @@ const { withFunctionTelemetry } = require('./_telemetry');
    ANTHROPIC_API_KEY must be set in the Netlify environment. */
 
 const { rateLimit } = require('./_ratelimit');
+const { enforceSharedQuota } = require('./_shared-quota');
 const { sharedTokenOk } = require('./_auth');
 const { inspectEgress } = require('./_data-boundary');
 const { inspectAdvisoryOutput } = require('./_answer-validator');
@@ -875,6 +876,14 @@ const handle = async (event) => {
      tunable via RATE_LIMIT_BRAIN_SOUL. */
   const limited = rateLimit(event, { name: 'brain-soul', limit: Number(process.env.RATE_LIMIT_BRAIN_SOUL) || 10, windowMs: 60000 });
   if (limited) return limited;
+  /* This opt-in gate cannot be bypassed by hitting a different Netlify
+     instance. It FAILS CLOSED if the approved shared quota backend has not
+     been provisioned or fails to provide an explicit atomic verdict. */
+  const sharedLimited = await enforceSharedQuota(event, {
+    name: 'brain-soul', limit: Number(process.env.RATE_LIMIT_BRAIN_SOUL) || 10,
+    windowMs: 60000
+  });
+  if (sharedLimited) return sharedLimited;
 
   // Explicit kill switch (incident runbook): disable without deleting the key.
   if (String(process.env.ADVISOR_ENABLED || '').toLowerCase() === 'false') {
