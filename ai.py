@@ -99,6 +99,68 @@ def detect_injection(text: str):
 def _wrap_untrusted(text: str) -> str:
     return f"<<UNTRUSTED>>{_sanitize_untrusted(text)}<<END>>"
 
+# ── EGRESS PII MASKING (UAE PDPL data minimisation) ───────────────────────────
+# Every prompt passes through redact_identifiers() inside llm_complete(), so no
+# caller can forget it. Pattern follows Microsoft Presidio's recogniser design
+# (regex + checksum validation, typed placeholder) without the dependency.
+# Only HIGH-PRECISION identifiers are masked: names stay, because grounded
+# triage judges a headline against the subject's name and cannot work without
+# it. A checksum (IBAN mod-97, card Luhn) gates the numeric types so dates,
+# amounts and list reference numbers are never mangled.
+_PII_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+# Emirates ID: 784-YYYY-NNNNNNN-C, dashed or run together.
+_PII_EMIRATES_ID = re.compile(r"\b784[- ]?\d{4}[- ]?\d{7}[- ]?\d\b")
+_PII_IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}\b")
+_PII_CARD = re.compile(r"\b\d(?:[ -]?\d){12,18}\b")
+# International (+CC…) numbers and UAE mobiles (05X XXX XXXX) only: a bare
+# digit run is too often a date, amount or designation reference.
+_PII_PHONE = re.compile(r"(?<![\w+])(?:\+\d{1,3}[ -]?(?:\(?\d{1,4}\)?[ -]?){2,5}\d{2,4}"
+                        r"|\b05\d[ -]?\d{3}[ -]?\d{4})\b")
+REDACTIONS = {"EMAIL": 0, "EMIRATES_ID": 0, "IBAN": 0, "CARD": 0, "PHONE": 0}
+
+def _iban_ok(s: str) -> bool:
+    s = s.replace(" ", "")
+    if not 15 <= len(s) <= 34:
+        return False
+    r = s[4:] + s[:4]
+    try:
+        return int("".join(str(int(c, 36)) for c in r)) % 97 == 1
+    except ValueError:
+        return False
+
+def _luhn_ok(s: str) -> bool:
+    d = [int(c) for c in s if c.isdigit()]
+    if not 13 <= len(d) <= 19:
+        return False
+    tot = 0
+    for i, n in enumerate(reversed(d)):
+        if i % 2:
+            n *= 2
+            n -= 9 if n > 9 else 0
+        tot += n
+    return tot % 10 == 0
+
+def redact_identifiers(text: str) -> str:
+    """Mask e-mails, Emirates IDs, IBANs, payment cards and phone numbers before
+    any text leaves the runner. Order matters: Emirates ID before card (a 15-digit
+    784… run can also pass Luhn), IBAN before phone."""
+    t = str(text or "")
+    def sub(rx, label, valid=None):
+        nonlocal t
+        def rep(m):
+            if valid and not valid(m.group(0)):
+                return m.group(0)
+            with _LLM_LOCK:
+                REDACTIONS[label] += 1
+            return f"[{label}]"
+        t = rx.sub(rep, t)
+    sub(_PII_EMAIL, "EMAIL")
+    sub(_PII_EMIRATES_ID, "EMIRATES_ID")
+    sub(_PII_IBAN, "IBAN", _iban_ok)
+    sub(_PII_CARD, "CARD", _luhn_ok)
+    sub(_PII_PHONE, "PHONE")
+    return t
+
 def llm_available() -> bool:
     """True only when the firm has provisioned a key (authorising data egress)."""
     return AI_ENABLED
@@ -213,6 +275,7 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
         return None
     with _LLM_LOCK:
         LLM_CALLS["attempted"] += 1
+    prompt, system = redact_identifiers(prompt), redact_identifiers(system)
     try:
         import requests
         r = requests.post(_AI_ENDPOINT, timeout=30,

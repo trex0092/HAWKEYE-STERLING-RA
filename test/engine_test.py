@@ -5262,6 +5262,34 @@ for _k in ai.LLM_CALLS:
 check("and makes no degraded claim on a healthy run",
       "DEGRADED THIS RUN" not in ai.governance_footer())
 
+# ── ai.py: egress PII masking (UAE PDPL data minimisation) ───────────────────
+# Every prompt is masked inside llm_complete itself, so no caller can skip it.
+# Checksums gate the numeric types: a date, an amount or a list reference must
+# reach the model untouched, or triage would be judging mangled evidence.
+print("\nai.py — egress PII masking")
+_red = ai.redact_identifiers(
+    "Mail a.b@example.ae, EID 784-1990-1234567-1, IBAN AE07 0331 2345 6789 0123 456, "
+    "card 4111 1111 1111 1111, call +971 50 123 4567 or 050 123 4567.")
+for _tok in ("[EMAIL]", "[EMIRATES_ID]", "[IBAN]", "[CARD]", "[PHONE]"):
+    check(f"redact_identifiers masks {_tok}", _tok in _red)
+check("no raw identifier survives masking",
+      not any(x in _red for x in ("a.b@example.ae", "1234567-1", "AE07", "4111", "123 4567")))
+_keep = "Gold dealer fined AED 1,250,000 on 2026-10-08; SDN ref 12345; IBAN AE00 1234 5678 9012 3456 789"
+check("dates, amounts, references and checksum-invalid IBANs pass through unchanged",
+      ai.redact_identifiers(_keep) == _keep)
+check("names are never masked (grounded triage needs the subject)",
+      ai.redact_identifiers("Subject: Mohammed Al Hashimi") == "Subject: Mohammed Al Hashimi")
+_reset_llm()
+_sent = {}
+def _capture(*a, **k):
+    _sent.update(k.get("json") or {})
+    return _Resp(200, "ok")
+_req.post = _capture
+ai.llm_complete("Headline: contact fraud@example.com", system="IBAN AE07 0331 2345 6789 0123 456")
+check("llm_complete masks the prompt before it leaves the runner",
+      "fraud@example.com" not in json.dumps(_sent) and "[EMAIL]" in json.dumps(_sent))
+check("llm_complete masks the system prompt too", "[IBAN]" in _sent.get("system", ""))
+
 _req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
 os.environ.pop("ANTHROPIC_API_KEY", None)
 _reset_llm()
