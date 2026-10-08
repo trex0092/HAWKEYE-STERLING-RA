@@ -285,3 +285,31 @@ The gateway supports only RS256 signed access JWTs and must not accept ID
 tokens or opaque access tokens. Every new account needs independent authority
 mapping. Other endpoints and tenant isolation remain out of scope for this PR.
 Synthetic unit tests: `node test/identity.test.js`.
+
+---
+
+## 7. Offline verified-source legal retrieval, not yet an Advisor RAG connection
+
+A deterministic lexical retrieval library is staged in
+`scripts/verified-legal-retrieval.mjs`. It reads the existing
+`data/obligations.json` register and only indexes entries whose
+`source_citation.basis` is `sourced`, whose article, official HTTPS URL,
+quote, locator, human verifier and verification date are populated and
+whose official source hostname is explicitly allowlisted by the trusted
+calling backend. Unverified `needs-source` rows are never returned as law.
+
+A caller must supply a **server-verified** role from Analyst, Reviewer-MLRO
+or Admin. Browser-supplied role names or official-source host allowlists
+must not be accepted. Sources verified after the requested as-of date are
+excluded. The library retrieves and ranks cited excerpts locally with no
+network access or external data transfers. If there is no matching,
+eligible evidence, it returns `insufficient_verified_sources`, never
+invented quotations or a model-generated confirmation of legal validity.
+
+**Scope gate:** The module is offline and is **not** yet wired into the
+Advisor's `KNOWLEDGE_CONTEXT`, deployed as a public endpoint or fed to
+Anthropic. Before adding model-facing RAG, complete the 21 obligation
+source citations (OA-5), authoritative source verification by counsel/MLRO,
+access and privacy design, retrieved-content prompt-injection testing and
+human sign-off. Retrieval output is untrusted data to a model, not a new
+instruction. Do not infer current law solely from a cached verification date.
