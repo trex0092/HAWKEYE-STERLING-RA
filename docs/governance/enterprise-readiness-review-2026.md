@@ -319,7 +319,15 @@ curated evidence template, `docs/aims/bcp-exercise-record.md`, and linked the fi
 second-operator drill to open action 44. This records the missing human exercise; it does not claim
 that the drill has occurred or change any residual-risk score.*
 
-Verified at HEAD: 70 workflows · 196 markdown documents under docs/ (163 excluding docs/research/auto).
+*Estate re-verification · 8 October 2026 — one curated document added,
+`docs/governance/ai-rulebooks-crosswalk-2026.md`. It determines applicability for, and maps
+existing controls to, ISO/IEC 27001, 23894, 42005 and 22989, OSFI E-23, California SB 53, EU AI
+Act Arts. 68–69, the OWASP LLM and Agentic Top 10 lists and the EU cyber-resilience acts. None of
+them binds the system; seven gaps are recorded as proposals only. The same change fixed two
+fail-closed contract breaks in `agent_orchestrator.py` and added its first tests. No scored
+control changed.*
+
+Verified at HEAD: 70 workflows · 197 markdown documents under docs/ (164 excluding docs/research/auto).
 
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days

@@ -25,8 +25,10 @@ THRESHOLDS (UAE DPMS context — tune in config):
   • AED 15,000  — CDD trigger for occasional transactions.
 No third-party dependencies. Deterministic. Human (MLRO) reviews & files.
 """
-import os, re, json, datetime
+import os, re, json, math, datetime
 from collections import defaultdict
+
+import txn_feed  # stdlib-only validation; never fetches or stores customer data
 
 CASH_REPORT_THRESHOLD = float(os.environ.get("DPMS_CASH_THRESHOLD", "55000"))
 CDD_TRIGGER_THRESHOLD = float(os.environ.get("CDD_TRIGGER_THRESHOLD", "15000"))
@@ -77,6 +79,11 @@ def feed_configured():
     return bool(TXN_FEED_PATH and os.path.exists(TXN_FEED_PATH))
 
 
+def _manifest_path(path):
+    """Trusted export completeness manifest, normally adjacent to the export."""
+    return os.environ.get("TXN_FEED_MANIFEST_PATH") or path + ".manifest.json"
+
+
 def feed_parse_error(path=None):
     """True if a feed file is configured and present but cannot be parsed as a
     JSON list of records. A corrupt / truncated feed must NOT read as a quiet
@@ -84,6 +91,15 @@ def feed_parse_error(path=None):
     p = path or TXN_FEED_PATH
     if not p or not os.path.exists(p):
         return False
+    if path is None and TXN_FEED_PATH:
+        # The configured production feed MUST be complete and independently
+        # attested. An untrusted or missing manifest is never a zero-activity
+        # day. Explicit paths remain a legacy offline fixture interface.
+        try:
+            txn_feed.read_validated_feed(p, _manifest_path(p))
+            return False
+        except txn_feed.FeedValidationError:
+            return True
     try:
         with open(p) as f:
             data = json.load(f)
@@ -96,6 +112,11 @@ def load_transactions(path=None):
     """Return the transaction list from the configured feed, or [] if none.
     Never raises, never fabricates. [] means 'no feed' (degrade loudly)."""
     p = path or TXN_FEED_PATH
+    if path is None and TXN_FEED_PATH:
+        # Never silently skip malformed rows for an activated live feed.
+        # Fail loudly on a missing export/manifest, incomplete coverage,
+        # duplicate ID, invalid amount, date, currency or digest mismatch.
+        return txn_feed.read_validated_feed(p, _manifest_path(p))
     if not p or not os.path.exists(p):
         return []
     try:
@@ -566,6 +587,42 @@ def rule_cash_no_source_of_funds(txns):
             and _amt(t) >= CDD_TRIGGER_THRESHOLD and t.get("source_of_funds_verified") is False]
 
 
+def _amount_readable(t):
+    v = t.get("amount")
+    if v is None or isinstance(v, bool):
+        return False
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(f) and f >= 0
+
+
+def rule_amount_not_comparable(txns):
+    """A payment whose amount the AED-denominated rules cannot use. The file
+    feed refuses these at ingestion (txn_feed.validate_batch); the Payments
+    Register path did not, so "Amount: AED 60,000" was dropped and
+    "Currency: USD" with "Amount: 20000" (≈ AED 73,450) was compared to the
+    AED 55,000 DPMSR threshold as 20,000 — both silently missing THRESHOLD.
+    Activity records and raw payment messages carry no amount field by design
+    and are not judged here."""
+    out = []
+    for t in txns:
+        if t.get("activity_only") or t.get("payment_message"):
+            continue
+        cur = _norm(t.get("currency"))
+        if not _amount_readable(t):
+            out.append(_alert("AMOUNT_UNREADABLE", "HIGH", t,
+                "amount missing or not a number — threshold, structuring and CDD rules "
+                "could not evaluate this payment; record the AED amount as digits"))
+        elif cur and cur != "aed":
+            out.append(_alert("NON_AED_AMOUNT", "HIGH", t,
+                f"amount {_amt(t):,.2f} recorded in {cur.upper()} — the DPMSR / CDD thresholds "
+                "are in AED, so they were not reliably applied; convert with an approved "
+                "documented rate and assess against AED 55,000 (POL-19 §3)"))
+    return out
+
+
 def rule_customer_not_in_db(txns):
     """A payment or activity task whose customer matches no Customer Database
     record (set by the daily run's resolver). No CDD file means no profile to
@@ -640,7 +697,8 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_profile_deviation, rule_circular_flow, rule_new_geography,
           rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
           rule_reference_keyword, rule_personal_account, rule_linked_threshold,
-          rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db]
+          rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db,
+          rule_amount_not_comparable]
 
 
 def _any_customer(txns):
@@ -701,11 +759,15 @@ def evaluate(transactions, jurisdiction_table=None):
 
 def status_line():
     """One line for the report / monitoring section. Honest about the feed."""
+    if TXN_FEED_PATH and not os.path.exists(TXN_FEED_PATH):
+        return ("Transaction monitoring (R.16): DEGRADED — configured transaction "
+                "feed file is missing; investigate the source/landing zone outage.")
     if feed_configured():
         if feed_parse_error():
-            return ("Transaction monitoring (R.16): DEGRADED — the configured transaction "
-                    "feed could not be parsed (corrupt or truncated JSON). No transactions "
-                    "were screened this run; investigate the feed before relying on it.")
+            return ("Transaction monitoring (R.16): DEGRADED — configured feed or "
+                    "authenticated completeness manifest failed validation. "
+                    "No transactions were screened from this file this run; "
+                    "investigate the source and manifest before relying on it.")
         res = evaluate(load_transactions())
         errs = res.get("rule_errors") or {}
         warn = (f"  ⚠ {sum(errs.values())} rule error(s) [{', '.join(sorted(errs))}] — "

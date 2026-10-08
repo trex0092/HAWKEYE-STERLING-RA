@@ -152,3 +152,37 @@ NIST AI RMF / ISO 42001 (L6).
 
 **Re-review** this document whenever an AI surface is added/changed (update the register first), when
 the Advisor's models change, or if a backend is introduced.
+
+---
+
+## Staged bounded read-only plan runner, 8 October 2026
+
+`agent_plan.py` adds an **offline, deterministic** plan executor with
+explicit task and input schemas, at most six steps, eight total calls,
+one retry per read-only step, bounded output sizes and a post-step
+time budget. Supported tool labels are limited to local
+`normalize_name`, `jurisdiction_risk` and `name_variants`. The
+trusted caller must supply an independently verified Analyst,
+Reviewer-MLRO or Admin role and bound implementations of approved
+read-only functions. No function is imported by name from an LLM output.
+
+The executor shares in-memory results across steps, but records only
+step IDs, tool labels, attempt counts, outcomes and SHA-256 result
+fingerprints in its diagnostic event trail. A failed, unauthorized
+or oversized operation becomes HOLD or DEGRADED, never a "no match"
+conclusion. Even when the plan succeeds, its terminal state is
+`REVIEW_REQUIRED` and `authorized_for_action` stays false.
+
+**Limitations:** This is not an autonomous AI agent, model-controlled
+tool gateway, live screening pipeline, persistent shared case state
+or regulatory decision. It performs no external network operations,
+tool discovery, autonomous replanning or write actions. The
+time budget is evaluated around each local callback and cannot
+interrupt a blocking or untrusted callback. Production use must
+also establish a verified server identity, tenant isolation, a
+proper resource-isolated executor, durable audit evidence, intake
+approval, model/tool red-team validation and MLRO authority.
+
+**Safety gate:** `data/tool-surfaces.json` continues to set
+`model_tool_calling.enabled=false`. Do not change that gate solely
+because an offline plan library exists. Tests: `test/engine_test.py`.

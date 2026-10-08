@@ -8532,14 +8532,15 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
             _pay_res = payment_screen.screen_feed(
                 _pay_records, all_lists,
                 jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down,
-                matcher=screen_name, normalizer=normalize, xml_parser=safe_xml_fromstring)
+                matcher=screen_name, normalizer=normalize, xml_parser=safe_xml_fromstring,
+                unscreenable=_unscreenable)
         if ASANA_PAYMENTS_SECTION_GID:
             # Only the register's own payments belong in its report (a file
             # feed, if any, stays in the main report only).
             _reg_res = payment_screen.screen_feed(
                 _reg_pay, all_lists, jurisdiction_table=kyc.load_jurisdiction_risk(),
                 lists_degraded=_core_down, matcher=screen_name, normalizer=normalize,
-                xml_parser=safe_xml_fromstring) if _file_cfg else _pay_res
+                xml_parser=safe_xml_fromstring, unscreenable=_unscreenable) if _file_cfg else _pay_res
             tm_report.update(feed=_reg_res, alerts=_tm["alerts"],
                              rule_errors=_tm.get("rule_errors") or {}, degraded="")
         txn_status = "\n   ".join([txn_status] + _reg_lines

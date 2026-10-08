@@ -70,6 +70,17 @@ expect_valueerror("screen_name rejects a non-list watchlist", lambda: mcp_tools.
 expect_valueerror("screen_name rejects a non-string watchlist entry", lambda: mcp_tools.screen_name("X Co", ["ok", 5]))
 expect_valueerror("screen_name rejects an oversized watchlist",
                   lambda: mcp_tools.screen_name("X Co", ["n"] * (mcp_tools.MAX_WATCHLIST + 1)))
+# A subject the matcher cannot compare (< 4 matchable chars) must never read
+# as cleared: "Ali" against ["Ali"] used to return cleared:true.
+_short = mcp_tools.screen_name("Ali", ["Ali"])
+check("screen_name routes a too-short subject to MANUAL REVIEW, never cleared",
+      _short["cleared"] is False and any(h["list"] == "MANUAL REVIEW" for h in _short["hits"]))
+check("screen_name routes an all-punctuation subject to MANUAL REVIEW",
+      mcp_tools.screen_name("!!!", ["Real Co"])["cleared"] is False)
+expect_valueerror("screen_name refuses an empty watchlist instead of clearing against nothing",
+                  lambda: mcp_tools.screen_name("Viktor Bout", []))
+expect_valueerror("screen_name refuses a watchlist with no screenable entry",
+                  lambda: mcp_tools.screen_name("Viktor Bout", ["  ", "!!!"]))
 
 # ── mcp_tools.monitor_transactions (FATF R.16 boundaries) ───────────────────────
 print("mcp_tools — monitor_transactions")
@@ -244,6 +255,12 @@ for _bad, _why in (({"watchlist": "x", "parties": []}, "non-array watchlist"),
         check(f"screen_payment refuses {_why}", False)
     except ValueError:
         check(f"screen_payment refuses {_why}", True)
+_sp_short = mcp_tools.screen_payment(["Viktor Bout"], parties=[
+    {"role": "originator", "name": "Bo"}, {"role": "beneficiary", "name": "Harmless Textiles LLC"}])
+check("screen_payment routes a too-short party name to manual review, never NO MATCH",
+      _sp_short["payments"][0]["outcome"] == "REVIEW — NAME NOT AUTO-SCREENABLE")
+expect_valueerror("screen_payment refuses an empty watchlist instead of clearing against nothing",
+                  lambda: mcp_tools.screen_payment([], parties=[{"role": "originator", "name": "Viktor Bout"}]))
 for _tname, _targs in _valid_args.items():
     try:
         json.dumps(mcp_tools.call_tool(_tname, _targs))
@@ -365,6 +382,83 @@ check("McpAgent is registered with exactly the mcp.tool authorization",
       any(a["name"] == "McpAgent" and a["authz"] == ["mcp.tool"] for a in __import__("agents").AGENTS))
 check("the credential broker can never issue McpAgent a secret",
       __import__("agents").CredentialBroker(env={"ASANA_TOKEN": "x"}).issue("McpAgent", "asana.write") is None)
+
+# ── agent_orchestrator.py — bounded, human-approved read-only coordinator ─────
+import agent_orchestrator as orch
+
+def _plan(steps=None, **over):
+    p = {"task_id": "case-42", "objective": "Screen the named subject",
+         "steps": steps if steps is not None else
+         [{"tool": "hawkeye_normalize_name", "arguments": {"name": "Zeta Quantum"}}]}
+    p.update(over)
+    return p
+
+def _denied(plan):
+    try:
+        orch.preview(plan)
+    except orch.WorkflowDenied:
+        return True
+    except Exception:
+        return False  # any other exception type is a fail-closed contract break
+    return False
+
+check("orchestrator: every allowlisted tool exists in mcp_tools.TOOLS",
+      orch.ALLOWED_TOOLS <= set(mcp_tools.TOOLS))
+check("orchestrator: report/dossier and transaction tools stay off the allowlist",
+      not ({"hawkeye_assemble_str_dossier", "hawkeye_assemble_tfs_dossier",
+            "hawkeye_monitor_transactions"} & orch.ALLOWED_TOOLS))
+pv = orch.preview(_plan())
+check("orchestrator: preview is metadata only (no argument values) and never executes",
+      pv["status"] == "AWAITING_HUMAN" and pv["execution_enabled"] is False
+      and "Zeta Quantum" not in json.dumps(pv))
+check("orchestrator: a tool outside the allowlist is denied",
+      _denied(_plan([{"tool": "hawkeye_assemble_str_dossier", "arguments": {}}])))
+check("orchestrator: an extra plan key is denied", _denied(_plan(extra=1)))
+check("orchestrator: more than MAX_STEPS steps is denied",
+      _denied(_plan([{"tool": "hawkeye_normalize_name", "arguments": {"name": "a"}}]
+                    * (orch.MAX_STEPS + 1))))
+check("orchestrator: an unhashable tool value is a WorkflowDenied, not a TypeError (regression)",
+      _denied(_plan([{"tool": ["hawkeye_normalize_name"], "arguments": {}}])))
+_deep = {}; _cur = _deep
+for _ in range(200000):
+    _cur["k"] = {}; _cur = _cur["k"]
+check("orchestrator: pathologically nested arguments are a WorkflowDenied, not a RecursionError (regression)",
+      _denied(_plan([{"tool": "hawkeye_normalize_name", "arguments": _deep}])))
+check("orchestrator: an over-budget argument payload is denied",
+      _denied(_plan([{"tool": "hawkeye_normalize_name",
+                      "arguments": {"name": "x" * (orch.MAX_ARG_BYTES + 1)}}])))
+
+_calls = []
+def _spy(tool, args):
+    _calls.append(tool)
+    return mcp_tools.call_tool(tool, args)
+r = orch.execute_human_approved(_plan(), _spy, verified_role="Analyst", signed_human_approval=True)
+check("orchestrator: an Analyst role cannot execute — the dispatcher is never called",
+      r["status"] == "AWAITING_HUMAN" and r["executed"] == 0 and _calls == [])
+r = orch.execute_human_approved(_plan(), _spy, verified_role="Reviewer-MLRO", signed_human_approval=False)
+check("orchestrator: without the approval flag nothing executes",
+      r["status"] == "AWAITING_HUMAN" and _calls == [])
+r = orch.execute_human_approved(_plan(), _spy, verified_role="Reviewer-MLRO", signed_human_approval=True)
+check("orchestrator: an approved MLRO plan runs the real read-only tool and never files",
+      r["status"] == "DRAFT_COMPLETE" and r["executed"] == 1 and _calls == ["hawkeye_normalize_name"]
+      and r["regulatory_decision"] is False and r["filing"] is False)
+check("orchestrator: the event log carries tool name and outcome only, never argument values",
+      "Zeta Quantum" not in json.dumps(r["events"]))
+try:
+    orch.execute_human_approved(_plan(), _spy, verified_role="Admin", signed_human_approval=True,
+                                replan_count=orch.MAX_REPLANS + 1)
+    check("orchestrator: replans beyond MAX_REPLANS are denied", False)
+except orch.WorkflowDenied:
+    check("orchestrator: replans beyond MAX_REPLANS are denied", True)
+def _boom(tool, args):
+    raise RuntimeError("secret subject Zeta Quantum")
+r = orch.execute_human_approved(_plan(), _boom, verified_role="Admin", signed_human_approval=True)
+check("orchestrator: a dispatcher failure stops at NEEDS_HUMAN without leaking the exception",
+      r["status"] == "NEEDS_HUMAN" and r["executed"] == 0 and "Zeta" not in json.dumps(r))
+_reordered = {"steps": _plan()["steps"], "objective": _plan()["objective"], "task_id": "case-42"}
+check("orchestrator: proposal digest is canonical (key order) and binds the exact plan",
+      orch.proposal_digest(_plan()) == orch.proposal_digest(_reordered)
+      and orch.proposal_digest(_plan()) != orch.proposal_digest(_plan(objective="Screen another subject")))
 
 total_fail = len(_fail)
 print("\n" + ("ALL MCP TESTS PASSED" if not total_fail else f"{total_fail} MCP TEST(S) FAILED"))
