@@ -12,7 +12,10 @@ import { pathToFileURL } from 'node:url';
 export const TITLE = '[HAWKEYE ALERT] Daily screening report delivery not verified';
 
 function validRepo(repo) {
+  const parts = String(repo || '').split('/');
   return typeof repo === 'string' &&
+    parts.length === 2 &&
+    parts.every(part => part !== '.' && part !== '..' && !part.includes('..')) &&
     /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(repo);
 }
 
