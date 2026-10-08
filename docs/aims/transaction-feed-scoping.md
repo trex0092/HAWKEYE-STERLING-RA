@@ -182,10 +182,16 @@ a valid date and a finite nonnegative numeric AED amount. If the ERP
 uses another currency, the owner must approve documented conversion
 before ingestion; the preflight deliberately refuses non-AED records.
 
-CURRENT INTEGRATION STATE: this is a manual preflight and synthetic
-regression coverage only. txn_monitor.py is unchanged and does not
-automatically call the validator. Section 6 remains OPEN. Production activation
-requires an authenticated private feed, an authorized manifest channel,
-a supervised MLRO acceptance run, and a separately reviewed fail-closed
-integration into the screening workflow. This technical addition is not
-evidence of control closure or human approval.
+RUNTIME VALIDATION STATE: The configured live-file path in txn_monitor.py now
+validates the complete export AND independently delivered manifest before
+loading any file transactions. Without that evidence it reports DEGRADED,
+including when a configured export is missing; no malformed records are
+silently discarded. Explicit file-path parsing remains supported for older
+offline fixtures, but the configured production path is always strict.
+
+Section 6 remains OPEN. No ERP/POS/bank source is connected or scheduled;
+production activation still requires an authenticated private feed, an
+authorized manifest channel, approved source completeness semantics, and a
+supervised MLRO acceptance run. Source owners must verify both the export and
+the manifest's authenticity. These code changes do not establish that the
+underlying data is complete or that any human approval has occurred.
