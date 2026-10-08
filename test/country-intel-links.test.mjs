@@ -29,9 +29,13 @@ vm.runInContext([
   pick(/const KYC_SLUG_OVERRIDES = \{[\s\S]*?\n\};/, 'KYC_SLUG_OVERRIDES'),
   pick(/function kycSlug\(name\) \{[\s\S]*?\n\}/, 'kycSlug'),
   pick(/function countryIntelUrl\(name\) \{[\s\S]*?\n\}/, 'countryIntelUrl'),
-  'globalThis.out = { COUNTRIES, countryIntelUrl, KYC_SLUG_OVERRIDES };',
+  pick(/const OC_INDEX_BASE = [^\n]+/, 'OC_INDEX_BASE'),
+  pick(/const OC_SLUG_OVERRIDES = \{[\s\S]*?\n\};/, 'OC_SLUG_OVERRIDES'),
+  pick(/const OC_INDEX_SLUGS = [^\n]+/, 'OC_INDEX_SLUGS'),
+  pick(/function ocIndexUrl\(name\) \{[\s\S]*?\n\}/, 'ocIndexUrl'),
+  'globalThis.out = { COUNTRIES, countryIntelUrl, KYC_SLUG_OVERRIDES, ocIndexUrl, OC_SLUG_OVERRIDES, OC_INDEX_SLUGS };',
 ].join('\n'), ctx);
-const { COUNTRIES, countryIntelUrl, KYC_SLUG_OVERRIDES } = ctx.out;
+const { COUNTRIES, countryIntelUrl, KYC_SLUG_OVERRIDES, ocIndexUrl, OC_SLUG_OVERRIDES, OC_INDEX_SLUGS } = ctx.out;
 
 const PREFIX = 'https://www.knowyourcountry.com/country-aml-intelligence/country/';
 const unmatched = COUNTRIES.filter(c => {
@@ -61,6 +65,32 @@ check('no KnowYourCountry content is stored in the data directory',
   !/knowyourcountry/i.test(readFileSync(new URL('../data/jurisdiction-risk.json', import.meta.url), 'utf8')));
 check('the reference never feeds the score (paintJurisdiction only sets the href)',
   !/countryIntelUrl/.test(pick(/function recalc\(\)[\s\S]*?\n\}/, 'recalc')));
+
+/* Organized Crime Index profile links (ocindex.net). OC_INDEX_SLUGS is the
+   country list from the site's own navigation (retrieved 2026-10-08, the 193
+   UN member states) - page addresses only, no Index scores or text. */
+check('OC Index: the reference list holds 193 country profiles', OC_INDEX_SLUGS.size === 193);
+const ocUrls = COUNTRIES.map(c => ocIndexUrl(c.name)).filter(Boolean);
+const ocReached = new Set(ocUrls.map(u => u.slice('https://ocindex.net/country/'.length)));
+check('OC Index: every one of the 193 profiles is reached by exactly one app jurisdiction',
+  ocUrls.length === 193 && ocReached.size === 193 && [...OC_INDEX_SLUGS].every(s => ocReached.has(s)));
+check('OC Index: every override targets a listed profile', Object.values(OC_SLUG_OVERRIDES).every(s => OC_INDEX_SLUGS.has(s)));
+check('OC Index: spellings fold to the site slug (Türkiye, Russia, the two Koreas, UAE)',
+  ocIndexUrl('Turkey') === 'https://ocindex.net/country/turkiye' && ocIndexUrl('Russian Federation') === 'https://ocindex.net/country/russia'
+  && ocIndexUrl('North Korea') === 'https://ocindex.net/country/korea-dpr' && ocIndexUrl('South Korea') === 'https://ocindex.net/country/korea-rep'
+  && ocIndexUrl('United Arab Emirates') === 'https://ocindex.net/country/united-arab-emirates');
+check('OC Index: a jurisdiction the Index does not cover gets no link (hidden), never a broken page',
+  ocIndexUrl('Gibraltar') === '' && ocIndexUrl('Hong Kong') === '' && ocIndexUrl('') === '');
+const ocLink = (html.match(/<a id="jurisdictionOcIndex"[^>]*>/) || [''])[0];
+check('OC Index: the link opens externally with noopener noreferrer and is translated',
+  /target="_blank"/.test(ocLink) && /rel="noopener noreferrer"/.test(ocLink)
+  && /data-i18n="fld\.ocIndex"/.test(ocLink) && /'fld\.ocIndex': \{en:'[^']+', ar:'[^']+'\}/.test(src));
+check('OC Index: a hidden link stays hidden (the class display rule yields to [hidden])',
+  /\.ext-ref\[hidden\]\s*\{\s*display:\s*none/.test(readFileSync(new URL('../app.css', import.meta.url), 'utf8')));
+check('OC Index: no Index content is stored in the data directory, and the link never feeds the score',
+  !/ocindex/i.test(readFileSync(new URL('../data/country-indicators.json', import.meta.url), 'utf8'))
+  && !/ocindex/i.test(readFileSync(new URL('../data/country-score-suggested.json', import.meta.url), 'utf8'))
+  && !/ocIndexUrl/.test(pick(/function recalc\(\)[\s\S]*?\n\}/, 'recalc')));
 
 /* DRAFT suggested country score (scripts/country-score.mjs): displayed beside
    the current score, never applied. The Python engine suite re-derives every
