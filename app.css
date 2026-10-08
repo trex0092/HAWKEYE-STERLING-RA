@@ -583,3 +583,5 @@ button:focus-visible{outline:2px solid rgba(210,166,72,0.55);outline-offset:2px}
 
 /* Analyst reference link under the jurisdiction select (opens externally). */
 .ext-ref { display: inline-block; margin-top: 4px; font-size: 0.8rem; color: var(--text2); text-decoration: underline; }
+/* DRAFT suggested country score under the jurisdiction select (display only). */
+.sugg-ref { margin-top: 4px; font-size: 0.8rem; color: var(--text2); }

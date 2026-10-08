@@ -173,6 +173,8 @@ jobs:
         run: node scripts/coverage-figures.mjs --check
       - name: Check the country coverage gap report is in sync with the screening configuration
         run: node scripts/country-coverage-report.mjs --check
+      - name: Check the draft suggested country scores are in sync with their inputs
+        run: node scripts/country-score.mjs --check
       - name: Run console + advisor screen smoke tests
         run: node test/screens.test.js
       - name: Run advisor full-surface smoke tests (every Q&A subject + tool + ask phase)

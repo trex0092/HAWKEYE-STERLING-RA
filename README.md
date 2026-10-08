@@ -267,6 +267,23 @@ The register's `fatf` field marks each listed country, and the MCP server serves
 
 These never change the risk score; the FATF list above stays the only jurisdiction scoring input. Commercial country reports (KnowYourCountry, the Organized Crime Index) restrict redistribution, so they are linked, never copied.
 
+The same file also holds each jurisdiction's **FATF effectiveness ratings** (the 11 Immediate Outcomes) for the 199 jurisdictions in FATF's [consolidated assessment ratings](https://www.fatf-gafi.org/en/publications/Mutualevaluations/Assessment-ratings.html) (2013 Methodology table updated 24 August 2026; 2022 Methodology table updated 25 September 2026). FATF licenses this data under CC BY 4.0, and the file carries FATF's citation and adaptation notice.
+
+### Suggested country score (draft, pending MLRO approval)
+
+[`scripts/country-score.mjs`](scripts/country-score.mjs) computes a second, reproducible 1-3 score for every country and writes it to [`data/country-score-suggested.json`](data/country-score-suggested.json). The app shows it under the jurisdiction select and the daily report prints it next to a hit's jurisdiction, beside the current score. **It is never applied**: no scoring code reads it, and changing a country's score stays an MLRO decision through the existing override (a reason is mandatory).
+
+| Factor | Effect |
+|---|---|
+| FATF call for action (black list) | suggested 3 |
+| FATF grey list | suggested 3 |
+| FATF effectiveness: Immediate Outcomes rated High or Substantial | 0-1: 3 pts, 2-3: 2 pts, 4-6: 1 pt, 7-11: 0 |
+| US INCSR major money-laundering jurisdiction | 2 pts |
+| US TIP Tier 3 / Tier 2 Watch List | 2 pts / 1 pt |
+| EU tax list Annex I | 1 pt |
+
+Points give 0-2 = 1 Low, 3-5 = 2 Medium, 6-8 = 3 High. A jurisdiction FATF has not rated, and that is not FATF-listed, gets no suggestion. The weights were chosen when the method was proposed; no source sets them. Transparency International's Corruption Perceptions Index was proposed but is left out because TI's terms (CC BY-ND 4.0, no commercial use) do not allow it here. The method has no sanctions factor yet, so a suggestion below the current score is not a recommendation to lower it. `npm test` fails if the committed file drifts from its inputs (`node scripts/country-score.mjs --write` regenerates it).
+
 ## MCP server (AI-agent access to the engine)
 
 A **Model Context Protocol (MCP)** server exposes the deterministic screening

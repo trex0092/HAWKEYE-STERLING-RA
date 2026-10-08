@@ -1295,6 +1295,40 @@ function countryIntelUrl(name) {
   const s = kycSlug(name);
   return s ? KYC_INTEL_BASE + 'country/' + s + '/' : KYC_INTEL_BASE;
 }
+/* DRAFT suggested country score (data/country-score-suggested.json, generated
+   by scripts/country-score.mjs from FATF ratings and public US/EU lists). It is
+   shown under the jurisdiction for the MLRO to compare with the current score;
+   it never feeds the assessment score, and a load failure says so instead of
+   showing nothing. null = still loading; {} = could not load. */
+let suggestedScores = null;
+function loadSuggestedScores() {
+  if (typeof fetch !== 'function') { suggestedScores = {}; paintSuggestedScore(); return; }
+  fetch('data/country-score-suggested.json', { credentials: 'same-origin' })
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    .then(d => {
+      const m = {};
+      (d.countries || []).forEach(r => { if (r && r.country) m[r.country] = r; });
+      suggestedScores = m;
+    })
+    .catch(() => { suggestedScores = {}; })
+    .then(paintSuggestedScore);
+}
+function paintSuggestedScore() {
+  const el = $('jurisdictionSuggested');
+  if (!el || suggestedScores === null) return;
+  if (!Object.keys(suggestedScores).length) {
+    el.textContent = 'Suggested score (draft): unavailable, the suggestion file could not be loaded.';
+    return;
+  }
+  const r = suggestedScores[state.entity.jurisdiction];
+  if (!r || r.suggested == null) {
+    el.textContent = 'Suggested score (draft): none, this jurisdiction has no FATF rating.';
+    return;
+  }
+  el.textContent = 'Suggested score (draft, pending MLRO approval, not applied): ' + r.suggested + ' · ' + ratingLabel(r.suggested)
+    + (r.compare === 'lower' ? ' (lower than current; not a recommendation to lower)' : '')
+    + '. Basis: ' + (r.factors || []).join('; ') + '.';
+}
 function paintJurisdiction() {
   const intel = $('jurisdictionIntel');
   if (intel) intel.href = countryIntelUrl(state.entity.jurisdiction);
@@ -1304,6 +1338,7 @@ function paintJurisdiction() {
   tag.className = 'score-tag '+scoreTagClass(score);
   tag.textContent = 'Score: '+score+' · '+ratingLabel(score)+(c && c.overridden ? ' ✱' : '');
   tag.title = ovTitle(c);
+  paintSuggestedScore();
 }
 function paintActivity() {
   const a = effOf('activities', state.profile.activity);
@@ -2936,6 +2971,7 @@ refreshSelectLabels(); /* add override marks (✱) to the now-built selects */
 initRiskDataPanel();
 initRegisterPanel();
 initLang();
+loadSuggestedScores();
 
 /* (Re)load persisted risk data + draft into the UI. Safe to re-run after the
    device is unlocked, when the encrypted store first becomes readable. */

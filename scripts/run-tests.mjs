@@ -57,7 +57,8 @@ const DRIFT_CHECKS = [
   { script: 'scripts/grc-metrics.mjs', label: 'GRC metrics snapshot in sync with the assurance matrix, obligation register, third-party register and CAPA log', fix: 'node scripts/grc-metrics.mjs --write' },
   { script: 'scripts/ai-governance-controls.mjs', label: 'Enterprise AI governance control register, evidence freshness and generated views are current', fix: 'node scripts/ai-governance-controls.mjs --write' },
   { script: 'scripts/coverage-figures.mjs', label: 'README coverage figures in sync with the adverse-media locale matrix, risk-term languages and sanctions source files', fix: 'node scripts/coverage-figures.mjs --write' },
-  { script: 'scripts/country-coverage-report.mjs', label: 'Country coverage gap report in sync with sanctions register and adverse-media locales', fix: 'npm run coverage:report:write' }
+  { script: 'scripts/country-coverage-report.mjs', label: 'Country coverage gap report in sync with sanctions register and adverse-media locales', fix: 'npm run coverage:report:write' },
+  { script: 'scripts/country-score.mjs', label: 'Draft suggested country scores in sync with app.js COUNTRIES, the FATF lists and the country indicators', fix: 'node scripts/country-score.mjs --write' }
 ];
 
 const failures = [];

@@ -1,5 +1,5 @@
 {
-  "_README": "Public-source country indicators shown as CONTEXT next to a screening hit's jurisdiction. They never change the risk score or the FATF jurisdiction bump (data/jurisdiction-risk.json stays the only scoring input); any scoring use is an MLRO decision. Each indicator carries its publisher, edition, publication date and source URL; values are transcribed from the publisher's own document, never from a commercial country-risk report (KnowYourCountry and the Organized Crime Index restrict redistribution, so they are linked, not copied). `published` is the name as the source prints it; `app` is the matching name in the COUNTRIES baseline in app.js (test/engine_test.py pins every `app` name to that list). Review when a new edition appears: INCSR Vol. II (each March), TIP Report (yearly), EU tax list (each February and October).",
+  "_README": "Public-source country indicators shown as CONTEXT next to a screening hit's jurisdiction. They never change the risk score or the FATF jurisdiction bump (data/jurisdiction-risk.json stays the only scoring input); any scoring use is an MLRO decision. Each indicator carries its publisher, edition, publication date and source URL; values are transcribed from the publisher's own document, never from a commercial country-risk report (KnowYourCountry and the Organized Crime Index restrict redistribution, so they are linked, not copied). `published` is the name as the source prints it; `app` is the matching name in the COUNTRIES baseline in app.js (test/engine_test.py pins every `app` name to that list). Review when a new edition appears: INCSR Vol. II (each March), TIP Report (yearly), EU tax list (each February and October), FATF consolidated ratings (after each plenary). The FATF effectiveness ratings also feed the DRAFT suggested country score in data/country-score-suggested.json (scripts/country-score.mjs), which is shown beside the current score and changes nothing until the MLRO approves.",
   "retrieved": "2026-10-08",
   "indicators": {
     "incsr_major_ml": {
@@ -1133,6 +1133,2011 @@
         {
           "published": "Viet Nam",
           "app": "Vietnam"
+        }
+      ]
+    },
+    "fatf_effectiveness": {
+      "label": "FATF mutual evaluation: effectiveness ratings (11 Immediate Outcomes)",
+      "publisher": "Financial Action Task Force (FATF)",
+      "edition": "Consolidated assessment ratings: 2013 Methodology table (updated 24 August 2026) and 2022 Methodology table (updated 25 September 2026)",
+      "published": "2026-09-25",
+      "source": "https://www.fatf-gafi.org/en/publications/Mutualevaluations/Assessment-ratings.html",
+      "sources": [
+        "https://www.fatf-gafi.org/content/dam/fatf-gafi/Global-Network/consolidated-assessment-ratings-2013-methodology.xlsx.coredownload.inline.xlsx",
+        "https://www.fatf-gafi.org/content/dam/fatf-gafi/Global-Network/consolidated-assessment-ratings-2022-methodology.xlsx.coredownload.inline.xlsx"
+      ],
+      "licence": "FATF written content and data: CC BY 4.0, commercial use permitted with attribution (https://www.fatf-gafi.org/en/pages/terms-conditions.html, read 2026-10-08). Citation: FATF (2026), Consolidated assessment ratings, https://www.fatf-gafi.org/en/publications/Mutualevaluations/Assessment-ratings.html (accessed 8 October 2026). Change made: only the 11 effectiveness ratings are kept, and high_or_substantial counts the HE and SE ratings among them. This is an adaptation of an original work by the Financial Action Task Force (FATF). The opinions expressed and arguments employed in this adaptation should not be reported as representing the official views of the FATF or of its Members or of its Secretariat.",
+      "note": "One row per jurisdiction in FATF's tables (199). Rule: the 2013-methodology summary row (report type containing '+', e.g. 'MER+FUR(s)') or, where there is none, the jurisdiction's single MER; a 2022-methodology MER (5th round, 11 jurisdictions so far) replaces it as the newer assessment. Effectiveness is only re-rated by a new MER or a follow-up assessment (FUAR), so follow-up reports do not change io. io lists IO1..IO11 in order, space-separated: HE high, SE substantial, ME moderate, LE low. Jurisdictions FATF has not rated (most dependent territories, and e.g. Iran and Afghanistan) are absent, not zero.",
+      "jurisdictions": [
+        {
+          "published": "Albania",
+          "app": "Albania",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-05",
+          "body": "MONEYVAL",
+          "io": "ME ME ME SE ME SE ME ME LE ME LE",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Algeria",
+          "app": "Algeria",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "MENAFATF",
+          "io": "LE ME LE LE LE ME ME SE SE LE LE",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Andorra",
+          "app": "Andorra",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-12",
+          "body": "MONEYVAL",
+          "io": "SE SE ME ME ME SE ME ME SE ME ME",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Angola",
+          "app": "Angola",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-03",
+          "body": "ESAAMLG",
+          "io": "LE LE LE LE LE ME LE ME ME LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Anguilla",
+          "app": "Anguilla",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-07",
+          "body": "CFATF",
+          "io": "ME ME ME ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Antigua and Barbuda",
+          "app": "Antigua and Barbuda",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-11",
+          "body": "CFATF",
+          "io": "ME ME LE ME ME ME LE ME ME LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Argentina",
+          "app": "Argentina",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-12",
+          "body": "FATF/GAFILAT",
+          "io": "ME SE ME ME ME ME ME ME ME ME LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Armenia",
+          "app": "Armenia",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2026-05",
+          "body": "MONEYVAL",
+          "io": "ME SE ME LE ME ME LE LE ME SE SE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Aruba",
+          "app": "Aruba",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2022-07",
+          "body": "CFATF",
+          "io": "SE SE SE SE ME SE ME SE ME ME LE",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Australia",
+          "app": "Australia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-03",
+          "body": "FATF",
+          "io": "SE HE ME ME ME SE ME ME SE ME SE",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Austria",
+          "app": "Austria",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2026-04",
+          "body": "FATF",
+          "io": "ME ME SE ME HE ME ME ME SE ME ME",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Azerbaijan",
+          "app": "Azerbaijan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-12",
+          "body": "MONEYVAL",
+          "io": "ME SE LE ME ME ME ME ME SE ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Bahamas",
+          "app": "Bahamas",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-12",
+          "body": "CFATF",
+          "io": "LE ME ME ME ME ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Bahrain",
+          "app": "Bahrain",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-05",
+          "body": "MENAFATF",
+          "io": "ME SE SE ME ME SE ME ME ME ME ME",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Bailiwick of Guernsey",
+          "app": "Guernsey",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-12",
+          "body": "MONEYVAL",
+          "io": "SE SE ME ME SE ME LE ME SE HE HE",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Bangladesh",
+          "app": "Bangladesh",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2020-12",
+          "body": "APG",
+          "io": "ME SE ME LE LE ME LE LE SE ME SE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Barbados",
+          "app": "Barbados",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-05",
+          "body": "CFATF",
+          "io": "LE ME ME ME ME LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Belarus",
+          "app": "Belarus",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2019-12",
+          "body": "EAG",
+          "io": "SE SE ME ME LE SE ME ME SE ME SE",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Belgium",
+          "app": "Belgium",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2025-12",
+          "body": "FATF",
+          "io": "ME ME ME ME ME SE ME ME SE ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Belize",
+          "app": "Belize",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2025-01",
+          "body": "CFATF",
+          "io": "SE SE ME ME ME ME LE ME SE SE SE",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Benin",
+          "app": "Benin",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Bermuda",
+          "app": "Bermuda",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2020-01",
+          "body": "CFATF",
+          "io": "HE SE SE ME SE SE ME LE SE SE ME",
+          "high_or_substantial": 7
+        },
+        {
+          "published": "Bhutan",
+          "app": "Bhutan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-08",
+          "body": "APG",
+          "io": "LE ME LE LE LE LE LE LE ME LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Bolivia",
+          "app": "Bolivia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-08",
+          "body": "GAFILAT",
+          "io": "ME SE ME LE ME ME LE ME ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Bosnia and Herzegovina",
+          "app": "Bosnia-Herzegovina",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-12",
+          "body": "MONEYVAL",
+          "io": "ME ME ME ME ME ME ME ME ME LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Botswana",
+          "app": "Botswana",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-09",
+          "body": "ESAAMLG",
+          "io": "LE ME LE LE LE ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Brazil",
+          "app": "Brazil",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2023-12",
+          "body": "FATF/GAFILAT",
+          "io": "SE SE ME ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "British Virgin Islands",
+          "app": "British Virgin Islands",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-10",
+          "body": "CFATF",
+          "io": "ME ME LE LE ME LE LE LE ME LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Brunei Darussalam",
+          "app": "Brunei Darussalam",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-06",
+          "body": "APG",
+          "io": "SE SE ME ME ME SE ME ME SE SE LE",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Bulgaria",
+          "app": "Bulgaria",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-06",
+          "body": "MONEYVAL",
+          "io": "ME ME ME ME LE LE LE LE ME ME LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Burkina Faso",
+          "app": "Burkina Faso",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-05",
+          "body": "GIABA",
+          "io": "LE ME LE LE LE ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Cabo Verde",
+          "app": "Cape Verde",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-05",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Cambodia",
+          "app": "Cambodia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-10",
+          "body": "APG",
+          "io": "ME ME LE LE LE LE LE LE SE ME LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Cameroon",
+          "app": "Cameroon",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-11",
+          "body": "GABAC",
+          "io": "LE LE LE LE LE ME LE LE ME LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Canada",
+          "app": "Canada",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2026-09",
+          "body": "FATF",
+          "io": "SE SE ME ME ME SE ME ME SE SE SE",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Cayman Islands",
+          "app": "Cayman Islands",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-10",
+          "body": "CFATF",
+          "io": "ME ME LE LE ME LE LE ME LE ME ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Central African Republic",
+          "app": "Central African Republic",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2023-11",
+          "body": "GABAC",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Chad",
+          "app": "Chad",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-03",
+          "body": "GABAC",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Chile",
+          "app": "Chile",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2021-09",
+          "body": "GAFILAT",
+          "io": "SE SE ME ME LE SE ME ME ME ME ME",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "China (People’s Republic of)",
+          "app": "China",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-11",
+          "body": "FATF",
+          "io": "SE ME ME LE LE ME ME SE SE LE LE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Chinese Taipei",
+          "app": "Taiwan",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2019-10",
+          "body": "APG",
+          "io": "SE SE ME ME ME SE ME SE SE SE SE",
+          "high_or_substantial": 7
+        },
+        {
+          "published": "Colombia",
+          "app": "Colombia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-01",
+          "body": "GAFILAT",
+          "io": "SE SE ME ME ME SE LE SE LE ME LE",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Comoros",
+          "app": "Comoros",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Congo",
+          "app": "Congo (Brazzaville)",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-03",
+          "body": "GABAC",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Cook Islands",
+          "app": "Cook Islands",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2018-09",
+          "body": "APG",
+          "io": "SE SE SE ME SE ME LE LE ME SE ME",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Costa Rica",
+          "app": "Costa Rica",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-02",
+          "body": "GAFILAT",
+          "io": "ME SE ME ME LE ME ME ME ME LE LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Croatia",
+          "app": "Croatia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-12",
+          "body": "MONEYVAL",
+          "io": "ME SE ME ME ME ME LE ME ME LE ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Cuba",
+          "app": "Cuba",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-02",
+          "body": "GAFILAT",
+          "io": "ME ME SE ME SE ME ME SE SE SE ME",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Curaçao",
+          "app": "Curacao",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2025-07",
+          "body": "CFATF",
+          "io": "ME SE LE ME LE ME ME ME ME LE LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Cyprus",
+          "app": "Cyprus",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-06",
+          "body": "MONEYVAL",
+          "io": "SE SE ME ME ME ME ME ME SE ME ME",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Czechia",
+          "app": "Czech Republic",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-12",
+          "body": "MONEYVAL",
+          "io": "ME SE ME ME ME ME ME SE SE ME ME",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Côte d’Ivoire",
+          "app": "Cote D'Ivoire",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "GIABA",
+          "io": "ME LE LE LE LE LE ME ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Democratic Republic of the Congo",
+          "app": "The Democratic Republic Of Congo",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-03",
+          "body": "GABAC",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Denmark",
+          "app": "Denmark",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-02",
+          "body": "FATF",
+          "io": "ME SE LE LE ME ME ME ME SE ME SE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Djibouti",
+          "app": "Djibouti",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-11",
+          "body": "MENAFATF",
+          "io": "LE ME LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Dominica",
+          "app": "Dominica",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "CFATF",
+          "io": "ME SE ME ME ME SE LE ME ME LE LE",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Dominican Republic",
+          "app": "Dominican Republic",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2019-09",
+          "body": "GAFILAT",
+          "io": "ME SE LE ME ME ME ME ME SE ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Ecuador",
+          "app": "Ecuador",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2023-01",
+          "body": "GAFILAT",
+          "io": "ME SE ME ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Egypt",
+          "app": "Egypt",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-05",
+          "body": "MENAFATF",
+          "io": "SE SE ME ME ME SE LE ME SE ME ME",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "El Salvador",
+          "app": "El Salvador",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-08",
+          "body": "GAFILAT",
+          "io": "ME SE LE ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Equatorial Guinea",
+          "app": "Equatorial Guinea",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-11",
+          "body": "GABAC",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Eritrea",
+          "app": "Eritrea",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2025-07",
+          "body": "ESAAMLG",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Estonia",
+          "app": "Estonia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-12",
+          "body": "MONEYVAL",
+          "io": "ME SE ME ME ME SE ME ME ME ME SE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Eswatini",
+          "app": "Eswatini",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-09",
+          "body": "ESAAMLG",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Ethiopia",
+          "app": "Ethiopia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-08",
+          "body": "ESAAMLG",
+          "io": "LE ME LE LE ME LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Fiji",
+          "app": "Fiji",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-05",
+          "body": "APG",
+          "io": "ME ME ME ME LE ME ME LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Finland",
+          "app": "Finland",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-10",
+          "body": "FATF",
+          "io": "SE HE LE ME ME SE SE ME ME ME ME",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "France",
+          "app": "France",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2022-05",
+          "body": "FATF",
+          "io": "SE HE ME ME SE SE SE HE HE SE SE",
+          "high_or_substantial": 9
+        },
+        {
+          "published": "Gabon",
+          "app": "Gabon",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-03",
+          "body": "GABAC",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Gambia",
+          "app": "Gambia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-05",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE LE LE ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Georgia",
+          "app": "Georgia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-12",
+          "body": "MONEYVAL",
+          "io": "ME SE ME ME ME ME ME ME SE LE ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Germany",
+          "app": "Germany",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-12",
+          "body": "FATF",
+          "io": "SE SE ME ME ME ME ME SE SE ME ME",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Ghana",
+          "app": "Ghana",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-08",
+          "body": "GIABA",
+          "io": "ME SE ME LE LE ME ME LE LE LE LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Gibraltar",
+          "app": "Gibraltar",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-05",
+          "body": "MONEYVAL",
+          "io": "ME SE ME ME ME LE LE LE ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Greece",
+          "app": "Greece",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2019-09",
+          "body": "FATF",
+          "io": "SE SE ME ME ME SE ME ME SE ME SE",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Grenada",
+          "app": "Grenada",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "CFATF",
+          "io": "ME LE ME LE LE ME ME ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Guatemala",
+          "app": "Guatemala",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2018-10",
+          "body": "GAFILAT",
+          "io": "ME SE ME ME ME SE SE SE ME ME ME",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Guinea",
+          "app": "Guinea",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-11",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Guinea-Bissau",
+          "app": "Guinea Bissau",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2022-05",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Guyana",
+          "app": "Guyana",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-07",
+          "body": "CFATF",
+          "io": "SE ME ME ME ME SE ME ME ME ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Haiti",
+          "app": "Haiti",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-07",
+          "body": "CFATF",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Holy See",
+          "app": "Vatican City State (Holy See)",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-05",
+          "body": "MONEYVAL",
+          "io": "ME SE SE SE SE ME ME ME SE ME ME",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Honduras",
+          "app": "Honduras",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2020-01",
+          "body": "GAFILAT",
+          "io": "ME SE ME ME LE ME ME HE SE ME LE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Hong Kong (China)",
+          "app": "Hong Kong",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-02",
+          "body": "FATF",
+          "io": "SE SE ME ME ME SE ME SE SE SE ME",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Hungary",
+          "app": "Hungary",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-05",
+          "body": "MONEYVAL",
+          "io": "LE SE ME ME LE SE LE LE ME ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Iceland",
+          "app": "Iceland",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-09",
+          "body": "FATF",
+          "io": "LE SE LE LE LE ME ME ME ME LE LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "India",
+          "app": "India",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-09",
+          "body": "FATF/APG/EAG",
+          "io": "SE SE ME ME SE SE ME SE ME ME SE",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Indonesia",
+          "app": "Indonesia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-06",
+          "body": "FATF",
+          "io": "SE SE ME ME ME SE ME ME SE ME ME",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Iraq",
+          "app": "Iraq",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-05",
+          "body": "MENAFATF",
+          "io": "ME SE ME ME ME ME LE SE ME ME LE",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Ireland",
+          "app": "Ireland",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-02",
+          "body": "FATF",
+          "io": "SE SE SE ME ME SE ME ME ME ME SE",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Isle of Man",
+          "app": "Isle of Man",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-12",
+          "body": "MONEYVAL",
+          "io": "SE SE ME ME ME LE LE LE ME ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Israel",
+          "app": "Israel",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-05",
+          "body": "FATF/MONEYVAL",
+          "io": "SE SE ME ME SE HE SE HE HE SE ME",
+          "high_or_substantial": 8
+        },
+        {
+          "published": "Italy",
+          "app": "Italy",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2026-04",
+          "body": "FATF",
+          "io": "SE SE SE ME ME SE SE SE SE ME SE",
+          "high_or_substantial": 8
+        },
+        {
+          "published": "Jamaica",
+          "app": "Jamaica",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-01",
+          "body": "CFATF",
+          "io": "ME ME ME LE LE ME LE SE LE LE LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Japan",
+          "app": "Japan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-10",
+          "body": "FATF/APG",
+          "io": "SE SE ME ME ME SE ME ME ME ME ME",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Jersey",
+          "app": "Jersey",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-05",
+          "body": "MONEYVAL",
+          "io": "HE SE ME ME SE ME ME SE SE SE SE",
+          "high_or_substantial": 7
+        },
+        {
+          "published": "Jordan",
+          "app": "Jordan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-05",
+          "body": "MENAFATF",
+          "io": "ME SE ME ME LE ME LE ME SE LE LE",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Kazakhstan",
+          "app": "Kazakhstan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "EAG",
+          "io": "SE SE ME ME ME SE SE ME SE SE SE",
+          "high_or_substantial": 7
+        },
+        {
+          "published": "Kenya",
+          "app": "Kenya",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-08",
+          "body": "ESAAMLG",
+          "io": "LE ME LE LE LE LE LE ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Korea",
+          "app": "South Korea",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-10",
+          "body": "FATF",
+          "io": "SE SE ME ME ME SE ME SE SE ME ME",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Kuwait",
+          "app": "Kuwait",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "MENAFATF",
+          "io": "ME ME ME ME LE ME ME ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Kyrgyzstan",
+          "app": "Kyrgyzstan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-12",
+          "body": "EAG",
+          "io": "LE ME ME ME ME ME ME LE ME ME ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Lao People’s Democratic Republic",
+          "app": "Lao People's Democratic Republic",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-06",
+          "body": "APG",
+          "io": "LE ME LE LE LE LE LE LE ME LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Latvia",
+          "app": "Latvia",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2026-02",
+          "body": "MONEYVAL",
+          "io": "HE SE SE ME HE HE SE HE SE SE HE",
+          "high_or_substantial": 10
+        },
+        {
+          "published": "Lebanon",
+          "app": "Lebanon",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2023-12",
+          "body": "MENAFATF",
+          "io": "ME ME ME ME ME ME LE LE ME ME ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Lesotho",
+          "app": "Lesotho",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-02",
+          "body": "ESAAMLG",
+          "io": "LE LE ME ME LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Liberia",
+          "app": "Liberia",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2023-07",
+          "body": "GIABA",
+          "io": "ME LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Liechtenstein",
+          "app": "Liechtenstein",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2022-07",
+          "body": "MONEYVAL",
+          "io": "SE SE ME ME ME SE ME SE SE ME ME",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Lithuania",
+          "app": "Lithuania",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-12",
+          "body": "MONEYVAL",
+          "io": "ME SE ME ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Luxembourg",
+          "app": "Luxembourg",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2023-09",
+          "body": "FATF",
+          "io": "SE SE ME ME SE SE ME ME SE ME ME",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Macau (China)",
+          "app": "Macau",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2019-10",
+          "body": "APG",
+          "io": "ME SE SE ME SE SE LE LE ME SE SE",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Madagascar",
+          "app": "Madagascar",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-04",
+          "body": "ESAAMLG/WB",
+          "io": "LE LE LE LE LE ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Malawi",
+          "app": "Malawi",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-04",
+          "body": "ESAAMLG",
+          "io": "ME ME ME ME LE ME ME ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Malaysia",
+          "app": "Malaysia",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2025-12",
+          "body": "FATF/APG",
+          "io": "SE ME SE ME ME SE ME ME SE SE SE",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Maldives",
+          "app": "Maldives",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2025-10",
+          "body": "APG",
+          "io": "ME ME LE LE ME ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Mali",
+          "app": "Mali",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-01",
+          "body": "GIABA",
+          "io": "LE ME LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Malta",
+          "app": "Malta",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-08",
+          "body": "MONEYVAL",
+          "io": "ME SE LE ME ME ME LE LE ME ME SE",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Marshall Islands",
+          "app": "Marshall Islands",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-11",
+          "body": "APG",
+          "io": "ME ME ME ME LE ME LE LE ME ME ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Mauritania",
+          "app": "Mauritania",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-11",
+          "body": "MENAFATF",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Mauritius",
+          "app": "Mauritius",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-01",
+          "body": "ESAAMLG",
+          "io": "LE ME LE ME LE ME ME LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Mexico",
+          "app": "Mexico",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-05",
+          "body": "FATF",
+          "io": "SE SE ME LE ME ME LE LE ME SE SE",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Moldova",
+          "app": "Moldova",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-06",
+          "body": "MONEYVAL",
+          "io": "SE SE ME ME ME ME ME ME SE ME LE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Monaco",
+          "app": "Monaco",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-11",
+          "body": "MONEYVAL",
+          "io": "ME ME LE ME ME ME LE LE ME ME ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Mongolia",
+          "app": "Mongolia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-10",
+          "body": "APG",
+          "io": "LE ME LE LE LE LE LE ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Montenegro",
+          "app": "Montenegro",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-12",
+          "body": "MONEYVAL",
+          "io": "SE SE ME ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Montserrat",
+          "app": "Montserrat",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2025-01",
+          "body": "CFATF",
+          "io": "ME SE ME LE LE ME ME SE ME ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Morocco",
+          "app": "Morocco",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-05",
+          "body": "MENAFATF",
+          "io": "ME ME ME ME LE ME LE ME SE ME LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Mozambique",
+          "app": "Mozambique",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-04",
+          "body": "ESAAMLG",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Myanmar",
+          "app": "Myanmar",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-10",
+          "body": "APG",
+          "io": "LE LE LE LE LE ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Namibia",
+          "app": "Namibia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-04",
+          "body": "ESAAMLG",
+          "io": "ME ME LE ME LE ME ME ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Nauru",
+          "app": "Nauru",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-02",
+          "body": "APG",
+          "io": "ME ME LE ME ME ME LE LE ME ME LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Nepal",
+          "app": "Nepal",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-06",
+          "body": "APG",
+          "io": "ME ME LE LE LE ME ME LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Netherlands",
+          "app": "Netherlands",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-09",
+          "body": "FATF",
+          "io": "SE HE ME ME ME HE SE SE SE SE ME",
+          "high_or_substantial": 7
+        },
+        {
+          "published": "New Zealand",
+          "app": "New Zealand",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-07",
+          "body": "FATF/APG",
+          "io": "SE HE ME ME ME SE SE HE SE ME ME",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Nicaragua",
+          "app": "Nicaragua",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-01",
+          "body": "GAFILAT",
+          "io": "ME ME LE ME LE ME ME SE ME ME LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Niger",
+          "app": "Niger",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-01",
+          "body": "GIABA",
+          "io": "ME LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Nigeria",
+          "app": "Nigeria",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-11",
+          "body": "GIABA",
+          "io": "LE LE ME LE LE ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Niue",
+          "app": "Niue",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2025-10",
+          "body": "APG",
+          "io": "ME SE LE ME LE LE ME LE LE LE LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "North Macedonia",
+          "app": "North Macedonia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-06",
+          "body": "MONEYVAL",
+          "io": "SE ME ME ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Norway",
+          "app": "Norway",
+          "methodology": "2013",
+          "report": "MER+FUR(s)+FUAR",
+          "date": "2023-02",
+          "body": "FATF",
+          "io": "SE SE ME ME ME SE ME ME SE ME SE",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Oman",
+          "app": "Oman",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-12",
+          "body": "FATF/MENAFATF",
+          "io": "ME SE ME ME ME SE ME ME SE ME SE",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Pakistan",
+          "app": "Pakistan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-08",
+          "body": "APG",
+          "io": "LE ME LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Palau",
+          "app": "Palau",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-06",
+          "body": "APG",
+          "io": "ME SE ME ME LE ME ME ME LE ME LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Panama",
+          "app": "Panama",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2019-08",
+          "body": "GAFILAT",
+          "io": "LE ME ME ME LE LE ME ME ME SE SE",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Papua New Guinea",
+          "app": "Papua New Guinea",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-09",
+          "body": "APG",
+          "io": "ME ME ME ME LE ME LE LE LE ME LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Paraguay",
+          "app": "Paraguay",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2022-11",
+          "body": "GAFILAT",
+          "io": "ME SE ME ME ME ME LE ME ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Peru",
+          "app": "Peru",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2020-01",
+          "body": "GAFILAT",
+          "io": "ME SE ME ME LE SE LE ME ME SE SE",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Philippines",
+          "app": "Philippines",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-08",
+          "body": "APG",
+          "io": "SE ME ME ME LE ME LE LE LE LE LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Poland",
+          "app": "Poland",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-12",
+          "body": "MONEYVAL",
+          "io": "ME SE ME SE SE ME ME LE ME ME ME",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Portugal",
+          "app": "Portugal",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2017-12",
+          "body": "FATF",
+          "io": "SE SE ME ME ME ME SE ME SE SE SE",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Qatar",
+          "app": "Qatar",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2023-05",
+          "body": "FATF/MENAFATF",
+          "io": "SE ME SE ME ME ME ME SE LE SE ME",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Romania",
+          "app": "Romania",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "MONEYVAL",
+          "io": "ME SE ME ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Russia",
+          "app": "Russian Federation",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-02",
+          "body": "EAG",
+          "io": "SE SE ME ME SE HE ME SE HE ME ME",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Rwanda",
+          "app": "Rwanda",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-08",
+          "body": "ESAAMLG",
+          "io": "LE LE LE LE LE ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Saint Kitts and Nevis",
+          "app": "St Kitts & Nevis",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-10",
+          "body": "CFATF",
+          "io": "LE ME LE LE ME LE LE LE ME LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Saint Lucia",
+          "app": "St Lucia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-10",
+          "body": "CFATF",
+          "io": "LE ME LE LE LE LE ME ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Saint Vincent and the Grenadines",
+          "app": "St Vincent & Gren",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "CFATF",
+          "io": "SE SE ME ME ME SE ME ME LE LE LE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Samoa",
+          "app": "Samoa",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-06",
+          "body": "APG",
+          "io": "ME SE LE ME ME LE LE ME ME ME LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "San Marino",
+          "app": "San Marino",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-05",
+          "body": "MONEYVAL",
+          "io": "SE HE ME ME ME SE ME SE SE ME ME",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Sao Tome and Principe",
+          "app": "São Tomé & Príncipe",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-11",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Saudi Arabia",
+          "app": "Saudi Arabia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2020-01",
+          "body": "FATF/MENAFATF",
+          "io": "SE ME SE ME ME ME LE LE SE SE LE",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Senegal",
+          "app": "Senegal",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-11",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Serbia",
+          "app": "Serbia",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2025-12",
+          "body": "MONEYVAL",
+          "io": "SE SE SE ME SE ME SE SE ME ME SE",
+          "high_or_substantial": 7
+        },
+        {
+          "published": "Seychelles",
+          "app": "Seychelles",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-04",
+          "body": "ESAAMLG",
+          "io": "LE LE LE ME LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Sierra Leone",
+          "app": "Sierra Leone",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-11",
+          "body": "GIABA",
+          "io": "ME LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Singapore",
+          "app": "Singapore",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2026-05",
+          "body": "FATF",
+          "io": "SE SE SE SE ME SE ME SE SE ME ME",
+          "high_or_substantial": 7
+        },
+        {
+          "published": "Sint Maarten",
+          "app": "St Maarten",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2025-07",
+          "body": "CFATF",
+          "io": "LE LE LE ME LE LE ME LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Slovak Republic",
+          "app": "Slovakia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-12",
+          "body": "MONEYVAL",
+          "io": "ME SE ME ME ME ME ME LE ME ME ME",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Slovenia",
+          "app": "Slovenia",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2026-05",
+          "body": "MONEYVAL",
+          "io": "ME SE SE LE ME ME ME ME ME ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Solomon Islands",
+          "app": "Solomon Islands",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2019-10",
+          "body": "APG",
+          "io": "ME ME LE LE LE ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "South Africa",
+          "app": "South Africa",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-11",
+          "body": "FATF",
+          "io": "ME ME ME ME LE ME ME ME LE LE ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Spain",
+          "app": "Spain",
+          "methodology": "2013",
+          "report": "MER+FUR(s)+FUAR",
+          "date": "2019-12",
+          "body": "FATF",
+          "io": "SE SE SE SE SE HE SE SE SE ME SE",
+          "high_or_substantial": 10
+        },
+        {
+          "published": "Sri Lanka",
+          "app": "Sri Lanka",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2021-11",
+          "body": "APG",
+          "io": "ME LE LE LE LE LE LE LE SE LE LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "Suriname",
+          "app": "Suriname",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-12",
+          "body": "CFATF",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Sweden",
+          "app": "Sweden",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2020-09",
+          "body": "FATF",
+          "io": "ME HE ME ME ME ME SE SE SE ME SE",
+          "high_or_substantial": 5
+        },
+        {
+          "published": "Switzerland",
+          "app": "Switzerland",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-10",
+          "body": "FATF",
+          "io": "SE ME ME ME ME SE SE SE SE SE SE",
+          "high_or_substantial": 7
+        },
+        {
+          "published": "Tajikistan",
+          "app": "Tajikistan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-11",
+          "body": "EAG",
+          "io": "SE SE ME ME ME ME LE ME SE ME LE",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Tanzania",
+          "app": "Tanzania",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-09",
+          "body": "ESAAMLG",
+          "io": "LE ME LE LE LE LE LE ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Thailand",
+          "app": "Thailand",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-10",
+          "body": "APG",
+          "io": "SE SE ME LE LE SE ME SE ME ME LE",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Timor-Leste",
+          "app": "Timor-Leste",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2024-11",
+          "body": "APG",
+          "io": "ME ME LE ME LE ME ME LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Togo",
+          "app": "Togo",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-05",
+          "body": "GIABA",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Tonga",
+          "app": "Tonga",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2021-09",
+          "body": "APG",
+          "io": "LE ME LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Trinidad and Tobago",
+          "app": "Trinidad & Tobago",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2019-06",
+          "body": "CFATF",
+          "io": "ME ME ME ME ME ME LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Tunisia",
+          "app": "Tunisia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2020-01",
+          "body": "MENAFATF",
+          "io": "ME ME LE LE LE ME ME ME LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Turkmenistan",
+          "app": "Turkmenistan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-05",
+          "body": "EAG",
+          "io": "SE SE ME ME LE ME ME SE SE ME ME",
+          "high_or_substantial": 4
+        },
+        {
+          "published": "Turks and Caicos Islands",
+          "app": "Turks & Caicos",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-11",
+          "body": "CFATF",
+          "io": "ME ME LE LE ME ME LE LE LE ME ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Türkiye",
+          "app": "Turkey",
+          "methodology": "2022",
+          "report": "MER",
+          "date": "2026-09",
+          "body": "FATF",
+          "io": "SE SE ME ME ME SE ME ME ME ME ME",
+          "high_or_substantial": 3
+        },
+        {
+          "published": "Uganda",
+          "app": "Uganda",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2026-03",
+          "body": "ESAAMLG",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Ukraine",
+          "app": "Ukraine",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2020-09",
+          "body": "MONEYVAL",
+          "io": "SE ME ME ME ME SE LE ME ME ME ME",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "United Arab Emirates",
+          "app": "United Arab Emirates",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-07",
+          "body": "MENAFATF",
+          "io": "ME LE ME ME LE ME LE ME SE ME LE",
+          "high_or_substantial": 1
+        },
+        {
+          "published": "United Kingdom",
+          "app": "United Kingdom",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2022-06",
+          "body": "FATF",
+          "io": "HE SE ME ME SE ME SE SE HE HE HE",
+          "high_or_substantial": 8
+        },
+        {
+          "published": "United States",
+          "app": "United States",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-03",
+          "body": "FATF",
+          "io": "SE SE ME ME LE SE SE HE HE HE HE",
+          "high_or_substantial": 8
+        },
+        {
+          "published": "Uruguay",
+          "app": "Uruguay",
+          "methodology": "2013",
+          "report": "MER",
+          "date": "2020-01",
+          "body": "GAFILAT",
+          "io": "ME ME ME ME ME ME ME ME ME ME ME",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Uzbekistan",
+          "app": "Uzbekistan",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2023-07",
+          "body": "EAG",
+          "io": "SE SE ME ME ME SE ME ME SE SE SE",
+          "high_or_substantial": 6
+        },
+        {
+          "published": "Vanuatu",
+          "app": "Vanuatu",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2018-09",
+          "body": "APG",
+          "io": "LE LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Venezuela",
+          "app": "Venezuela",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-10",
+          "body": "CFATF",
+          "io": "ME LE LE LE LE LE LE LE LE LE LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Viet Nam",
+          "app": "Vietnam",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-02",
+          "body": "APG",
+          "io": "ME ME LE LE LE LE LE SE SE LE LE",
+          "high_or_substantial": 2
+        },
+        {
+          "published": "Zambia",
+          "app": "Zambia",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2025-09",
+          "body": "ESAAMLG",
+          "io": "ME ME ME ME LE ME ME ME ME ME LE",
+          "high_or_substantial": 0
+        },
+        {
+          "published": "Zimbabwe",
+          "app": "Zimbabwe",
+          "methodology": "2013",
+          "report": "MER+FUR(s)",
+          "date": "2024-04",
+          "body": "ESAAMLG",
+          "io": "LE LE LE LE LE LE LE LE ME ME LE",
+          "high_or_substantial": 0
         }
       ]
     }
