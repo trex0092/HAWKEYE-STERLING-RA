@@ -476,6 +476,54 @@ def parse_register_entry(name, notes):
     return rec
 
 
+_HOME_ISO2 = {"ae"}
+_AGENT_ROLES = {"ordering_institution", "senders_correspondent", "receivers_correspondent",
+                "intermediary", "account_with_institution"}
+
+
+def monitoring_records(records, xml_parser=None):
+    """Register records as the monitoring rules need them. A pasted MT103 /
+    pacs.008 reaches parse_register_entry as raw text, so it carried no amount,
+    currency, date or country: an AED 200,000 wire to Hong Kong raised no DPMSR
+    THRESHOLD. Each message is expanded into one wire record per payment.
+    A message that cannot be parsed keeps no amount, so AMOUNT_UNREADABLE fires
+    instead of a silent pass. A record that names no customer is keyed by its
+    own reference, so unrelated payments never pool into one velocity profile."""
+    out = []
+    for r in records or []:
+        if not r.get("payment_message"):
+            out.append(r)
+            continue
+        ref = _clean(r.get("transaction_id"))
+        base = {k: v for k, v in r.items() if k != "payment_message"}
+        base.update(method="wire", customer=r.get("customer") or f"(payment {ref})")
+        try:
+            pays = parse_payment_message(r["payment_message"], xml_parser)
+        except Exception:
+            pays = []
+        if not pays:
+            out.append(base)
+            continue
+        for p in pays:
+            rec = {**base, "transaction_id": p.get("reference") or ref,
+                   "date": p.get("date", ""), "currency": str(p.get("currency") or "").upper()}
+            if p.get("amount") is not None:
+                rec["amount"] = p["amount"]
+            parties = p.get("parties") or []
+            foreign = sorted((q for q in parties if q.get("country")
+                              and q["country"].lower() not in _HOME_ISO2),
+                             key=lambda q: q["role"] in _AGENT_ROLES)
+            named = next((q for q in parties if q["role"] == BENEFICIARY and q.get("name")), None)
+            if foreign:
+                c = foreign[0]["country"]
+                rec["counterparty_country"] = ISO2_TO_JURISDICTION.get(c, "") or c
+            cp = (foreign[0] if foreign and foreign[0].get("name") else named)
+            if cp:
+                rec["counterparty"] = cp["name"]
+            out.append(rec)
+    return out
+
+
 # ── SCREENING ─────────────────────────────────────────────────────────────────
 def _jurisdiction_tier(party, table):
     if not table:
