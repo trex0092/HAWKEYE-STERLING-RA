@@ -634,7 +634,11 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
      quota apart from malformed, on both statuses that can carry it. */
   const evalSrc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'advisor-eval.mjs'), 'utf8');
 check('advisor eval aborts remaining live cases after a provider-wide quota/billing failure',
-  /provider-wide quota\/billing failure is terminal/.test(evalSrc)
+  // Categorization is now implemented and separately tested in
+  // advisor-eval-http.mjs; verify the live loop actually uses that decision.
+  /classifyAdvisorEvalFailure/.test(evalSrc)
+  && /terminal:\s*failure\.stop_run/.test(evalSrc)
+  && /if\s*\(r\.terminal\)/.test(evalSrc)
   && /break evalLoop/.test(evalSrc)
   && /NOT_ATTEMPTED/.test(evalSrc));
 check('advisor eval counts only evaluated cases as held, never the ones skipped after a terminal error',
