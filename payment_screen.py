@@ -288,7 +288,7 @@ def payment_from_feed(txn, xml_parser=None):
                 party["country_name"] = _clean(p["country_name"])
             parties.append(party)
     if not parties and (txn.get("counterparty") or txn.get("customer")):
-        inbound = str(txn.get("direction", "")).lower() == "in"
+        inbound = canonical_direction(txn.get("direction")) == "in"
         cust = _party(BENEFICIARY if inbound else ORIGINATOR, txn.get("customer", ""),
                       source="feed.customer")
         cpty = _party(ORIGINATOR if inbound else BENEFICIARY, txn.get("counterparty", ""),
@@ -304,6 +304,22 @@ def payment_from_feed(txn, xml_parser=None):
              "amount": txn.get("amount"), "parties": parties,
              "remittance": [_clean(rem)] if rem else [],
              "permalink": _clean(txn.get("permalink")), "customer": _clean(txn.get("customer"))}]
+
+
+_DIRECTION_SYNONYMS = {
+    "in": "in", "inbound": "in", "incoming": "in", "inward": "in", "received": "in",
+    "receipt": "in", "credit": "in", "cr": "in",
+    "out": "out", "outbound": "out", "outgoing": "out", "outward": "out", "sent": "out",
+    "paid": "out", "payment out": "out", "debit": "out", "dr": "out",
+}
+
+
+def canonical_direction(raw):
+    """'in' or 'out' for a recorded direction label ("Incoming", "IN (received)",
+    "Outward"), else "" — an unknown label is never guessed into a side."""
+    s = re.sub(r"\([^)]*\)", " ", str(raw or "")).lower()
+    s = " ".join(re.sub(r"[^a-z ]", " ", s).split())
+    return _DIRECTION_SYNONYMS.get(s, "")
 
 
 # ── ASANA "PAYMENTS REGISTER" ────────────────────────────────────────────────
@@ -463,7 +479,8 @@ def parse_register_entry(name, notes):
             out_parties.append(party)
     rec = {"transaction_id": _clean(name), "parties": out_parties,
            "date": fields.get("date", ""), "currency": fields.get("currency", "").upper(),
-           "direction": fields.get("direction", "").lower(),
+           "direction": (canonical_direction(fields.get("direction"))
+                         or fields.get("direction", "").lower()),
            "method": fields.get("method", "").lower(),
            "customer": fields.get("customer", ""),
            "remittance_info": fields.get("reference", "")}
