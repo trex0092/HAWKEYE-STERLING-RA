@@ -34,6 +34,7 @@ import ai
 import str_dossier
 import tfs_dossier
 import payment_screen
+import kyc_document_evidence
 
 # ── input caps (defence in depth on untrusted MCP arguments) ──────────────────
 MAX_NAME_LEN = 512
@@ -289,6 +290,25 @@ def analyze_kyc_note(notes, today=None):
             for p in parsed.get("individuals", [])
         ],
     }
+
+
+# ── TOOL: compare_document_evidence (explicit, read-only and opt-in) ──────────
+def compare_document_evidence(notes, evidence, person_index=None, as_of=None):
+    """Compare normalized OCR evidence with ONE explicitly selected KYC party.
+    No image upload, model, network call or background processing. Never verifies
+    authenticity or clears existing CDD gaps. Returns field statuses without
+    echoing raw IDs, dates of birth, or names. Human review is always required.
+    """
+    _req_str(notes, "notes", cap=MAX_NOTES_LEN)
+    if type(person_index) is not int or person_index < 0:
+        raise ValueError("'person_index' must select a nonnegative individual index")
+    parsed = kyc.parse_customer(notes, kyc_document_evidence.parse_as_of(as_of))
+    individuals = parsed.get("individuals", [])
+    if person_index >= len(individuals):
+        raise ValueError("'person_index' is outside the KYC individuals list")
+    return kyc_document_evidence.compare_evidence(
+        evidence, individuals[person_index], person_index=person_index, as_of=as_of
+    )
 
 
 # ── TOOL: jurisdiction_risk ───────────────────────────────────────────────────
@@ -599,6 +619,31 @@ TOOLS = {
                 }
             },
             "required": ["transactions"],
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_compare_document_evidence": (
+        compare_document_evidence,
+        compare_document_evidence.__doc__,
+        {
+            "type": "object",
+            "properties": {
+                "notes": {"type": "string", "description": "Existing structured KYC note, confidential PII."},
+                "evidence": {
+                    "type": "object",
+                    "description": (
+                        "Normalized hawkeye.document-evidence/v1 object: "
+                        "schema_version, opaque evidence_id, source, document_type, "
+                        "extraction_status and allowlisted fields. No raw image or vendor JSON."
+                    ),
+                },
+                "person_index": {
+                    "type": "integer", "minimum": 0,
+                    "description": "Explicit zero-based KYC individual index; never auto-select."
+                },
+                "as_of": {"type": "string", "description": "YYYY-MM-DD reference date for expiry checks."},
+            },
+            "required": ["notes", "evidence", "person_index"],
             "additionalProperties": False,
         },
     ),

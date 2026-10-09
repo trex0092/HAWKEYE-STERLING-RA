@@ -67,6 +67,7 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | `hawkeye_screen_internal_watchlist` | Screen against the firm's committed internal watchlist (`data/internal-watchlist.json`); an empty list is a valid "no designations" state, never a degraded screen. |
 | `hawkeye_monitor_transactions` | Run the FATF R.16 rule-set (cash threshold, structuring, velocity, round-amount, high-risk geography, CDD trigger) over one customer's transactions. |
 | `hawkeye_analyze_kyc_note` | Parse a structured KYC note into identity records + the CDD gaps an MLRO must close; ID numbers are privacy-masked. |
+| `hawkeye_compare_document_evidence` | Opt-in comparison of approved normalized document OCR evidence with one explicitly selected KYC individual. Privacy-safe field statuses, expiry and review findings; never an authenticity or identity verification result. |
 | `hawkeye_jurisdiction_risk` | Return the FATF / locally-designated risk tier for a country and/or principals' nationalities. |
 | `hawkeye_name_variants` | Expand a name into the transliteration-equivalent spellings the matcher screens under (Mohammed/Muhammad, Abdul/Abdel, bin/ibn …) — makes fuzzy-match recall transparent. |
 | `hawkeye_adverse_media_scan` | Deterministically scan a headline for the adverse-media keyword taxonomy (fraud, laundering, sanctions, corruption, terrorism …); no model, so it never invents an allegation. |
@@ -74,6 +75,82 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | `hawkeye_assemble_tfs_dossier` | Assemble a **DRAFT** FFR/PNMR dossier for a Targeted Financial Sanctions list hit (UN Consolidated List / UAE Local Terrorist List); recommends the report kind, never files or freezes. The TFS counterpart of `hawkeye_assemble_str_dossier`. |
 | `hawkeye_compute_risk_rating` | Compute a LOW/MEDIUM/HIGH customer risk rating (FATF R.10) from already-known hits/PEP/adverse-media/CDD-gap findings, with contributing factors and the EDD requirement. Deterministic; does not itself screen anything. |
 | `hawkeye_related_parties` | Surface hidden links across a book of customers: a shared owner/UBO across two or more customers, or a UBO who is also a customer entity. Pure graph analysis, no model. |
+
+## Optional document evidence comparison (not production OCR)
+
+The vendor-neutral adapter in \`kyc_document_evidence.py\` accepts normalized
+document evidence, **not** photos, PDF files, images, base64 data, document
+scans or a raw Doubango JSON payload. It has no OCR engine, model, network
+calls, third-party library dependency or background processing. This design
+reuses the *concept* of structured extraction without copying licensed
+Doubango code or models.
+
+The read-only \`hawkeye_compare_document_evidence\` tool must be invoked
+explicitly; no scheduled screening, onboarding, scoring, CDD record, Asana
+case or risk decision is changed. This feature is a **pilot-only comparison
+capability** until the MLRO formally approves scope, DPIA, provider contract,
+handling policy, retention and operational safeguards.
+
+Synthetic example, with all identifiers fictitious:
+
+\`\`\`json
+{
+  "notes": "SECTION 4\nIndividual 1 - Director\nName: Test Person\nNationality: Testland\nPassport/ID: XY000111\nPassport Expiry: 2030-01-01\nDate of Birth: 1990-01-01\nProof of Address: Obtained\n",
+  "person_index": 0,
+  "as_of": "2026-10-09",
+  "evidence": {
+    "schema_version": "hawkeye.document-evidence/v1",
+    "evidence_id": "SYNTHETIC:document-01",
+    "source": "synthetic_fixture",
+    "document_type": "passport",
+    "extraction_status": "extracted",
+    "fields": {
+      "full_name": "Test Person",
+      "date_of_birth": "1990-01-01",
+      "document_number": "XY000111",
+      "expiry_date": "2030-01-01",
+      "nationality": "Testland"
+    }
+  }
+}
+\`\`\`
+
+The allowed \`document_type\` values are \`passport\`, \`emirates_id\`,
+\`other_id\`, and \`unknown\`. \`fields\` may include only \`full_name\`,
+\`date_of_birth\`, \`document_number\`, \`expiry_date\`,
+\`nationality\`, and \`issuing_country\`. The last field is retained as
+evidence context but **not compared** against the customer's country,
+because issuing jurisdiction and nationality/customer domicile are different
+concepts. Unknown/other document types do not borrow the passport/EID number
+or expiry fields. \`extraction_status\` is \`extracted\` or \`failed\`.
+A failed extraction must have no populated fields.
+
+A provider-specific adapter must independently map vendor JSON to this
+allowlist. Never accept its default/undocumented fields without review.
+For multiple KYC individuals the operator must choose the zero-based
+\`person_index\`; no name-based automatic association is performed.
+The comparison reports \`MATCH\`, \`MISMATCH\`, missing/unreadable or
+\`NOT_COMPARABLE\` per field, with \`EXPIRED\` for a document expiring
+on or before \`as_of\`. The output contains no raw extracted values,
+document number, date of birth or name. Existing CDD gaps remain unchanged.
+The result **never** establishes identity, document authenticity, liveness,
+fraud, onboarding eligibility or sanction clearance.
+
+**Privacy and threat boundaries:** Only synthetic data should be sent through
+an LLM-facing MCP tool until customer-PII egress and client retention are
+approved. A real operational service must add authorized confidential intake,
+transport and storage encryption, access control, malware/file validation,
+retention/deletion enforcement, input image redaction rules, processor and
+subprocessor due diligence, regional transfer assessment and operator audit.
+No customer photos, ID numbers or unredacted outputs belong in GitHub logs,
+issues, fixtures or repository history. Raw KYC notes still pass through the
+MCP tool at invocation time, so client/transport confidentiality is essential.
+
+Run the existing offline harness for regression checks:
+
+\`\`\`bash
+python test/mcp_tools_test.py
+\`\`\`
 
 ## Resources (read-only reference data)
 
