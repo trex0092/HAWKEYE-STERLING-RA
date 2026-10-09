@@ -231,6 +231,77 @@ expect_valueerror("related_parties rejects a non-object customer", lambda: mcp_t
 expect_valueerror("related_parties rejects a non-list individuals field",
                   lambda: mcp_tools.related_parties([{"name": "X", "individuals": "not-a-list"}]))
 
+# ── Document evidence (synthetic, privacy-preserving, human review only) ─────
+print("mcp_tools — compare_document_evidence")
+_doc_note = ("SECTION 4\nIndividual 1 - Director\nName: Ahmed Khan\nNationality: Pakistan\n"
+             "Passport/ID: AB1234567\nPassport Expiry: 2030-01-01\n"
+             "Date of Birth: 1980-01-01\nProof of Address: Obtained\n")
+_doc_evidence = {
+    "schema_version": "hawkeye.document-evidence/v1",
+    "evidence_id": "SYNTHETIC:document-01",
+    "source": "synthetic_fixture",
+    "document_type": "passport",
+    "extraction_status": "extracted",
+    "fields": {
+        "full_name": "Ahmed Khan", "date_of_birth": "1980-01-01",
+        "document_number": "AB1234567", "expiry_date": "2030-01-01",
+        "nationality": "Pakistan",
+    },
+}
+_dres = mcp_tools.compare_document_evidence(_doc_note, _doc_evidence, person_index=0, as_of="2026-10-09")
+check("matching OCR evidence is not treated as identity verification",
+      _dres["outcome"] == "NO_DISCREPANCY_DETECTED"
+      and _dres["identity_verified"] is False
+      and _dres["document_authenticity_verified"] is False
+      and _dres["cdd_gaps_cleared"] is False and _dres["human_review_required"])
+check("all five comparable fields match", _dres["match_count"] == 5 and _dres["mismatch_count"] == 0)
+check("document comparison does not echo PII",
+      "AB1234567" not in json.dumps(_dres) and "Ahmed Khan" not in json.dumps(_dres)
+      and "1980-01-01" not in json.dumps(_dres))
+_mismatch = {**_doc_evidence, "fields": {**_doc_evidence["fields"], "date_of_birth": "1981-01-01"}}
+_different = mcp_tools.compare_document_evidence(_doc_note, _mismatch, person_index=0, as_of="2026-10-09")
+check("date mismatch is flagged without exposing values",
+      _different["outcome"] == "DISCREPANCY_FOUND" and _different["mismatch_count"] == 1
+      and "1981-01-01" not in json.dumps(_different))
+_expired = {**_doc_evidence, "fields": {**_doc_evidence["fields"], "expiry_date": "2026-10-09"}}
+check("document expiring on reference day is expired",
+      mcp_tools.compare_document_evidence(_doc_note, _expired, person_index=0, as_of="2026-10-09")["expiry_state"]
+      == "EXPIRED")
+_unknown = {**_doc_evidence, "fields": {"full_name": "Ahmed Khan"}}
+check("missing extracted values never count as verified matches",
+      mcp_tools.compare_document_evidence(_doc_note, _unknown, person_index=0, as_of="2026-10-09")["outcome"]
+      == "INCONCLUSIVE")
+_failed = {**_doc_evidence, "extraction_status": "failed", "fields": {}}
+check("failed extraction does not produce a clean result",
+      mcp_tools.compare_document_evidence(_doc_note, _failed, person_index=0)["outcome"]
+      == "EXTRACTION_FAILED")
+_nonpassport = {**_doc_evidence, "document_type": "unknown"}
+_nonp_result = mcp_tools.compare_document_evidence(_doc_note, _nonpassport, person_index=0)
+check("unknown document type is not mapped to passport ID",
+      next(x for x in _nonp_result["comparisons"] if x["field"] == "document_number")["result"]
+      == "NOT_COMPARABLE")
+expect_valueerror("document evidence rejects unlisted field (no raw image payload)",
+                  lambda: mcp_tools.compare_document_evidence(_doc_note, {
+                      **_doc_evidence, "fields": {**_doc_evidence["fields"], "image_base64": "unsafe"}
+                  }, person_index=0))
+expect_valueerror("document evidence requires explicit person selection",
+                  lambda: mcp_tools.compare_document_evidence(_doc_note, _doc_evidence))
+expect_valueerror("document evidence rejects out-of-range person selection",
+                  lambda: mcp_tools.compare_document_evidence(_doc_note, _doc_evidence, person_index=1))
+expect_valueerror("document evidence rejects boolean as person index",
+                  lambda: mcp_tools.compare_document_evidence(_doc_note, _doc_evidence, person_index=True))
+expect_valueerror("document evidence rejects invalid reference date",
+                  lambda: mcp_tools.compare_document_evidence(_doc_note, _doc_evidence,
+                                                              person_index=0, as_of="2026-02-30"))
+expect_valueerror("document evidence rejects vendor-native JSON",
+                  lambda: mcp_tools.compare_document_evidence(_doc_note, {
+                      **_doc_evidence, "bounding_boxes": {}
+                  }, person_index=0))
+expect_valueerror("failed extraction cannot carry fields",
+                  lambda: mcp_tools.compare_document_evidence(_doc_note, {
+                      **_doc_evidence, "extraction_status": "failed"
+                  }, person_index=0))
+
 # ── mcp_tools.call_tool dispatch ───────────────────────────────────────────────────
 print("mcp_tools — dispatch")
 check("call_tool dispatches a known tool", mcp_tools.call_tool("hawkeye_normalize_name", {"name": "Test"})["normalized"] == "TEST")
@@ -253,6 +324,7 @@ _valid_args = {
     "hawkeye_screen_payment": {"watchlist": ["ACME LLC"], "parties": [
         {"role": "originator", "name": "Test Person Ltd"}, {"role": "beneficiary", "name": "Other Co"}]},
     "hawkeye_monitor_transactions": {"transactions": [{"customer": "C", "date": "2026-01-01", "amount": 55000, "method": "cash"}]},
+    "hawkeye_compare_document_evidence": {"notes": _doc_note, "evidence": _doc_evidence, "person_index": 0},
     "hawkeye_analyze_kyc_note": {"notes": "SECTION 4\nIndividual 1 — Director\nName: JANE DOE\n"},
     "hawkeye_jurisdiction_risk": {"country": "Iran"},
     "hawkeye_name_variants": {"name": "Mohammed Abdul Rahman"},
