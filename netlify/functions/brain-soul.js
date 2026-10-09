@@ -1019,12 +1019,12 @@ const handle = async (event) => {
 
     if (!apiResp.ok) {
       ok = false;
-      // Never reflect the upstream provider's error body to the client — it can
-      // carry auth / quota / billing / org detail. Log it server-side only and
-      // return just the status code (mirrors the generic upstream-failure
-      // messages used by the Asana/backup functions).
+      // Provider bodies can contain org IDs, diagnostic identifiers or even
+      // reflected request context. Use the raw body ONLY for in-memory failure
+      // classification. Never log it, return it, or place it in audit metadata.
       const errBody = await apiResp.text().catch(() => '');
-      if (errBody) console.warn('brain-soul: Anthropic API error ' + apiResp.status + ': ' + errBody.slice(0, 300));
+      console.warn('brain-soul: Anthropic API error ' + apiResp.status +
+        (isUsageLimit(apiResp.status, errBody) ? ' (billing/usage cap)' : ' (request rejected)'));
       text = '[API error ' + apiResp.status + apiErrorHint(apiResp.status, errBody) + ']';
     } else {
       // A 200 with a null/empty/invalid body must not throw into the catch below
