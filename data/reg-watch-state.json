@@ -74,10 +74,12 @@
       "checkedAt": "2026-10-09",
       "changedAt": "2026-10-06",
       "contentAsOf": "2026-10-04",
-      "status": 200,
+      "status": 403,
       "prevHash": "f5359df5b816213005400e4196850dfc0d9ebdc8b09d6404f4dfc805a75a868a",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261004141918"
+      "via": "web.archive.org snapshot 20261004141918",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "wolfsberg": {
       "hash": "575ebdfe1028c70db1de23dfd4f5f5ec3d9b6ed11ef6646943945d298c284815",
@@ -114,10 +116,12 @@
       "checkedAt": "2026-10-09",
       "changedAt": "2026-10-09",
       "contentAsOf": "2026-10-06",
-      "status": 200,
+      "status": 403,
       "prevHash": "c16edc1321838af88fad0d4314831591586e9529b4cf3e7949baf0a11de1f8f5",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261006145254"
+      "via": "web.archive.org snapshot 20261006145254",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "ofac": {
       "hash": "b4628aabc79731b66f8c1261f1031f3d10a90f0acb5f7b990a4e64995083dfd9",
@@ -198,23 +202,23 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "f43649febc286bda88fd571199ff0b1bc88c60e0532dcda48710ddc06f7c367f",
-      "bytes": 107839,
+      "hash": "3069e981131a5658c942c23df426a729f1318df5d81934eac609165b77e04719",
+      "bytes": 107855,
       "checkedAt": "2026-10-09",
       "changedAt": "2026-10-09",
       "contentAsOf": "2026-10-09",
       "status": 200,
-      "prevHash": "22d6b61c463c8dd38aacf9e8f11d2d69dfdac07b7e24c8f20e2c4382fa2ae0e5",
+      "prevHash": "f43649febc286bda88fd571199ff0b1bc88c60e0532dcda48710ddc06f7c367f",
       "fp": 2
     },
     "eu-ai-act": {
-      "hash": "37b08b75eef73be327f0cff257c610d13911c2eca10b9b689182da00c2a43be5",
-      "bytes": 18051,
+      "hash": "9c3ef47dbbfc368d9b743247e3b1956d1b9df02210a189e2f633cfe680c73d1c",
+      "bytes": 18016,
       "checkedAt": "2026-10-09",
-      "changedAt": "2026-10-06",
+      "changedAt": "2026-10-09",
       "contentAsOf": "2026-10-09",
       "status": 200,
-      "prevHash": "2d4fcec8f66627017cde0c94da3c28540c8ffe90c13083ddf863889980ab9a44",
+      "prevHash": "37b08b75eef73be327f0cff257c610d13911c2eca10b9b689182da00c2a43be5",
       "fp": 2
     }
   }
