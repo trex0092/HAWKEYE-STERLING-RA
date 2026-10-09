@@ -29,6 +29,7 @@ import os, re, json, math, datetime
 from collections import defaultdict
 
 import txn_feed  # stdlib-only validation; never fetches or stores customer data
+from payment_screen import canonical_direction
 
 CASH_REPORT_THRESHOLD = float(os.environ.get("DPMS_CASH_THRESHOLD", "55000"))
 CDD_TRIGGER_THRESHOLD = float(os.environ.get("CDD_TRIGGER_THRESHOLD", "15000"))
@@ -639,6 +640,20 @@ def rule_date_unreadable(txns):
             if not (t.get("activity_only") or t.get("payment_message")) and not _d(t.get("date"))]
 
 
+def rule_direction_unrecognised(txns):
+    """A payment whose direction is missing or is not a known label for in or
+    out. Pass-through, round-trip and funnel rules key on the direction, and the
+    register picks the counterparty (whose country the geography rules read)
+    by it. Activity records and raw payment messages are not judged."""
+    return [_alert("DIRECTION_UNRECOGNISED", "HIGH", t,
+            f"direction {str(t.get('direction') or '').strip() or 'not recorded'!r} is not in or "
+            "out — pass-through, round-trip and funnel rules could not evaluate this payment and "
+            "the counterparty may be the wrong party; record Direction: in | out")
+            for t in txns
+            if not (t.get("activity_only") or t.get("payment_message"))
+            and _norm(t.get("direction")) not in ("in", "out")]
+
+
 def rule_method_unrecognised(txns):
     """A payment whose method is missing or is not a known label for cash,
     wire or gold. The DPMSR threshold, structuring and cash rules key on the
@@ -729,7 +744,7 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_reference_keyword, rule_personal_account, rule_linked_threshold,
           rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db,
           rule_amount_not_comparable, rule_date_unreadable,
-          rule_method_unrecognised]
+          rule_method_unrecognised, rule_direction_unrecognised]
 
 
 def _any_customer(txns):
@@ -788,6 +803,17 @@ def _with_canonical_method(t):
     return dict(t, method=m, method_recorded=t.get("method"))
 
 
+def _with_canonical_direction(t):
+    """Copy of t whose direction is in/out when the recorded label is a known
+    synonym. The recorded label is kept in direction_recorded."""
+    if not isinstance(t, dict):
+        return t
+    d = canonical_direction(t.get("direction"))
+    if not d or d == t.get("direction"):
+        return t
+    return dict(t, direction=d, direction_recorded=t.get("direction"))
+
+
 def _with_counterparty_country(t):
     """The rules read counterparty_country as a jurisdiction NAME. The feed
     schema also allows parties[] with ISO alpha-2 countries, which no rule
@@ -826,7 +852,8 @@ def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):
     optional rule_errors dict) so a rule that silently produces no alerts because
     it crashes on every customer is visible, not a silent all-clear."""
     alerts = []
-    txns = [_with_canonical_method(_with_counterparty_country(t)) for t in txns]
+    txns = [_with_canonical_direction(_with_canonical_method(_with_counterparty_country(t)))
+            for t in txns]
     for rule in _RULES:
         try:
             if rule is rule_high_risk_counterparty:

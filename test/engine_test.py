@@ -1501,6 +1501,26 @@ check("register: 'Method: Cash deposit' on a Payments Register task raises THRES
       "THRESHOLD" in _rules([payment_screen.parse_register_entry("TX-M", (
           "Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: 60,000\nCurrency: AED\n"
           "Direction: in\nMethod: Cash deposit\nOriginator: Some Person\nBeneficiary: Example Trading LLC\n"))]))
+def _dir_reg(direction):
+    return payment_screen.parse_register_entry("TX-DIR", (
+        "Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: 30,000\nCurrency: AED\n"
+        f"Direction: {direction}\nMethod: wire\nOriginator: Some Person\nOriginator country: IR\n"
+        "Beneficiary: Example Trading LLC\nBeneficiary country: AE\n"))
+check("register: 'Direction: Incoming' takes the Iranian originator as counterparty and raises HIGH_RISK_GEO",
+      all(_dir_reg(d)["direction"] == "in" and _dir_reg(d)["counterparty"] == "Some Person"
+          and "HIGH_RISK_GEO" in _rules([_dir_reg(d)])
+          for d in ("Incoming", "Inbound", "Received", "IN (received)")))
+check("register: 'Direction: Outgoing' is read as out",
+      _dir_reg("Outgoing")["direction"] == "out"
+      and _dir_reg("Outgoing")["counterparty"] == "Example Trading LLC")
+check("an unrecognised or missing direction is DIRECTION_UNRECOGNISED, never a silent miss",
+      "DIRECTION_UNRECOGNISED" in _rules([_dir_reg("sideways")])
+      and "DIRECTION_UNRECOGNISED" in _rules([_dir_reg("")]))
+check("in / out raise no DIRECTION_UNRECOGNISED",
+      not any("DIRECTION_UNRECOGNISED" in _rules([_dir_reg(d)]) for d in ("in", "out")))
+check("direction rule skips activity records and raw payment messages",
+      "DIRECTION_UNRECOGNISED" not in _rules([{"customer": "X", "activity_only": True},
+                                              {"transaction_id": "M", "payment_message": ":20:X"}]))
 _MT_REG = (":20:REF123\n:32A:261001AED200000,00\n:50K:/1\nACME GOLD TRADING LLC\n"
            ":52A:EBILAEAD\n:57A:HSBCHKHH\n:59:/2\nPEARL METALS LIMITED\n")
 def _msg_rules(msg):
