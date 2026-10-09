@@ -5483,12 +5483,14 @@ check("the report discloses 429 cooldown without falsely claiming an open AI cir
       "LLM rate-limit cooldown (HTTP 429)" in _cooldown_monitor
       and "12 model call(s) deferred" in _cooldown_monitor
       and "AI circuit OPEN" not in _cooldown_monitor
-      and "AI circuit still CLOSED" in _cooldown_monitor)
+      and "AI circuit remained CLOSED" in _cooldown_monitor)
 _mixed_monitor = _mon_section({"attempted": 6, "ok": 1, "failed": 5, "skipped": 8,
                                "circuit_skipped": 3, "rate_limited_skipped": 5})
 check("the monitoring report separates mixed circuit and cooldown skips",
       "3 model call(s) skipped" in _mixed_monitor
       and "5 model call(s) deferred" in _mixed_monitor
+      and "429 cooldown did not itself trip the circuit" in _mixed_monitor
+      and "AI circuit remained CLOSED" not in _mixed_monitor
       and "reason unavailable" not in _mixed_monitor)
 _legacy_monitor = _mon_section({"attempted": 2, "ok": 1, "failed": 1, "skipped": 5})
 check("legacy aggregate skips do not get a fabricated circuit-open diagnosis",
