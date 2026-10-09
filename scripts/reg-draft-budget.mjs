@@ -36,6 +36,15 @@ export function evidenceCount(reported, excerpts) {
     ? reported : shown;
 }
 
+export function missingExcerptNotice(reported, excerpts, description) {
+  const shown = Array.isArray(excerpts) ? excerpts.length : 0;
+  const hidden = evidenceCount(reported, excerpts) - shown;
+  return hidden > 0
+    ? ['OMITTED: ' + hidden + ' additional ' + description +
+       ' were not included in the watcher excerpts; verify the original source manually.']
+    : [];
+}
+
 export function boundedLines(items, prefix, limit, maxChars) {
   const source = Array.isArray(items) ? items : [];
   const lines = source.slice(0, limit).map((item) =>
