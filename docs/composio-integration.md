@@ -20,10 +20,13 @@ The implementation uses the documented Composio HTTP API directly. Hawkeye there
 
 | File | Purpose |
 |---|---|
-| `netlify/functions/_composio.js` | Server-only API adapter |
+| `netlify/functions/_composio.js` | Server-only API adapter with session tool filters |
+| `netlify/functions/_composio-engine-policy.js` | Default-deny read-tool policy and bounded arguments |
+| `composio_engine.py` | Offline evidence-reference coverage and freshness checker; no credentials or network |
 | `netlify/functions/composio-router.js` | Authenticated administration and execution endpoint |
 | `netlify/functions/composio-webhook.js` | HMAC-verified trigger receiver |
-| `test/composio-integration.test.mjs` | Boundary, authentication and webhook tests |
+| `test/composio-integration.test.mjs` | Boundary, read-tool policy, auth, cost/privacy and webhook tests |
+| `test/mcp_tools_test.py` | Engine evidence-contract and local MCP privacy/fail-closed tests |
 | `.env.example` | Required configuration and kill switches |
 | `data/tool-surfaces.json` | Machine-readable connector registration |
 
@@ -35,7 +38,7 @@ Keep `COMPOSIO_ENABLED=0` until all of the following are complete:
 2. A least-privilege Composio project key has been created with the permissions needed for the selected session, connected-account, trigger and webhook operations.
 3. `APP_SHARED_TOKEN` is configured. The Composio router refuses to operate without it.
 4. Each connected business account has been approved, with the narrowest practical provider scopes.
-5. The approved toolkit list is recorded in `COMPOSIO_TOOLKITS`.
+5. The approved toolkit list is recorded in `COMPOSIO_TOOLKITS`; individual read-only tool slugs discovered from that live Composio project are reviewed for side effects and approved separately in `COMPOSIO_READ_TOOL_SLUGS`. No tool execution is allowed while this is empty.
 6. Trigger delivery is used only after `COMPOSIO_WEBHOOK_SECRET` has been stored server-side.
 
 ## Configuration
@@ -46,6 +49,11 @@ Server-side environment:
 COMPOSIO_API_KEY=
 COMPOSIO_ENABLED=0
 COMPOSIO_TOOLKITS=asana,gmail,googledrive,slack,github
+COMPOSIO_READ_TOOL_SLUGS=
+COMPOSIO_ALLOW_HOSTED_MCP=0
+COMPOSIO_ALLOW_ADMIN_MUTATIONS=0
+COMPOSIO_ALLOW_ADVANCED_SESSION=0
+COMPOSIO_ALLOW_PRESIGNED_URLS=0
 COMPOSIO_BASE_URL=https://backend.composio.dev
 COMPOSIO_ALLOW_PROXY=0
 COMPOSIO_WEBHOOK_SECRET=<subscription signing secret>
@@ -74,11 +82,11 @@ Content-Type: application/json
   "user_id": "operator_123",
   "toolkits": ["asana", "gmail", "googledrive", "slack", "github"],
   "manageConnections": true,
-  "mcp": true
+  "mcp": false
 }
 ```
 
-Sessions can be restricted further with auth configs, connected accounts, per-toolkit tool policy and preload settings. Persist the returned Composio session ID in the calling system and reuse it rather than creating a new session for every turn.
+Session tool filters are now enforced server-side from the EXACT read-only tool allowlist. Caller-supplied tool or workbench overrides are rejected; the default is a session with zero executable app tools. Hosted MCP sessions require a separately approved server setting (`COMPOSIO_ALLOW_HOSTED_MCP=1`) and may expose Composio's own meta tools, so **do not** enable this for an untrusted model or client. Persist the returned session ID in a trusted calling system and reuse it for the same verified user.
 
 ### Discover and execute tools
 
@@ -116,7 +124,7 @@ Execute:
 }
 ```
 
-Composio tool arguments are passed to the selected external provider. Do not send a full customer record when the action only needs a task ID, document ID, email ID, or other narrow identifier.
+`tools.execute` now accepts **only an individually approved read-only Composio slug**, from an allowed toolkit, using at most 8,192 bytes of JSON arguments. A verb that resembles read-only is not evidence of side-effect safety: the human reviewer must inspect the actual Composio tool schema, authentication scopes and execution behavior. By default the configured slug allowlist is empty, so this example returns HTTP 403 until approved. `tools.execute_meta` permits schema/search metadata only: remote bash, remote workbench, account-modifying meta tools and bundled multi-execute are blocked. Composio tool arguments are passed to external providers; use narrow IDs and do not transmit full customer records or credentials.
 
 ## Account authentication
 
@@ -142,7 +150,7 @@ This does not change `model_tool_calling.enabled=false` in Hawkeye's capability 
 
 ## Triggers
 
-The router supports trigger type discovery, creation, listing, enabling, disabling, updating and deletion.
+The router supports trigger type discovery and listing. Trigger creation, enable/disable, update and deletion require `COMPOSIO_ALLOW_ADMIN_MUTATIONS=1` on top of the disabled-by-default Composio master gate, and are **not available to the engine**. Session deletion, mount upload/delete and webhook subscription edits or secret rotation use the same high-privilege gate. Mount download URLs require `COMPOSIO_ALLOW_PRESIGNED_URLS=1`, and attaching remote sessions requires `COMPOSIO_ALLOW_ADVANCED_SESSION=1`. Do not enable these under a shared browser token; implement verified operator RBAC and independent approvals first.
 
 Example trigger creation:
 
