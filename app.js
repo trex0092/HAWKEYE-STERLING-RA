@@ -1332,10 +1332,14 @@ function ocIndexUrl(name) {
    by scripts/country-score.mjs from FATF ratings and public US/EU lists). It is
    shown under the jurisdiction for the MLRO to compare with the current score;
    it never feeds the assessment score, and a load failure says so instead of
-   showing nothing. null = still loading; {} = could not load. */
+   showing nothing. null = still loading; {} = could not load. Off http(s)
+   (file://) the browser blocks the fetch and logs a CORS error, so it is not
+   attempted there, the same guard the other fetches in this file use. */
 let suggestedScores = null;
 function loadSuggestedScores() {
-  if (typeof fetch !== 'function') { suggestedScores = {}; paintSuggestedScore(); return; }
+  if (typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) {
+    suggestedScores = {}; paintSuggestedScore(); return;
+  }
   fetch('data/country-score-suggested.json', { credentials: 'same-origin' })
     .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
     .then(d => {

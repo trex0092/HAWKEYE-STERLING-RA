@@ -115,6 +115,25 @@ check('suggested score: the app shows it under the jurisdiction',
   /<div id="jurisdictionSuggested"[^>]*>/.test(html) && /fetch\('data\/country-score-suggested\.json'/.test(src));
 check('suggested score: the app labels it draft and pending MLRO approval, and says so when it cannot load',
   /draft, pending MLRO approval, not applied/.test(src) && /suggestion file could not be loaded/.test(src));
+{
+  /* Off http(s) the fetch is blocked by the browser with a logged CORS error
+     (failed the cross-browser smoke on file://), so it must not be attempted;
+     the panel still says loudly that the file could not be loaded. */
+  const run = (protocol) => {
+    const el = { textContent: '' };
+    let fetched = 0;
+    const c = { location: { protocol }, fetch: () => { fetched++; return new Promise(() => {}); },
+      $: () => el, state: { entity: { jurisdiction: 'Germany' } }, ratingLabel: String };
+    vm.createContext(c);
+    vm.runInContext(pick(/let suggestedScores = null;[\s\S]*?\nfunction paintSuggestedScore\(\) \{[\s\S]*?\n\}/, 'suggested-score loader')
+      + '\nloadSuggestedScores();', c);
+    return { fetched, text: el.textContent };
+  };
+  const off = run('file:'), on = run('https:');
+  check('suggested score: not fetched off http(s) (file://), and the panel says it could not be loaded',
+    off.fetched === 0 && /could not be loaded/.test(off.text));
+  check('suggested score: fetched over https', on.fetched === 1);
+}
 check('suggested score: it never feeds the assessment score (recalc does not read it)',
   !/suggestedScores|paintSuggestedScore/.test(pick(/function recalc\(\)[\s\S]*?\n\}/, 'recalc')));
 
