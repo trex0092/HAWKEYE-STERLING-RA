@@ -259,7 +259,10 @@
       "typology": "trade_based_money_laundering_gold_route",
       "severity": "HIGH",
       "detection": "automated",
-      "source_red_flags": [],
+      "source_red_flags": [
+        "RFC-172",
+        "RFC-184"
+      ],
       "description": "Ordered evidenced gold transport route differs from documented planned route. An alert prompts chain-of-custody review, not a finding of criminality.",
       "required_fields": [
         "gold_trade",
@@ -274,7 +277,10 @@
       "typology": "gold_logistics_post_contract_change",
       "severity": "HIGH",
       "detection": "automated",
-      "source_red_flags": [],
+      "source_red_flags": [
+        "RFC-173",
+        "RFC-175"
+      ],
       "description": "Explicit post-contract route/consignee change in a recorded gold trade. Requires contractual and transport-document review.",
       "required_fields": [
         "gold_trade",
@@ -288,7 +294,10 @@
       "typology": "gold_origin_traceability_gap",
       "severity": "HIGH",
       "detection": "automated",
-      "source_red_flags": [],
+      "source_red_flags": [
+        "RFC-135",
+        "RFC-143"
+      ],
       "description": "Gold origin explicitly recorded as not verified. No alert is inferred from an absent field; escalate for KYS/MLRO provenance review.",
       "required_fields": [
         "gold_trade",
