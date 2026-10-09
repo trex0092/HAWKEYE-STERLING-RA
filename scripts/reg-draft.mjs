@@ -11,17 +11,18 @@
    key is missing or the API errors, it exits 0 so the (detection-only) PR still
    opens. Model id per the repo's Claude usage standard: claude-opus-5
    (override with ANTHROPIC_MODEL, e.g. claude-sonnet-5 to cut cost). */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { extractText, CHANGES_FILE, fetchWithFallback, parseAnalysis } from './reg-watch.mjs';
 import {
   draftBudget, validatedReportDate, boundedLines, boundedItems,
-  manualDraftSection, providerStopReason, usageCounts
+  manualDraftSection, approvedWatchSource, providerStopReason, usageCounts
 } from './reg-draft-budget.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
 const OUT_DIR = 'docs/research/auto';
 const BUDGET = draftBudget(process.env);
+const APPROVED_SOURCES = JSON.parse(readFileSync(new URL('../data/reg-sources.json', import.meta.url), 'utf8')).sources;
 
 function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection-only PR).'); process.exit(0); }
 
@@ -54,7 +55,10 @@ if (!validatedReportDate(date)) skip('invalid report date (YYYY-MM-DD required)'
    references, so severity mutations flow through, and unreachable entries
    must survive onto the card. */
 const allChanges = Array.isArray(changes) ? changes : [];
-if (Array.isArray(changes)) changes = changes.filter(c => c.status === 'new' || c.status === 'changed');
+if (Array.isArray(changes)) {
+  changes = changes.filter(c => c && typeof c === 'object' &&
+    (c.status === 'new' || c.status === 'changed'));
+}
 if (!Array.isArray(changes) || !changes.length) skip('no content changes');
 
 async function fetchText(url) {
@@ -71,6 +75,9 @@ async function fetchText(url) {
 }
 
 async function draftFor(c) {
+  if (!approvedWatchSource(c, APPROVED_SOURCES)) {
+    return { text: manualDraftSection(c, 'source not approved'), ok: false, attempted: false };
+  }
   const page = await fetchText(c.url);
   /* No upstream model call when the primary/archived page could not be
      retrieved: the AI would otherwise be asked to invent the update. */
