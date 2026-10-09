@@ -286,6 +286,42 @@ Points give 0-2 = 1 Low, 3-5 = 2 Medium, 6-8 = 3 High. A jurisdiction FATF has n
 
 On 2026-10-08 the 17 suggestions above the then-current score were applied to the country list, on the approval of Luisa Fernanda (repository owner); no separate MLRO countersignature is recorded. The 53 lower suggestions were not applied: 39 of them would take a country off score 3, which also switches off the OECD Annex II escalation for artisanal (ASM) gold from that country.
 
+
+### Gold trade-route monitoring and PEP coverage QA (review-only)
+
+The transaction-monitoring engine includes explicit gold trade evidence rules:
+\`GOLD_ROUTE_DEVIATION\` compares the **recorded planned and actual transport
+routes** (ordered two-letter country codes); \`GOLD_ROUTE_CHANGE\` reports an
+expressly documented post-contract shipment-route or consignee change;
+\`GOLD_ORIGIN_UNVERIFIED\` reports an explicitly failed/unverified origin
+check. A malformed supplied route gives \`GOLD_ROUTE_UNREADABLE\`, which needs
+manual checking. An absent route or unknown origin is not treated as proof
+of a mismatch or a clean supply chain. All are MLRO review findings, not
+sanctions designations, fraud findings, reporting/freeze instructions or
+automatic customer decisions.
+
+A Payments Register template can provide \`Gold trade: yes\`,
+\`Gold planned route: GH, AE\`, \`Gold actual route: GH, TR, AE\`,
+\`Gold route changed after contract: yes\`, and
+\`Gold origin verified: no\`. Corresponding fields are also documented
+in \`data/transaction-feed.schema.json\`. Production transaction
+monitoring remains **inactive without an approved real feed**. Never
+commit actual transaction or shipment/customer PII to this repository.
+
+The existing \`hawkeye_analyze_kyc_note\` MCP tool also returns an
+\`individuals[].pep_country_qa\` reminder for Turkey (including Türkiye
+spelling), India and Papua New Guinea. These are **operator-selected
+screening-quality spot-check examples**, not newly elevated country risk
+scores or evidence of PEP exposure. A nationality never establishes a PEP
+finding, and a negative public-source match never confirms someone is not a
+PEP. No country scores, lists or Asana KYC records change.
+
+The **53 proposed country-score decreases remain unapplied**. In
+particular, 39 would lower a high-risk classification and affect the
+existing artisanal-gold EDD trigger. Such changes need separate documented
+risk-model validation and MLRO approval, not this engineering PR.
+
+
 ## MCP server (AI-agent access to the engine)
 
 A **Model Context Protocol (MCP)** server exposes the deterministic screening
