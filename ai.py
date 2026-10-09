@@ -22,7 +22,7 @@ DESIGN RULES (governance-first):
 
 No third-party dependencies (uses requests, already required by the engine).
 """
-import os, re, json, hashlib, datetime, unicodedata, threading
+import os, re, json, hashlib, datetime, unicodedata, threading, time
 
 # ── LLM GATEWAY (opt-in, gated on ANTHROPIC_API_KEY) ──────────────────────────
 AI_MODEL      = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
@@ -209,7 +209,8 @@ LLM_USAGE = {"input_tokens": 0, "output_tokens": 0,
 # sharpening on every remaining article while saving no time at all, because
 # those replies were already fast. Throttling is not an outage.
 LLM_BREAKER_AFTER = int(os.environ.get("LLM_BREAKER_AFTER", "5"))
-_LLM_STATE = {"consecutive_failures": 0, "open": False, "reason": ""}
+_LLM_STATE = {"consecutive_failures": 0, "open": False, "reason": "",
+              "rate_limit_until": 0.0}
 # The triage pass is threaded, so the counters below are shared mutable state.
 # `+=` is not atomic and these numbers are REPORTED — an undercount would
 # understate how degraded a run was, which is the kind of quiet inaccuracy this
@@ -244,12 +245,47 @@ def _llm_unreachable():
 # succeed) nothing in this run will change the answer, so the first such reply
 # opens the circuit with its reason. Same defined degrade as the breaker:
 # deterministic triage stands, no finding lost, and the footer says so.
-_FINAL_REFUSAL = re.compile(r"credit balance|usage limit|spend(ing)? limit|billing", re.I)
+_FINAL_REFUSAL = re.compile(r"credit balance|usage limit|spend(ing)? limit|billing|quota exceeded", re.I)
+
+# Transient upstream 429s must NOT permanently trip the transport circuit,
+# but hammering the same limited API per article wastes network time and
+# produces no extra verdict. Pause new paid calls until a bounded cooldown
+# expires; deterministic findings and cached model verdicts still stand.
+def _llm_cooldown_seconds(response):
+    try:
+        base = int(os.environ.get("LLM_429_COOLDOWN_SECONDS", "60"))
+    except ValueError:
+        base = 60
+    base = max(1, min(300, base))
+    try:
+        retry_after = (getattr(response, "headers", {}) or {}).get("Retry-After")
+        n = int(str(retry_after))
+        if n > 0:
+            return max(1, min(300, n))
+    except (TypeError, ValueError, AttributeError):
+        pass
+    return base
+
+
+def _llm_pause_on_429(response):
+    pause = _llm_cooldown_seconds(response)
+    with _LLM_LOCK:
+        _LLM_STATE["rate_limit_until"] = max(
+            _LLM_STATE.get("rate_limit_until", 0.0), time.monotonic() + pause
+        )
+
+
+def _llm_rate_paused():
+    with _LLM_LOCK:
+        if time.monotonic() < _LLM_STATE.get("rate_limit_until", 0.0):
+            LLM_CALLS["skipped"] += 1
+            return True
+    return False
 
 def _llm_refusal_is_final(r) -> bool:
     if r.status_code in (401, 403):
         return True
-    if r.status_code == 400:
+    if r.status_code in (400, 429):
         try:
             return bool(_FINAL_REFUSAL.search(r.text or ""))
         except Exception:
@@ -277,6 +313,8 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
         with _LLM_LOCK:
             LLM_CALLS["skipped"] += 1
         return None
+    if _llm_rate_paused():
+        return None
     with _LLM_LOCK:
         LLM_CALLS["attempted"] += 1
     prompt, system = redact_identifiers(prompt), redact_identifiers(system)
@@ -297,6 +335,8 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
                 LLM_CALLS["failed"] += 1
             if _llm_refusal_is_final(r):
                 _llm_stop(f"HTTP {r.status_code}")
+            elif r.status_code == 429:
+                _llm_pause_on_429(r)
             return None
         data = r.json()
         parts = data.get("content", []) or []

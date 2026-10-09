@@ -390,6 +390,9 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     [400, /malformed/i, 'bad request'],
   ];
   let hintsOk = true, bodyLeak = false;
+  const loggedProviderDiagnostics = [];
+  const originalProviderWarn = console.warn;
+  console.warn = (...parts) => { loggedProviderDiagnostics.push(parts.join(' ')); };
   for (const [status, re] of HINTS) {
     mockFetch(async () => ({ ok: false, status, text: async () => 'SECRET-PROVIDER-DETAIL org_id=abc123' }));
     /* Distinct per-status client IP: these probes must not consume the shared
@@ -400,8 +403,12 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     if (!re.test(rr.text) || !new RegExp('API error ' + status).test(rr.text)) hintsOk = false;
     if (/SECRET-PROVIDER-DETAIL|org_id/.test(rr.text)) bodyLeak = true;
   }
+  console.warn = originalProviderWarn;
   check('handler: every upstream status carries an operator-actionable next step', hintsOk);
   check('handler: the provider error BODY is still never reflected to the client', !bodyLeak);
+  check('handler: provider error bodies are not written to server logs',
+    !/SECRET-PROVIDER-DETAIL|org_id=abc123/.test(loggedProviderDiagnostics.join(' ')) &&
+    loggedProviderDiagnostics.some(x => /Anthropic API error 401/.test(x)));
 
   // 6d-bis/ter use a DISTINCT client IP so they don't consume the shared default
   // rate-limit bucket that the later cases rely on.

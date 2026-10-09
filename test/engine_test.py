@@ -808,6 +808,8 @@ check("401/403 are final refusals", ai._llm_refusal_is_final(_Reply(401)) and ai
 check("a 429 (throttling) is NOT final", not ai._llm_refusal_is_final(_Reply(429, "rate limit")))
 check("a 500/529 is NOT final", not ai._llm_refusal_is_final(_Reply(529, "overloaded")))
 check("an ordinary 400 is NOT final", not ai._llm_refusal_is_final(_Reply(400, "max_tokens too large")))
+check("a billing quota 429 is a final refusal, unlike transient throttling",
+      ai._llm_refusal_is_final(_Reply(429, "Your credit balance is too low")))
 
 # ── ai.py: report stays deterministic even if a key were present ──────────────
 print("ai.py — no generative prose in reports")
@@ -5303,7 +5305,7 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 ai.AI_ENABLED = True
 
 def _reset_llm():
-    ai._LLM_STATE.update(consecutive_failures=0, open=False)
+    ai._LLM_STATE.update(consecutive_failures=0, open=False, rate_limit_until=0.0)
     for _k in ai.LLM_CALLS:
         ai.LLM_CALLS[_k] = 0
 
@@ -5325,19 +5327,30 @@ check("refused calls count as skipped, never as attempted or failed",
       and ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER
       and ai.LLM_CALLS["attempted"] == ai.LLM_BREAKER_AFTER)
 
-# A REPLY IS NOT AN OUTAGE — the rule the concurrent triage pass depends on.
-# The breaker exists to stop paying the 30s timeout; an HTTP reply of any status
-# arrives in milliseconds and costs nothing, so it must not accumulate toward
-# "unreachable". Concurrency earns 429s, and tripping on a burst of them would
-# disable triage for the whole run while saving no time whatsoever.
+# A REPLY IS NOT AN OUTAGE — a rate-limited model must pause, NOT be
+# misclassified as a transport outage. No repeated billed attempts during the
+# cooldown; conservative deterministic triage remains available.
 _reset_llm()
-_req.post = lambda *a, **k: _Resp(429)
+_hits429 = {"n": 0}
+def _rate_limited(*a, **k):
+    _hits429["n"] += 1
+    return _Resp(429)
+_req.post = _rate_limited
 for _ in range(ai.LLM_BREAKER_AFTER * 3):
     ai.llm_complete("x")
-check("a burst of 429s never trips the breaker — throttling is not an outage",
+check("429 throttling does not trip the unreachable circuit",
       not ai.llm_circuit_open())
-check("but those 429s are still counted as failed, for disclosure",
-      ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER * 3)
+check("429 pauses further API attempts rather than flooding provider",
+      _hits429["n"] == 1 and ai.LLM_CALLS["attempted"] == 1
+      and ai.LLM_CALLS["failed"] == 1
+      and ai.LLM_CALLS["skipped"] == ai.LLM_BREAKER_AFTER * 3 - 1)
+# Simulate passage of the advertised retry window without sleeping.
+ai._LLM_STATE["rate_limit_until"] = 0.0
+_req.post = lambda *a, **k: _Resp(200, "recovered")
+check("429 cooldown expires and allows a new model attempt",
+      ai.llm_complete("x") == "recovered" and ai.LLM_CALLS["ok"] == 1)
+check("Retry-After seconds are clamped to prevent unlimited upstream backoff",
+      1 <= ai._llm_cooldown_seconds(_Resp(429)) <= 300)
 _reset_llm()
 _req.post = lambda *a, **k: _Resp(500)
 for _ in range(ai.LLM_BREAKER_AFTER * 2):
