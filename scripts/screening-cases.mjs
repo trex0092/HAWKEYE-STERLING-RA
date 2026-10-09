@@ -529,8 +529,26 @@ async function main() {
          It only appends analyst-assistance text to the Asana digest. */
       const ai = await enrichScreeningResults(results);
       const digestResults = { ...results, ai_enrichment: ai };
-      if (ai.text) console.log('screening-cases: OpenAI analyst enhancement appended (' + (ai.model || 'configured model') + ')');
-      else if (ai.enabled && ai.error) console.warn('screening-cases: OpenAI enhancement unavailable — ' + ai.error + '; original digest will still post');
+      if (ai.text) {
+        // Usage-only accounting: no customer names, sampled prompts or raw
+        // provider responses enter public CI logs.
+        const u = ai.usage || {};
+        const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
+        console.log('screening-cases: OpenAI analyst enhancement appended (' +
+          (ai.model || 'configured model') + '); tokens input=' + count(u.input_tokens) +
+          ' output=' + count(u.output_tokens) + ' cached_input=' +
+          count(u.cached_input_tokens) + ' reasoning_output=' +
+          count(u.reasoning_output_tokens) + ' output_budget=' +
+          count(ai.output_token_budget));
+      } else if (ai.enabled && ai.skipped === 'healthy_clean_run') {
+        console.log('screening-cases: optional OpenAI skipped; clean and fully covered run needs no paid summary');
+      } else if (ai.enabled && ai.error) {
+        console.warn('screening-cases: OpenAI enhancement unavailable — ' +
+          ai.error + '; original digest will still post');
+        if (ai.usage) console.warn('screening-cases: unsuccessful OpenAI output still used ' +
+          (Number.isSafeInteger(ai.usage.total_tokens) ? ai.usage.total_tokens : 0) +
+          ' billed tokens; no AI note was published');
+      }
       const html = buildResultsDigestHtml(digestResults, a => (casesState[a.key] || {}).taskGid || null);
       const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || SECTIONS.sanctions.gid;
       /* Mirror the daily case digest into the queue the MLRO actually works
