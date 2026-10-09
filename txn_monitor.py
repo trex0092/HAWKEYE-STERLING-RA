@@ -835,6 +835,9 @@ def _with_counterparty_country(t):
             return t
         c = str(foreign[0].get("country_name") or foreign[0].get("country")).strip()
         cp = cp or foreign[0].get("name") or foreign[0].get("bic")
+    if len(c) == 3 and c.isalpha():
+        import payment_screen
+        c = payment_screen.ISO3_TO_ISO2.get(c.upper(), c)
     if len(c) == 2 and c.isalpha():
         import payment_screen
         c = payment_screen.ISO2_TO_JURISDICTION.get(c.upper(), c.upper())

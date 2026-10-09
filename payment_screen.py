@@ -56,6 +56,16 @@ ISO2_TO_JURISDICTION = {
     "VE": "venezuela", "VN": "vietnam", "YE": "yemen",
     "IR": "islamic republic of iran", "KP": "north korea", "MM": "myanmar",
 }
+# ISO 3166-1 alpha-3 codes for the same jurisdictions. A register or feed that
+# records "IRN" instead of "IR" missed the table: an Iranian originator raised
+# no HIGH_RISK_GEO. test/engine_test.py fails if an alpha-2 code above has none.
+ISO3_TO_ISO2 = {
+    "AGO": "AO", "BOL": "BO", "BIH": "BA", "VGB": "VG", "BGR": "BG", "CMR": "CM",
+    "CIV": "CI", "COD": "CD", "HTI": "HT", "IRQ": "IQ", "KEN": "KE", "KWT": "KW",
+    "LAO": "LA", "LBN": "LB", "MCO": "MC", "NPL": "NP", "PNG": "PG", "SSD": "SS",
+    "SYR": "SY", "VEN": "VE", "VNM": "VN", "YEM": "YE", "IRN": "IR", "PRK": "KP",
+    "MMR": "MM",
+}
 
 # Party roles. ORIGINATOR / BENEFICIARY are the R.16 mandatory pair.
 ORIGINATOR, BENEFICIARY = "originator", "beneficiary"
@@ -474,6 +484,8 @@ def parse_register_entry(name, notes):
                 party["name"] = val
             if len(ctry) == 2 and ctry.isalpha():
                 party["country"] = ctry.upper()
+            elif ctry.upper() in ISO3_TO_ISO2:
+                party["country"] = ISO3_TO_ISO2[ctry.upper()]
             elif ctry:
                 party["country_name"] = ctry
             out_parties.append(party)
