@@ -21,7 +21,7 @@ check('workflow never serializes all GitHub variables to env/logs',
   !/\bVARS_JSON\b/.test(workflow));
 check('production deploy never equates HTTP 200 with published assets',
   workflow.includes('scripts/site-currency.mjs --quiet') &&
-  workflow.includes('after ~18 minutes') &&
+  workflow.includes('in ~18 minutes') &&
   workflow.includes('Build hook returned HTTP success, but production did not publish'));
 check('operational runbook distinguishes build activation from publish locks',
   runbook.includes('Active builds') &&
