@@ -63,6 +63,16 @@ check('a critical match at the end displaces an earlier low-priority match',
   criticalEvidence.evidence_coverage.omitted_alerts===6);
 check('a one-entry sample always prioritizes the highest-severity row',
   prioritySampleAlerts(criticalLast,1)[0].name==='CRITICAL LAST');
+const allCritical = [...Array.from({length:15},(_,i) =>
+  highRow('CRITICAL #'+i,'critical',99,'UN Consolidated Sanctions')),
+  highRow('PEP BACKFILL','medium',52,'PEP (Wikidata)'),
+  highRow('MEDIA BACKFILL','low',30,'Adverse Media (Google News)'),
+];
+const protectedCritical = screeningEvidence({...fixture,alerts:allCritical});
+check('critical overflow never loses slots to lower-risk domain diversity',
+  protectedCritical.alerts.length===12 &&
+  protectedCritical.alerts.every(a=>a.band==='critical') &&
+  protectedCritical.evidence_coverage.omitted_critical_alerts===3);
 const diverse = [
   ...Array.from({length:17},(_,i)=>highRow('SANCTION #'+i,'high',99,'UK OFSI')),
   highRow('SYNTHETIC PEP','medium',59,'PEP (Wikidata)'),
@@ -163,14 +173,27 @@ check('missing or out-of-order headings are rejected before Asana output',
   !validateAnalystNote(validNote.replace('## PEP context','## Other context')).ok);
 check('overlong model reports are not treated as valid compliance summaries',
   validateAnalystNote(validNote + ' filler'.repeat(500)).reason==='too_many_words');
-check('explicit clean-day gate is true only with full, healthy coverage',
-  isHealthyCleanRun({
-    date:'2026-10-09',screened:20,newMatches:0,matchCount:4,degraded:false,
-    alerts:[],failures:[],lists:[{name:'UN',count:500}],
-    enrichment:{amErrors:0,amPartial:0,pepErrors:0,skipped:0}
-  }) &&
-  !isHealthyCleanRun({newMatches:0,alerts:[],failures:[],lists:[],degraded:false}) &&
-  !isHealthyCleanRun({newMatches:0,alerts:[],failures:['UN unavailable'],lists:[{name:'EU'}]}));
+const verifiedClean = {
+  date:'2026-10-09',screened:20,newMatches:0,matchCount:4,degraded:false,
+  alerts:[],failures:[],lists:[{name:'UN',count:500,partial:false}],
+  enrichment:{amErrors:0,amPartial:0,pepErrors:0,skipped:0,
+    pepLookupEnabled:true,amLocalesPerSubject:8,
+    amBackboneFailures:{googleNews:0,gdelt:0,bing:0}}
+};
+check('explicit clean-day gate is true only with verified health of every enabled source',
+  isHealthyCleanRun(verifiedClean) &&
+  !isHealthyCleanRun({...verifiedClean, degraded:true}) &&
+  !isHealthyCleanRun({...verifiedClean,failures:['UN unavailable']}) &&
+  !isHealthyCleanRun({...verifiedClean,lists:[]}));
+check('unknown coverage does not enable a cheap but misleading clean-day shortcut',
+  !isHealthyCleanRun({...verifiedClean,enrichment:{}}) &&
+  !isHealthyCleanRun({...verifiedClean,enrichment:undefined}) &&
+  !isHealthyCleanRun({...verifiedClean,lists:[{name:'UN',count:500}]}) &&
+  !isHealthyCleanRun({...verifiedClean,lists:[{name:'UN',count:500,partial:true}]}) &&
+  !isHealthyCleanRun({...verifiedClean,enrichment:{...verifiedClean.enrichment,
+    pepLookupEnabled:false}}) &&
+  !isHealthyCleanRun({...verifiedClean,enrichment:{...verifiedClean.enrichment,
+    amBackboneFailures:{googleNews:0,gdelt:1,bing:0}}}));
 check('adaptive ceiling reserves more space only for complex runs',
   adaptiveOutputTokens({alerts:[]},1800)===850 &&
   adaptiveOutputTokens({alerts:Array(6).fill({})},1800)===1100 &&
@@ -184,11 +207,7 @@ const disabled = await enrichScreeningResults(fixture,{
 check('API key alone never authorizes customer-screening evidence egress',
   disabled.enabled === false && disabled.reason.includes('explicit processor/transfer approval') &&
   called === 0);
-const cleanDay = await enrichScreeningResults({
-  date:'2026-10-09',screened:20,newMatches:0,matchCount:5,degraded:false,
-  alerts:[],failures:[],lists:[{name:'UN',count:500}],
-  enrichment:{amErrors:0,amPartial:0,pepErrors:0,skipped:0}
-},{
+const cleanDay = await enrichScreeningResults({...verifiedClean,matchCount:5},{
   enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>{called++;throw new Error('MUST NOT BE CALLED');}
 });
