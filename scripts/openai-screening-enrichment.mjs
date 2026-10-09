@@ -79,9 +79,15 @@ export function prioritySampleAlerts(alerts, limit = 12) {
     score: finiteCount(row && row.topScore) || 0,
     domains: evidenceDomains(row),
   })).sort((a, b) => b.rank - a.rank || b.score - a.score || a.index - b.index);
-  // Allocate 9 slots by priority, reserve up to 3 for domain diversity.
-  const reserved = Math.min(3, Math.floor(max / 4));
-  const chosen = ranked.slice(0, Math.min(max, max - reserved));
+  // CRITICAL cases are never displaced by domain-diversity sampling.
+  // Reserve slots for secondary evidence only after all eligible CRITICAL
+  // rows have been selected, even if all 12 slots are CRITICAL.
+  const critical = ranked.filter(item => item.rank === BAND_ORDER.critical).slice(0, max);
+  const free = max - critical.length;
+  const reserved = Math.min(3, Math.floor(free / 4));
+  const chosen = critical.concat(
+    ranked.filter(item => item.rank !== BAND_ORDER.critical).slice(0, free - reserved)
+  );
   const indices = new Set(chosen.map(x => x.index));
   for (const domain of ['sanctions', 'pep', 'media']) {
     if (chosen.length >= max) break;
@@ -98,17 +104,26 @@ export function prioritySampleAlerts(alerts, limit = 12) {
 }
 
 export function isHealthyCleanRun(results) {
+  // Skipping a billable note on a clean day is allowed only when actual
+  // runtime COVERAGE is known to be complete, not merely absent/undefined.
+  // Unknown coverage, disabled PEP lookup, list errors or partial lists need
+  // explicit human-visible attention, so do not invoke the cost shortcut.
   if (!results || typeof results !== 'object' ||
       !Array.isArray(results.alerts) || results.alerts.length !== 0 ||
-      results.newMatches !== 0 || results.degraded === true ||
+      results.newMatches !== 0 || results.degraded !== false ||
       !Array.isArray(results.failures) || results.failures.length ||
-      !Array.isArray(results.lists) || results.lists.length === 0) return false;
-  const h = results.enrichment || {};
+      !Array.isArray(results.lists) || results.lists.length === 0 ||
+      results.lists.some(list => !list || list.partial !== false ||
+        !Number.isSafeInteger(list.count) || list.count <= 0)) return false;
+  const h = results.enrichment;
+  if (!h || typeof h !== 'object' || h.pepLookupEnabled !== true ||
+      !Number.isSafeInteger(h.amLocalesPerSubject) || h.amLocalesPerSubject < 1) return false;
   if ([h.amErrors, h.amPartial, h.pepErrors, h.skipped].some(
-    value => value !== undefined && value !== null && value !== 0)) return false;
+    value => !Number.isSafeInteger(value) || value !== 0)) return false;
   if (h.pepWorldwide && h.pepWorldwide.partial === true) return false;
-  if (h.amBackboneFailures && Object.values(h.amBackboneFailures).some(
-    value => value !== undefined && value !== null && value !== 0)) return false;
+  if (!h.amBackboneFailures || ['googleNews', 'gdelt', 'bing'].some(
+    source => !Number.isSafeInteger(h.amBackboneFailures[source]) ||
+      h.amBackboneFailures[source] !== 0)) return false;
   return true;
 }
 
