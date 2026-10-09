@@ -29,7 +29,7 @@ import os, re, json, math, datetime
 from collections import defaultdict
 
 import txn_feed  # stdlib-only validation; never fetches or stores customer data
-from payment_screen import canonical_direction
+import payment_screen  # stdlib-only; label and country-code tables
 
 CASH_REPORT_THRESHOLD = float(os.environ.get("DPMS_CASH_THRESHOLD", "55000"))
 CDD_TRIGGER_THRESHOLD = float(os.environ.get("CDD_TRIGGER_THRESHOLD", "15000"))
@@ -808,7 +808,7 @@ def _with_canonical_direction(t):
     synonym. The recorded label is kept in direction_recorded."""
     if not isinstance(t, dict):
         return t
-    d = canonical_direction(t.get("direction"))
+    d = payment_screen.canonical_direction(t.get("direction"))
     if not d or d == t.get("direction"):
         return t
     return dict(t, direction=d, direction_recorded=t.get("direction"))
@@ -836,10 +836,8 @@ def _with_counterparty_country(t):
         c = str(foreign[0].get("country_name") or foreign[0].get("country")).strip()
         cp = cp or foreign[0].get("name") or foreign[0].get("bic")
     if len(c) == 3 and c.isalpha():
-        import payment_screen
         c = payment_screen.ISO3_TO_ISO2.get(c.upper(), c)
     if len(c) == 2 and c.isalpha():
-        import payment_screen
         c = payment_screen.ISO2_TO_JURISDICTION.get(c.upper(), c.upper())
     if c == t.get("counterparty_country") and cp == t.get("counterparty"):
         return t
