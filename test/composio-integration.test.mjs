@@ -47,6 +47,8 @@ try {
   let rejected = false;
   try { composio._test.assertAllowedToolkit('dropbox'); } catch { rejected = true; }
   check('unregistered toolkit is rejected', rejected);
+  check('explicit empty toolkit selection never broadens to five defaults',
+    composio._test.allowedToolkits([]).length === 0);
 
   rejected = false;
   try { composio._test.cleanId('../escape', 'id'); } catch { rejected = true; }
