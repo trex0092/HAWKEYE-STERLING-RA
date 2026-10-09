@@ -561,12 +561,14 @@ const CITE_RECOGNIZED = new Set([
   'CAB 57/2018',  // Cabinet Decision No. (57) of 2018 — cited by the Q&A corpus
   'CAB 57/2020',  // Cabinet Decision No. (57) of 2020 — cited by the Q&A corpus
   'CAB 111/2022', // Cabinet Decision No. (111) of 2022 — cited by the Q&A corpus
-  'FDL 26/2021',  // Federal Decree-Law No. 26 of 2021 — AML amendment law (data/reg-sources.json)
   'FDL 33/2021',  // Federal Decree-Law No. 33 of 2021 — labour law (the Advisor's HR domain)
   'FDL 7/2014',   // Federal Law No. 7 of 2014 — counter-terrorism offences (TF topics)
 ]);
 const CITE_REPEALED = {
   'FDL 20/2018': 'repealed by Federal Decree-Law No. 10 of 2025',
+  // FDL 26/2021 amended FDL 20/2018 and was repealed with it
+  // (docs/research/uae-aml-legal-framework.md): as a CURRENT basis it is stale.
+  'FDL 26/2021': 'amended FDL 20/2018 and was repealed with it by Federal Decree-Law No. 10 of 2025',
   'CAB 10/2019': 'superseded by Cabinet Resolution No. (134) of 2025',
   'FDL 4/2002': 'the original AML law, repealed by Federal Decree-Law No. (20) of 2018 and in turn by FDL 10/2025',
 };
@@ -786,6 +788,24 @@ const MODEL_BY_MODE = {
    cached advisor.js) gets the visible degrade below, unchanged. On a site
    whose cap affords deep in one call, none of this runs. */
 const DEEP_HOP_LIMIT = Math.max(2, Math.min(8, Math.ceil(MODEL_BY_MODE.deep.maxTokens / AFFORDABLE_TOKENS)));
+/* The user turn that resumes a deep answer (the API's documented replacement
+   for continuing an interrupted response without a prefill). */
+const DEEP_CONTINUE_INSTRUCTION = 'Your previous response was interrupted and ended with the text above. '
+  + 'Continue from exactly where it stopped. Do not repeat, restate or summarise anything already written.';
+/* Join a hop's chunk to the prior text. A prefill used to continue mid-token;
+   a fresh turn starts a new token, so insert a single space only when neither
+   side already carries whitespace at the seam. */
+/* Token counts the API billed for this call, for spend measurement. Numbers
+   only: nothing from the request or response text enters the audit line. */
+function usageTag(u) {
+  const n = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.round(Number(v)) : 0);
+  return 'tokens=in:' + n(u.input_tokens) + ',out:' + n(u.output_tokens) +
+    ',cacheRead:' + n(u.cache_read_input_tokens) + ',cacheWrite:' + n(u.cache_creation_input_tokens);
+}
+function joinContinuation(prior, chunk) {
+  if (!prior || !chunk) return prior + chunk;
+  return /\s$/.test(prior) || /^\s/.test(chunk) || /^[.,;:!?)\]]/.test(chunk) ? prior + chunk : prior + ' ' + chunk;
+}
 
 function selectModel(mode, deepContinue) {
   const requested = mode === 'speed' || mode === 'deep' ? mode : 'balanced';
@@ -961,16 +981,22 @@ const handle = async (event) => {
   const systemBlocks  = buildSystemBlocks(persona);
   const userMessage   = modeInstruction + '\n\nQUESTION:\n' + boundary.question + (boundary.context.trim() ? '\n\nCONTEXT:\n' + boundary.context : '');
 
-  /* On a resumed hop the prior output is replayed as an assistant prefill so
-     the model continues mid-thought. trimEnd() on both what is SENT and what is
-     KEPT — the API rejects trailing whitespace in a prefill, and keeping a
-     different string from the one sent would desynchronise the resume point. */
+  /* On a resumed hop the prior output is replayed as an assistant turn and the
+     model is asked, in a FOLLOWING user turn, to continue from where it stopped.
+     It is never sent as a last-assistant-turn prefill: the Claude 4.6+ models,
+     the governed deep model (claude-opus-5) included, reject a request that ends
+     on an assistant message with HTTP 400 — so every hop after the first failed
+     and billed the first hop for an error. trimEnd() keeps the sent and kept
+     strings identical so the resume point stays in sync. */
   const priorText = continuation && boundary.accumulated ? boundary.accumulated.replace(/\s+$/, '') : '';
   const messages = [{ role: 'user', content: userMessage }];
-  if (priorText) messages.push({ role: 'assistant', content: priorText });
+  if (priorText) {
+    messages.push({ role: 'assistant', content: priorText });
+    messages.push({ role: 'user', content: DEEP_CONTINUE_INSTRUCTION });
+  }
 
   const start = Date.now();
-  let text = '', ok = true, stopReason = '';
+  let text = '', ok = true, stopReason = '', usage = null;
 
   const ctrl = new AbortController();
   const abortTimer = setTimeout(() => ctrl.abort(), ABORT_BUDGET_MS);
@@ -1007,6 +1033,7 @@ const handle = async (event) => {
       const data = await apiResp.json().catch(() => null);
       const blocks = (data && Array.isArray(data.content)) ? data.content : [];
       stopReason = String((data && data.stop_reason) || '');
+      usage = (data && data.usage && typeof data.usage === 'object') ? data.usage : null;
       text = blocks.filter(b => b && b.type === 'text').map(b => b.text).join('');
       if (!text) {
         ok = false;
@@ -1041,7 +1068,7 @@ const handle = async (event) => {
      as it would be on a single-call path. Invariant 2: a partial response
      carries the accumulated text for the next hop and nothing renderable. */
   if (continuation) {
-    const full = priorText + text;
+    const full = joinContinuation(priorText, text);
     if (ok && tippingOffGuard(full)) {
       text = full; // fall through: the guard block below withholds it
     } else if (ok && stopReason === 'max_tokens' && deepHop + 1 < DEEP_HOP_LIMIT) {
@@ -1099,6 +1126,7 @@ const handle = async (event) => {
     (degradedFrom ? ' | modeDegraded=' + degradedFrom + '→' + effectiveMode : '') +
     (continuation ? ' | deepHops=' + (deepHop + 1) : '') +
     ' | elapsedMs=' + elapsedMs + ' | ok=' + ok +
+    (usage ? ' | ' + usageTag(usage) : '') +
     ' | hash=' + simpleHash(question) +
     ' | piiPolicy=' + boundary.mode +
     ' | outputPolicy=' + outputReview.policy +
@@ -1149,6 +1177,7 @@ exports.__internals = {
   PII_PATTERNS, piiGuard, structureGuard, budgetFlag,
   hallucinationGuard, legalCiteGuard, CITE_RECOGNIZED, CITE_REPEALED, injectionGuard, anomalyGuard, qualityScore,
   selectModel, MODEL_BY_MODE, PLATFORM_CAP_MS, ABORT_BUDGET_MS, AFFORDABLE_TOKENS, DEEP_MIN_TOKENS, DEEP_HOP_LIMIT,
+  DEEP_CONTINUE_INSTRUCTION, joinContinuation, usageTag,
   simpleHash, buildKnowledgeContext, apiErrorHint, isUsageLimit,
   TYPOLOGIES, RED_FLAGS_HIGH, KRIS, ZERO_TOLERANCE, PERSONA_SUFFIX, buildSystemBlocks,
 };

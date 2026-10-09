@@ -170,9 +170,9 @@ REGULATORY BASIS
 
 This screening is conducted in accordance with:
 
-— UAE Federal Decree-Law No. 26 of 2021 (AML/CFT Law)
+— UAE Federal Decree-Law No. 10 of 2025 (AML/CFT/CPF Law — repeals FDL 20/2018 as amended by FDL 26/2021)
+— UAE Cabinet Resolution No. 134 of 2025 (Executive Regulations of FDL 10/2025)
 — UAE Cabinet Resolution No. 74 of 2020 (TFS Obligations)
-— UAE Federal Decree-Law No. 10 of 2025 (AML/CFT Amendments)
 — FATF Recommendation 6 (Targeted Financial Sanctions)
 — FATF Recommendation 10 (Customer Due Diligence)
 — MoE Due Diligence Regulations — DPMS Sector
@@ -325,9 +325,10 @@ STR Reference (if any): ___________________________
 
 > RETENTION NOTICE: This record and all supporting
 > files must be retained for a minimum of 10 years
-> from the date of screening pursuant to UAE Federal
-> Decree-Law No. 26 of 2021, Article 23, and Cabinet
-> Resolution No. 74 of 2020."""
+> from the date of screening — UAE AML framework
+> (Federal Decree-Law No. 10 of 2025, repealing FDL
+> 20/2018 as amended; duty formerly FDL 26/2021
+> Art. 23) and Cabinet Resolution No. 74 of 2020."""
 
 # ---- create Asana task ----
 pat             = os.environ["ASANA_PAT"]

@@ -36,6 +36,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 | Document | What it is | Framework ref |
 |---|---|---|
 | [iso-42001-soa-2026.md](iso-42001-soa-2026.md) | Statement of Applicability (Advisor view) | ISO 42001 Annex A |
+| [iso-27001-soa-draft-2026.md](iso-27001-soa-draft-2026.md) | **Draft** Statement of Applicability for all 93 controls: applicability proposals, repository evidence and gaps (not approved; no certification claimed) | ISO/IEC 27001:2022 Annex A |
 | [nist-ai-rmf-mapping-2026.md](nist-ai-rmf-mapping-2026.md) | GOVERN/MAP/MEASURE/MANAGE crosswalk | NIST AI RMF 1.0 |
 | [eu-ai-act-assessment-2026.md](eu-ai-act-assessment-2026.md) | Applicability, role & risk classification, Art. 4 literacy, Art. 73-equivalent clocks | EU AI Act (voluntary) |
 | [uae-ai-charter-mapping-2026.md](uae-ai-charter-mapping-2026.md) | 12-principle mapping | UAE AI Charter |

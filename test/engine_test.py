@@ -5250,6 +5250,25 @@ check("an intermittent outage never trips the breaker — a reply re-arms it",
       not ai.llm_circuit_open())
 check("the healthy calls in that run still returned their text", ai.LLM_CALLS["ok"] == 10)
 
+# SPEND MEASUREMENT. Each successful reply's billed `usage` is summed into
+# ai.LLM_USAGE (counts only); a malformed usage field is ignored, never raised.
+_reset_llm()
+for _k in ai.LLM_USAGE:
+    ai.LLM_USAGE[_k] = 0
+class _UsageResp:
+    def __init__(self, usage):
+        self.status_code, self._usage = 200, usage
+    def json(self):
+        return {"content": [{"type": "text", "text": "fine"}], "usage": self._usage}
+_req.post = lambda *a, **k: _UsageResp({"input_tokens": 120, "output_tokens": 30,
+                                        "cache_read_input_tokens": 400, "cache_creation_input_tokens": 0})
+ai.llm_complete("x"); ai.llm_complete("y")
+_req.post = lambda *a, **k: _UsageResp({"input_tokens": "lots", "output_tokens": -5})
+ai.llm_complete("z")
+check("billed tokens are summed per run from each response's usage object",
+      ai.LLM_USAGE == {"input_tokens": 240, "output_tokens": 60,
+                       "cache_read_input_tokens": 800, "cache_creation_input_tokens": 0})
+
 # THREAD SAFETY. The triage pass is now a fan-out, so the counters are shared.
 # `+=` is not atomic and these numbers are reported — an undercount would
 # understate how degraded a run was.

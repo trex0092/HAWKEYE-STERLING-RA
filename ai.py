@@ -169,6 +169,10 @@ def llm_available() -> bool:
 # Read by monitoring.py to track LLM call volume & failures per run. `skipped`
 # counts calls the circuit breaker below refused to make.
 LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0, "skipped": 0, "cached": 0}
+# Billed tokens across the run, read from each response's `usage` object, so
+# spend can be measured instead of estimated. Counts only, never content.
+LLM_USAGE = {"input_tokens": 0, "output_tokens": 0,
+             "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
 
 # LLM circuit breaker — the mirror of the GDELT / Google News / Bing / Wikidata
 # guards in screen.py, and for the same reason. A degraded Anthropic endpoint
@@ -297,8 +301,13 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
         data = r.json()
         parts = data.get("content", []) or []
         text = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
         with _LLM_LOCK:
             LLM_CALLS["ok" if text else "failed"] += 1
+            for _k in LLM_USAGE:
+                _v = usage.get(_k)
+                if isinstance(_v, int) and _v >= 0:
+                    LLM_USAGE[_k] += _v
         return text or None
     except Exception:
         # Transport error or timeout — the expensive case, and the only one the

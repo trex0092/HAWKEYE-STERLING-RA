@@ -54,5 +54,5 @@ document-control procedure.
 > a document an auditor does not know to ask for.
 
 **Owner:** MLRO / Compliance. **Review cadence:** at least annually and on any
-material change to the AI system. **Retention:** 10 years (UAE FDL No. 26 of 2021,
-Art. 23).
+material change to the AI system. **Retention:** 10 years (UAE FDL No. 10 of 2025;
+duty formerly FDL 26/2021 Art. 23).
