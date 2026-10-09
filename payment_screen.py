@@ -382,6 +382,18 @@ def _yes_no(v):
     return None
 
 
+# An AED amount: digits with optional thousands commas (1,234,567 or the Indian
+# 12,34,567) and at most two decimals. "60.000,00" (a decimal comma) used to
+# read as 60, and "60.000" as 60 — a 1,000x understatement that cleared the
+# DPMSR threshold silently. Anything else is unreadable and alerts.
+_AMOUNT_RE = re.compile(r"-?(?:\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3}|\d+)(?:\.\d{1,2})?")
+
+
+def _amount(v):
+    s = str(v if v is not None else "").strip()
+    return float(s.replace(",", "")) if _AMOUNT_RE.fullmatch(s) else None
+
+
 def _first_num(v):
     m = re.search(r"\d[\d,]*(?:\.\d+)?", str(v or ""))
     return _num(m.group(0)) if m else None
@@ -496,10 +508,10 @@ def parse_register_entry(name, notes):
            "method": fields.get("method", "").lower(),
            "customer": fields.get("customer", ""),
            "remittance_info": fields.get("reference", "")}
-    amount = _num(fields.get("amount"))
+    amount = _amount(fields.get("amount"))
     if amount is not None:
         rec["amount"] = amount
-    emv = _num(fields.get("expected monthly volume"))
+    emv = _amount(fields.get("expected monthly volume"))
     if emv:
         rec["expected_monthly_volume"] = emv
     rec.update(_register_monitoring_fields(fields))
