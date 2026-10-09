@@ -128,12 +128,16 @@
   "h": "https://ofac.treasury.gov/contact-ofac"
  },
  {
-  "t": "Designations Removals; Designations Updates; Publication of Iran-related OFAC Alert; Publication of Amended Iran-related Frequently Asked Question",
-  "h": "https://ofac.treasury.gov/recent-actions/20261005"
+  "t": "Iran-related Designations; Issuance of Iran-related General License; Issuance of Amended Russia-related General License",
+  "h": "https://ofac.treasury.gov/recent-actions/20261008"
  },
  {
   "t": "Sanctions List Updates",
   "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
+ },
+ {
+  "t": "Designations Removals; Designations Updates; Publication of Iran-related OFAC Alert; Publication of Amended Iran-related Frequently Asked Question",
+  "h": "https://ofac.treasury.gov/recent-actions/20261005"
  },
  {
   "t": "Counter Terrorism Designations",
@@ -176,12 +180,8 @@
   "h": "https://ofac.treasury.gov/recent-actions/20260923"
  },
  {
-  "t": "Expiration of Emergency With Respect to the Situation in Ethiopia; Ethiopia-related Designations Removals; Issuance of Amended Russia-related General License and Associated Frequently Asked Questions",
-  "h": "https://ofac.treasury.gov/recent-actions/20260918"
- },
- {
   "t": "Current page 1",
-  "h": "https://ofac.treasury.gov/recent-actions?page=0"
+  "h": "https://ofac.treasury.gov/recent-actions?pulse_nocache=1791539600098-2&page=0"
  },
  {
   "t": "All Recent Actions",
