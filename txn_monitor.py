@@ -868,6 +868,13 @@ def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):
     return alerts
 
 
+def _customer_key(name):
+    """Grouping key for a customer name: case, dots, commas and spacing ignored,
+    so "Acme LLC", "ACME LLC " and "Acme L.L.C." are one customer. Grouping on
+    the raw string split their payments and hid structuring across them."""
+    return " ".join(re.sub(r"[.,]", "", str(name or "?")).lower().split()) or "?"
+
+
 def evaluate(transactions, jurisdiction_table=None):
     """Group by customer and evaluate. Returns {configured, n_txns, n_customers,
     alerts:[...], by_severity:{...}, rule_errors:{...}}. With no feed:
@@ -875,7 +882,7 @@ def evaluate(transactions, jurisdiction_table=None):
     txns = transactions or []
     by_customer = defaultdict(list)
     for t in txns:
-        by_customer[t.get("customer", "?")].append(t)
+        by_customer[_customer_key(t.get("customer"))].append(t)
     alerts = []
     rule_errors = {}
     for cust, ctx in by_customer.items():
