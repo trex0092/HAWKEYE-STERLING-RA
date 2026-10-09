@@ -2,7 +2,7 @@
  * provider quota classification and usage telemetry. */
 import {
   boundedInt, draftBudget, validatedReportDate, boundedLines, boundedItems,
-  manualDraftSection, providerStopReason, usageCounts
+  manualDraftSection, approvedWatchSource, providerStopReason, usageCounts
 } from '../scripts/reg-draft-budget.mjs';
 
 let passed = 0, failed = 0;
@@ -53,6 +53,15 @@ check('null / malformed arrays cannot crash source extractors',
   boundedItems(null, 'NEW ITEM: ', 10, 250).length === 0);
 
 const source = {name:'Safe\nExample',url:'https://regulator.example/document'};
+const approved = [{ id: 'uae-reg', name: 'Authority', url: 'https://regulator.example/document' }];
+check('Regulatory Watch only fetches approved source IDs and exact URLs',
+  approvedWatchSource({ id: 'uae-reg', url: 'https://regulator.example/document' }, approved) &&
+  !approvedWatchSource({ id: 'unknown', url: 'https://regulator.example/document' }, approved) &&
+  !approvedWatchSource({ id: 'uae-reg', url: 'https://127.0.0.1/private' }, approved) &&
+  !approvedWatchSource({ id: 'uae-reg', url: 'http://regulator.example/document' }, approved));
+check('unregistered source is marked for review without a provider call',
+  manualDraftSection(source, 'source not approved').includes('source not approved'));
+
 check('manual fallback preserves source link, does not invent a severity',
   manualDraftSection(source,'API request budget exhausted').includes('regulator.example') &&
   !manualDraftSection(source,'API request budget exhausted').includes('SEVERITY:') &&
