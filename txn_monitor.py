@@ -426,8 +426,16 @@ def rule_gold_route_deviation(txns):
     for t in txns:
         if t.get("gold_trade") is not True:
             continue
-        planned = _gold_route_countries(t.get("gold_route_planned"))
-        actual = _gold_route_countries(t.get("gold_route_actual"))
+        try:
+            planned = _gold_route_countries(t.get("gold_route_planned"))
+            actual = _gold_route_countries(t.get("gold_route_actual"))
+        except ValueError:
+            # One malformed route must not hide legitimate findings on the
+            # customer's other payments. Report processing failure as review.
+            out.append(_alert("GOLD_ROUTE_UNREADABLE", "HIGH", t,
+                "gold route fields malformed; manually verify source and "
+                "destination against approved transport evidence"))
+            continue
         if planned and actual and planned != actual:
             out.append(_alert("GOLD_ROUTE_DEVIATION", "HIGH", t,
                 "recorded gold route differs from the documented planned route; "
