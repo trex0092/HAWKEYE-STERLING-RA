@@ -420,9 +420,15 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
                          "repeated failures or a credit/usage-limit refusal; those items carry DETERMINISTIC "
                          "triage/summaries only (severity floors intact, no finding dropped)")
             if rate_limited:
+                # A later independent breaker trip is possible in the same run.
+                # Do not claim the circuit stayed closed if it subsequently
+                # opened for a different reason.
+                state = ("429 cooldown did not itself trip the circuit; "
+                         "other open-circuit skips are reported separately"
+                         if circuit else "AI circuit remained CLOSED")
                 L.append(f"      ⚠ LLM rate-limit cooldown (HTTP 429) — {rate_limited} model call(s) "
                          "deferred while provider requests are paused; those items carry DETERMINISTIC "
-                         "triage/summaries only, with the AI circuit still CLOSED")
+                         f"triage/summaries only ({state})")
             if unattributed:
                 L.append(f"      ⚠ LLM coverage degraded — {unattributed} model call(s) skipped, "
                          "reason unavailable in legacy/incomplete telemetry; verify model status "
