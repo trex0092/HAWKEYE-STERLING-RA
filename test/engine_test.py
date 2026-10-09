@@ -1544,6 +1544,14 @@ check("in / out raise no DIRECTION_UNRECOGNISED",
 check("direction rule skips activity records and raw payment messages",
       "DIRECTION_UNRECOGNISED" not in _rules([{"customer": "X", "activity_only": True},
                                               {"transaction_id": "M", "payment_message": ":20:X"}]))
+check("structuring is caught across case / spacing / dot variants of one customer name",
+      "STRUCTURING" in _rules([{"customer": n, "method": "cash", "currency": "AED", "direction": "in",
+                                "amount": 52000, "date": f"2026-10-0{i + 1}", "transaction_id": f"TS{i}"}
+                               for i, n in enumerate(("Acme LLC", "ACME  LLC ", "Acme L.L.C."))]))
+check("three different customers are still evaluated apart (no STRUCTURING)",
+      "STRUCTURING" not in _rules([{"customer": n, "method": "cash", "currency": "AED", "direction": "in",
+                                    "amount": 52000, "date": f"2026-10-0{i + 1}", "transaction_id": f"TD{i}"}
+                                   for i, n in enumerate(("Acme LLC", "Beta LLC", "Gamma LLC"))]))
 _MT_REG = (":20:REF123\n:32A:261001AED200000,00\n:50K:/1\nACME GOLD TRADING LLC\n"
            ":52A:EBILAEAD\n:57A:HSBCHKHH\n:59:/2\nPEARL METALS LIMITED\n")
 def _msg_rules(msg):
