@@ -80,7 +80,8 @@ export function prioritySampleAlerts(alerts, limit = 12) {
     domains: evidenceDomains(row),
   })).sort((a, b) => b.rank - a.rank || b.score - a.score || a.index - b.index);
   // Allocate 9 slots by priority, reserve up to 3 for domain diversity.
-  const chosen = ranked.slice(0, Math.min(max, Math.max(0, max - 3)));
+  const reserved = Math.min(3, Math.floor(max / 4));
+  const chosen = ranked.slice(0, Math.min(max, max - reserved));
   const indices = new Set(chosen.map(x => x.index));
   for (const domain of ['sanctions', 'pep', 'media']) {
     if (chosen.length >= max) break;
