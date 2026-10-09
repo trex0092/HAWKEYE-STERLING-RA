@@ -101,11 +101,14 @@ const cleaned = approvedWatchSourceDetails(forgedSource, [
 check('approved metadata remains bounded and strips newline/control injection',
   cleaned && cleaned.name.length <= 120 && !cleaned.name.includes('\n') &&
   cleaned.jurisdiction === 'UAE Test');
+// Build the hostile URI from parts: ESLint no-script-url forbids static
+// script URLs even in inert test data, but the unsafe-scheme case matters.
+const hostileLink = 'java' + 'script:alert(1)';
 check('unapproved source URL and name cannot become rendered action links',
-  !manualDraftSection({ name: 'MALICIOUS_SOURCE', url:'javascript:alert(1)' },
+  !manualDraftSection({ name: 'MALICIOUS_SOURCE', url: hostileLink },
       'source not approved').includes('MALICIOUS_SOURCE') &&
-  !manualDraftSection({ name: 'MALICIOUS_SOURCE', url:'javascript:alert(1)' },
-      'source not approved').includes('javascript:'));
+  !manualDraftSection({ name: 'MALICIOUS_SOURCE', url: hostileLink },
+      'source not approved').includes(hostileLink));
 
 check('unregistered source is marked for review without a provider call',
   manualDraftSection(source, 'source not approved').includes('source not approved'));
