@@ -318,6 +318,92 @@ expect_valueerror("failed extraction cannot carry fields",
                       **_doc_evidence, "extraction_status": "failed"
                   }, person_index=0))
 
+# ── Composio connected-app evidence: existence is NOT verification ───────────
+print("mcp_tools — Composio metadata-only evidence assessment")
+_connected = {
+    "schema_version": "hawkeye.composio-evidence/v1",
+    "as_of": "2026-10-09",
+    "freshness_days": 30,
+    "requirements": [
+        "asana.kyc_case", "gmail.evidence_request", "googledrive.provenance",
+        "slack.review_thread", "github.ci_result"
+    ],
+    "observations": [
+        {"check": "asana.kyc_case", "status": "available",
+         "checked_at": "2026-10-09", "reference": "ASANA:synthetic-case-001"},
+        {"check": "gmail.evidence_request", "status": "available",
+         "checked_at": "2026-10-08", "reference": "GMAIL:synthetic-email-001"},
+        {"check": "googledrive.provenance", "status": "available",
+         "checked_at": "2026-10-09", "reference": "DRIVE:synthetic-doc-001"},
+        {"check": "slack.review_thread", "status": "unavailable",
+         "checked_at": "2026-10-09", "reference": None},
+        {"check": "github.ci_result", "status": "available",
+         "checked_at": "2026-10-09", "reference": "GITHUB:synthetic-run-001"},
+    ],
+}
+_conn = mcp_tools.assess_connected_evidence(_connected)
+check("Composio evidence checker covers all five business sources",
+      _conn["required_count"] == 5 and _conn["reference_count"] == 4
+      and _conn["unresolved_count"] == 1
+      and _conn["state_counts"]["SOURCE_UNAVAILABLE"] == 1)
+check("Composio evidence never claims that a connected source is verified",
+      _conn["human_review_required"] is True
+      and _conn["identity_verified"] is False
+      and _conn["source_content_verified"] is False
+      and _conn["mlro_approval_granted"] is False
+      and _conn["cdd_gaps_cleared"] is False)
+check("Composio evidence output never echoes source refs, emails or IDs",
+      "synthetic-email-001" not in json.dumps(_conn)
+      and "synthetic-doc-001" not in json.dumps(_conn)
+      and "synthetic-case-001" not in json.dumps(_conn))
+check("Composio evidence is explicitly INCOMPLETE during source outage",
+      not _conn["all_references_located"]
+      and any(x["check"] == "slack.review_thread"
+              and x["state"] == "SOURCE_UNAVAILABLE" for x in _conn["coverage"]))
+_recent = {**_connected, "observations": _connected["observations"][:1]}
+check("Composio absent source observation is NOT_CHECKED, never a passed check",
+      mcp_tools.assess_connected_evidence(_recent)["state_counts"]["NOT_CHECKED"] == 4)
+_stale = {**_connected, "observations": [
+    {**_connected["observations"][0], "checked_at": "2026-01-01"}]}
+check("Composio old KYC reference is stale, not independently verified",
+      mcp_tools.assess_connected_evidence(_stale)["coverage"][0]["state"]
+      == "STALE_OBSERVATION")
+_duplicate = {**_connected, "observations": [
+    _connected["observations"][0],
+    {**_connected["observations"][0], "status": "not_found", "reference": None}]}
+check("Composio conflicting reads cannot produce favorable evidence",
+      mcp_tools.assess_connected_evidence(_duplicate)["coverage"][0]["state"]
+      == "MULTIPLE_OBSERVATIONS")
+expect_valueerror("Composio rejects unrequested provider evidence",
+                  lambda: mcp_tools.assess_connected_evidence({
+                      **_connected, "observations": _connected["observations"] +
+                      [{"check": "github.deploy_record", "status": "available",
+                        "checked_at": "2026-10-09", "reference": "GITHUB:synthetic-run-001"}]}))
+expect_valueerror("Composio rejects arbitrary provider body/doc/email fields",
+                  lambda: mcp_tools.assess_connected_evidence({
+                      **_connected, "observations": [
+                          {**_connected["observations"][0], "message_body": "PRIVATE PASSPORT"}]}))
+expect_valueerror("Composio rejects unsupported toolkits and data categories",
+                  lambda: mcp_tools.assess_connected_evidence({
+                      **_connected, "requirements": ["dropbox.raw_files"]}))
+expect_valueerror("Composio rejects missing provenance for available evidence",
+                  lambda: mcp_tools.assess_connected_evidence({
+                      **_connected, "observations": [
+                          {**_connected["observations"][0], "reference": None}]}))
+expect_valueerror("Composio rejects future-dated observations",
+                  lambda: mcp_tools.assess_connected_evidence({
+                      **_connected, "observations": [
+                          {**_connected["observations"][0], "checked_at": "2026-10-10"}]}))
+expect_valueerror("Composio rejects boolean freshness budget",
+                  lambda: mcp_tools.assess_connected_evidence({
+                      **_connected, "freshness_days": True}))
+expect_valueerror("Composio rejects repeated required evidence check",
+                  lambda: mcp_tools.assess_connected_evidence({
+                      **_connected, "requirements": ["asana.kyc_case", "asana.kyc_case"]}))
+expect_valueerror("Composio rejects unverified vendor-native payloads",
+                  lambda: mcp_tools.assess_connected_evidence({
+                      **_connected, "provider_payload": {"data": ["PRIVATE"]}}))
+
 # ── mcp_tools.call_tool dispatch ───────────────────────────────────────────────────
 print("mcp_tools — dispatch")
 check("call_tool dispatches a known tool", mcp_tools.call_tool("hawkeye_normalize_name", {"name": "Test"})["normalized"] == "TEST")
@@ -341,6 +427,7 @@ _valid_args = {
         {"role": "originator", "name": "Test Person Ltd"}, {"role": "beneficiary", "name": "Other Co"}]},
     "hawkeye_monitor_transactions": {"transactions": [{"customer": "C", "date": "2026-01-01", "amount": 55000, "method": "cash"}]},
     "hawkeye_compare_document_evidence": {"notes": _doc_note, "evidence": _doc_evidence, "person_index": 0},
+    "hawkeye_assess_connected_evidence": {"manifest": _connected},
     "hawkeye_analyze_kyc_note": {"notes": "SECTION 4\nIndividual 1 — Director\nName: JANE DOE\n"},
     "hawkeye_jurisdiction_risk": {"country": "Iran"},
     "hawkeye_name_variants": {"name": "Mohammed Abdul Rahman"},
