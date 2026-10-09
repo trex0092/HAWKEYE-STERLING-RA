@@ -86,12 +86,18 @@ check('usage telemetry retains only bounded numeric token counts',
   Object.values(safeUsage({input_tokens:'secret',output_tokens:-2,total_tokens:Infinity})).every(n=>n===0));
 
 let called = 0;
-const noKey = await enrichScreeningResults(fixture,{apiKey:'',fetchImpl:async()=>{called++;}});
+const disabled = await enrichScreeningResults(fixture,{
+  enabled:false, apiKey:'SYNTHETIC_PROVIDER_KEY',fetchImpl:async()=>{called++;}
+});
+check('API key alone never authorizes customer-screening evidence egress',
+  disabled.enabled === false && disabled.reason.includes('explicit processor/transfer approval') &&
+  called === 0);
+const noKey = await enrichScreeningResults(fixture,{enabled:true,apiKey:'',fetchImpl:async()=>{called++;}});
 check('missing key means no API call or customer-data egress',
   noKey.enabled === false && called === 0);
 let captured;
 const ok = await enrichScreeningResults(fixture,{
-  apiKey:'SYNTHETIC_PROVIDER_KEY',model:'gpt-5.6-luna',maxInputChars:5000,
+  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'gpt-5.6-luna',maxInputChars:5000,
   maxOutputTokens:999999,timeoutMs:99999999,
   fetchImpl:async(url,request)=>{
     captured={url,request};
@@ -113,7 +119,7 @@ check('success returns only model output and numeric usage metadata',
 
 let readErrorBody=0;
 const bad=await enrichScreeningResults(fixture,{
-  apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>({ok:false,status:429,json:async()=>{
     readErrorBody++;
     return {error:{message:'REFLECTED_SECRET_OR_PRIVATE_ACCOUNT_ID'}};
@@ -123,14 +129,14 @@ check('429 provider error bodies are never parsed, returned or leaked into logs'
   bad.text==='' && bad.error.includes('429') && readErrorBody===0 &&
   !JSON.stringify(bad).includes('REFLECTED_SECRET_OR_PRIVATE_ACCOUNT_ID'));
 const thrown=await enrichScreeningResults(fixture,{
-  apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>{throw new Error('REFLECTED_CUSTOMER_ID_AND_KEY');}
 });
 check('network exception messages are redacted, never echoed',
   thrown.error.includes('transport failed') &&
   !JSON.stringify(thrown).includes('REFLECTED_CUSTOMER_ID_AND_KEY'));
 const incomplete=await enrichScreeningResults(fixture,{
-  apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>({ok:true,status:200,json:async()=>({
     status:'incomplete',output:[{content:[{type:'output_text',text:'TRUNCATED'}]}]
   })})
@@ -138,7 +144,7 @@ const incomplete=await enrichScreeningResults(fixture,{
 check('partially generated answers cannot masquerade as complete analysis',
   incomplete.text==='' && incomplete.error.includes('incomplete'));
 const invalidModel=await enrichScreeningResults(fixture,{
-  apiKey:'SYNTHETIC_PROVIDER_KEY',model:'invalid model with spaces',
+  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'invalid model with spaces',
   fetchImpl:async()=>{called++;}
 });
 check('invalid model settings fail closed before an API request',
