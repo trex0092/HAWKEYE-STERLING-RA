@@ -1,0 +1,5 @@
+# CI-only: the dispatch-only Arabic-name benchmark (.github/workflows/arabic-name-bench.yml).
+# Never imported by the engine, the app or the MCP server. Constrained to the
+# engine lock so both files install together in one environment.
+-c requirements.txt
+rigour==2.5.0

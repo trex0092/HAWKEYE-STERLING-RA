@@ -337,7 +337,14 @@ what this repository does not evidence. No certification is claimed, and no scor
 gaps this repository records, with licence evidence and adoption mode. Nothing adopted; no scored
 control changed.*
 
-Verified at HEAD: 70 workflows · 199 markdown documents under docs/ (166 excluding docs/research/auto).
+*Estate re-verification · 8 October 2026 — Arabic-name matching benchmark added: a
+dispatch-only, shadow-only workflow that scores the live fuzzy gate and opensanctions/rigour
+(MIT) on Latin-to-Arabic-script name pairs from the UN Consolidated List, downloaded on the
+runner. Watchman matching benchmark added beside the yente one: a dispatch-only, shadow-only
+workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
+no government list. Measurement only — no scored control changed.*
+
+Verified at HEAD: 72 workflows · 199 markdown documents under docs/ (166 excluding docs/research/auto).
 
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days

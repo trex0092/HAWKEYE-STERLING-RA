@@ -3895,6 +3895,14 @@ def parse_un(data):
                     el = entry.find(field)
                     if el is not None and el.text: parts.append(el.text.strip())
                 if parts: entry_names.append(" ".join(parts))
+                # The UN publishes the party's name in its original script
+                # (Arabic, Cyrillic, ...) as NAME_ORIGINAL_SCRIPT. It was never
+                # read, so a customer recorded in that script could not meet the
+                # designation: normalize() keeps Arabic in Arabic and romanize()
+                # deliberately does not guess it. Recall-only: it adds a name.
+                orig = entry.find("NAME_ORIGINAL_SCRIPT")
+                if orig is not None and orig.text and orig.text.strip():
+                    entry_names.append(orig.text.strip())
                 # Designated a.k.a. names are real designations the party operates
                 # under — capture them too (EU/UK parsers already do). Missing these
                 # was a false-negative gap: a UN alias-only match would screen clear.
