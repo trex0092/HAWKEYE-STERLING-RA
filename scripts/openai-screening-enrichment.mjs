@@ -197,13 +197,22 @@ export async function enrichScreeningResults(results, {
   apiKey = process.env.OPENAI_API_KEY || '',
   model = process.env.OPENAI_SCREENING_MODEL || DEFAULT_OPENAI_SCREENING_MODEL,
   fetchImpl = globalThis.fetch,
-  timeoutMs = Number(process.env.OPENAI_SCREENING_TIMEOUT_MS) || 30000
+  timeoutMs = process.env.OPENAI_SCREENING_TIMEOUT_MS,
+  maxInputChars = process.env.OPENAI_SCREENING_MAX_INPUT_CHARS,
+  maxOutputTokens = process.env.OPENAI_SCREENING_MAX_OUTPUT_TOKENS
 } = {}) {
   if (!apiKey) return { enabled: false, text: '', reason: 'OPENAI_API_KEY not configured' };
-  if (typeof fetchImpl !== 'function') return { enabled: true, text: '', error: 'fetch unavailable' };
+  if (typeof fetchImpl !== 'function') return { enabled: true, text: '', error: 'OpenAI transport unavailable' };
+  // A bad model identifier must never turn an access token into an opaque
+  // error returned from the processor or an unbounded logging field.
+  if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/.test(model)) {
+    return { enabled: true, text: '', error: 'OpenAI model configuration invalid' };
+  }
 
+  const input = buildEnrichmentPrompt(results, { maxInputChars });
+  const outputBudget = boundedInt(maxOutputTokens, 1400, 256, 1800);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs));
+  const timer = setTimeout(() => controller.abort(), boundedInt(timeoutMs, 30000, 5000, 60000));
   try {
     const response = await fetchImpl(OPENAI_RESPONSES_URL, {
       method: 'POST',
@@ -212,30 +221,34 @@ export async function enrichScreeningResults(results, {
         Authorization: 'Bearer ' + apiKey,
         'Content-Type': 'application/json'
       },
-      // codeql[js/file-access-to-http]: reviewed 2026-09-21, intended design, not a leak.
-      // screeningEvidence() (above) already curates/clips this data before it gets here
-      // (name/jurisdiction/hits length-capped, no secrets or credentials), the destination
-      // is the fixed OPENAI_RESPONSES_URL literal (not attacker-controllable), the feature
-      // is opt-in (returns enabled:false above if OPENAI_API_KEY is unset), and store:false
-      // is set explicitly. See this file's header comment for the documented data flow.
+      // CodeQL: fixed vendor endpoint, explicit opt-in and store:false.
+      // The bounded, sampled evidence is human-review-only, not a clearance.
       body: JSON.stringify({
         model,
         store: false,
-        input: buildEnrichmentPrompt(results),
-        max_output_tokens: 1400
+        input,
+        max_output_tokens: outputBudget
       })
     });
-    const payload = await response.json().catch(() => ({}));
+    // Provider error bodies can contain org/account IDs, sensitive request
+    // echoes or billing metadata. Never return or log the raw error.message.
     if (!response.ok) {
-      const msg = payload && payload.error && payload.error.message
-        ? payload.error.message : 'HTTP ' + response.status;
-      return { enabled: true, text: '', error: clip(msg, 300), model };
+      return { enabled: true, text: '', error: safeOpenAIError(response.status), model };
+    }
+    const payload = await response.json().catch(() => null);
+    if (!payload || payload.error || (payload.status && payload.status !== 'completed')) {
+      return { enabled: true, text: '', error: 'OpenAI response incomplete or invalid; manual review required', model };
     }
     const text = extractResponseText(payload);
-    if (!text) return { enabled: true, text: '', error: 'OpenAI response contained no text output', model };
-    return { enabled: true, text, model };
-  } catch (e) {
-    return { enabled: true, text: '', error: clip(e && e.message || e, 300), model };
+    if (!text || text.length > 14000) {
+      return { enabled: true, text: '', error: 'OpenAI response empty or exceeded output bounds; manual review required', model };
+    }
+    return { enabled: true, text, model, usage: safeUsage(payload.usage),
+      input_chars: input.length, output_token_budget: outputBudget };
+  } catch (_) {
+    // Do not surface network exception text: some SDKs/clients include query
+    // parameters, provider account details or reflected credentials in errors.
+    return { enabled: true, text: '', error: 'OpenAI request timed out or transport failed; manual review required', model };
   } finally {
     clearTimeout(timer);
   }
