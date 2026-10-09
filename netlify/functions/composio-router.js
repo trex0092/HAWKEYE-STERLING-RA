@@ -71,6 +71,7 @@ async function dispatch(action, body) {
     case 'session.get':
       return composio.getSession(body.session_id);
     case 'session.update':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.updateSession(body.session_id, body.patch);
     case 'session.delete':
       requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
