@@ -639,6 +639,20 @@ def rule_date_unreadable(txns):
             if not (t.get("activity_only") or t.get("payment_message")) and not _d(t.get("date"))]
 
 
+def rule_method_unrecognised(txns):
+    """A payment whose method is missing or is not a known label for cash,
+    wire or gold. The DPMSR threshold, structuring and cash rules key on the
+    method, so such a payment is never assessed for them. Activity records and
+    raw payment messages are not judged."""
+    return [_alert("METHOD_UNRECOGNISED", "HIGH", t,
+            f"method {str(t.get('method') or '').strip() or 'not recorded'!r} is not cash, wire "
+            "or gold — the DPMSR threshold, structuring and cash rules could not evaluate this "
+            "payment; record Method: cash | wire | gold")
+            for t in txns
+            if not (t.get("activity_only") or t.get("payment_message"))
+            and _norm(t.get("method")) not in KNOWN_METHODS]
+
+
 def rule_customer_not_in_db(txns):
     """A payment or activity task whose customer matches no Customer Database
     record (set by the daily run's resolver). No CDD file means no profile to
@@ -714,7 +728,8 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
           rule_reference_keyword, rule_personal_account, rule_linked_threshold,
           rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db,
-          rule_amount_not_comparable, rule_date_unreadable]
+          rule_amount_not_comparable, rule_date_unreadable,
+          rule_method_unrecognised]
 
 
 def _any_customer(txns):
@@ -734,6 +749,43 @@ def _alert(rule, severity, t, detail):
 
 _AGENT_ROLES = {"ordering_institution", "senders_correspondent", "receivers_correspondent",
                 "intermediary", "account_with_institution"}
+
+
+# Payment-method labels people actually type on a Payments Register task or a
+# feed export, mapped to the three values the rules key on. Only unambiguous
+# synonyms: anything else stays as recorded and raises METHOD_UNRECOGNISED,
+# because "cash deposit" or "bank transfer" falling outside the exact words
+# "cash" / "wire" silently dropped the DPMSR THRESHOLD, STRUCTURING and the
+# cash rules for an AED 60,000 payment.
+_METHOD_SYNONYMS = {
+    "cash": "cash", "cash deposit": "cash", "cash payment": "cash",
+    "cash deposited": "cash", "banknotes": "cash", "bank notes": "cash",
+    "currency notes": "cash",
+    "wire": "wire", "wire transfer": "wire", "bank transfer": "wire",
+    "bank wire": "wire", "swift": "wire", "swift transfer": "wire",
+    "tt": "wire", "telegraphic transfer": "wire", "international transfer": "wire",
+    "remittance": "wire", "transfer": "wire",
+    "gold": "gold",
+}
+KNOWN_METHODS = frozenset(_METHOD_SYNONYMS.values())
+
+
+def _canonical_method(raw):
+    """'Cash (AED notes)' -> 'cash'; 'Bank transfer' -> 'wire'; else ''."""
+    s = re.sub(r"\([^)]*\)", " ", str(raw or "")).lower()
+    s = " ".join(re.sub(r"[^a-z ]", " ", s).split())
+    return _METHOD_SYNONYMS.get(s, "")
+
+
+def _with_canonical_method(t):
+    """Copy of t whose method is cash/wire/gold when the recorded label is a
+    known synonym. The recorded label is kept in method_recorded."""
+    if not isinstance(t, dict):
+        return t
+    m = _canonical_method(t.get("method"))
+    if not m or m == t.get("method"):
+        return t
+    return dict(t, method=m, method_recorded=t.get("method"))
 
 
 def _with_counterparty_country(t):
@@ -774,7 +826,7 @@ def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):
     optional rule_errors dict) so a rule that silently produces no alerts because
     it crashes on every customer is visible, not a silent all-clear."""
     alerts = []
-    txns = [_with_counterparty_country(t) for t in txns]
+    txns = [_with_canonical_method(_with_counterparty_country(t)) for t in txns]
     for rule in _RULES:
         try:
             if rule is rule_high_risk_counterparty:
