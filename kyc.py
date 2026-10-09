@@ -85,6 +85,18 @@ _JURISDICTION_ALIASES = {
     "bvi": "british virgin islands",
     "bolivarian republic of venezuela": "venezuela",
     "plurinational state of bolivia": "bolivia",
+    # ISO 3166 / UN short names, which put the qualifier after the name.
+    "iran, islamic republic of": "islamic republic of iran",
+    "iran (islamic republic of)": "islamic republic of iran",
+    "korea, democratic people's republic of": "north korea",
+    "korea (democratic people's republic of)": "north korea",
+    "congo, the democratic republic of the": "the democratic republic of congo",
+    "congo, democratic republic of the": "the democratic republic of congo",
+    "venezuela, bolivarian republic of": "venezuela",
+    "venezuela (bolivarian republic of)": "venezuela",
+    "bolivia, plurinational state of": "bolivia",
+    "bolivia (plurinational state of)": "bolivia",
+    "virgin islands, british": "british virgin islands",
 }
 
 

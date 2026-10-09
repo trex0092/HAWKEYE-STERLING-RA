@@ -1019,6 +1019,25 @@ _iso_names = set(payment_screen.ISO2_TO_JURISDICTION.values())
 _missing_iso = [c for c in _jr.get("grey", []) + _jr.get("high", []) if c.strip().lower() not in _iso_names]
 check("every FATF-listed jurisdiction has an ISO code for payment screening (add it to "
       "ISO2_TO_JURISDICTION): " + ", ".join(_missing_iso), not _missing_iso)
+_missing_iso3 = sorted(set(payment_screen.ISO2_TO_JURISDICTION) - set(payment_screen.ISO3_TO_ISO2.values()))
+check("every listed alpha-2 code has its alpha-3 code (add it to ISO3_TO_ISO2): "
+      + ", ".join(_missing_iso3), not _missing_iso3)
+def _ctry_reg(country):
+    return payment_screen.parse_register_entry("TX-C", (
+        "Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: 30,000\nCurrency: AED\n"
+        f"Direction: in\nMethod: wire\nOriginator: Some Person\nOriginator country: {country}\n"
+        "Beneficiary: Example Trading LLC\nBeneficiary country: AE\n"))
+check("register: an originator country of IRN / PRK / MMR raises HIGH_RISK_GEO like IR / KP / MM",
+      all("HIGH_RISK_GEO" in [a["rule"] for a in txn_monitor.evaluate([_ctry_reg(c)])["alerts"]]
+          for c in ("IRN", "PRK", "MMR")))
+check("register: ISO short names ('Iran, Islamic Republic of') raise HIGH_RISK_GEO",
+      all("HIGH_RISK_GEO" in [a["rule"] for a in txn_monitor.evaluate([_ctry_reg(c)])["alerts"]]
+          for c in ("Iran, Islamic Republic of", "Korea, Democratic People's Republic of")))
+check("counterparty_country 'IRN' on a feed record raises HIGH_RISK_GEO",
+      "HIGH_RISK_GEO" in [a["rule"] for a in txn_monitor.evaluate([{
+          "customer": "A", "date": "2026-10-01", "amount": 30000, "currency": "AED",
+          "direction": "in", "method": "wire", "counterparty": "X",
+          "counterparty_country": "IRN"}])["alerts"]])
 _ps_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in
                           ("ACME GENERAL TRADING LLC", "SEA FALCON SHIPPING COMPANY", "ZED")]}
 _px = screen.safe_xml_fromstring
