@@ -396,6 +396,63 @@ def rule_route_mismatch(txns):
             for t in txns if t.get("route_mismatch") is True]
 
 
+
+def _gold_route_countries(value):
+    """Validate a recorded, ordered route of ISO 3166-1 alpha-2 codes.
+
+    Do not infer the journey from counterparties or payment messages. An
+    invalid explicit route is a RULE ERROR, not a silent no-discrepancy.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list) or len(value) > 32:
+        raise ValueError("gold route must be a list of at most 32 ISO2 country codes")
+    countries = []
+    for item in value:
+        if not isinstance(item, str) or not re.fullmatch(r"[A-Za-z]{2}", item):
+            raise ValueError("gold route contains an invalid ISO2 country code")
+        countries.append(item.upper())
+    return tuple(countries)
+
+
+def rule_gold_route_deviation(txns):
+    """Alert on documented-vs-observed gold transit discrepancies.
+
+    Requires explicit gold_trade=True plus BOTH ordered routes; a missing
+    route must not manufacture a mismatch or imply a clean supply chain.
+    Any difference is a review trigger only, not evidence of illicit gold.
+    """
+    out = []
+    for t in txns:
+        if t.get("gold_trade") is not True:
+            continue
+        planned = _gold_route_countries(t.get("gold_route_planned"))
+        actual = _gold_route_countries(t.get("gold_route_actual"))
+        if planned and actual and planned != actual:
+            out.append(_alert("GOLD_ROUTE_DEVIATION", "HIGH", t,
+                "recorded gold route differs from the documented planned route; "
+                "review chain of custody, transport and commercial rationale"))
+    return out
+
+
+def rule_gold_route_change(txns):
+    """Post-contract route or consignee change, explicitly documented as true."""
+    return [_alert("GOLD_ROUTE_CHANGE", "HIGH", t,
+            "gold shipment route/consignee changed after contract; "
+            "verify amendment, carrier and chain-of-custody evidence")
+            for t in txns if t.get("gold_trade") is True
+            and t.get("gold_route_changed_after_contract") is True]
+
+
+def rule_gold_origin_unverified(txns):
+    """Gold origin explicitly recorded unverified, never inferred from missing."""
+    return [_alert("GOLD_ORIGIN_UNVERIFIED", "HIGH", t,
+            "gold origin verification explicitly failed or remains unverified; "
+            "obtain mine/refinery traceability evidence and escalate for KYS review")
+            for t in txns if t.get("gold_trade") is True
+            and t.get("gold_origin_verified") is False]
+
+
 def rule_profile_deviation(txns):
     """Activity inconsistent with the customer's declared profile: a calendar
     month's total above PROFILE_DEVIATION_FACTOR × the declared expected monthly
@@ -739,6 +796,7 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_third_party_payment, rule_refund_diversion,
           rule_pricing_deviation, rule_phantom_delivery,
           rule_invoice_mismatch, rule_route_mismatch,
+          rule_gold_route_deviation, rule_gold_route_change, rule_gold_origin_unverified,
           rule_profile_deviation, rule_circular_flow, rule_new_geography,
           rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
           rule_reference_keyword, rule_personal_account, rule_linked_threshold,
