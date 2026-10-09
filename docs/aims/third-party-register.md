@@ -80,6 +80,21 @@ cross-border basis, ROPA and DPIA update, purpose/role permissions, and
 processor/subprocessor scope are **not verified here**. Do not treat this
 future processor as approved just because code or an API key exists.
 
+For technical cost control, the optional processor call is **skipped** if the
+deterministic screening run has no new/changed alerts or coverage failures.
+Otherwise the context selects critical/highest-scoring cases first, reserves
+limited room for sanctions, PEP and adverse-media source categories, and keeps
+omitted critical-alert and evidence counts visible. The strongest available
+list matches and local case-priority evidence are retained where the character
+budget allows. Output token ceilings adapt to case volume rather than spending
+the maximum on every call. Only a fully completed API response with the
+required analyst-note headings and bounded length can appear in the Asana
+digest; an incomplete or malformed note never changes a screening result.
+Logs contain numeric input/output/cached/reasoning token usage, not named
+prompts or original provider diagnostics. **No guaranteed cost reduction or
+quality improvement percentage** is asserted without a controlled benchmark
+using approved synthetic/labelled test cases.
+
 The feature is explicitly **default OFF** in code and needs
 `OPENAI_SCREENING_ENABLED=1` *and* a separately provisioned server-side
 `OPENAI_API_KEY` before any named evidence egress is possible. Do **not**
