@@ -155,13 +155,31 @@ export function validateAnalystNote(text) {
     return { ok: false, reason: 'empty_or_oversized' };
   if (text.trim().split(/\s+/).length > 450)
     return { ok: false, reason: 'too_many_words' };
-  const headings = text.split(/\r?\n/).map(normalizeHeading);
+  const lines = text.split(/\r?\n/);
+  const headings = lines.map(normalizeHeading);
+  const positions = [];
   let previous = -1;
   for (const required of REQUIRED_NOTE_SECTIONS) {
     const index = headings.findIndex((line, i) =>
       i > previous && line === normalizeHeading(required));
     if (index < 0) return { ok: false, reason: 'missing_or_unordered_sections' };
+    positions.push(index);
     previous = index;
+  }
+  // A model can reproduce all the requested headings without doing any
+  // analysis. Reject heading-only/template-only responses before they enter
+  // an MLRO task, rather than mistaking layout compliance for quality.
+  for (let i = 1; i < positions.length; i++) {
+    const next = i + 1 < positions.length ? positions[i + 1] : lines.length;
+    const body = lines.slice(positions[i] + 1, next).join(' ').trim();
+    if ((body.match(/[\p{L}\p{N}]+/gu) || []).length < 5) {
+      return { ok: false, reason: 'empty_or_placeholder_section' };
+    }
+    if (i === positions.length - 1 &&
+        (!/\bMLRO\b/i.test(body) ||
+         !/\b(?:review|verif|investigat|assess|escalat|examin|adjudicat|decid)/i.test(body))) {
+      return { ok: false, reason: 'mlro_review_not_explicit' };
+    }
   }
   return { ok: true, reason: '' };
 }

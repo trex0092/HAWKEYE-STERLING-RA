@@ -20,6 +20,7 @@
    evaluated. Override with ANTHROPIC_MODEL (single model, comma list allowed). */
 import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { classifyAdvisorEvalFailure } from './advisor-eval-http.mjs';
 
 const require = createRequire(import.meta.url);
 const { __internals: I } = require('../netlify/functions/brain-soul.js');
@@ -130,23 +131,27 @@ async function ask(model, prompt, context) {
       body: JSON.stringify({ model, max_tokens: 1024, system: SYSTEM, messages: [{ role: 'user', content }] }),
     });
     if (!res.ok) {
-      /* Put the status AND the API's error message in the workflow log (only
-         there, not in the report file, which must stay free of network-derived
-         strings — CodeQL js/http-to-file-access). A 400 "credit balance is too
-         low" and a schema error need very different operational responses. */
+      /* The error body is untrusted, possibly including account IDs, keys or
+         reflected customer context. Inspect only for predefined categories.
+         Never log or return the provider's raw diagnostic message. */
       let detail = '';
       try {
         const err = await res.json();
-        detail = String((err && err.error && err.error.message) || '').slice(0, 300);
+        detail = String((err && err.error && err.error.message) || '').slice(0, 2048);
       } catch { detail = ''; }
-      console.error('advisor-eval: API error ' + res.status + (detail ? ' — ' + detail : ''));
-      const terminal = /specified api usage limits|credit balance|billing|spend cap|quota/i.test(detail);
-      return { ok: false, text: '[API error ' + res.status + ']', terminal, detail };
+      const failure = classifyAdvisorEvalFailure(res.status, detail);
+      console.error('advisor-eval: provider HTTP ' + failure.status_code +
+        ' (' + failure.category + '); no provider response content logged');
+      return { ok: false, text: '[API error ' + failure.status_code + ']',
+        terminal: failure.stop_run, category: failure.category };
     }
     const data = await res.json();
     return { ok: true, text: (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') };
-  } catch (e) {
-    return { ok: false, text: '[error: ' + String(e && e.message || e).slice(0, 120) + ']' };
+  } catch (_) {
+    // Network/abort messages also cannot be trusted to be safe for public logs.
+    console.error('advisor-eval: upstream transport failed (details withheld)');
+    return { ok: false, text: '[transport error]', terminal: true,
+      category: 'transport_failure' };
   } finally { clearTimeout(timer); }
 }
 
@@ -172,7 +177,9 @@ for (const model of MODELS) {
     results.push({ model, id: c.id, why: c.why, held, errored, apiOk: r.ok, guard, excerpt: (r.text || '').slice(0, 280).replace(/\s+/g, ' ') });
     console.log((errored ? 'ERROR ' : held ? '  ok  ' : 'FAIL  ') + c.id);
     if (r.terminal) {
-      console.error('advisor-eval: provider-wide quota/billing failure is terminal for this run; remaining cases will not be called');
+      console.error('advisor-eval: provider failure (' +
+        (r.category || 'unavailable') +
+        ') stops further live model calls; eval INCOMPLETE, not a behavioural regression');
       break evalLoop;
     }
   }

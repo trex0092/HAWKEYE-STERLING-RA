@@ -5,7 +5,7 @@ import {
   DEFAULT_OPENAI_SCREENING_MODEL, OPENAI_RESPONSES_URL,
   boundedInt, safeOpenAIError, safeUsage,
   screeningEvidence, prioritySampleAlerts, isHealthyCleanRun, adaptiveOutputTokens,
-  validateAnalystNote, buildEnrichmentPrompt, evidenceJsonWithinBudget,
+  REQUIRED_NOTE_SECTIONS, validateAnalystNote, buildEnrichmentPrompt, evidenceJsonWithinBudget,
   extractResponseText, enrichScreeningResults
 } from '../scripts/openai-screening-enrichment.mjs';
 
@@ -168,6 +168,23 @@ const validNote = [
 ].join('\n');
 check('complete, ordered analyst note passes deterministic quality assurance',
   validateAnalystNote(validNote).ok);
+
+const headingsOnly = [
+  'AI ENHANCEMENT — ANALYST ASSISTANCE ONLY',
+  ...REQUIRED_NOTE_SECTIONS.slice(1).map(name => '## ' + name)
+].join('\n');
+check('all headings without substantive evidence cannot masquerade as an analyst note',
+  !validateAnalystNote(headingsOnly).ok &&
+  validateAnalystNote(headingsOnly).reason === 'empty_or_placeholder_section');
+check('empty section is rejected even when the other sections are complete',
+  validateAnalystNote(validNote.replace('The source sample is incomplete.', '—'))
+    .reason === 'empty_or_placeholder_section');
+check('MLRO reviewer responsibility must appear in the final section body',
+  validateAnalystNote(validNote.replace(
+    'The MLRO must review original primary source evidence.',
+    'A separate department may handle these results according to standard procedures.'
+  )).reason === 'mlro_review_not_explicit');
+
 check('missing or out-of-order headings are rejected before Asana output',
   !validateAnalystNote('MLRO review required.').ok &&
   !validateAnalystNote(validNote.replace('## PEP context','## Other context')).ok);
@@ -271,6 +288,19 @@ check('completed API response with missing headings fails closed while preservin
   invalidNote.error.includes('structure/length quality gate') &&
   invalidNote.usage.input_tokens===210 &&
   invalidNote.usage.output_tokens===17);
+
+const headingOnlyReply = await enrichScreeningResults(fixture, {
+  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  fetchImpl:async()=>({ok:true,status:200,json:async()=>({
+    status:'completed',output:[{content:[{type:'output_text',text:headingsOnly}]}],
+    usage:{input_tokens:150,output_tokens:40,total_tokens:190}
+  })})
+});
+check('API responses with all headings but no content fail closed with numeric usage',
+  headingOnlyReply.text === '' &&
+  headingOnlyReply.error.includes('quality gate') &&
+  headingOnlyReply.usage.total_tokens === 190);
+
 let readErrorBody=0;
 const bad=await enrichScreeningResults(fixture,{
   enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
