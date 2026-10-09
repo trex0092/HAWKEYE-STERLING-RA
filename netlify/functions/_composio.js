@@ -71,7 +71,9 @@ function assertAllowedToolkit(value) {
 }
 
 function allowedToolkits(values) {
-  const list = Array.isArray(values) && values.length ? values : configuredToolkits();
+  // A deliberately empty enabled-toolkit list must remain empty; falling back
+  // to five defaults here makes a "no apps" scope unintentionally broad.
+  const list = Array.isArray(values) ? values : configuredToolkits();
   return [...new Set(list.map(assertAllowedToolkit))];
 }
 
