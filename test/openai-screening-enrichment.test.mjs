@@ -5,7 +5,7 @@ import {
   DEFAULT_OPENAI_SCREENING_MODEL, OPENAI_RESPONSES_URL,
   boundedInt, safeOpenAIError, safeUsage,
   screeningEvidence, prioritySampleAlerts, isHealthyCleanRun, adaptiveOutputTokens,
-  validateAnalystNote, buildEnrichmentPrompt, evidenceJsonWithinBudget,
+  REQUIRED_NOTE_SECTIONS, validateAnalystNote, buildEnrichmentPrompt, evidenceJsonWithinBudget,
   extractResponseText, enrichScreeningResults
 } from '../scripts/openai-screening-enrichment.mjs';
 
