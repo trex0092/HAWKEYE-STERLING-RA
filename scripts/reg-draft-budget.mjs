@@ -56,14 +56,49 @@ export function boundedItems(items, prefix, limit, maxChars) {
 /* The watcher input is a generated report, not authority to fetch arbitrary
  * endpoints. Fetch only the exact HTTPS URL already in the reviewed source
  * registry, preventing request redirection through a tampered report. */
-export function approvedWatchSource(change, registry) {
+function registryLabel(value, cap) {
+  return String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ').trim().slice(0, cap);
+}
+
+/* Both the ID and EXACT HTTPS URL must match the reviewed source catalogue.
+ * In addition to approval, return only metadata from that catalogue, NOT a
+ * change report's potentially unbounded/forged name or jurisdiction. */
+export function approvedWatchSourceDetails(change, registry) {
   if (!change || !Array.isArray(registry) || typeof change.id !== 'string' ||
-      typeof change.url !== 'string' || !change.url.startsWith('https://')) return false;
-  return registry.some((source) => source && source.id === change.id &&
-    source.url === change.url && typeof source.name === 'string');
+      typeof change.url !== 'string' || !change.url.startsWith('https://')) return null;
+  const source = registry.find((entry) =>
+    entry && entry.id === change.id && entry.url === change.url &&
+    typeof entry.name === 'string' && entry.name.trim());
+  if (!source) return null;
+  return {
+    id: source.id,
+    url: source.url,
+    name: registryLabel(source.name, 120),
+    jurisdiction: registryLabel(source.jurisdiction, 64),
+  };
+}
+
+export function approvedWatchSource(change, registry) {
+  return approvedWatchSourceDetails(change, registry) !== null;
+}
+
+/* A provider rejection and a locally exhausted request budget are different
+ * causes. Retain the true stop reason for every subsequent manual-review item
+ * instead of telling operators that a 429/credential error was a budget cap. */
+export function deferredDraftCause(haltReason, attemptedCalls, maxCalls) {
+  if (haltReason) return haltReason;
+  return Number.isSafeInteger(attemptedCalls) && Number.isSafeInteger(maxCalls) &&
+    attemptedCalls >= maxCalls ? 'API request budget exhausted' : null;
 }
 
 export function manualDraftSection(source, cause) {
+  // Never render an unapproved URL/name as an actionable primary-source link
+  // in the review proposal; locate the rejected entry in the change report.
+  if (cause === 'source not approved') {
+    return '### Unapproved watch source\n_AI analysis skipped (source not approved). ' +
+      'MLRO must verify the original change-report entry against the reviewed source registry._';
+  }
   const label = String(source && source.name || 'Unlabelled source')
     .replace(/[\r\n\u0000-\u001f]/g, ' ').slice(0, 120);
   const url = String(source && source.url || '').replace(/[\r\n\u0000-\u001f]/g, ' ').slice(0, 500);
