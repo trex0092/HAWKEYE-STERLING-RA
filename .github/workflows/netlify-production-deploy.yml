@@ -3,10 +3,12 @@ name: Netlify Production Deploy (build hook)
 # Production deploys stopped publishing after 27 Jun 2026: pushes to main no
 # longer trigger a Netlify production build (no Netlify status/check appears
 # on main commits — verified 25 Jul), while PR deploy previews still build.
-# The live site therefore serves the 27 Jun bundle (pre app.js split) and the
-# deploy badge shows the last failed production attempt. The July workaround
-# (netlify-deploy.yml, since repurposed) prescribed a Netlify BUILD HOOK but
-# its secret was never created.
+# The live site has repeatedly lagged main. On 2026-10-09 the
+# NETLIFY_BUILD_HOOK_URL repository secret WAS present, a build hook POST
+# returned HTTP 200, but production still served an older commit after the
+# full 18-minute verification window. HTTP 200 acknowledges a trigger only;
+# it does NOT attest that builds are active or auto publishing is unlocked.
+# See docs/runbooks/netlify-production-recovery.md before repeating builds.
 #
 # ONE-TIME SETUP (Netlify UI, ~1 minute):
 #   Netlify -> Site configuration -> Build & deploy -> Build hooks ->
@@ -111,7 +113,6 @@ jobs:
           ALT_5: ${{ secrets.NETLIFY_WEBHOOK_URL }}
           # Saved on the adjacent Variables tab instead of Secrets:
           VAR_HOOK: ${{ vars.NETLIFY_BUILD_HOOK_URL }}
-          VARS_JSON: ${{ toJSON(vars) }}
         run: |
           set -u
           if [ -z "${HOOK_URL:-}" ]; then
@@ -128,8 +129,8 @@ jobs:
               HOOK_URL="$VAR_HOOK"; found="vars.NETLIFY_BUILD_HOOK_URL"
             fi
             if [ -z "$found" ]; then
-              echo "Repository/organization VARIABLE names visible to this run (secrets cannot be enumerated without over-provisioning):"
-              echo "$VARS_JSON" | python3 -c 'import json,sys; [print("  -", k) for k in sorted(json.load(sys.stdin) or {})]' || true
+              # Never materialize the full vars context: action-run logs can
+              # expose names AND values even when we intended to print names.
               echo "Probed and empty: NETLIFY_BUILD_HOOK_URL and common variants (NETLIFY_BUILD_HOOK, NETLIFY_BUILDHOOK_URL, NETLIFY_HOOK_URL, BUILD_HOOK_URL, NETLIFY_WEBHOOK_URL), plus the Variables tab."
               echo "Remaining causes: saved under an ENVIRONMENT (this workflow binds none — re-save as a Repository secret), saved on a different repository, or never saved on the GitHub side at all."
               if [ "$EVENT" = "push" ]; then
@@ -215,7 +216,7 @@ jobs:
             sleep 20
           done
           cat /tmp/currency.txt
-          echo "::error::Build was triggered but after ~18 minutes the live site still does not serve this commit's assets (see the divergences listed above) — check the deploy log in the Netlify UI (app.netlify.com/projects/hawkeye-sterling-ra/deploys)."
+          echo "::error::Build hook returned HTTP success, but production did not publish this commit in ~18 minutes. The trigger is NOT evidence of a deploy. In Netlify verify Build status ACTIVE, production deploy UNLOCKED, correct project/branch and the latest hook-triggered deploy status; then review docs/runbooks/netlify-production-recovery.md. Do not repeat hooks blindly."
           exit 1
 
   # Self-heal — register item 26's first half. On 2026-08-04 four consecutive
