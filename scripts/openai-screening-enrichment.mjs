@@ -194,6 +194,10 @@ export function extractResponseText(payload) {
 }
 
 export async function enrichScreeningResults(results, {
+  // A secret alone is NOT authorization for named-screening-evidence egress.
+  // Enable only after MLRO/DPO/IT records the provider DPA, DPIA, transfer
+  // basis, region, retention and approved service scopes.
+  enabled = process.env.OPENAI_SCREENING_ENABLED === '1',
   apiKey = process.env.OPENAI_API_KEY || '',
   model = process.env.OPENAI_SCREENING_MODEL || DEFAULT_OPENAI_SCREENING_MODEL,
   fetchImpl = globalThis.fetch,
@@ -201,6 +205,10 @@ export async function enrichScreeningResults(results, {
   maxInputChars = process.env.OPENAI_SCREENING_MAX_INPUT_CHARS,
   maxOutputTokens = process.env.OPENAI_SCREENING_MAX_OUTPUT_TOKENS
 } = {}) {
+  if (enabled !== true) {
+    return { enabled: false, text: '',
+      reason: 'OpenAI screening enrichment disabled pending explicit processor/transfer approval' };
+  }
   if (!apiKey) return { enabled: false, text: '', reason: 'OPENAI_API_KEY not configured' };
   if (typeof fetchImpl !== 'function') return { enabled: true, text: '', error: 'OpenAI transport unavailable' };
   // A bad model identifier must never turn an access token into an opaque
