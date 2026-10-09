@@ -67,8 +67,8 @@ Do not use the old generic secret name `COMPOSIO`. After its credential value ha
 ## Engine evidence-reconciliation surface (no Composio API calls)
 
 The local deterministic HAWKEYE MCP tool
-\`hawkeye_assess_connected_evidence\` takes a
-\`hawkeye.composio-evidence/v1\` **metadata-only** manifest.
+`hawkeye_assess_connected_evidence` takes a
+`hawkeye.composio-evidence/v1` **metadata-only** manifest.
 It checks reference existence, query freshness, duplication and source outage,
 never raw files, email bodies, Slack text, ID scans or customer names.
 
@@ -76,11 +76,11 @@ Supported references (not independently verified facts):
 
 | Provider | Approved reference categories | Typical AML/KYC use |
 |---|---|---|
-| Asana | \`kyc_case\`, \`remediation\`, \`mlro_case\` | CDD case, missing-document follow-up, manual review record |
-| Gmail | \`evidence_request\`, \`compliance_response\` | Source correspondence references, not the underlying messages |
-| Google Drive | \`policy\`, \`provenance\`, \`identity_file\` | Approved policy, supply-chain origin and KYC file references, not document authenticity |
-| Slack | \`review_thread\`, \`escalation_thread\` | Escalation discussion for locating the formal decision, never an MLRO authorization |
-| GitHub | \`control_change\`, \`ci_result\`, \`deploy_record\` | Versioned change, assurance run, release record (does **not** prove the live Netlify site updated) |
+| Asana | `kyc_case`, `remediation`, `mlro_case` | CDD case, missing-document follow-up, manual review record |
+| Gmail | `evidence_request`, `compliance_response` | Source correspondence references, not the underlying messages |
+| Google Drive | `policy`, `provenance`, `identity_file` | Approved policy, supply-chain origin and KYC file references, not document authenticity |
+| Slack | `review_thread`, `escalation_thread` | Escalation discussion for locating the formal decision, never an MLRO authorization |
+| GitHub | `control_change`, `ci_result`, `deploy_record` | Versioned change, assurance run, release record (does **not** prove the live Netlify site updated) |
 
 First, a verified human/operator uses an approved connected account to read the
 minimal reference metadata with named Composio tools. That trusted caller
@@ -88,7 +88,7 @@ selects the specific categories that are actually relevant and transforms the
 provider response to this allowlisted shape, with an explicit date. Example,
 entirely synthetic:
 
-\`\`\`json
+```json
 {
   "manifest": {
     "schema_version": "hawkeye.composio-evidence/v1",
@@ -102,12 +102,12 @@ entirely synthetic:
     ]
   }
 }
-\`\`\`
+```
 
-Status is \`available\`, \`not_found\`, \`unavailable\` or \`error\`.
-\`reference\` is an opaque 8-128 character reference for an available entry and
-\`null\` otherwise. \`requirements\` must have 1-16 distinct registered
-\`source.category\` codes; \`observations\` is capped at 60, and unrequested
+Status is `available`, `not_found`, `unavailable` or `error`.
+`reference` is an opaque 8-128 character reference for an available entry and
+`null` otherwise. `requirements` must have 1-16 distinct registered
+`source.category` codes; `observations` is capped at 60, and unrequested
 or vendor-native fields are rejected. A future-dated read or malformed date is
 invalid. Duplicate observations for the same check are explicitly marked
 ambiguous instead of choosing the favorable result. All states stay
@@ -120,17 +120,17 @@ not original document IDs, message references, provider payloads or subject
 names. It does not create a Composio account, connect to Composio, read email,
 or change customer records. The existing outer Netlify endpoint remains the
 **only** Composio network/credential surface; do not copy
-\`COMPOSIO_API_KEY\` into the Python engine or a local MCP client.
+`COMPOSIO_API_KEY` into the Python engine or a local MCP client.
 
 ### Exact read-tool scoping and costs
 
-1. Keep \`COMPOSIO_ENABLED=0\` pending the vendor-assurance gate (OA-29).
+1. Keep `COMPOSIO_ENABLED=0` pending the vendor-assurance gate (OA-29).
 2. Discover available tool slugs in an authorized Composio session using
-   \`tools.list\` or \`tools.search\`. **Do not invent tool slug names.**
+   `tools.list` or `tools.search`. **Do not invent tool slug names.**
 3. Review the actual tool schema, data transferred, side effects, OAuth scopes
    and external-provider billing/quota. Approve only necessary read operations
    and configure their comma-separated exact slugs in
-   \`COMPOSIO_READ_TOOL_SLUGS\` as a server-side environment setting.
+   `COMPOSIO_READ_TOOL_SLUGS` as a server-side environment setting.
 4. Prefer stable references, field-limited provider lookups, retained
    user-scoped sessions and an explicit result budget (8 KB of serialized
    arguments per call). Avoid polling, large file downloads and broad
