@@ -105,10 +105,10 @@ export function isHealthyCleanRun(results) {
       !Array.isArray(results.lists) || results.lists.length === 0) return false;
   const h = results.enrichment || {};
   if ([h.amErrors, h.amPartial, h.pepErrors, h.skipped].some(
-    value => typeof value === 'number' && value > 0)) return false;
+    value => value !== undefined && value !== null && value !== 0)) return false;
   if (h.pepWorldwide && h.pepWorldwide.partial === true) return false;
   if (h.amBackboneFailures && Object.values(h.amBackboneFailures).some(
-    value => typeof value === 'number' && value > 0)) return false;
+    value => value !== undefined && value !== null && value !== 0)) return false;
   return true;
 }
 
