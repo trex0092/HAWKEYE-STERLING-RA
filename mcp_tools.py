@@ -282,6 +282,7 @@ def analyze_kyc_note(notes, today=None):
                 "nationality": p.get("nationality", ""),
                 "share_pct": p.get("share_pct"),
                 "pep_status": p.get("pep_status", ""),
+                "pep_country_qa": kyc.pep_country_qa_advisory(p.get("nationality", "")),
                 "id_masked": kyc.mask_id(p.get("id_number")),
                 "arrangement_role": p.get("arrangement_role", False),
                 "cdd_gaps": p.get("cdd_gaps", []),

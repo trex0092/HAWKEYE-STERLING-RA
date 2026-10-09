@@ -165,6 +165,38 @@
         "pattern": "^[A-Z]{2}-[0-9]{2}$"
       },
       "description": "STR red-flag codes a person recorded on the payment (data/str-red-flags.json); each becomes a RED_FLAG alert."
+    },
+    "gold_trade": {
+      "type": "boolean",
+      "description": "True only when this is an actual gold shipment/trade. The payment method 'gold' alone does not imply a recorded physical shipment."
+    },
+    "gold_origin_verified": {
+      "type": "boolean",
+      "description": "False ONLY on documented failed/unverified origin traceability. Omitted/unknown never becomes a finding."
+    },
+    "gold_route_changed_after_contract": {
+      "type": "boolean",
+      "description": "True only if the shipment route or consignee actually changed after the contractual route was agreed."
+    },
+    "gold_route_planned": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z]{2}$"
+      },
+      "description": "Documented original gold route, ordered ISO 3166-1 alpha-2 codes, e.g. [GH,AE]. Source: approved trade documents."
+    },
+    "gold_route_actual": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z]{2}$"
+      },
+      "description": "Actual evidenced gold route, ordered ISO 3166-1 alpha-2 codes; compare with planned route. An unverified path must be left absent."
     }
   },
   "additionalProperties": true

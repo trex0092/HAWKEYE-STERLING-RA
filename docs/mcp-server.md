@@ -65,8 +65,8 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | `hawkeye_screen_name` | Fuzzy-screen a subject against a caller-supplied list of names; returns matches with score/confidence/context or an explicit CLEARED result. |
 | `hawkeye_screen_payment` | Screen the **parties of one payment** — originator, beneficiary, ultimate parties, banks in the chain and the payment reference — against a caller-supplied list. Reads a raw SWIFT MT103 or ISO 20022 pacs.008 message, or a `parties` array; flags FATF-listed party countries and a missing originator/beneficiary name (R.16). A potential match means hold the payment and apply POL-07. |
 | `hawkeye_screen_internal_watchlist` | Screen against the firm's committed internal watchlist (`data/internal-watchlist.json`); an empty list is a valid "no designations" state, never a degraded screen. |
-| `hawkeye_monitor_transactions` | Run the FATF R.16 rule-set (cash threshold, structuring, velocity, round-amount, high-risk geography, CDD trigger) over one customer's transactions. |
-| `hawkeye_analyze_kyc_note` | Parse a structured KYC note into identity records + the CDD gaps an MLRO must close; ID numbers are privacy-masked. |
+| `hawkeye_monitor_transactions` | Run the deterministic transaction-monitoring rules over one customer's supplied transaction records, including cash and gold trade-route/provenance evidence; MLRO review only. |
+| `hawkeye_analyze_kyc_note` | Parse structured KYC notes, CDD gaps and operator-selected country PEP coverage QA reminders (Turkey, India, Papua New Guinea). The reminders are not PEP matches; identifiers are masked. |
 | `hawkeye_compare_document_evidence` | Opt-in comparison of approved normalized document OCR evidence with one explicitly selected KYC individual. Privacy-safe field statuses, expiry and review findings; never an authenticity or identity verification result. |
 | `hawkeye_jurisdiction_risk` | Return the FATF / locally-designated risk tier for a country and/or principals' nationalities. |
 | `hawkeye_name_variants` | Expand a name into the transliteration-equivalent spellings the matcher screens under (Mohammed/Muhammad, Abdul/Abdel, bin/ibn …) — makes fuzzy-match recall transparent. |
@@ -75,6 +75,59 @@ untrusted: each is type-checked and size-capped before it reaches the engine.
 | `hawkeye_assemble_tfs_dossier` | Assemble a **DRAFT** FFR/PNMR dossier for a Targeted Financial Sanctions list hit (UN Consolidated List / UAE Local Terrorist List); recommends the report kind, never files or freezes. The TFS counterpart of `hawkeye_assemble_str_dossier`. |
 | `hawkeye_compute_risk_rating` | Compute a LOW/MEDIUM/HIGH customer risk rating (FATF R.10) from already-known hits/PEP/adverse-media/CDD-gap findings, with contributing factors and the EDD requirement. Deterministic; does not itself screen anything. |
 | `hawkeye_related_parties` | Surface hidden links across a book of customers: a shared owner/UBO across two or more customers, or a UBO who is also a customer entity. Pure graph analysis, no model. |
+
+
+## Gold shipment route and PEP coverage QA (operator-supplied evidence only)
+
+`hawkeye_monitor_transactions` now checks four gold-specific review states
+using **explicit fields**, never guessed from the payment counterparty or a
+customer's country. The transaction-monitoring engine is **inactive in daily
+production** until an approved and complete transaction feed is connected.
+
+| Rule | Required evidence | Outcome |
+| --- | --- | --- |
+| `GOLD_ROUTE_DEVIATION` | `gold_trade: true`; nonempty `gold_route_planned` and `gold_route_actual` (ordered two-letter country codes) | Actual route differs from documented agreed route |
+| `GOLD_ROUTE_CHANGE` | `gold_trade: true`, `gold_route_changed_after_contract: true` | Post-contract route or consignee change |
+| `GOLD_ORIGIN_UNVERIFIED` | `gold_trade: true`, `gold_origin_verified: false` | Origin explicitly cannot be verified |
+| `GOLD_ROUTE_UNREADABLE` | `gold_trade: true` plus malformed supplied route | Require manual route verification, without hiding findings on other transactions |
+
+For example, a **synthetic** transaction may carry these additional keys:
+
+```json
+{
+  "gold_trade": true,
+  "gold_route_planned": ["GH", "AE"],
+  "gold_route_actual": ["GH", "TR", "AE"],
+  "gold_route_changed_after_contract": true,
+  "gold_origin_verified": false
+}
+```
+
+The Payments Register supports `Gold trade (yes/no)`, `Gold planned route
+(ISO2 comma separated)`, `Gold actual route (ISO2 comma separated)`,
+`Gold route changed after contract (yes/no)` and `Gold origin verified
+(yes/no)`. These also map to optional feed fields in
+`data/transaction-feed.schema.json`. The rules inspect documentary evidence
+only: **no automatic STR filing, risk classification, customer refusal, TFS
+freeze or assumption of criminal conduct**. Invalid source data must be
+corrected by an authorized reviewer; no shipments or customer details may
+be committed to GitHub.
+
+`hawkeye_analyze_kyc_note` adds a nullable `pep_country_qa` field for
+each individual. For three **operator-selected QA test examples** (Turkey,
+India and Papua New Guinea), this returns `PEP_COVERAGE_SPOT_CHECK`:
+a reminder to inspect PEP/RCA name matching, variant/transliteration support,
+source quality, and manual evidence. No match is implied by citizenship,
+no country's app risk score is changed, and the output contains no
+independent PEP determination. A missing public-source PEP hit is not a
+definitive negative screen. All PEP/RCA screening and any positive findings
+remain subject to appropriate independent corroboration and MLRO review.
+
+The country score suggestions remain unchanged. In particular, **none of
+the 53 lower recommendations is applied** by this PR, preserving existing
+artisanal-gold high-risk/EDD escalation pending separately documented
+model validation and MLRO signoff. Country Risk Asana task edits are
+outside this branch's scope.
 
 ## Optional document evidence comparison (not production OCR)
 

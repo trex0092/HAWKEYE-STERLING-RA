@@ -128,6 +128,22 @@ check("kyc: an unfilled template block (header only) adds no party",
       mcp_tools.analyze_kyc_note(_full + "Individual 2 — Secretary\n")["individual_count"] == 1)
 check("kyc: an ID with no expiry recorded is a CDD gap",
       mcp_tools.analyze_kyc_note(_full.replace("Passport Expiry: 2030-01-01\n", ""))["cdd_complete"] is False)
+
+# Operator-selected PEP screening QA jurisdictions. These are NOT PEP hits and
+# are not changes to any country's risk score or to the KYC note.
+_qa_note = ("SECTION 4\nIndividual 1 — Director\nName: EXAMPLE PERSON\n"
+            "Nationality: Türkiye\nDate of Birth: 1970-01-01\n")
+_qa_result = mcp_tools.analyze_kyc_note(_qa_note)
+_qa_flag = _qa_result["individuals"][0]["pep_country_qa"]
+check("KYC PEP QA: Türkiye adds a manual coverage spot-check, not a PEP match",
+      _qa_flag is not None and _qa_flag["jurisdiction"] == "Turkey"
+      and _qa_flag["is_pep_finding"] is False
+      and _qa_flag["risk_score_adjustment"] == 0
+      and _qa_flag["human_review_required"])
+check("KYC PEP QA: a nonselected nationality has no QA advisory",
+      mcp_tools.analyze_kyc_note(_qa_note.replace("Türkiye", "France"))
+      ["individuals"][0]["pep_country_qa"] is None)
+
 import tempfile as _tf_iw
 with _tf_iw.NamedTemporaryFile("w", suffix=".json", delete=False) as _iwf:
     _iwf.write('{"entries": ["Viktor Bout", ]}')

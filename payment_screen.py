@@ -409,6 +409,9 @@ REGISTER_MONITORING_FIELDS = (
     "Corporate paid from personal account (yes/no)", "Source of funds verified (yes/no)",
     "Payment completed (yes/no)", "Delivery confirmed (yes/no)",
     "Invoice mismatch (yes/no)", "Route mismatch (yes/no)",
+    "Gold trade (yes/no)", "Gold origin verified (yes/no)",
+    "Gold route changed after contract (yes/no)",
+    "Gold planned route (ISO2 comma separated)", "Gold actual route (ISO2 comma separated)",
     "Funding account", "Refund account", "Refund reason documented (yes/no)",
     "Red flags (codes, e.g. ML-11, TF-07)",
 )
@@ -433,10 +436,20 @@ def _register_monitoring_fields(fields):
                       ("delivery confirmed", "delivery_confirmed"),
                       ("invoice mismatch", "invoice_mismatch"),
                       ("route mismatch", "route_mismatch"),
+                      ("gold trade", "gold_trade"),
+                      ("gold origin verified", "gold_origin_verified"),
+                      ("gold route changed after contract", "gold_route_changed_after_contract"),
                       ("refund reason documented", "refund_reason_documented")):
         b = _yes_no(fields.get(key))
         if b is not None:
             out[dest] = b
+    for label, dest in (("gold planned route", "gold_route_planned"),
+                        ("gold actual route", "gold_route_actual")):
+        raw = fields.get(label)
+        if raw:
+            # Never infer a route; leave malformed codes intact for the
+            # transaction rule to flag as a processing error.
+            out[dest] = [token.strip().upper() for token in raw.split(",") if token.strip()]
     if "delivery_confirmed" in out:
         out["goods_transaction"] = True   # a delivery line means a goods trade
     for key, dest in (("third party relationship", "third_party_relationship"),

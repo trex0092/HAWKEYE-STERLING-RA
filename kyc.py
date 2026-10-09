@@ -35,6 +35,45 @@ def _warn(msg):
     library (no dependency on screen.log); the workflows capture stderr."""
     print(f"[kyc] WARN {msg}", file=sys.stderr, flush=True)
 
+
+# Geographic PEP screening QA samples requested by the operator. NOT country
+# risk tiers and NOT indications that a person is a PEP. Geography cannot
+# establish political exposure. The same basic PEP screening obligation applies
+# to all nationalities. These three records receive an extra coverage reminder.
+_PEP_QA_COUNTRY_ALIASES = {
+    "turkey": "Turkey", "turkiye": "Turkey", "turkish": "Turkey",
+    "india": "India", "indian": "India",
+    "papua new guinea": "Papua New Guinea", "papua new guinean": "Papua New Guinea",
+    "png": "Papua New Guinea",
+}
+
+
+def pep_country_qa_advisory(nationality):
+    """Optional QA-sample reminder; NOT a PEP match or risk-score input."""
+    import unicodedata
+    if not isinstance(nationality, str):
+        return None
+    normalized = unicodedata.normalize("NFKD", nationality.casefold())
+    normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    normalized = " ".join(re.sub(r"[^a-z ]", " ", normalized).split())
+    jurisdiction = _PEP_QA_COUNTRY_ALIASES.get(normalized)
+    if jurisdiction is None:
+        return None
+    return {
+        "code": "PEP_COVERAGE_SPOT_CHECK",
+        "jurisdiction": jurisdiction,
+        "scope": "operator_selected_quality_assurance",
+        "human_review_required": True,
+        "is_pep_finding": False,
+        "risk_score_adjustment": 0,
+        "note": (
+            "Recheck PEP/RCA screening coverage and retain independently sourced "
+            "review evidence. Nationality alone is not a PEP indicator, and a "
+            "negative public-source search is not proof of non-PEP status."
+        ),
+    }
+
+
 # ── Legal-arrangement role / entity vocabulary (R.25) ─────────────────────────
 # A party holding one of these roles, OR an entity whose name carries one of these
 # tokens, is treated as part of a legal arrangement (trust/foundation/partnership)
