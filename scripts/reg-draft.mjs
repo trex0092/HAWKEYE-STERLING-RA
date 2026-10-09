@@ -15,7 +15,8 @@ import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { extractText, CHANGES_FILE, fetchWithFallback, parseAnalysis } from './reg-watch.mjs';
 import {
   draftBudget, validatedReportDate, boundedLines, boundedItems,
-  manualDraftSection, approvedWatchSource, providerStopReason, usageCounts
+  manualDraftSection, approvedWatchSource, approvedWatchSourceDetails,
+  deferredDraftCause, providerStopReason, usageCounts
 } from './reg-draft-budget.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
@@ -88,18 +89,21 @@ async function draftFor(c) {
   /* When the watcher itemised the change, hand the actual additions/deletions
      to the analyst prompt — a draft grounded in the delta beats one guessing
      from the full page. */
-  const delta = c.diff ? [
-    'Detected delta (' + c.diff.addedCount + ' added / ' + c.diff.removedCount + ' removed segments):',
+  const delta = c.diff && typeof c.diff === 'object' && !Array.isArray(c.diff) ? [
+    'Detected delta (' + (Array.isArray(c.diff.added) ? c.diff.added.length : 0) +
+      ' added / ' + (Array.isArray(c.diff.removed) ? c.diff.removed.length : 0) + ' removed segments):',
     ...boundedLines(c.diff.added, 'ADDED: ', BUDGET.listEntries, BUDGET.entryChars),
     ...boundedLines(c.diff.removed, 'REMOVED: ', BUDGET.listEntries, BUDGET.entryChars),
     ''
   ] : [];
   /* New / removed publications as the page titles and links them — the most
      precise evidence of what was issued or withdrawn. */
-  const itemLines = c.items ? [
-    'Publications newly listed on the page (' + c.items.addedCount + '):',
+  const itemLines = c.items && typeof c.items === 'object' && !Array.isArray(c.items) ? [
+    'Publications newly listed on the page (' +
+      (Array.isArray(c.items.added) ? c.items.added.length : 0) + '):',
     ...boundedItems(c.items.added, 'NEW ITEM: ', BUDGET.listEntries, BUDGET.entryChars),
-    'Publications no longer listed (' + c.items.removedCount + '):',
+    'Publications no longer listed (' +
+      (Array.isArray(c.items.removed) ? c.items.removed.length : 0) + '):',
     ...boundedItems(c.items.removed, 'REMOVED ITEM: ', BUDGET.listEntries, BUDGET.entryChars),
     ''
   ] : [];
@@ -156,7 +160,8 @@ async function draftFor(c) {
       const detail = await res.text().catch(() => '');
       const reason = providerStopReason(res.status, detail.slice(0, 2048));
       console.warn('reg-draft: Anthropic request stopped: HTTP ' + res.status + ' (' + reason + ')');
-      return { text: manualDraftSection(c, reason), ok: false, attempted: true, halt: true };
+      return { text: manualDraftSection(c, reason), ok: false, attempted: true,
+        halt: true, haltReason: reason };
     }
     const data = await res.json();
     const text = ((data && Array.isArray(data.content)) ? data.content : [])
@@ -173,7 +178,8 @@ async function draftFor(c) {
     console.warn('reg-draft: API timeout/network failure; no further billable calls in this run');
     return {
       text: manualDraftSection(c, 'provider timeout or network failure'),
-      ok: false, attempted: true, halt: true
+      ok: false, attempted: true, halt: true,
+      haltReason: 'provider timeout or network failure'
     };
   } finally {
     clearTimeout(timer);
@@ -182,15 +188,22 @@ async function draftFor(c) {
 
 const sections = [];
 const usageTotal = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-let apiCalls = 0, successful = 0, deferred = 0, providerPaused = false;
+let apiCalls = 0, successful = 0, deferred = 0, providerHaltReason = null;
 for (const c of changes) {
   if (!c || typeof c !== 'object') continue;
-  const result = providerPaused || apiCalls >= BUDGET.maxCalls
-    ? { text: manualDraftSection(c, 'API request budget exhausted'), ok: false, attempted: false }
-    : await draftFor(c);
+  const reviewed = approvedWatchSourceDetails(c, APPROVED_SOURCES);
+  // Canonical source metadata is derived from the reviewed registry on EVERY
+  // path, including provider-paused and locally budget-exhausted entries.
+  const trusted = reviewed ? { ...c, ...reviewed } : null;
+  const reason = deferredDraftCause(providerHaltReason, apiCalls, BUDGET.maxCalls);
+  const result = !trusted
+    ? { text: manualDraftSection(null, 'source not approved'), ok: false, attempted: false }
+    : reason
+      ? { text: manualDraftSection(trusted, reason), ok: false, attempted: false }
+      : await draftFor(trusted);
   if (result.attempted) apiCalls++;
   if (result.ok) successful++; else deferred++;
-  if (result.halt) providerPaused = true;
+  if (result.halt) providerHaltReason = result.haltReason || 'provider error';
   if (result.usage) for (const key of Object.keys(usageTotal)) usageTotal[key] += result.usage[key];
   const text = result.text;
   /* Only a COMPLETE provider response may propose a severity adjustment. */
