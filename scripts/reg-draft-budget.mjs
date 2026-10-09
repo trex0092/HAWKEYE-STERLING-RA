@@ -27,6 +27,15 @@ export function validatedReportDate(value) {
     ? value : null;
 }
 
+/* The watcher intentionally emits just the FIRST few excerpts alongside a
+ * larger real change count. Preserve that count without trusting an arbitrary
+ * report field to become unlimited prompt text or a misleading negative. */
+export function evidenceCount(reported, excerpts) {
+  const shown = Array.isArray(excerpts) ? excerpts.length : 0;
+  return Number.isSafeInteger(reported) && reported >= shown && reported <= 1_000_000
+    ? reported : shown;
+}
+
 export function boundedLines(items, prefix, limit, maxChars) {
   const source = Array.isArray(items) ? items : [];
   const lines = source.slice(0, limit).map((item) =>
