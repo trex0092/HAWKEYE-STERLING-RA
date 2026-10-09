@@ -1480,6 +1480,27 @@ check("register: 'Date: 01/10/2026' on a Payments Register task is DATE_UNREADAB
 check("date rule skips activity records and raw payment messages",
       "DATE_UNREADABLE" not in _rules([{"customer": "X", "activity_only": True},
                                        {"transaction_id": "M", "payment_message": ":20:X"}]))
+def _method_pay(method, country=None):
+    t = {"customer": "Acme", "method": method, "currency": "AED", "direction": "in",
+         "amount": 60000, "date": "2026-10-01", "transaction_id": "TM"}
+    if country:
+        t["counterparty_country"] = country
+    return _rules([t])
+check("a 'cash deposit' of AED 60,000 is read as cash and raises THRESHOLD",
+      "THRESHOLD" in _method_pay("cash deposit") and "THRESHOLD" in _method_pay("Cash (AED notes)"))
+check("'bank transfer' / 'SWIFT' / 'TT' of AED 60,000 from Iran raise THRESHOLD",
+      all("THRESHOLD" in _method_pay(m, "Iran") for m in ("bank transfer", "SWIFT", "TT")))
+check("an unrecognised or missing method is METHOD_UNRECOGNISED, never a silent threshold miss",
+      all("METHOD_UNRECOGNISED" in _method_pay(m) for m in ("cheque", "", None)))
+check("canonical cash / wire / gold raise no METHOD_UNRECOGNISED",
+      not any("METHOD_UNRECOGNISED" in _method_pay(m) for m in ("cash", "wire", "gold")))
+check("method rule skips activity records and raw payment messages",
+      "METHOD_UNRECOGNISED" not in _rules([{"customer": "X", "activity_only": True},
+                                           {"transaction_id": "M", "payment_message": ":20:X"}]))
+check("register: 'Method: Cash deposit' on a Payments Register task raises THRESHOLD",
+      "THRESHOLD" in _rules([payment_screen.parse_register_entry("TX-M", (
+          "Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: 60,000\nCurrency: AED\n"
+          "Direction: in\nMethod: Cash deposit\nOriginator: Some Person\nBeneficiary: Example Trading LLC\n"))]))
 _MT_REG = (":20:REF123\n:32A:261001AED200000,00\n:50K:/1\nACME GOLD TRADING LLC\n"
            ":52A:EBILAEAD\n:57A:HSBCHKHH\n:59:/2\nPEARL METALS LIMITED\n")
 def _msg_rules(msg):
