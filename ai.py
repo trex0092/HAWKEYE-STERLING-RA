@@ -167,8 +167,11 @@ def llm_available() -> bool:
 
 # Usage telemetry (presence-only counts; no prompt/response content retained).
 # Read by monitoring.py to track LLM call volume & failures per run. `skipped`
-# counts calls the circuit breaker below refused to make.
-LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0, "skipped": 0, "cached": 0}
+# includes BOTH distinct fallback reasons: final/open circuit and temporary
+# HTTP 429 cooldown. Keep disjoint sub-counters so the report never says
+# "circuit OPEN" when only an upstream retry window is active.
+LLM_CALLS = {"attempted": 0, "ok": 0, "failed": 0, "skipped": 0, "cached": 0,
+             "circuit_skipped": 0, "rate_limited_skipped": 0}
 # Billed tokens across the run, read from each response's `usage` object, so
 # spend can be measured instead of estimated. Counts only, never content.
 LLM_USAGE = {"input_tokens": 0, "output_tokens": 0,
@@ -279,6 +282,7 @@ def _llm_rate_paused():
     with _LLM_LOCK:
         if time.monotonic() < _LLM_STATE.get("rate_limit_until", 0.0):
             LLM_CALLS["skipped"] += 1
+            LLM_CALLS["rate_limited_skipped"] += 1
             return True
     return False
 
@@ -309,10 +313,11 @@ def llm_complete(prompt: str, system: str = "", max_tokens: int = 400):
     Never raises — the caller always has a deterministic fallback."""
     if not AI_ENABLED:
         return None
-    if _LLM_STATE["open"]:
-        with _LLM_LOCK:
+    with _LLM_LOCK:
+        if _LLM_STATE["open"]:
             LLM_CALLS["skipped"] += 1
-        return None
+            LLM_CALLS["circuit_skipped"] += 1
+            return None
     if _llm_rate_paused():
         return None
     with _LLM_LOCK:
@@ -861,9 +866,16 @@ def governance_footer():
                  f"OPENED ({_why}); "
                  f"{LLM_CALLS.get('skipped', 0)} call(s) were skipped and those items carry "
                  f"DETERMINISTIC triage only (severity floors intact, no finding dropped)")
-    # The breaker only counts an UNREACHABLE endpoint, so a run where every call
-    # got an HTTP error reply (e.g. a usage cap: 557 of 557 failed on 21 Sep
-    # 2026) never trips it and would still read "AI-ASSISTED". Say what happened.
+    # Transient 429 pauses are NOT a circuit trip; some articles were still
+    # classified deterministically. Say so even if an earlier model call
+    # succeeded, without implying the key was refused for the whole run.
+    elif (LLM_TRIAGE and not _llm_in_reports()
+          and LLM_CALLS.get("rate_limited_skipped", 0) > 0):
+        mode += (f" — DEGRADED THIS RUN: {LLM_CALLS['rate_limited_skipped']} model call(s) "
+                 "deferred during an HTTP 429 rate-limit cooldown (AI circuit remained CLOSED); "
+                 "those items used DETERMINISTIC triage only (severity floors intact, no finding dropped)")
+    # A run with no successful model replies is degraded even if every HTTP
+    # response was fast, and no timeouts tripped the transport circuit.
     elif (LLM_TRIAGE and not _llm_in_reports()
           and LLM_CALLS.get("attempted", 0) > 0 and LLM_CALLS.get("ok", 0) == 0):
         mode += (f" (DEGRADED THIS RUN: 0 of {LLM_CALLS['attempted']} model calls succeeded, so every item "

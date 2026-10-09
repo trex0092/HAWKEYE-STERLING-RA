@@ -398,17 +398,41 @@ def build_monitoring_section(run_result, coverage_result, txn_status=None):
         L.append(f"   LLM usage: {llm.get('attempted',0)} call(s) · "
                  f"{llm.get('ok',0)} ok · {llm.get('failed',0)} failed"
                  + (f" · {llm['cached']} reused from cache (not re-billed)" if llm.get("cached") else ""))
-        # A tripped AI circuit is a COVERAGE statement, not a footnote: the
-        # affected items carry deterministic triage only. Reporting the call
-        # counts while staying silent about the ones never made would read as
-        # a full-strength AI pass that simply made fewer calls.
+        # Skipped model calls have TWO distinct meanings:
+        #   1) permanently open circuit for this run (unreachable / final refusal)
+        #   2) temporary HTTP 429 backoff, eligible to recover after Retry-After.
+        # They must never share an "AI circuit OPEN" label. Legacy snapshots
+        # predate the new sub-counters and are marked "reason unavailable"
+        # instead of inventing a breaker trip from an aggregate count.
         if llm.get("attempted", 0) > 0 and llm.get("ok", 0) == 0 and not llm.get("skipped"):
             L.append(f"      WARNING: 0 of {llm['attempted']} model calls succeeded; every item carries "
                      "DETERMINISTIC triage/summaries only (severity floors intact, no finding dropped)")
-        if llm.get("skipped"):
-            L.append(f"      ⚠ AI circuit OPEN — {llm['skipped']} model call(s) skipped after "
-                     "repeated failures or a credit/usage-limit refusal; those items carry DETERMINISTIC triage/summaries only "
-                     "(severity floors intact, no finding dropped)")
+        skipped = llm.get("skipped", 0) or 0
+        if skipped:
+            if "circuit_skipped" in llm or "rate_limited_skipped" in llm:
+                circuit = min(skipped, max(0, llm.get("circuit_skipped", 0) or 0))
+                rate_limited = min(skipped - circuit, max(0, llm.get("rate_limited_skipped", 0) or 0))
+            else:
+                circuit = rate_limited = 0
+            unattributed = skipped - circuit - rate_limited
+            if circuit:
+                L.append(f"      ⚠ AI circuit OPEN — {circuit} model call(s) skipped after "
+                         "repeated failures or a credit/usage-limit refusal; those items carry DETERMINISTIC "
+                         "triage/summaries only (severity floors intact, no finding dropped)")
+            if rate_limited:
+                # A later independent breaker trip is possible in the same run.
+                # Do not claim the circuit stayed closed if it subsequently
+                # opened for a different reason.
+                state = ("429 cooldown did not itself trip the circuit; "
+                         "other open-circuit skips are reported separately"
+                         if circuit else "AI circuit remained CLOSED")
+                L.append(f"      ⚠ LLM rate-limit cooldown (HTTP 429) — {rate_limited} model call(s) "
+                         "deferred while provider requests are paused; those items carry DETERMINISTIC "
+                         f"triage/summaries only ({state})")
+            if unattributed:
+                L.append(f"      ⚠ LLM coverage degraded — {unattributed} model call(s) skipped, "
+                         "reason unavailable in legacy/incomplete telemetry; verify model status "
+                         "(deterministic triage remains in force)")
     if base.get("history_runs"):
         L.append(f"   Baseline: {base['history_runs']} prior run(s); "
                  f"median runtime {(_fmt(base.get('median_total_seconds')))}, "

@@ -5326,6 +5326,9 @@ check("refused calls count as skipped, never as attempted or failed",
       ai.LLM_CALLS["skipped"] == 4
       and ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER
       and ai.LLM_CALLS["attempted"] == ai.LLM_BREAKER_AFTER)
+check("open circuit skip count is independent of 429 cooldown deferrals",
+      ai.LLM_CALLS["circuit_skipped"] == 4
+      and ai.LLM_CALLS["rate_limited_skipped"] == 0)
 
 # A REPLY IS NOT AN OUTAGE — a rate-limited model must pause, NOT be
 # misclassified as a transport outage. No repeated billed attempts during the
@@ -5344,6 +5347,17 @@ check("429 pauses further API attempts rather than flooding provider",
       _hits429["n"] == 1 and ai.LLM_CALLS["attempted"] == 1
       and ai.LLM_CALLS["failed"] == 1
       and ai.LLM_CALLS["skipped"] == ai.LLM_BREAKER_AFTER * 3 - 1)
+check("429 backoff skips never count as an open circuit",
+      ai.LLM_CALLS["rate_limited_skipped"] == ai.LLM_BREAKER_AFTER * 3 - 1
+      and ai.LLM_CALLS["circuit_skipped"] == 0)
+_prev_triage_mode, ai.LLM_TRIAGE = ai.LLM_TRIAGE, True
+_cooldown_footer = ai.governance_footer()
+check("429 cooldown footer names temporary degradation without a breaker trip",
+      "DEGRADED THIS RUN" in _cooldown_footer
+      and "HTTP 429 rate-limit cooldown" in _cooldown_footer
+      and "AI circuit remained CLOSED" in _cooldown_footer
+      and "AI circuit OPENED" not in _cooldown_footer)
+ai.LLM_TRIAGE = _prev_triage_mode
 # Simulate passage of the advertised retry window without sleeping.
 ai._LLM_STATE["rate_limit_until"] = 0.0
 _req.post = lambda *a, **k: _Resp(200, "recovered")
@@ -5372,6 +5386,8 @@ for _ in range(20):
 check("a credit-limit refusal opens the circuit after ONE call", ai.llm_circuit_open() and _hits["n"] == 1)
 check("the remaining calls are skipped and disclosed",
       ai.LLM_CALLS["skipped"] == 19 and ai.LLM_CALLS["failed"] == 1)
+check("a rejected billing key skips through the OPEN circuit, never via 429 pause",
+      ai.LLM_CALLS["circuit_skipped"] == 19 and ai.LLM_CALLS["rate_limited_skipped"] == 0)
 _lt, ai.LLM_TRIAGE = ai.LLM_TRIAGE, True
 check("the footer names the refusal, not an outage",
       "refused the key" in ai.governance_footer() and "HTTP 400" in ai.governance_footer())
@@ -5457,9 +5473,34 @@ def _mon_section(llm_calls):
                       "error_rate": 0.0, "llm_calls": llm_calls},
          "anomalies": [], "baseline": {}}, {})
 
-_mon = _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 12})
+_mon = _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 12,
+                     "circuit_skipped": 12, "rate_limited_skipped": 0})
 check("the report discloses the open AI circuit and the skipped count",
       "AI circuit OPEN" in _mon and "12 model call(s) skipped" in _mon)
+_cooldown_monitor = _mon_section({"attempted": 1, "ok": 0, "failed": 1, "skipped": 12,
+                                 "circuit_skipped": 0, "rate_limited_skipped": 12})
+check("the report discloses 429 cooldown without falsely claiming an open AI circuit",
+      "LLM rate-limit cooldown (HTTP 429)" in _cooldown_monitor
+      and "12 model call(s) deferred" in _cooldown_monitor
+      and "AI circuit OPEN" not in _cooldown_monitor
+      and "AI circuit remained CLOSED" in _cooldown_monitor)
+_mixed_monitor = _mon_section({"attempted": 6, "ok": 1, "failed": 5, "skipped": 8,
+                               "circuit_skipped": 3, "rate_limited_skipped": 5})
+check("the monitoring report separates mixed circuit and cooldown skips",
+      "3 model call(s) skipped" in _mixed_monitor
+      and "5 model call(s) deferred" in _mixed_monitor
+      and "429 cooldown did not itself trip the circuit" in _mixed_monitor
+      and "AI circuit remained CLOSED" not in _mixed_monitor
+      and "reason unavailable" not in _mixed_monitor)
+_legacy_monitor = _mon_section({"attempted": 2, "ok": 1, "failed": 1, "skipped": 5})
+check("legacy aggregate skips do not get a fabricated circuit-open diagnosis",
+      "5 model call(s) skipped" in _legacy_monitor
+      and "reason unavailable" in _legacy_monitor
+      and "AI circuit OPEN" not in _legacy_monitor)
+check("zero skips do not create artificial monitoring warnings",
+      "LLM rate-limit cooldown" not in _mon_section({
+          "attempted": 2, "ok": 2, "failed": 0, "skipped": 0,
+          "circuit_skipped": 0, "rate_limited_skipped": 0}))
 check("the report shows how many verdicts were reused from the cache",
       "7 reused from cache" in _mon_section({"attempted": 3, "ok": 3, "failed": 0, "skipped": 0, "cached": 7}))
 check("a run that never tripped the breaker carries no circuit warning",

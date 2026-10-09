@@ -13,8 +13,14 @@ excluded from history so they cannot poison the baseline medians):
 - **stage timings** — watchlist, sanctions, enrichment, AI triage, and total wall-clock;
 - **counts** — subjects screened, errors, flagged / adverse / PEP findings, plus
   the degradation detail counters below;
-- **LLM usage** — calls attempted / ok / failed (from `ai.LLM_CALLS`; counts only,
-  no prompt or response content retained);
+- **LLM usage** — calls attempted / ok / failed, cache reuse and skipped
+  calls (from `ai.LLM_CALLS`; counts only, no prompt or response content
+  retained). Skipped calls have separate `circuit_skipped` (run-level
+  terminal/open circuit) and `rate_limited_skipped` (temporary HTTP 429
+  Retry-After cooldown) counters. Both invoke deterministic fallback, but
+  **only the first is labelled `AI circuit OPEN`**. Older metrics with
+  an aggregate `skipped` count and no reason counters are explicitly
+  labelled `reason unavailable`, not guessed to be circuit outages;
 - **error rate** — errored subjects ÷ subjects screened.
 
 Counts definitions (semantics fixed 2026-07-14 — see the CHANGELOG entry; the
