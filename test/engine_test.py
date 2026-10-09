@@ -1842,12 +1842,12 @@ check("GOLD: Payments Register parses routes and provenance without guessing",
       and _gold_fields["gold_origin_verified"] is False
       and _gold_fields["gold_route_changed_after_contract"] is True)
 _gold_template = payment_screen.parse_register_entry("SYNTHETIC-001", (
-    "Customer: Example Trading\\nDate: 2026-10-01\\nDirection: out\\n"
-    "Amount: 1000\\nMethod: wire\\nOriginator: Example Trading\\nBeneficiary: Example Refiner\\n"
-    "Gold trade: yes\\nGold origin verified: no\\n"
-    "Gold planned route (ISO2 comma separated): GH, AE\\n"
-    "Gold actual route (ISO2 comma separated): GH, TR, AE\\n"
-    "Gold route changed after contract (yes/no): yes\\n"
+    "Customer: Example Trading\nDate: 2026-10-01\nDirection: out\n"
+    "Amount: 1000\nMethod: wire\nOriginator: Example Trading\nBeneficiary: Example Refiner\n"
+    "Gold trade: yes\nGold origin verified: no\n"
+    "Gold planned route (ISO2 comma separated): GH, AE\n"
+    "Gold actual route (ISO2 comma separated): GH, TR, AE\n"
+    "Gold route changed after contract (yes/no): yes\n"
 ))
 check("GOLD: end-to-end register entry retains route and provenance evidence",
       _gold_template is not None and _gold_template.get("gold_route_planned") == ["GH", "AE"]
