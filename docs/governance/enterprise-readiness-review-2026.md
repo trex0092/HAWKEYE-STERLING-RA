@@ -344,7 +344,7 @@ runner. Watchman matching benchmark added beside the yente one: a dispatch-only,
 workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
 no government list. Measurement only — no scored control changed.*
 
-Verified at HEAD: 72 workflows · 199 markdown documents under docs/ (166 excluding docs/research/auto).
+Verified at HEAD: 72 workflows · 200 markdown documents under docs/ (167 excluding docs/research/auto).
 
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days
