@@ -9,6 +9,7 @@ Reviewed at least annually and on change.
 |---|---|---|---|---|
 | SCR-1 | `screen.py` — unified screening engine | Daily sanctions + adverse-media + PEP screening of every customer and UBO | Rules + fuzzy match + optional LLM triage | MLRO reviews & files every alert |
 | AI-1 | `ai.py` — AI layer | Risk rating, adverse-media triage, summaries, transliteration, STR draft | Deterministic + opt-in LLM (grounded classification only) | All outputs decision-support |
+| AI-2 | `scripts/openai-screening-enrichment.mjs` — optional screening digest note | Summarizes a bounded, explicitly incomplete sample of existing screening evidence for MLRO review | External LLM, off by default | Additive only; no case state/scoring/filing effects; processor approval required before activation |
 | AG-1 | `agents.py` — agentic operating model | Agent identity, least-privilege authorization, credential broker, QA gate | Deterministic orchestration | No agent decides/files |
 | WEB-1 | `index.html` / `advisor.html` / `console.html` | On-device entity risk assessment, cited Q&A | Rules-based scoring + retrieval | Analyst-driven |
 
@@ -24,6 +25,7 @@ that executes without a human (see safeguards column).
 | AG-1 | **Administrative automation** | Orchestration/authorization plumbing; makes no risk call | Least-privilege, QA gate, deterministic |
 | WEB-1 | **Administrative automation** | Deterministic rules + retrieval; analyst owns the outcome | Contributing factors shown; analyst-driven |
 | AI-1 | **Significant-decision support** | Sharpens risk rating / adverse-media triage / STR drafts | Decision-support only; `[AI]`-labelled; deterministic fallback; MLRO owns the call |
+| AI-2 | **Significant-decision support (inactive)** | A reviewer-facing narrative may refer to named sanctions/PEP/adverse screening candidates | `OPENAI_SCREENING_ENABLED=0` default; further DPA, DPIA, legal-transfer and MLRO/DPO approval required; no autonomous decisions |
 | SCR-1 | **Significant-decision support** | Flags sanctions/PEP/adverse-media hits feeding CDD/EDD | **MLRO sign-off before acting**; non-Latin ⇒ MANUAL REVIEW; periodic bias/false-positive review |
 | — | **Critical decision (autonomous, legal/serious effect)** | **None.** No AI surface auto-decides, blocks, files, or de-risks a customer without a human. | N/A — if ever introduced, requires DPIA refresh, explicit lawful basis, and senior-management approval before deployment |
 
@@ -36,6 +38,7 @@ that executes without a human (see safeguards column).
 | Service | Use | Provider | Data sent | Gating |
 |---|---|---|---|---|
 | Anthropic Claude (`AI_MODEL`) | Grounded adverse-media triage (classify real headlines); optional summaries | Anthropic | Subject name + a single news headline (no full customer record) | **Opt-in** via `ANTHROPIC_API_KEY`; off ⇒ no egress |
+| OpenAI Responses API (`OPENAI_SCREENING_MODEL`) | Optional AI analyst-assistance text for the daily Asana sanctions/PEP/adverse-media digest; no final decisions | OpenAI | **Potentially confidential** sample of subject names, matched names, scores and coverage metadata. Shortlists are bounded and omissions explicitly declared. | **NOT APPROVED / OFF by default**. Both `OPENAI_SCREENING_ENABLED=1` AND a server-side `OPENAI_API_KEY` are necessary but not sufficient: MLRO/DPO/IT must first approve DPA, ROPA/DPIA, processor location/retention, PDPL transfer basis and model/response controls. |
 | Wikidata `wbsearchentities` | PEP auto-detection | Wikimedia (CC0) | Individual name | Always-on, public API |
 | Google News RSS | Adverse-media search | Google | Subject name + risk terms | Always-on, public feed |
 
