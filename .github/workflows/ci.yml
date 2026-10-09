@@ -93,6 +93,8 @@ jobs:
         run: node test/compliance-calendar.test.mjs
       - name: Run regulatory-watch unit tests
         run: node test/reg-watch.test.mjs
+      - name: Guard Regulatory Watch AI request and token budgets (offline)
+        run: node test/reg-draft-budget.test.mjs
       - name: Run sanctions-watch unit tests
         run: node test/sanctions-watch.test.mjs
       - name: Run immediate re-screen trigger guard
