@@ -290,26 +290,26 @@ On 2026-10-08 the 17 suggestions above the then-current score were applied to th
 ### Gold trade-route monitoring and PEP coverage QA (review-only)
 
 The transaction-monitoring engine includes explicit gold trade evidence rules:
-\`GOLD_ROUTE_DEVIATION\` compares the **recorded planned and actual transport
-routes** (ordered two-letter country codes); \`GOLD_ROUTE_CHANGE\` reports an
+`GOLD_ROUTE_DEVIATION` compares the **recorded planned and actual transport
+routes** (ordered two-letter country codes); `GOLD_ROUTE_CHANGE` reports an
 expressly documented post-contract shipment-route or consignee change;
-\`GOLD_ORIGIN_UNVERIFIED\` reports an explicitly failed/unverified origin
-check. A malformed supplied route gives \`GOLD_ROUTE_UNREADABLE\`, which needs
+`GOLD_ORIGIN_UNVERIFIED` reports an explicitly failed/unverified origin
+check. A malformed supplied route gives `GOLD_ROUTE_UNREADABLE`, which needs
 manual checking. An absent route or unknown origin is not treated as proof
 of a mismatch or a clean supply chain. All are MLRO review findings, not
 sanctions designations, fraud findings, reporting/freeze instructions or
 automatic customer decisions.
 
-A Payments Register template can provide \`Gold trade: yes\`,
-\`Gold planned route: GH, AE\`, \`Gold actual route: GH, TR, AE\`,
-\`Gold route changed after contract: yes\`, and
-\`Gold origin verified: no\`. Corresponding fields are also documented
-in \`data/transaction-feed.schema.json\`. Production transaction
+A Payments Register template can provide `Gold trade: yes`,
+`Gold planned route: GH, AE`, `Gold actual route: GH, TR, AE`,
+`Gold route changed after contract: yes`, and
+`Gold origin verified: no`. Corresponding fields are also documented
+in `data/transaction-feed.schema.json`. Production transaction
 monitoring remains **inactive without an approved real feed**. Never
 commit actual transaction or shipment/customer PII to this repository.
 
-The existing \`hawkeye_analyze_kyc_note\` MCP tool also returns an
-\`individuals[].pep_country_qa\` reminder for Turkey (including Türkiye
+The existing `hawkeye_analyze_kyc_note` MCP tool also returns an
+`individuals[].pep_country_qa` reminder for Turkey (including Türkiye
 spelling), India and Papua New Guinea. These are **operator-selected
 screening-quality spot-check examples**, not newly elevated country risk
 scores or evidence of PEP exposure. A nationality never establishes a PEP
