@@ -86,7 +86,7 @@ check('Regulatory Watch only fetches approved source IDs and exact URLs',
 // Reports and documents are UNTRUSTED input; even a matching ID/URL cannot
 // smuggle a forged jurisdiction or a 2 MB metadata label into a paid prompt.
 const forgedSource = {id:'uae-reg', url:'https://regulator.example/document',
-  name:'FORGED\\nMODEL PROMPT ' + 'X'.repeat(100000), jurisdiction:'Unreviewed'};
+  name:'FORGED\nMODEL PROMPT ' + 'X'.repeat(100000), jurisdiction:'Unreviewed'};
 const canonical = approvedWatchSourceDetails(forgedSource, approved);
 check('approved registry, not incoming report, owns model-facing metadata',
   canonical && canonical.id === 'uae-reg' && canonical.name === 'Authority' &&
@@ -96,10 +96,10 @@ check('unregistered source yields no trusted metadata',
   approvedWatchSourceDetails({ ...forgedSource, url: 'https://evil.example/' }, approved) === null &&
   approvedWatchSourceDetails({ ...forgedSource, id: '__other' }, approved) === null);
 const cleaned = approvedWatchSourceDetails(forgedSource, [
-  {...approved[0], name: 'Authority\\nA' + 'Z'.repeat(400), jurisdiction: 'UAE\\nTest'}
+  {...approved[0], name: 'Authority\nA' + 'Z'.repeat(400), jurisdiction: 'UAE\nTest'}
 ]);
 check('approved metadata remains bounded and strips newline/control injection',
-  cleaned && cleaned.name.length <= 120 && !cleaned.name.includes('\\n') &&
+  cleaned && cleaned.name.length <= 120 && !cleaned.name.includes('\n') &&
   cleaned.jurisdiction === 'UAE Test');
 check('unapproved source URL and name cannot become rendered action links',
   !manualDraftSection({ name: 'MALICIOUS_SOURCE', url:'javascript:alert(1)' },
