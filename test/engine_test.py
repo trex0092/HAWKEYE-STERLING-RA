@@ -1470,6 +1470,10 @@ def _reg_rules(amount, currency):
     return _rules([payment_screen.parse_register_entry("TX-AMT", (
         f"Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: {amount}\nCurrency: {currency}\n"
         "Direction: in\nMethod: cash\nOriginator: Some Person\nBeneficiary: Example Trading LLC\n"))])
+check("register: a decimal-comma amount '60.000,00' or '60.000' is AMOUNT_UNREADABLE, never read as AED 60",
+      all("AMOUNT_UNREADABLE" in _reg_rules(v, "AED") for v in ("60.000,00", "60.000", "60,00", "1,2")))
+check("register: '60,000.00', '60000' and Indian grouping '1,05,000' still raise THRESHOLD",
+      all("THRESHOLD" in _reg_rules(v, "AED") for v in ("60,000.00", "60000", "1,05,000")))
 check("register: a USD cash amount is flagged NON_AED_AMOUNT, never compared to AED thresholds as-is",
       "NON_AED_AMOUNT" in _reg_rules("20000", "USD"))
 check("register: an amount the parser cannot read is AMOUNT_UNREADABLE, never silently dropped",
