@@ -15,6 +15,7 @@ import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { extractText, CHANGES_FILE, fetchWithFallback, parseAnalysis } from './reg-watch.mjs';
 import {
   draftBudget, validatedReportDate, boundedLines, boundedItems,
+  evidenceCount, missingExcerptNotice,
   manualDraftSection, approvedWatchSource, approvedWatchSourceDetails,
   deferredDraftCause, providerStopReason, usageCounts
 } from './reg-draft-budget.mjs';
@@ -90,21 +91,25 @@ async function draftFor(c) {
      to the analyst prompt — a draft grounded in the delta beats one guessing
      from the full page. */
   const delta = c.diff && typeof c.diff === 'object' && !Array.isArray(c.diff) ? [
-    'Detected delta (' + (Array.isArray(c.diff.added) ? c.diff.added.length : 0) +
-      ' added / ' + (Array.isArray(c.diff.removed) ? c.diff.removed.length : 0) + ' removed segments):',
+    'Detected delta (' + evidenceCount(c.diff.addedCount, c.diff.added) +
+      ' added / ' + evidenceCount(c.diff.removedCount, c.diff.removed) + ' removed segments):',
     ...boundedLines(c.diff.added, 'ADDED: ', BUDGET.listEntries, BUDGET.entryChars),
+    ...missingExcerptNotice(c.diff.addedCount, c.diff.added, 'added segments'),
     ...boundedLines(c.diff.removed, 'REMOVED: ', BUDGET.listEntries, BUDGET.entryChars),
+    ...missingExcerptNotice(c.diff.removedCount, c.diff.removed, 'removed segments'),
     ''
   ] : [];
   /* New / removed publications as the page titles and links them — the most
      precise evidence of what was issued or withdrawn. */
   const itemLines = c.items && typeof c.items === 'object' && !Array.isArray(c.items) ? [
     'Publications newly listed on the page (' +
-      (Array.isArray(c.items.added) ? c.items.added.length : 0) + '):',
+      evidenceCount(c.items.addedCount, c.items.added) + '):',
     ...boundedItems(c.items.added, 'NEW ITEM: ', BUDGET.listEntries, BUDGET.entryChars),
+    ...missingExcerptNotice(c.items.addedCount, c.items.added, 'new publication items'),
     'Publications no longer listed (' +
-      (Array.isArray(c.items.removed) ? c.items.removed.length : 0) + '):',
+      evidenceCount(c.items.removedCount, c.items.removed) + '):',
     ...boundedItems(c.items.removed, 'REMOVED ITEM: ', BUDGET.listEntries, BUDGET.entryChars),
+    ...missingExcerptNotice(c.items.removedCount, c.items.removed, 'removed publication items'),
     ''
   ] : [];
   const prompt = [
