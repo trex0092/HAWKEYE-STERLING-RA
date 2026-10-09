@@ -53,12 +53,22 @@ export function boundedItems(items, prefix, limit, maxChars) {
   return lines;
 }
 
+/* The watcher input is a generated report, not authority to fetch arbitrary
+ * endpoints. Fetch only the exact HTTPS URL already in the reviewed source
+ * registry, preventing request redirection through a tampered report. */
+export function approvedWatchSource(change, registry) {
+  if (!change || !Array.isArray(registry) || typeof change.id !== 'string' ||
+      typeof change.url !== 'string' || !change.url.startsWith('https://')) return false;
+  return registry.some((source) => source && source.id === change.id &&
+    source.url === change.url && typeof source.name === 'string');
+}
+
 export function manualDraftSection(source, cause) {
   const label = String(source && source.name || 'Unlabelled source')
     .replace(/[\r\n\u0000-\u001f]/g, ' ').slice(0, 120);
   const url = String(source && source.url || '').replace(/[\r\n\u0000-\u001f]/g, ' ').slice(0, 500);
   const allowed = new Set([
-    'input source unavailable', 'empty source text', 'API request budget exhausted',
+    'input source unavailable', 'empty source text', 'source not approved', 'API request budget exhausted',
     'provider error', 'provider rate limit', 'provider billing or authentication failure',
     'provider timeout or network failure', 'provider empty or truncated response',
   ]);
