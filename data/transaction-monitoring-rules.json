@@ -304,6 +304,23 @@
         "gold_origin_verified"
       ],
       "automatic_filing": false
+    },
+    {
+      "id": "TXN-GOLD-UNREADABLE-001",
+      "engine_rule": "GOLD_ROUTE_UNREADABLE",
+      "typology": "gold_transport_evidence_quality_gap",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-183"
+      ],
+      "description": "Gold route fields are malformed. Explicit manual validation is required; a malformed route on one payment does not suppress valid alerts on other payments.",
+      "required_fields": [
+        "gold_trade",
+        "gold_route_planned",
+        "gold_route_actual"
+      ],
+      "automatic_filing": false
     }
   ]
 }
