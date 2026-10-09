@@ -22,6 +22,7 @@
  */
 
 const { URLSearchParams } = require('node:url');
+const enginePolicy = require('./_composio-engine-policy');
 
 const DEFAULT_BASE_URL = 'https://backend.composio.dev';
 const DEFAULT_TOOLKITS = ['asana', 'gmail', 'googledrive', 'slack', 'github'];
@@ -138,19 +139,23 @@ function sessionPath(sessionId, suffix = '') {
 
 async function createSession(userId, options = {}) {
   const toolkits = allowedToolkits(options.toolkits);
+  if (options.mcp === true && !enginePolicy.hostedMcpAllowed())
+    throw new Error('Hosted Composio MCP is disabled until separately approved');
+  if (options.workbench || options.preload || options.tools)
+    throw new Error('Unreviewed session tool/workbench overrides are disabled');
   const body = {
     user_id: cleanId(userId, 'user id'),
     toolkits: { enable: toolkits },
+    // Session filters are enforced on the provider side AS WELL AS on each
+    // Hawkeye router invocation, so a saved session is not a policy bypass.
+    tools: enginePolicy.approvedSessionTools(toolkits),
     manage_connections: options.manageConnections === false ? false : true,
     mcp: options.mcp === true,
   };
 
   if (options.authConfigs && typeof options.authConfigs === 'object') body.auth_configs = options.authConfigs;
   if (options.connectedAccounts && typeof options.connectedAccounts === 'object') body.connected_accounts = options.connectedAccounts;
-  if (options.tools && typeof options.tools === 'object') body.tools = options.tools;
   if (options.tags && typeof options.tags === 'object') body.tags = options.tags;
-  if (options.preload && typeof options.preload === 'object') body.preload = options.preload;
-  if (options.workbench && typeof options.workbench === 'object') body.workbench = options.workbench;
 
   return request('POST', '/api/v3.1/tool_router/session', { body });
 }
@@ -162,9 +167,15 @@ function getSession(sessionId) {
 function updateSession(sessionId, patch) {
   if (!patch || typeof patch !== 'object') throw new Error('session patch is required');
   const body = { ...patch };
+  if (body.tools || body.preload || body.workbench || body.experimental)
+    throw new Error('Session tools, preload and workbench cannot be overridden by request');
+  if (body.mcp === true && !enginePolicy.hostedMcpAllowed())
+    throw new Error('Hosted Composio MCP is disabled until separately approved');
   if (body.toolkits) {
     const requested = Array.isArray(body.toolkits) ? body.toolkits : body.toolkits.enable;
-    body.toolkits = { enable: allowedToolkits(requested) };
+    const allowed = allowedToolkits(requested);
+    body.toolkits = { enable: allowed };
+    body.tools = enginePolicy.approvedSessionTools(allowed);
   }
   return request('PATCH', sessionPath(sessionId), { body });
 }
