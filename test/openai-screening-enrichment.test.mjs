@@ -70,7 +70,7 @@ check('direct evidence fit remains valid JSON after large reductions',(()=>{
 check('the original screening data is never changed by model sampling',
   JSON.stringify(fixture) === baseline);
 check('current default low-cost OpenAI model ID and API endpoint stay unchanged',
-  DEFAULT_OPENAI_SCREENING_MODEL === 'gpt-5.6-luna' &&
+  DEFAULT_OPENAI_SCREENING_MODEL === 'gpt-6-luna' &&
   OPENAI_RESPONSES_URL === 'https://api.openai.com/v1/responses');
 check('Response API text extraction handles output blocks only',
   extractResponseText({output:[{content:[{type:'output_text',text:'Review.'},{type:'refusal',text:'hidden'}]}]}) === 'Review.');
@@ -97,7 +97,7 @@ check('missing key means no API call or customer-data egress',
   noKey.enabled === false && called === 0);
 let captured;
 const ok = await enrichScreeningResults(fixture,{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'gpt-5.6-luna',maxInputChars:5000,
+  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'gpt-6-luna',maxInputChars:5000,
   maxOutputTokens:999999,timeoutMs:99999999,
   fetchImpl:async(url,request)=>{
     captured={url,request};
@@ -112,7 +112,7 @@ const sent=JSON.parse(captured.request.body);
 check('actual request is bounded and never stores the provider response',
   captured.url===OPENAI_RESPONSES_URL && sent.store===false &&
   sent.max_output_tokens===1800 && sent.input.length<=5000 &&
-  sent.model==='gpt-5.6-luna');
+  sent.model==='gpt-6-luna');
 check('success returns only model output and numeric usage metadata',
   ok.text==='MLRO review required.' && ok.usage.input_tokens===220 &&
   !JSON.stringify(ok).includes('SYNTHETIC_PROVIDER_KEY'));
@@ -143,6 +143,14 @@ const incomplete=await enrichScreeningResults(fixture,{
 });
 check('partially generated answers cannot masquerade as complete analysis',
   incomplete.text==='' && incomplete.error.includes('incomplete'));
+const statusMissing = await enrichScreeningResults(fixture,{
+  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  fetchImpl:async()=>({ok:true,status:200,json:async()=>({
+    output:[{type:'message',content:[{type:'output_text',text:'Unconfirmed completion'}]}]
+  })})
+});
+check('missing Responses API completion status cannot masquerade as a usable MLRO note',
+  statusMissing.text === '' && statusMissing.error.includes('incomplete'));
 const invalidModel=await enrichScreeningResults(fixture,{
   enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'invalid model with spaces',
   fetchImpl:async()=>{called++;}
