@@ -9,7 +9,9 @@
    explain the run. It is instructed not to infer facts that are absent from the
    supplied evidence and not to make a compliance disposition. */
 
-export const DEFAULT_OPENAI_SCREENING_MODEL = 'gpt-5.6-luna';
+// Published, lower-cost Responses API model. Access still depends on the
+// organization's enabled models and separately approved processor controls.
+export const DEFAULT_OPENAI_SCREENING_MODEL = 'gpt-6-luna';
 export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
 function clip(value, max = 120) {
@@ -244,7 +246,7 @@ export async function enrichScreeningResults(results, {
       return { enabled: true, text: '', error: safeOpenAIError(response.status), model };
     }
     const payload = await response.json().catch(() => null);
-    if (!payload || payload.error || (payload.status && payload.status !== 'completed')) {
+    if (!payload || payload.error || payload.status !== 'completed') {
       return { enabled: true, text: '', error: 'OpenAI response incomplete or invalid; manual review required', model };
     }
     const text = extractResponseText(payload);
