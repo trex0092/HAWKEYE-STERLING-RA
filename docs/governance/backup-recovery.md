@@ -7,7 +7,8 @@ This runbook covers how Hawkeye Sterling RA data is backed up, how to restore it
 and how to independently verify the integrity of an exported record. It
 complements the data-retention controls in
 [`data-retention.md`](data-retention.md) and the record-keeping obligations under
-UAE Federal Decree-Law No. (26) of 2021, Art. 23 (10-year retention).
+UAE Federal Decree-Law No. (10) of 2025 (10-year retention; the duty was formerly
+FDL 26/2021 Art. 23, repealed with FDL 20/2018).
 
 ## What is stored where
 

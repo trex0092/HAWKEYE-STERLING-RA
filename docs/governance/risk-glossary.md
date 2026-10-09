@@ -153,6 +153,37 @@ things you may do with a risk once it is scored.
 
 ---
 
+## 10. AI terms
+
+Added 2026-10-08 to close gap G-3 in
+[`ai-rulebooks-crosswalk-2026.md`](ai-rulebooks-crosswalk-2026.md) §8: the
+estate's AI documents used these words without one shared meaning.
+ISO/IEC 22989:2022 is the international AI vocabulary. **These definitions are
+this repository's own plain-language wording, aligned in intent with that
+vocabulary. They are not quotations from the standard**, which is copyrighted
+and was not consulted verbatim. Where the EU AI Act gives a term a legal
+meaning, the row says so and points at the assessment that applies it.
+
+| Term | In business language | Where the estate applies it |
+|---|---|---|
+| **AI system** | Software that produces outputs (answers, classifications, recommendations) by inference from data, not only by fixed rules written in advance. The deterministic risk and screening engines are **not** AI systems here; the Advisor and the opt-in LLM triage are. | [`../aims/ai-system-inventory.md`](../aims/ai-system-inventory.md); [ADR-001](adr-001-deterministic-vs-learned.md); EU AI Act Art. 3(1) reading in [`eu-ai-act-assessment-2026.md`](eu-ai-act-assessment-2026.md) §2 |
+| **Model** | The trained component inside an AI system (here, the vendor's large language model). The firm trains no model of its own. | [`../models/README.md`](../models/README.md) model cards |
+| **Provider / deployer** | EU AI Act roles: the *provider* builds or puts a system into service under its name; the *deployer* uses it. Hawkeye Sterling is both for the Advisor; the model vendor is the general-purpose-model provider. | [`eu-ai-act-assessment-2026.md`](eu-ai-act-assessment-2026.md) §2 |
+| **Human oversight** | A named person can see, question, override or stop an AI output before it affects anyone. Here every regulated decision is the MLRO's, and the AI only drafts or advises. | [`agentic-ai-governance-6layers-2026.md`](agentic-ai-governance-6layers-2026.md) Layer 5 |
+| **Kill switch** | A setting that turns an AI surface off without deleting it or its keys. | [`ai-incident-runbook.md`](ai-incident-runbook.md) |
+| **Agent / tool call** | An AI system that can choose and run actions (tools) itself. **Model tool-calling is disabled** in this estate (`data/tool-surfaces.json` `model_tool_calling.enabled=false`). The two plan runners (`agent_orchestrator.py`, `agent_plan.py`) execute human-supplied read-only plans and let no model choose a tool. | [`tool-connector-register.md`](tool-connector-register.md) |
+| **Prompt injection** | Text, typed by a user or found in a retrieved source, that tries to make the AI ignore its instructions. Treated as an attack, not as content. | [`../aims/red-team-procedure.md`](../aims/red-team-procedure.md); `test/redteam_injection.py` |
+| **Hallucination / unsupported claim** | A fluent statement the AI cannot ground in a cited source. The estate measures it and labels AI output; it does not claim to prevent it. | [`citation-accuracy-metric.md`](citation-accuracy-metric.md) |
+| **Retrieval (RAG)** | Fetching vetted source text and giving it to the model with the question, so the answer can cite it. Retrieved text is untrusted data, never instructions. | `scripts/verified-legal-retrieval.mjs` |
+| **Evaluation (eval)** | A repeatable test of AI behaviour against fixed cases with a pass mark. | [`eval-scorecard.md`](eval-scorecard.md) |
+| **Red teaming** | Deliberately attacking the AI to find failures before someone else does. | [`../aims/red-team-procedure.md`](../aims/red-team-procedure.md) |
+| **Bias / fairness** | Here, a measurable difference in recall between name scripts (a Latin-script name matched more reliably than the same name in Arabic script, for example). | [`../aims/bias-fairness-testing.md`](../aims/bias-fairness-testing.md) |
+| **Drift** | The inputs or behaviour moving away from what the system was validated on, so earlier test results stop being evidence. | [`../aims/population-stability-monitoring.md`](../aims/population-stability-monitoring.md) |
+| **Explainability** | Being able to say, for a given output, which inputs and rules produced it. Full for the deterministic engines; limited to cited sources for the LLM. | [`explainability-statement-2026.md`](explainability-statement-2026.md) |
+| **AI incident** | An AI output or failure that harmed, or could have harmed, a person, a filing or the firm. Runs the AI incident runbook and its clocks. | [`ai-incident-runbook.md`](ai-incident-runbook.md) |
+
+---
+
 ## How to use this page
 
 - **Writing a new governance document?** Use these words with these meanings. If

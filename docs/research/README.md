@@ -12,6 +12,7 @@ app content changes).
 | [aml-regulators-directory.md](aml-regulators-directory.md) | Directory of the regulators/bodies the watchers monitor |
 | [2026-06-aml-regulatory-update.md](2026-06-aml-regulatory-update.md) | June 2026 deep-dive: FDL 10/2025, Cabinet 134/2025, FATF plenary, MoET/DPMS actions (fully cited) |
 | [2026-07-cbuae-april-2026-update.md](2026-07-cbuae-april-2026-update.md) | July 2026 note: CBUAE April 2026 update and PF risk-area follow-ups |
+| [open-source-candidates-2026.md](open-source-candidates-2026.md) | 20 open-source repositories checked against this repo's recorded gaps, with licence evidence and the zero-runtime-dependency adoption mode; nothing adopted |
 | [auto/](auto/) | Dated Regulatory Watch notes (`REG-UPDATE-YYYY-MM-DD.md`) |
 
 **Citation policy:** every claim carries its source URL; pages that block
