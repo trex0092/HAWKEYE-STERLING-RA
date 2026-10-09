@@ -1790,6 +1790,84 @@ _route = txn_monitor.evaluate([{**_base_txn, "route_mismatch": True}])
 check("TXN surfaces an explicit payment/shipping route mismatch",
       any(a["rule"] == "ROUTE_MISMATCH" for a in _route["alerts"]))
 
+
+# Gold-route alerts require explicit shipment evidence. Neither nationality nor
+# a transit-country code alone is a criminal or PEP indicator.
+_gold_txn = {**_base_txn, "gold_trade": True,
+             "gold_route_planned": ["GH", "AE"],
+             "gold_route_actual": ["GH", "TR", "AE"]}
+_gold_diff = txn_monitor.evaluate([_gold_txn])
+check("GOLD: actual route differs from the documented planned route",
+      any(a["rule"] == "GOLD_ROUTE_DEVIATION" for a in _gold_diff["alerts"]))
+check("GOLD: alerts are human review only, not a filing instruction",
+      any(a["rule"] == "GOLD_ROUTE_DEVIATION" and a["severity"] == "HIGH"
+          for a in _gold_diff["alerts"]))
+_gold_same = txn_monitor.evaluate([{**_gold_txn, "gold_route_actual": ["gh", "ae"]}])
+check("GOLD: ISO2 route case is normalized without a false deviation",
+      not any(a["rule"] == "GOLD_ROUTE_DEVIATION" for a in _gold_same["alerts"]))
+_gold_missing = txn_monitor.evaluate([{**_base_txn, "gold_trade": True,
+                                       "gold_route_planned": ["GH", "AE"]}])
+check("GOLD: absent actual route cannot be presumed divergent",
+      not any(a["rule"] == "GOLD_ROUTE_DEVIATION" for a in _gold_missing["alerts"]))
+_gold_wrong_class = txn_monitor.evaluate([{**_gold_txn, "gold_trade": False,
+                                           "gold_origin_verified": False,
+                                           "gold_route_changed_after_contract": True}])
+check("GOLD: non-gold records do not trigger gold shipment flags",
+      not any(a["rule"].startswith("GOLD_") for a in _gold_wrong_class["alerts"]))
+_gold_change = txn_monitor.evaluate([{**_base_txn, "gold_trade": True,
+                                      "gold_route_changed_after_contract": True}])
+check("GOLD: explicit post-contract change requires review",
+      any(a["rule"] == "GOLD_ROUTE_CHANGE" for a in _gold_change["alerts"]))
+_gold_origin = txn_monitor.evaluate([{**_base_txn, "gold_trade": True,
+                                      "gold_origin_verified": False}])
+check("GOLD: explicitly unverified origin requires KYS review",
+      any(a["rule"] == "GOLD_ORIGIN_UNVERIFIED" for a in _gold_origin["alerts"]))
+_gold_unknown = txn_monitor.evaluate([{**_base_txn, "gold_trade": True}])
+check("GOLD: unknown origin and route are not inferred as factual alerts",
+      not any(a["rule"].startswith("GOLD_") for a in _gold_unknown["alerts"]))
+_gold_bad = txn_monitor.evaluate([{**_gold_txn, "gold_route_actual": ["NOT-ISO2"]},
+                                  _gold_txn])
+check("GOLD: malformed route is surfaced without hiding a valid deviation",
+      any(a["rule"] == "GOLD_ROUTE_UNREADABLE" for a in _gold_bad["alerts"])
+      and any(a["rule"] == "GOLD_ROUTE_DEVIATION" for a in _gold_bad["alerts"]))
+_gold_fields = payment_screen._register_monitoring_fields({
+    "gold trade": "yes", "gold origin verified": "no",
+    "gold planned route": "GH, AE", "gold actual route": "GH, TR, AE",
+    "gold route changed after contract": "yes",
+})
+check("GOLD: Payments Register parses routes and provenance without guessing",
+      _gold_fields["gold_route_planned"] == ["GH", "AE"]
+      and _gold_fields["gold_route_actual"] == ["GH", "TR", "AE"]
+      and _gold_fields["gold_trade"] is True
+      and _gold_fields["gold_origin_verified"] is False
+      and _gold_fields["gold_route_changed_after_contract"] is True)
+_gold_template = payment_screen.parse_register_entry("SYNTHETIC-001", (
+    "Customer: Example Trading\\nDate: 2026-10-01\\nDirection: out\\n"
+    "Amount: 1000\\nMethod: wire\\nOriginator: Example Trading\\nBeneficiary: Example Refiner\\n"
+    "Gold trade: yes\\nGold origin verified: no\\n"
+    "Gold planned route (ISO2 comma separated): GH, AE\\n"
+    "Gold actual route (ISO2 comma separated): GH, TR, AE\\n"
+    "Gold route changed after contract (yes/no): yes\\n"
+))
+check("GOLD: end-to-end register entry retains route and provenance evidence",
+      _gold_template is not None and _gold_template.get("gold_route_planned") == ["GH", "AE"]
+      and _gold_template.get("gold_route_actual") == ["GH", "TR", "AE"]
+      and _gold_template.get("gold_origin_verified") is False)
+
+for _nation, _expected in (("Turkey", "Turkey"), ("Türkiye", "Turkey"),
+                            ("India", "India"), ("Papua New Guinea", "Papua New Guinea")):
+    _warning = kyc.pep_country_qa_advisory(_nation)
+    check("PEP QA: " + _nation + " is a non-scoring coverage reminder",
+          _warning is not None and _warning["jurisdiction"] == _expected
+          and _warning["is_pep_finding"] is False
+          and _warning["risk_score_adjustment"] == 0
+          and _warning["human_review_required"])
+check("PEP QA: substring nationalities do not trigger false country warnings",
+      kyc.pep_country_qa_advisory("Indianapolis") is None
+      and kyc.pep_country_qa_advisory("Papuan community") is None)
+check("PEP QA: selected examples do not contaminate all nationality records",
+      kyc.pep_country_qa_advisory("French") is None)
+
 with open(os.path.join(ROOT, "data", "transaction-monitoring-rules.json"), encoding="utf-8") as _tmr_f:
     _tmr = json.load(_tmr_f)
 _tm_rules = _tmr.get("rules", [])
@@ -1799,7 +1877,8 @@ check("TXN engine rules are represented in the machine-readable registry",
       {r.get("engine_rule") for r in _tm_rules}.issuperset(
           {"THRESHOLD","STRUCTURING","VELOCITY","HIGH_RISK_GEO","PASSTHROUGH","ROUND_AMOUNT",
            "THIRD_PARTY_PAYMENT","REFUND_DIVERSION","PRICING_DEVIATION",
-           "PHANTOM_DELIVERY","INVOICE_MISMATCH","ROUTE_MISMATCH"}))
+           "PHANTOM_DELIVERY","INVOICE_MISMATCH","ROUTE_MISMATCH",
+           "GOLD_ROUTE_DEVIATION","GOLD_ROUTE_CHANGE","GOLD_ORIGIN_UNVERIFIED"}))
 
 # ── monitoring.py: runtime metrics + source-coverage drift ────────────────────
 print("monitoring.py — runtime metrics + coverage drift")
