@@ -23,7 +23,8 @@ check('optional Netlify site diagnostics use only individually scoped configurat
   workflow.includes('secrets.NETLIFY_AUTH_TOKEN') &&
   workflow.includes('NETLIFY_SITE_ID') &&
   workflow.includes('scripts/netlify-deploy-preflight.mjs') &&
-  !/toJSON\s*\(\s*secrets\s*\)/i.test(workflow));
+  !/\$\{\{\s*toJSON\s*\(\s*secrets\s*\)\s*\}\}/i.test(workflow) &&
+  !/\bSECRETS_JSON\s*:/.test(workflow));
 check('preflight preserves exact-byte publishing verification and conditional fail-fast',
   workflow.indexOf('scripts/netlify-deploy-preflight.mjs') <
     workflow.indexOf('Wait for the publish to reach the live site') &&
