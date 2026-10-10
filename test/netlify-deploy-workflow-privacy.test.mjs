@@ -19,6 +19,23 @@ check('production build hook remains repository-secret scoped and branch pinned'
 check('workflow never serializes all GitHub variables to env/logs',
   !/toJSON\s*\(\s*vars\s*\)/i.test(workflow) &&
   !/\bVARS_JSON\b/.test(workflow));
+check('optional Netlify site diagnostics use only individually scoped configuration',
+  workflow.includes('secrets.NETLIFY_AUTH_TOKEN') &&
+  workflow.includes('NETLIFY_SITE_ID') &&
+  workflow.includes('scripts/netlify-deploy-preflight.mjs') &&
+  !/\$\{\{\s*toJSON\s*\(\s*secrets\s*\)\s*\}\}/i.test(workflow) &&
+  !/\bSECRETS_JSON\s*:/.test(workflow));
+check('preflight preserves exact-byte publishing verification and conditional fail-fast',
+  workflow.indexOf('scripts/netlify-deploy-preflight.mjs') <
+    workflow.indexOf('Wait for the publish to reach the live site') &&
+  workflow.includes("steps.kick.outputs.kicked == 'true'"));
+check('operator runbook explains read-only API configuration without requiring it for baseline',
+  runbook.includes('NETLIFY_AUTH_TOKEN') &&
+  runbook.includes('NETLIFY_SITE_ID') &&
+  runbook.includes('read-only') &&
+  runbook.includes('Missing API credentials') &&
+  runbook.includes('workflow behavior is') );
+
 check('production deploy never equates HTTP 200 with published assets',
   workflow.includes('scripts/site-currency.mjs --quiet') &&
   workflow.includes('in ~18 minutes') &&
