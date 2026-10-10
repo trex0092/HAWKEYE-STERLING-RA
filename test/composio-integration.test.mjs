@@ -49,6 +49,17 @@ try {
   check('unregistered toolkit is rejected', rejected);
   check('explicit empty toolkit selection never broadens to five defaults',
     composio._test.allowedToolkits([]).length === 0);
+  process.env.COMPOSIO_TOOLKITS = '';
+  check('empty server toolkit configuration DENIES all connected apps',
+    composio.configuredToolkits().length === 0 &&
+    composio._test.allowedToolkits().length === 0);
+  process.env.COMPOSIO_TOOLKITS = 'asana,dropbox';
+  let unsupportedToolkitDenied = false;
+  try { composio.configuredToolkits(); }
+  catch (err) { unsupportedToolkitDenied = err.statusCode === 403; }
+  check('misconfigured server toolkit cannot add an unapproved provider',
+    unsupportedToolkitDenied);
+  process.env.COMPOSIO_TOOLKITS = 'asana,gmail,googledrive,slack,github';
 
   rejected = false;
   try { composio._test.cleanId('../escape', 'id'); } catch { rejected = true; }
@@ -83,6 +94,39 @@ try {
   check('hosted MCP is OFF and no app tool is executable with empty read allowlist',
     posted.mcp === false && posted.tools.asana.enable.length === 0 &&
     posted.tools.gmail.enable.length === 0);
+  check('ordinary Composio sessions cannot manage linked accounts',
+    posted.manage_connections === false);
+  let accountOptionsDenied = false;
+  try {
+    await composio.createSession('operator_1', {
+      toolkits: ['asana'], manageConnections: true
+    });
+  } catch (err) { accountOptionsDenied = err.statusCode === 403; }
+  check('shared-token clients cannot turn on provider account management',
+    accountOptionsDenied);
+  accountOptionsDenied = false;
+  try {
+    await composio.createSession('operator_1', {
+      toolkits: ['asana'], connectedAccounts: { asana: ['private_account'] }
+    });
+  } catch (err) { accountOptionsDenied = err.statusCode === 403; }
+  check('caller-supplied connected accounts require separately approved admin gate',
+    accountOptionsDenied);
+  accountOptionsDenied = false;
+  try {
+    await composio.createSession('operator_1', {
+      toolkits: ['asana'], authConfigs: { asana: 'private_config' }
+    });
+  } catch (err) { accountOptionsDenied = err.statusCode === 403; }
+  check('caller-supplied auth configs cannot widen a read-only session',
+    accountOptionsDenied);
+  process.env.COMPOSIO_ALLOW_ADMIN_MUTATIONS = '1';
+  await composio.createSession('operator_admin', {
+    toolkits: ['asana'], manageConnections: true
+  });
+  check('connection-management session requires separately enabled admin flag',
+    JSON.parse(captured.init.body).manage_connections === true);
+  delete process.env.COMPOSIO_ALLOW_ADMIN_MUTATIONS;
 
   process.env.COMPOSIO_READ_TOOL_SLUGS = 'ASANA_GET_TASK,GMAIL_FETCH_EMAILS,GITHUB_GET_COMMIT';
   const approvedSession = await composio.createSession('operator_2', { toolkits: ['asana', 'gmail'] });
@@ -164,6 +208,8 @@ try {
         return false; } catch (err) { return /cannot be overridden/.test(err.message); }
     })());
   check('administrative mutations and presigned file links are disabled by default',
+    await rejects('auth.link', { session_id: 'trs_synthetic',
+      link: { toolkit: 'asana' } }) &&
     await rejects('mount.delete', { session_id: 'trs_synthetic', mount_id: 'm_1', file: {} }) &&
     await rejects('mount.download_url', { session_id: 'trs_synthetic', mount_id: 'm_1', file: {} }) &&
     await rejects('triggers.create', { user_id: 'operator_2', slug: 'GITHUB_PUSH_EVENT' }) &&
