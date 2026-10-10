@@ -43,7 +43,10 @@ file. **Neither signal can override a known failure in the other**:
   for. Only independently dated changes inside the site's configured grace
   window can be reported as **LAG**, which is not verified currency.
 - A failed GitHub commit comparison or undatable changed file is
-  **UNVERIFIABLE/DRIFT**, not an implicit clean bill of health. More than
+  **UNVERIFIABLE/DRIFT**, not an implicit clean bill of health. A missing
+  or malformed live deploy marker is likewise **UNVERIFIABLE** on GitHub
+  production checks, even if root HTML happens to match, because the
+  independent Netlify Functions cannot be verified from those files. More than
   100 changed deploy-relevant paths also fail closed rather than performing
   an unbounded number of API history lookups.
 - A docs-only merge can leave an earlier deploy current, but only after the
