@@ -11,7 +11,7 @@
         site is not a current site, and that distinction is the whole point.
 
    Usage: node test/site-currency.test.mjs */
-import { decide, discoverServedAssets, firstDivergence, isDeployRelevantPath, sha256 } from '../scripts/site-currency.mjs';
+import { assessDeploymentIntegrity, decide, discoverServedAssets, firstDivergence, isDeployRelevantPath, sha256 } from '../scripts/site-currency.mjs';
 
 let passed = 0, failed = 0;
 const check = (name, cond) => { if (cond) { passed++; console.log('  ok  ' + name); } else { failed++; console.log('FAIL  ' + name); } };
@@ -90,6 +90,64 @@ const opts = { graceSeconds: 86400, now: NOW };
     { name: 'index.html', status: 'error', detail: 'HTTP 503', changedAt: at(10) },
   ], opts);
   check('a site-wide outage is unverifiable, not current', d.verdict === 'unverifiable' && d.ok === false);
+}
+
+/* ---- complete deployment evidence must not be inferred from a marker ---- */
+{
+  const CURRENT = 'a'.repeat(40);
+  const OLDER = 'b'.repeat(40);
+  const match = decide([{name:'index.html',status:'match',changedAt:at(900000)}],opts);
+  const absent = decide([{name:'telemetry.js',status:'missing',changedAt:at(900000)}],opts);
+  const unavailable = decide([{name:'sw.js',status:'error',changedAt:at(900000)}],opts);
+  const recentlyModified = decide([{name:'app.js',status:'differ',changedAt:at(10)}],opts);
+
+  check('matching deploy SHA AND matching files are provably current',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:CURRENT,
+      assetDecision:match}).verdict==='current');
+  check('matching deploy SHA does NOT excuse missing telemetry.js',
+    !assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:CURRENT,
+      assetDecision:absent}).ok);
+  check('matching deploy SHA does NOT excuse unreadable root JavaScript',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:CURRENT,
+      assetDecision:unavailable}).verdict==='integrity_failure');
+  check('matching deploy SHA does NOT excuse mutated files as grace-window lag',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:CURRENT,
+      assetDecision:recentlyModified,graceSeconds:86400}).verdict==='integrity_failure');
+
+  check('stale deploy SHA and stale Netlify function fails despite matching root HTML',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[at(900000)],
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+  check('stale deploy SHA and RECENT changed function is classified only as lag',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[at(60)],
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='lag');
+  check('zero lag budget cannot falsely call stale Function deployment current',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[at(1)],
+      assetDecision:match,graceSeconds:0,now:NOW}).ok===false);
+  check('a single old function amongst recent files defeats deploy lag',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['app.js','netlify/functions/brain-soul.js'],
+      changedAtSeconds:[at(60),at(900000)],
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+  check('unable to date a changed Function is NOT treated as harmless lag',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[NaN],
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+  check('unavailable GitHub compare API is UNVERIFIABLE, not CURRENT',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:null,assetDecision:match}).verdict==='unverifiable');
+  check('docs-only commits may be current but still require root asset comparison',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:[],assetDecision:match}).verdict==='current' &&
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:[],assetDecision:absent}).ok===false);
+  check('no more than 100 path histories may be excused by the grace window',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:Array(101).fill('netlify/functions/example.js'),
+      changedAtSeconds:Array(101).fill(at(1)),
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
 }
 
 /* ---- the asset list is discovered, not hardcoded ---- */
