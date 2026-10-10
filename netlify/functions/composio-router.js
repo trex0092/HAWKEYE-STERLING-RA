@@ -92,6 +92,9 @@ async function dispatch(action, body) {
       return composio.executeMeta(body.session_id,
         enginePolicy.readMetaExecution(body.execution));
     case 'auth.link':
+      // Linking a provider account is an OAuth/authorization mutation. A
+      // shared application token alone must never open this action.
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.linkToolkit(body.session_id, body.link);
     case 'proxy.execute':
       if (!/^(1|true|yes|on)$/i.test(String(process.env.COMPOSIO_ALLOW_PROXY || ''))) {
