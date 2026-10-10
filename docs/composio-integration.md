@@ -64,6 +64,21 @@ APP_SHARED_TOKEN=<strong independent Hawkeye application secret>
 
 Do not use the old generic secret name `COMPOSIO`. After its credential value has been migrated to `COMPOSIO_API_KEY` in the required server environments, remove the old secret.
 
+
+**Session and account-management boundary:** Normal read-only sessions now
+send `manage_connections: false`. The `auth.link` action and requests
+supplying `manageConnections: true`, `authConfigs`, connected-account
+overrides or session tags require the independent
+`COMPOSIO_ALLOW_ADMIN_MUTATIONS=1` gate. Leave it **OFF**; even with that
+gate on, `APP_SHARED_TOKEN` does not provide per-person RBAC, so privileged
+account operations must not be enabled until OA-20 and OA-29 are resolved.
+An explicitly empty `COMPOSIO_TOOLKITS` configuration disables all
+toolkits, and any provider outside the five reviewed categories is rejected
+rather than accepted as a server allowlist extension. These guards also
+limit provider costs and unexpected OAuth/account-link exposure.
+
+
+
 ## Engine evidence-reconciliation surface (no Composio API calls)
 
 The local deterministic HAWKEYE MCP tool
