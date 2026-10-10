@@ -22,6 +22,7 @@
  */
 
 const { URLSearchParams } = require('node:url');
+const enginePolicy = require('./_composio-engine-policy');
 
 const DEFAULT_BASE_URL = 'https://backend.composio.dev';
 const DEFAULT_TOOLKITS = ['asana', 'gmail', 'googledrive', 'slack', 'github'];
@@ -41,9 +42,17 @@ function baseUrl() {
 }
 
 function configuredToolkits() {
-  const raw = String(process.env.COMPOSIO_TOOLKITS || '').trim();
-  const items = raw ? raw.split(',') : DEFAULT_TOOLKITS;
+  // An explicit empty configuration means NO toolkit, not the default five.
+  // Even a server-side typo must never widen the set beyond the five
+  // data-processor/toolkit categories approved by this integration.
+  const raw = process.env.COMPOSIO_TOOLKITS;
+  const items = raw === undefined ? DEFAULT_TOOLKITS : String(raw).split(',');
   const out = items.map(x => x.trim().toLowerCase()).filter(Boolean);
+  if (out.some(x => !DEFAULT_TOOLKITS.includes(x))) {
+    const err = new Error('Composio configured toolkit is outside the governed allowlist');
+    err.statusCode = 403;
+    throw err;
+  }
   return [...new Set(out)];
 }
 
@@ -70,7 +79,9 @@ function assertAllowedToolkit(value) {
 }
 
 function allowedToolkits(values) {
-  const list = Array.isArray(values) && values.length ? values : configuredToolkits();
+  // A deliberately empty enabled-toolkit list must remain empty; falling back
+  // to five defaults here makes a "no apps" scope unintentionally broad.
+  const list = Array.isArray(values) ? values : configuredToolkits();
   return [...new Set(list.map(assertAllowedToolkit))];
 }
 
@@ -138,19 +149,34 @@ function sessionPath(sessionId, suffix = '') {
 
 async function createSession(userId, options = {}) {
   const toolkits = allowedToolkits(options.toolkits);
+  if (options.mcp === true && !enginePolicy.hostedMcpAllowed())
+    throw new Error('Hosted Composio MCP is disabled until separately approved');
+  if (options.workbench || options.preload || options.tools)
+    throw new Error('Unreviewed session tool/workbench overrides are disabled');
+  // The ordinary read-only session must not open account-linking or auth
+  // configuration controls with the shared application token.
+  const adminAllowed = /^(1|true|yes|on)$/i.test(
+    String(process.env.COMPOSIO_ALLOW_ADMIN_MUTATIONS || ''));
+  if (!adminAllowed && (options.manageConnections === true ||
+      options.authConfigs !== undefined || options.connectedAccounts !== undefined ||
+      options.tags !== undefined)) {
+    const err = new Error('Composio session account-management options require separate approval');
+    err.statusCode = 403;
+    throw err;
+  }
   const body = {
     user_id: cleanId(userId, 'user id'),
     toolkits: { enable: toolkits },
-    manage_connections: options.manageConnections === false ? false : true,
+    // Session filters are enforced on the provider side AS WELL AS on each
+    // Hawkeye router invocation, so a saved session is not a policy bypass.
+    tools: enginePolicy.approvedSessionTools(toolkits),
+    manage_connections: adminAllowed && options.manageConnections === true,
     mcp: options.mcp === true,
   };
 
   if (options.authConfigs && typeof options.authConfigs === 'object') body.auth_configs = options.authConfigs;
   if (options.connectedAccounts && typeof options.connectedAccounts === 'object') body.connected_accounts = options.connectedAccounts;
-  if (options.tools && typeof options.tools === 'object') body.tools = options.tools;
   if (options.tags && typeof options.tags === 'object') body.tags = options.tags;
-  if (options.preload && typeof options.preload === 'object') body.preload = options.preload;
-  if (options.workbench && typeof options.workbench === 'object') body.workbench = options.workbench;
 
   return request('POST', '/api/v3.1/tool_router/session', { body });
 }
@@ -162,9 +188,15 @@ function getSession(sessionId) {
 function updateSession(sessionId, patch) {
   if (!patch || typeof patch !== 'object') throw new Error('session patch is required');
   const body = { ...patch };
+  if (body.tools || body.preload || body.workbench || body.experimental)
+    throw new Error('Session tools, preload and workbench cannot be overridden by request');
+  if (body.mcp === true && !enginePolicy.hostedMcpAllowed())
+    throw new Error('Hosted Composio MCP is disabled until separately approved');
   if (body.toolkits) {
     const requested = Array.isArray(body.toolkits) ? body.toolkits : body.toolkits.enable;
-    body.toolkits = { enable: allowedToolkits(requested) };
+    const allowed = allowedToolkits(requested);
+    body.toolkits = { enable: allowed };
+    body.tools = enginePolicy.approvedSessionTools(allowed);
   }
   return request('PATCH', sessionPath(sessionId), { body });
 }

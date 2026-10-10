@@ -4,6 +4,7 @@ const { withFunctionTelemetry } = require('./_telemetry');
 const { rateLimit } = require('./_ratelimit');
 const { dataTokenOk } = require('./_auth');
 const composio = require('./_composio');
+const enginePolicy = require('./_composio-engine-policy');
 
 function allowedOrigins() {
   const primary = process.env.PRIMARY_ORIGIN || 'https://hawkeye-sterling-ra.netlify.app';
@@ -55,6 +56,14 @@ function requireConfiguredToken(event) {
   }
 }
 
+function requireExplicitFlag(name) {
+  if (!/^(1|true|yes|on)$/i.test(String(process.env[name] || ''))) {
+    const err = new Error('Composio privileged action requires a separately approved server-side gate');
+    err.statusCode = 403;
+    throw err;
+  }
+}
+
 async function dispatch(action, body) {
   switch (action) {
     case 'session.create':
@@ -62,10 +71,13 @@ async function dispatch(action, body) {
     case 'session.get':
       return composio.getSession(body.session_id);
     case 'session.update':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.updateSession(body.session_id, body.patch);
     case 'session.delete':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.deleteSession(body.session_id);
     case 'session.attach':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADVANCED_SESSION');
       return composio.attachSession(body.session_id, body.attach || {});
     case 'tools.list':
       return composio.sessionTools(body.session_id);
@@ -74,10 +86,15 @@ async function dispatch(action, body) {
     case 'tools.search':
       return composio.searchTools(body.session_id, body.query);
     case 'tools.execute':
-      return composio.executeTool(body.session_id, body.execution);
+      return composio.executeTool(body.session_id,
+        enginePolicy.readExecution(body.execution, composio.configuredToolkits()));
     case 'tools.execute_meta':
-      return composio.executeMeta(body.session_id, body.execution);
+      return composio.executeMeta(body.session_id,
+        enginePolicy.readMetaExecution(body.execution));
     case 'auth.link':
+      // Linking a provider account is an OAuth/authorization mutation. A
+      // shared application token alone must never open this action.
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.linkToolkit(body.session_id, body.link);
     case 'proxy.execute':
       if (!/^(1|true|yes|on)$/i.test(String(process.env.COMPOSIO_ALLOW_PROXY || ''))) {
@@ -89,10 +106,13 @@ async function dispatch(action, body) {
     case 'mount.items':
       return composio.listMountItems(body.session_id, body.mount_id, body.query);
     case 'mount.upload_url':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.mountUploadUrl(body.session_id, body.mount_id, body.file);
     case 'mount.download_url':
+      requireExplicitFlag('COMPOSIO_ALLOW_PRESIGNED_URLS');
       return composio.mountDownloadUrl(body.session_id, body.mount_id, body.file);
     case 'mount.delete':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.mountDelete(body.session_id, body.mount_id, body.file);
     case 'triggers.types':
       return composio.listTriggerTypes(body.query);
@@ -101,26 +121,34 @@ async function dispatch(action, body) {
     case 'triggers.list':
       return composio.listActiveTriggers(body.query);
     case 'triggers.create':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.createTrigger(body.user_id, body.slug, {
         connectedAccountId: body.connected_account_id,
         triggerConfig: body.trigger_config,
         toolkitVersions: body.toolkit_versions,
       });
     case 'triggers.enable':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.updateTrigger(body.trigger_id, 'enable');
     case 'triggers.disable':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.updateTrigger(body.trigger_id, 'disable');
     case 'triggers.update':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.updateTrigger(body.trigger_id, body.patch);
     case 'triggers.delete':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.deleteTrigger(body.trigger_id);
     case 'webhooks.list':
       return composio.listWebhookSubscriptions(body.query);
     case 'webhooks.create':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.createWebhookSubscription(body.subscription);
     case 'webhooks.update':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.updateWebhookSubscription(body.subscription_id, body.subscription);
     case 'webhooks.rotate_secret':
+      requireExplicitFlag('COMPOSIO_ALLOW_ADMIN_MUTATIONS');
       return composio.rotateWebhookSecret(body.subscription_id);
     default: {
       const err = new Error('Unknown Composio action');
@@ -159,8 +187,12 @@ async function handler(event) {
     return resp(200, { ok: true, data }, event);
   } catch (err) {
     const status = Number(err && err.statusCode) || 500;
-    const out = { ok: false, error: err && err.message ? err.message : 'Internal error' };
-    if (err && err.composio && status < 500) out.details = err.composio;
+    // Composio errors can reflect account IDs, token fragments, provider
+    // messages or request fields. Never echo raw upstream JSON to the caller.
+    const upstream = Boolean(err && err.composio);
+    const out = { ok: false, error: upstream
+      ? 'Composio request rejected by upstream provider (details withheld)'
+      : err && err.message ? err.message : 'Internal error' };
     return resp(status, out, event);
   }
 }
