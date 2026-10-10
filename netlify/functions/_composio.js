@@ -42,9 +42,17 @@ function baseUrl() {
 }
 
 function configuredToolkits() {
-  const raw = String(process.env.COMPOSIO_TOOLKITS || '').trim();
-  const items = raw ? raw.split(',') : DEFAULT_TOOLKITS;
+  // An explicit empty configuration means NO toolkit, not the default five.
+  // Even a server-side typo must never widen the set beyond the five
+  // data-processor/toolkit categories approved by this integration.
+  const raw = process.env.COMPOSIO_TOOLKITS;
+  const items = raw === undefined ? DEFAULT_TOOLKITS : String(raw).split(',');
   const out = items.map(x => x.trim().toLowerCase()).filter(Boolean);
+  if (out.some(x => !DEFAULT_TOOLKITS.includes(x))) {
+    const err = new Error('Composio configured toolkit is outside the governed allowlist');
+    err.statusCode = 403;
+    throw err;
+  }
   return [...new Set(out)];
 }
 
@@ -145,13 +153,24 @@ async function createSession(userId, options = {}) {
     throw new Error('Hosted Composio MCP is disabled until separately approved');
   if (options.workbench || options.preload || options.tools)
     throw new Error('Unreviewed session tool/workbench overrides are disabled');
+  // The ordinary read-only session must not open account-linking or auth
+  // configuration controls with the shared application token.
+  const adminAllowed = /^(1|true|yes|on)$/i.test(
+    String(process.env.COMPOSIO_ALLOW_ADMIN_MUTATIONS || ''));
+  if (!adminAllowed && (options.manageConnections === true ||
+      options.authConfigs !== undefined || options.connectedAccounts !== undefined ||
+      options.tags !== undefined)) {
+    const err = new Error('Composio session account-management options require separate approval');
+    err.statusCode = 403;
+    throw err;
+  }
   const body = {
     user_id: cleanId(userId, 'user id'),
     toolkits: { enable: toolkits },
     // Session filters are enforced on the provider side AS WELL AS on each
     // Hawkeye router invocation, so a saved session is not a policy bypass.
     tools: enginePolicy.approvedSessionTools(toolkits),
-    manage_connections: options.manageConnections === false ? false : true,
+    manage_connections: adminAllowed && options.manageConnections === true,
     mcp: options.mcp === true,
   };
 
