@@ -2,6 +2,7 @@
  * misreported as success and repository variables are never materialized
  * wholesale in public action logs. */
 import { readFileSync } from 'node:fs';
+import { discoverServedAssets } from '../scripts/site-currency.mjs';
 
 let passed = 0, failed = 0;
 function check(name, predicate) {
@@ -19,6 +20,31 @@ check('production build hook remains repository-secret scoped and branch pinned'
 check('workflow never serializes all GitHub variables to env/logs',
   !/toJSON\s*\(\s*vars\s*\)/i.test(workflow) &&
   !/\bVARS_JSON\b/.test(workflow));
+
+/* Every runtime file that site-currency probes must trigger the production
+ * build-hook workflow when it changes alone. In June/July a stale publish
+ * passed health because probes and triggers covered different asset sets. */
+const push = workflow.split(/\n  push:\s*\n/)[1]?.split(/\n  schedule:\s*\n/)[0] || '';
+const triggers = [...push.matchAll(/^\s*-\s*'([^']+)'/gm)].map(m => m[1]);
+function deployTriggeredFor(asset) {
+  if (triggers.includes(asset)) return true;
+  if (asset.startsWith('assets/') && triggers.includes('assets/**')) return true;
+  if (asset.startsWith('netlify/') && triggers.includes('netlify/**')) return true;
+  const isRoot = !asset.includes('/');
+  const ext = asset.split('.').pop();
+  return isRoot && ['html','js','css','webmanifest'].includes(ext)
+    && triggers.includes('*.' + ext);
+}
+const served = discoverServedAssets();
+check('every exact-byte-monitored customer-facing runtime asset triggers deploy on main',
+  served.length > 15 && served.every(deployTriggeredFor));
+check('privacy terms and 404 changes alone trigger a new production publish',
+  ['privacy-policy.html','terms.html','404.html'].every(deployTriggeredFor));
+check('country-score suggestion JSON changes alone trigger publishing, not risk-model approval',
+  deployTriggeredFor('data/country-score-suggested.json'));
+check('unrelated governance and transient state do not consume Netlify build minutes',
+  !deployTriggeredFor('data/grc-metrics.json') &&
+  !deployTriggeredFor('docs/governance/dpia-2026.md'));
 check('production deploy never equates HTTP 200 with published assets',
   workflow.includes('scripts/site-currency.mjs --quiet') &&
   workflow.includes('in ~18 minutes') &&
