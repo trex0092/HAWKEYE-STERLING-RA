@@ -178,6 +178,20 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # Optional early diagnosis. Never uses the build hook as API read access:
+      # Netlify has a separate token and site identifier, both configured by
+      # the project owner. Without them, the existing exact-byte poll stays in
+      # force; a positive STOPPED/LOCKED/WRONG-BRANCH provider response aborts
+      # immediately rather than waiting 18 minutes without a possible deploy.
+      # This probe is GET-only and logs fixed status messages, never response
+      # bodies, site IDs, environment variables or authentication details.
+      - name: Inspect Netlify build activation and published deploy lock (optional)
+        if: steps.kick.outputs.kicked == 'true'
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID || vars.NETLIFY_SITE_ID }}
+        run: node scripts/netlify-deploy-preflight.mjs
+
       - name: Wait for the publish to reach the live site
         if: steps.kick.outputs.kicked == 'true'
         env:
