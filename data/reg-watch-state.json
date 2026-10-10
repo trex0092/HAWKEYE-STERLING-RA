@@ -11,7 +11,7 @@
       "prevHash": "1501f5fc552f33f5ef73a4bae0e2a918462dc37340b8c102887cde52683d304c",
       "fp": 2,
       "error": "fetch failed (UND_ERR_CONNECT_TIMEOUT)",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "uae-fiu": {
       "hash": "7e067a5c918cf49ed2584aabd12bf981be702878d9826327b9087a962cc5c702",
@@ -33,7 +33,7 @@
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
       "via": "web.archive.org save-page-now 20261009095816",
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -83,7 +83,7 @@
       "fp": 2,
       "via": "web.archive.org snapshot 20261004141918",
       "error": "HTTP 403",
-      "errorStreak": 2
+      "errorStreak": 3
     },
     "wolfsberg": {
       "hash": "575ebdfe1028c70db1de23dfd4f5f5ec3d9b6ed11ef6646943945d298c284815",
@@ -125,7 +125,7 @@
       "fp": 2,
       "via": "web.archive.org snapshot 20261006145254",
       "error": "HTTP 403",
-      "errorStreak": 2
+      "errorStreak": 3
     },
     "ofac": {
       "hash": "f35470cdb07ac635cb25a59a3064614c131491efe06d9aeac0a491859c021283",
