@@ -27,6 +27,34 @@ Exact content comparison: `scripts/site-currency.mjs`
   deploy, or published site. The responsible Netlify operator must verify
   the site's own deploy record and publishing settings.
 
+## Fail-closed deployment-integrity criteria
+
+The live `data/deploy-meta.json` identifies the Netlify build commit. The
+Site Currency probe also hashes every served root HTML, JS, CSS and manifest
+file. **Neither signal can override a known failure in the other**:
+
+- A deploy marker matching `main` is **not a pass** when a required root
+  asset is absent, unreadable or byte-different. The repository config
+  explicitly disables Netlify post-processing, so unexpected differences
+  require investigation rather than a silent green check.
+- When the deploy marker is older than `main`, equal HTML/JS bytes do
+  **not** prove that deployed Netlify Functions are current. All changed
+  deploy-relevant files, including `netlify/functions/**`, must be accounted
+  for. Only independently dated changes inside the site's configured grace
+  window can be reported as **LAG**, which is not verified currency.
+- A failed GitHub commit comparison or undatable changed file is
+  **UNVERIFIABLE/DRIFT**, not an implicit clean bill of health. More than
+  100 changed deploy-relevant paths also fail closed rather than performing
+  an unbounded number of API history lookups.
+- A docs-only merge can leave an earlier deploy current, but only after the
+  actual served root assets have been checked. Missing production files
+  cannot be excused by a non-deploy commit.
+
+The check remains **read-only**, and does not trigger another paid Netlify
+build to attempt to conceal deployment drift. A failed Site Currency check
+is an operational incident requiring Netlify deploy inspection, not grounds
+to bypass production protections.
+
 ## Operator recovery steps
 
 1. Open the Netlify deploy list for **hawkeye-sterling-ra** and verify the
