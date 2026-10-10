@@ -106,12 +106,12 @@ check('known blocker stops redundant 18-minute publish poll and stays red',
   blockedMessages.join('').includes('stopped') &&
   !blockedMessages.join('').includes('SYNTHETIC-SECRET'));
 
-const failed=fakeApi({deploys:[{commit_ref:SHA,context:'production',
+const failingDeploy=fakeApi({deploys:[{commit_ref:SHA,context:'production',
   state:'error',error_message:'CUSTOMER_PRIVATE_TOKEN=never-echo'}]});
 const failedMessages=[];
 const failedExit=await runNetlifyPreflight({env:{NETLIFY_AUTH_TOKEN:'SYNTHETIC-SECRET',
   NETLIFY_SITE_ID:'abc-123',GITHUB_REPOSITORY:REPO,GITHUB_SHA:SHA},
-fetchImpl:failed.fetchImpl,log:x=>failedMessages.push(x),warn:x=>failedMessages.push(x)});
+fetchImpl:failingDeploy.fetchImpl,log:x=>failedMessages.push(x),warn:x=>failedMessages.push(x)});
 check('Netlify provider deploy errors remain diagnostic codes without raw body',
   failedExit===2 && failedMessages.join('').includes('matching production deploy') &&
   !failedMessages.join('').includes('CUSTOMER_PRIVATE_TOKEN'));
