@@ -138,11 +138,22 @@ const opts = { graceSeconds: 86400, now: NOW };
   check('unavailable GitHub compare API is UNVERIFIABLE, not CURRENT',
     assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
       changedPaths:null,assetDecision:match}).verdict==='unverifiable');
-  check('docs-only commits may be current but still require root asset comparison',
+  check('docs-only commits require matching root assets before passing',
     assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
       changedPaths:[],assetDecision:match}).verdict==='current' &&
     assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
-      changedPaths:[],assetDecision:absent}).ok===false);
+      changedPaths:[],assetDecision:absent}).verdict==='integrity_failure' &&
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:[],assetDecision:recentlyModified}).verdict==='integrity_failure');
+  check('a missing deploy marker cannot verify even byte-identical static HTML',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:null,
+      assetDecision:match}).verdict==='unverifiable');
+  check('an invalid deploy marker cannot verify Netlify Function freshness',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:'not-sha',
+      assetDecision:match}).ok===false);
+  check('local asset-only probes remain usable when no expected commit is given',
+    assessDeploymentIntegrity({expectedCommit:'',markerCommit:null,
+      assetDecision:match}).verdict==='current');
   check('no more than 100 path histories may be excused by the grace window',
     assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
       changedPaths:Array(101).fill('netlify/functions/example.js'),
