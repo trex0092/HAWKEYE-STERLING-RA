@@ -162,6 +162,57 @@ export function decide(results, { graceSeconds = 86400, now = Math.floor(Date.no
 }
 
 /**
+ * Combine the primary deploy SHA and exact bytes the site serves.
+ * Pure for offline tests. In particular:
+ * - A correct deploy SHA cannot excuse missing/modified root assets.
+ * - Identical HTML does not prove that stale Netlify Functions were updated.
+ * - Deployment lag is allowed only when ALL changed deploy paths are dated
+ *   inside the configured grace window; undatable paths fail closed.
+ */
+export function assessDeploymentIntegrity({
+  expectedCommit, markerCommit, changedPaths = null, changedAtSeconds = [],
+  assetDecision, graceSeconds = 86400, now = Math.floor(Date.now() / 1000)
+} = {}) {
+  if (!assetDecision || typeof assetDecision.verdict !== 'string') {
+    return { verdict: 'unverifiable', ok: false,
+      reason: 'asset comparison did not produce a verdict' };
+  }
+  const knownMarker = typeof markerCommit === 'string' && /^[0-9a-f]{40}$/.test(markerCommit);
+  const knownExpected = typeof expectedCommit === 'string' && /^[0-9a-f]{40}$/.test(expectedCommit);
+  if (knownMarker && knownExpected && markerCommit === expectedCommit) {
+    return assetDecision.verdict === 'current'
+      ? { verdict: 'current', ok: true, reason: 'deploy marker and every served root asset match' }
+      : { verdict: 'integrity_failure', ok: false,
+          reason: 'deploy marker matches but live assets differ, are missing or cannot be read' };
+  }
+  if (knownMarker && knownExpected && markerCommit !== expectedCommit) {
+    if (!Array.isArray(changedPaths)) {
+      return { verdict: 'unverifiable', ok: false,
+        reason: 'deploy marker is behind main and changed-path comparison is unavailable' };
+    }
+    if (changedPaths.length > 0) {
+      if (assetDecision.verdict === 'unverifiable') {
+        return { verdict: 'unverifiable', ok: false,
+          reason: 'unreadable live assets and stale deploy marker' };
+      }
+      const datesProveLag = graceSeconds > 0 && changedPaths.length <= 100 &&
+        changedPaths.length === changedAtSeconds.length &&
+        changedAtSeconds.every(at => Number.isFinite(at) && at <= now && now - at <= graceSeconds);
+      if (datesProveLag && assetDecision.ok === true) {
+        return { verdict: 'lag', ok: true,
+          reason: 'deploy-relevant changes are within the grace window; production is not verified current yet' };
+      }
+      return { verdict: 'drift', ok: false,
+        reason: 'stale commit marker with deploy-relevant code/functions outside verified lag' };
+    }
+    // Only docs/CI have changed; still verify actual assets before declaring
+    // current. The older early return here masked missing production files.
+  }
+  return { verdict: assetDecision.verdict, ok: assetDecision.ok === true,
+    reason: assetDecision.reason };
+}
+
+/**
  * Unix seconds of the asset's most recent commit on the deploy branch, used
  * only to tell deploy lag from real drift.
  *
