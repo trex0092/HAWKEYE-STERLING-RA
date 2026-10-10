@@ -375,26 +375,36 @@ async function main() {
   const graceSeconds = Number.parseInt(process.env.GRACE_SECONDS || '86400', 10);
   const expectedCommit = String(process.env.EXPECTED_DEPLOY_SHA || process.env.GITHUB_SHA || '').trim().toLowerCase();
   const deployMeta = await fetchDeployMeta(origin);
+  let changedPaths = null;
 
   if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit)) {
-    console.log(`deploy marker: live ${deployMeta.commit} · expected ${expectedCommit}`);
+    console.log(`deploy marker: live @{deployMeta.commit} · expected @{expectedCommit}`);
     if (deployMeta.commit !== expectedCommit) {
-      const changed = await deployRelevantChangesSince(deployMeta.commit, expectedCommit);
-      if (Array.isArray(changed) && changed.length === 0) {
-        console.log('verdict: CURRENT — commits since the live deploy marker contain no deploy-relevant app changes');
-        return;
-      }
-      if (Array.isArray(changed) && changed.length) {
-        annotate(`::notice::Live deploy marker is behind main and ${changed.length} deploy-relevant path(s) changed: ${changed.slice(0, 12).join(', ')}`);
+      changedPaths = await deployRelevantChangesSince(deployMeta.commit, expectedCommit);
+      if (Array.isArray(changedPaths) && changedPaths.length) {
+        annotate(`::notice::Live marker is behind main and @{changedPaths.length} deploy-relevant paths changed: @{changedPaths.slice(0, 12).join(', ')}`);
+      } else if (Array.isArray(changedPaths)) {
+        annotate('::notice::Only non-deploy files changed since marker; verifying served assets anyway.');
       } else {
-        annotate(`::notice::Live deploy marker is behind main; compare evidence unavailable, falling back to served-asset verification.`);
+        annotate('::notice::Stale marker with unavailable change comparison; current production cannot be established.');
       }
     }
   } else if (/^[0-9a-f]{40}$/.test(expectedCommit)) {
-    console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); falling back to asset comparison`);
+    console.log(`deploy marker unavailable (@{deployMeta.reason || 'unknown'}); falling back to asset comparison`);
   }
 
   const { results, decision } = await compare({ origin, graceSeconds });
+  // A static asset match alone does not prove that separately deployed
+  // Netlify Functions are current. Check all deploy-relevant path timestamps
+  // only where a nonzero grace window could excuse recent changes.
+  const changedAtSeconds = Array.isArray(changedPaths) && changedPaths.length > 0 &&
+    changedPaths.length <= 100 && graceSeconds > 0
+    ? await Promise.all(changedPaths.map(name => lastChangedAt(name)))
+    : [];
+  const integrity = assessDeploymentIntegrity({
+    expectedCommit, markerCommit: deployMeta.ok ? deployMeta.commit : null,
+    changedPaths, changedAtSeconds, assetDecision: decision, graceSeconds,
+  });
 
   const width = Math.max(...results.map((r) => r.name.length));
   for (const r of results) {
