@@ -35,6 +35,7 @@ import str_dossier
 import tfs_dossier
 import payment_screen
 import kyc_document_evidence
+import composio_engine
 
 # ── input caps (defence in depth on untrusted MCP arguments) ──────────────────
 MAX_NAME_LEN = 512
@@ -310,6 +311,18 @@ def compare_document_evidence(notes, evidence, person_index=None, as_of=None):
     return kyc_document_evidence.compare_evidence(
         evidence, individuals[person_index], person_index=person_index, as_of=as_of
     )
+
+
+# ── TOOL: assess_connected_evidence (offline Composio metadata) ──────────────
+def assess_connected_evidence(manifest):
+    """Assess approved connected-app EVIDENCE REFERENCES for freshness/coverage.
+
+    Accepts only the versioned, metadata-only contract produced by a trusted
+    operator from approved Composio reads. Never calls Composio, accesses raw
+    emails/files, sends personal data, changes a KYC case or clears a finding.
+    A located reference remains unverified pending MLRO evidence review.
+    """
+    return composio_engine.assess_manifest(manifest)
 
 
 # ── TOOL: jurisdiction_risk ───────────────────────────────────────────────────
@@ -620,6 +633,27 @@ TOOLS = {
                 }
             },
             "required": ["transactions"],
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_assess_connected_evidence": (
+        assess_connected_evidence,
+        assess_connected_evidence.__doc__,
+        {
+            "type": "object",
+            "properties": {
+                "manifest": {
+                    "type": "object",
+                    "description": (
+                        "hawkeye.composio-evidence/v1 metadata manifest with "
+                        "schema_version, as_of, freshness_days, requirements "
+                        "(approved source.category IDs) and observations. "
+                        "Never send provider responses, names, document text, "
+                        "messages, photos or passwords."
+                    ),
+                },
+            },
+            "required": ["manifest"],
             "additionalProperties": False,
         },
     ),
