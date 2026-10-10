@@ -22,9 +22,11 @@
  *
  * The primary signal is now a Netlify-generated deploy marker:
  * `data/deploy-meta.json`, written from Netlify's immutable `COMMIT_REF`
- * during the build. That proves exactly which Git commit is live. Asset hashes
- * remain a secondary integrity diagnostic, so Netlify/CDN serve-time rewriting
- * can be surfaced without being misclassified as deployment staleness.
+ * during the build. That proves exactly which Git commit is live.
+ * Hashes of the served assets are INDEPENDENT integrity evidence: a matching
+ * marker cannot excuse mutated/unreadable/missing files. A missing marker
+ * cannot prove dynamic Netlify Functions are current, even if HTML matches.
+ * Site serving failures are distinct from a stale deployment marker.
  *
  * SCOPE (stated, not silent)
  * --------------------------
@@ -399,7 +401,7 @@ async function main() {
       }
     }
   } else if (/^[0-9a-f]{40}$/.test(expectedCommit)) {
-    console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); falling back to asset comparison`);
+    console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); checking assets but Netlify Function freshness remains UNVERIFIABLE`);
   }
 
   const { results, decision } = await compare({ origin, graceSeconds });
