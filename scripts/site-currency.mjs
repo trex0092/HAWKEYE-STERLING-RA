@@ -378,11 +378,11 @@ async function main() {
   let changedPaths = null;
 
   if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit)) {
-    console.log(`deploy marker: live @{deployMeta.commit} · expected @{expectedCommit}`);
+    console.log(`deploy marker: live ${deployMeta.commit} · expected ${expectedCommit}`);
     if (deployMeta.commit !== expectedCommit) {
       changedPaths = await deployRelevantChangesSince(deployMeta.commit, expectedCommit);
       if (Array.isArray(changedPaths) && changedPaths.length) {
-        annotate(`::notice::Live marker is behind main and @{changedPaths.length} deploy-relevant paths changed: @{changedPaths.slice(0, 12).join(', ')}`);
+        annotate(`::notice::Live marker is behind main and ${changedPaths.length} deploy-relevant paths changed: ${changedPaths.slice(0, 12).join(', ')}`);
       } else if (Array.isArray(changedPaths)) {
         annotate('::notice::Only non-deploy files changed since marker; verifying served assets anyway.');
       } else {
@@ -390,7 +390,7 @@ async function main() {
       }
     }
   } else if (/^[0-9a-f]{40}$/.test(expectedCommit)) {
-    console.log(`deploy marker unavailable (@{deployMeta.reason || 'unknown'}); falling back to asset comparison`);
+    console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); falling back to asset comparison`);
   }
 
   const { results, decision } = await compare({ origin, graceSeconds });
@@ -428,36 +428,25 @@ async function main() {
     console.log(`    live: ${e.live}`);
   }
   console.log('');
-  console.log(`verdict: ${decision.verdict.toUpperCase()} — ${decision.reason}`);
+  console.log(`asset comparison: ${decision.verdict.toUpperCase()} — ${decision.reason}`);
+  console.log(`verdict: ${integrity.verdict.toUpperCase()} — ${integrity.reason}`);
 
-  if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit) && deployMeta.commit === expectedCommit) {
-    if (!decision.ok) {
-      annotate(`::warning::Deploy commit is current, but ${decision.stale.length || decision.unreadable.length} served asset(s) differ or are unreadable. Treating this as serve-time integrity diagnostics, not deploy staleness.`);
-    }
-    console.log('verdict: CURRENT — deployed commit marker matches expected Git SHA');
-    return;
-  }
-
-  if (decision.ok) {
-    if (decision.verdict === 'lag') {
-      annotate(`::notice::Deploy lag — ${decision.stale.length} asset(s) not yet published, all within grace.`);
+  if (integrity.ok) {
+    if (integrity.verdict === 'lag') {
+      annotate('::notice::Deploy-relevant code is within the grace window. Production is NOT YET verified current.');
     }
     return;
   }
-
-  if (decision.verdict === 'unverifiable') {
-    annotate(`::error::Site currency UNVERIFIABLE — ${decision.reason}. Treating as a failure: an unread site is not a current site.`);
+  if (integrity.verdict === 'unverifiable') {
+    annotate(`::error::Site currency UNVERIFIABLE — ${integrity.reason}. Unknown coverage must never be called current.`);
     process.exit(2);
   }
-
+  if (integrity.verdict === 'integrity_failure') {
+    annotate(`::error::PRODUCTION INTEGRITY FAILURE — ${integrity.reason}. The SHA marker cannot excuse missing, unreadable, or mutated files.`);
+    process.exit(1);
+  }
   const names = decision.stale.map((r) => r.name).join(', ');
-  annotate(
-    `::error::PRODUCTION DRIFT — the live site is NOT serving what main ships. ` +
-      `Stale or absent: ${names}. Production deploys are not publishing: check the Netlify ` +
-      `deploy log (app.netlify.com/projects/hawkeye-sterling-ra/deploys), re-link the ` +
-      `repository under Build & deploy -> Continuous deployment, or set the ` +
-      `NETLIFY_BUILD_HOOK_URL secret so netlify-production-deploy.yml can publish.`,
-  );
+  annotate(`::error::PRODUCTION DRIFT — ${integrity.reason}. Stale or absent root assets: ${names || 'none (Netlify Functions/configuration may be behind)'}. Check Netlify Deploys and docs/runbooks/netlify-production-recovery.md.`);
   process.exit(1);
 }
 
