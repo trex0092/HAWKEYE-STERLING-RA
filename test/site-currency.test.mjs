@@ -170,7 +170,13 @@ const opts = { graceSeconds: 86400, now: NOW };
   /* The #338 lesson: a hardcoded list acquires a blind spot exactly where a new
      file hides. Every served root asset must come from disk. */
   check('discovery covers every root html/js/css file', assets.length >= 13);
-  check('discovery excludes non-served roots', !assets.includes('package.json') && !assets.includes('README.md'));
+  check('legal and missing-page assets are covered by exact-byte verification',
+    ['privacy-policy.html', 'terms.html', '404.html'].every(name => assets.includes(name)));
+  check('live site probe includes the browser-fetched country suggestions and robots.txt',
+    assets.includes('data/country-score-suggested.json') && assets.includes('robots.txt'));
+  check('discovery excludes non-served roots and ephemeral state',
+    !assets.includes('package.json') && !assets.includes('README.md') &&
+    !assets.includes('data/run-metrics.json') && !assets.includes('data/grc-metrics.json'));
 }
 
 /* ---- hashing is over raw bytes ---- */
@@ -186,6 +192,13 @@ const opts = { graceSeconds: 86400, now: NOW };
   check('Netlify config is deploy-relevant', isDeployRelevantPath('netlify.toml'));
   check('Netlify functions are deploy-relevant', isDeployRelevantPath('netlify/functions/brain-soul.js'));
   check('assets are deploy-relevant', isDeployRelevantPath('assets/logo.svg'));
+  check('browser-read country suggestions are deploy-relevant, but proposals do not become approvals',
+    isDeployRelevantPath('data/country-score-suggested.json'));
+  check('published robots.txt is deploy-relevant', isDeployRelevantPath('robots.txt'));
+  check('legal and 404 root pages remain deploy-relevant',
+    ['privacy-policy.html','terms.html','404.html'].every(isDeployRelevantPath));
+  check('unrelated transient JSON state is NOT deploy-relevant',
+    !isDeployRelevantPath('data/temporary-transaction-state.json'));
   check('workflow-only changes are not deploy-relevant', !isDeployRelevantPath('.github/workflows/ci.yml'));
   check('docs-only changes are not deploy-relevant', !isDeployRelevantPath('README.md'));
   check('screening data-only changes are not deploy-relevant', !isDeployRelevantPath('data/sanctions-country-coverage.json'));
