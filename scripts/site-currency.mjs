@@ -30,10 +30,10 @@
  *
  * SCOPE (stated, not silent)
  * --------------------------
- * Every root-level `.html`, `.js`, `.css` and `.webmanifest` file — the whole
- * app surface, discovered from disk rather than listed, so a new root asset is
- * covered the day it is added (a hardcoded list is exactly how the shadow-
- * policy sweep in #338 acquired a blind spot). Binary assets under `assets/`
+ * Every root-level `.html`, `.js`, `.css` and `.webmanifest` file,
+ * plus the browser-fetched country-score suggestion JSON and robots.txt.
+ * Root assets are discovered from disk, so newly added entry points are
+ * covered automatically. Binary assets under `assets/`
  * (fonts, images) are NOT fetched: they are large and effectively immutable,
  * and any deploy carrying them also carries the text assets above. A stale
  * deploy cannot hide behind that gap.
@@ -49,12 +49,23 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SERVED_EXTENSIONS = new Set(['.html', '.js', '.css', '.webmanifest']);
+/* This is a narrow, reviewed allowlist of additional runtime assets that
+ * cannot be discovered by root-level HTML/JS/CSS suffixes. Do not add all
+ * data/*.json: most files are private governance snapshots or transient
+ * screening state and should not trigger daily paid Netlify rebuilds.
+ *
+ * country-score-suggested.json is fetched by app.js in the browser. It is
+ * explicitly a proposal surface, NOT an authorized country-risk override. */
+export const EXTRA_RUNTIME_ASSETS = Object.freeze([
+  'data/country-score-suggested.json',
+  'robots.txt',
+]);
 
 export function sha256(buf) {
   return createHash('sha256').update(buf).digest('hex');
@@ -102,10 +113,12 @@ export function firstDivergence(repoBuf, liveBuf, { context = 40, cap = 160 } = 
 
 /** Root-level assets the site publishes, discovered from disk. */
 export function discoverServedAssets(root = REPO_ROOT) {
-  return readdirSync(root, { withFileTypes: true })
+  const roots = readdirSync(root, { withFileTypes: true })
     .filter((e) => e.isFile() && SERVED_EXTENSIONS.has(path.extname(e.name)))
-    .map((e) => e.name)
-    .sort();
+    .map((e) => e.name);
+  const extras = EXTRA_RUNTIME_ASSETS.filter((name) =>
+    existsSync(path.join(root, name)));
+  return [...roots, ...extras].sort();
 }
 
 /**
@@ -269,6 +282,7 @@ export function isDeployRelevantPath(name) {
   const p = String(name || '').replace(/^\.\//, '');
   if (!p) return false;
   if (/^[^/]+\.(?:html|js|css|webmanifest)$/.test(p)) return true;
+  if (EXTRA_RUNTIME_ASSETS.includes(p)) return true;
   return p === 'netlify.toml' || p.startsWith('assets/') || p.startsWith('netlify/');
 }
 
