@@ -2051,10 +2051,16 @@
       "detectedAt": "2026-10-10T02:38:36.544Z",
       "prevCount": 19417,
       "newCount": 19417,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38017713108,
+        "startedAt": "2026-10-10T02:38:41Z"
+      },
+      "status": "complete",
       "chainPrev": "3ca7ae3b8601face8895c9f06ba59bf3f0929706212bad68ec2811217e01342c",
-      "chainHash": "c363a82e12ef36c3c74636f3d362420ca2a86856390331af432c0756c922e22c"
+      "chainHash": "c363a82e12ef36c3c74636f3d362420ca2a86856390331af432c0756c922e22c",
+      "latencyHours": 0,
+      "resolutionHash": "56c82975ea503684e178a56c636965c4aab1a0f1919ac587736b10711951bbd2"
     },
     {
       "id": "ofac-consolidated",
@@ -2064,10 +2070,16 @@
       "detectedAt": "2026-10-10T02:38:36.544Z",
       "prevCount": 442,
       "newCount": null,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38017713108,
+        "startedAt": "2026-10-10T02:38:41Z"
+      },
+      "status": "complete",
       "chainPrev": "c363a82e12ef36c3c74636f3d362420ca2a86856390331af432c0756c922e22c",
-      "chainHash": "0a6226585ce0c2a634b1ce498468a57051be30353c4493437abf68517fd249cc"
+      "chainHash": "0a6226585ce0c2a634b1ce498468a57051be30353c4493437abf68517fd249cc",
+      "latencyHours": 0,
+      "resolutionHash": "9e9abbadb7d2d424f385f1bfdbd66f5251fc4fa65477228773793a4c43f7aeb6"
     },
     {
       "id": "fr-dgt",
@@ -2077,10 +2089,16 @@
       "detectedAt": "2026-10-10T02:38:36.544Z",
       "prevCount": 19619,
       "newCount": 19616,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38017713108,
+        "startedAt": "2026-10-10T02:38:41Z"
+      },
+      "status": "complete",
       "chainPrev": "0a6226585ce0c2a634b1ce498468a57051be30353c4493437abf68517fd249cc",
-      "chainHash": "ac590e9ed22c71310f3d0363f0a92850c4ce63939e12946a4683222b353e0e3a"
+      "chainHash": "ac590e9ed22c71310f3d0363f0a92850c4ce63939e12946a4683222b353e0e3a",
+      "latencyHours": 0,
+      "resolutionHash": "643ad6ae192e66313d07f379442b647536a56e13b262bc8a5dd76de396b15d11"
     }
   ]
 }
