@@ -42,6 +42,19 @@ file. **Neither signal can override a known failure in the other**:
   deploy-relevant files, including `netlify/functions/**`, must be accounted
   for. Only independently dated changes inside the site's configured grace
   window can be reported as **LAG**, which is not verified currency.
+- The GitHub Compare API exposes at most **300 file records**. A response
+  touching that ceiling is **truncated/UNVERIFIABLE**, not a complete record,
+  even if the returned files happen to be documentation only. Commit history
+  is verified to be complete, anchored at the immutable live commit and
+  ending at the expected `main` commit. Missing or non-ancestor history
+  fails closed; known stale assets still count as proven DRIFT.
+- A recent edit to a Function cannot erase its earlier unshipped revisions:
+  deploy-lag grace is accepted only when both the **deployed marker** and
+  the **oldest intervening commit** are inside the configured window.
+  Timestamp evidence comes from one complete compare response; per-file
+  GitHub history requests are not needed. This conservative control may
+  classify a late app change following old docs-only changes as DRIFT,
+  but cannot silently call a long-stale deployment current.
 - A failed GitHub commit comparison or undatable changed file is
   **UNVERIFIABLE/DRIFT**, not an implicit clean bill of health. A missing
   or malformed live deploy marker is likewise **UNVERIFIABLE** on GitHub

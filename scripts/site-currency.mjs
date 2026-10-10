@@ -173,7 +173,8 @@ export function decide(results, { graceSeconds = 86400, now = Math.floor(Date.no
  */
 export function assessDeploymentIntegrity({
   expectedCommit, markerCommit, changedPaths = null, changedAtSeconds = [],
-  assetDecision, graceSeconds = 86400, now = Math.floor(Date.now() / 1000)
+  markerCommittedAt = NaN, assetDecision,
+  graceSeconds = 86400, now = Math.floor(Date.now() / 1000)
 } = {}) {
   if (!assetDecision || typeof assetDecision.verdict !== 'string') {
     return { verdict: 'unverifiable', ok: false,
@@ -189,15 +190,30 @@ export function assessDeploymentIntegrity({
   }
   if (knownMarker && knownExpected && markerCommit !== expectedCommit) {
     if (!Array.isArray(changedPaths)) {
+      // Known stale root bytes are already hard evidence of drift. An
+      // incomplete GitHub compare cannot turn a proven failure into
+      // "unknown", or a clean-looking static site into "current".
+      if (assetDecision.verdict === 'drift' ||
+          assetDecision.verdict === 'integrity_failure') {
+        return { verdict: 'drift', ok: false,
+          reason: 'live root assets differ and full deploy-path comparison is unavailable' };
+      }
       return { verdict: 'unverifiable', ok: false,
-        reason: 'deploy marker is behind main and changed-path comparison is unavailable' };
+        reason: 'deploy marker is behind main and full changed-path comparison is unavailable' };
     }
     if (changedPaths.length > 0) {
       if (assetDecision.verdict === 'unverifiable') {
         return { verdict: 'unverifiable', ok: false,
           reason: 'unreadable live assets and stale deploy marker' };
       }
-      const datesProveLag = graceSeconds > 0 && changedPaths.length <= 100 &&
+      // The MOST RECENT commit to a path cannot prove lag: a stale Function
+      // can be changed again today, concealing an unshipped edit from weeks
+      // ago. Require independently verified age for the *deployed marker*
+      // and all intervening comparison commits before granting grace.
+      const markerWithinGrace = Number.isFinite(markerCommittedAt) &&
+        markerCommittedAt <= now && now - markerCommittedAt <= graceSeconds;
+      const datesProveLag = graceSeconds > 0 && markerWithinGrace &&
+        changedPaths.length <= 100 &&
         changedPaths.length === changedAtSeconds.length &&
         changedAtSeconds.every(at => Number.isFinite(at) && at <= now && now - at <= graceSeconds);
       if (datesProveLag && assetDecision.ok === true) {
@@ -223,47 +239,35 @@ export function assessDeploymentIntegrity({
     reason: assetDecision.reason };
 }
 
-/**
- * Unix seconds of the asset's most recent commit on the deploy branch, used
- * only to tell deploy lag from real drift.
- *
- * Read over the API rather than by shelling out to `git log`: the
- * hawkeye-no-child-process rule in `.semgrep/hawkeye.yml` forbids subprocess
- * spawning anywhere in application, script or function code, and a monitoring
- * probe is not the place to make an exception for a command-injection vector.
- * `fetch` is already this script's transport, and api.github.com is already on
- * both callers' egress allowlists.
- *
- * Returns NaN whenever the date cannot be established — no repo slug, no
- * network, a rate limit, an unparseable body. `decide()` treats an undatable
- * divergence as DRIFT, which is the safe direction: a divergence we cannot
- * prove is recent must not be excused as lag.
+/** GitHub compare responses are bounded to 300 changed files and 250 commits.
+ * A partial comparison MUST NOT imply that Netlify Functions are current.
+ * The commit list (not the latest edit per path) gives a conservative lower
+ * bound on how long any unshipped change has been waiting. Parsing is pure
+ * and independently regression-tested using synthetic truncated responses.
  */
-async function lastChangedAt(name, { timeoutMs = 15000 } = {}) {
-  const slug = process.env.GITHUB_REPOSITORY;
-  if (!slug) return NaN;
-  const branch = process.env.DEPLOY_BRANCH || 'main';
-  const url =
-    `https://api.github.com/repos/${slug}/commits` +
-    `?path=${encodeURIComponent(name)}&sha=${encodeURIComponent(branch)}&per_page=1`;
-  const headers = { Accept: 'application/vnd.github+json' };
-  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { headers, signal: ac.signal });
-    if (!res.ok) return NaN;
-    const body = await res.json();
-    const iso = body?.[0]?.commit?.committer?.date;
-    const ms = Date.parse(iso || '');
-    return Number.isFinite(ms) ? Math.floor(ms / 1000) : NaN;
-  } catch {
-    return NaN;
-  } finally {
-    clearTimeout(timer);
-  }
+export function verifiedDeployComparison(body, base, head) {
+  const isSha = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
+  if (!isSha(base) || !isSha(head) ||
+      !body || body.status !== 'ahead' ||
+      body.base_commit?.sha !== base ||
+      body.merge_base_commit?.sha !== base ||
+      !Array.isArray(body.files) || body.files.length >= 300 ||
+      !Array.isArray(body.commits) || !Number.isSafeInteger(body.total_commits) ||
+      body.total_commits < 1 || body.commits.length !== body.total_commits ||
+      body.commits[body.commits.length - 1]?.sha !== head ||
+      body.files.some(file => !file || typeof file.filename !== 'string')) return null;
+  const markerAtMs = Date.parse(body.base_commit?.commit?.committer?.date || '');
+  const commitDates = body.commits.map(commit =>
+    Date.parse(commit?.commit?.committer?.date || ''));
+  if (!Number.isFinite(markerAtMs) ||
+      commitDates.some(ms => !Number.isFinite(ms))) return null;
+  return {
+    changedPaths: [...new Set(body.files.filter(file =>
+      isDeployRelevantPath(file.filename)).map(file => file.filename))],
+    markerCommittedAt: Math.floor(markerAtMs / 1000),
+    oldestComparedCommitAt: Math.floor(Math.min(...commitDates) / 1000),
+  };
 }
-
 
 export function isDeployRelevantPath(name) {
   const p = String(name || '').replace(/^\.\//, '');
@@ -280,11 +284,11 @@ async function deployRelevantChangesSince(base, head, timeoutMs = 15000) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const res = await fetch(`https://api.github.com/repos/${slug}/compare/${base}...${head}`, { headers, signal: ac.signal });
+    const res = await fetch(`https://api.github.com/repos/${slug}/compare/${base}...${head}`, {
+      headers, signal: ac.signal,
+    });
     if (!res.ok) return null;
-    const body = await res.json();
-    if (!Array.isArray(body.files)) return null;
-    return body.files.filter((x) => isDeployRelevantPath(x && x.filename)).map((x) => x.filename);
+    return verifiedDeployComparison(await res.json(), base, head);
   } catch {
     return null;
   } finally {
@@ -332,7 +336,8 @@ async function fetchAsset(origin, name, timeoutMs) {
   }
 }
 
-export async function compare({ origin, graceSeconds = 86400, timeoutMs = 30000 } = {}) {
+export async function compare({ origin, graceSeconds = 86400, timeoutMs = 30000,
+  oldestComparedCommitAt = NaN } = {}) {
   const assets = discoverServedAssets();
   const results = [];
   for (const name of assets) {
@@ -348,25 +353,17 @@ export async function compare({ origin, graceSeconds = 86400, timeoutMs = 30000 
         repoHash,
         liveHash,
         excerpt: match ? null : firstDivergence(repoBody, fetched.body),
-        changedAt: NaN,
+        changedAt: match ? NaN : oldestComparedCommitAt,
       });
     } else {
-      results.push({ name, status: fetched.status, repoHash, liveHash: null, detail: fetched.detail, changedAt: NaN });
+      results.push({ name, status: fetched.status, repoHash, liveHash: null,
+        detail: fetched.detail, changedAt: oldestComparedCommitAt });
     }
   }
 
-  /* Date only the divergences, and only when a grace window can act on the
-     answer. A matching asset's history is irrelevant, and with grace at zero
-     (the deploy workflow's publish-wait, which polls up to 30 times) every
-     divergence is drift regardless of age — so a healthy site makes no API
-     calls at all, and the polling caller makes none either. */
-  if (graceSeconds > 0) {
-    await Promise.all(
-      results
-        .filter((r) => r.status === 'differ' || r.status === 'missing')
-        .map(async (r) => { r.changedAt = await lastChangedAt(r.name); }),
-    );
-  }
+  // One bounded compare response supplies the *oldest* intervening commit.
+  // No extra per-file GitHub API calls, and recent re-edits cannot erase a
+  // much older unshipped deployment change. If unavailable, NaN fails closed.
 
   return { results, decision: decide(results, { graceSeconds }) };
 }
@@ -387,11 +384,13 @@ async function main() {
   const expectedCommit = String(process.env.EXPECTED_DEPLOY_SHA || process.env.GITHUB_SHA || '').trim().toLowerCase();
   const deployMeta = await fetchDeployMeta(origin);
   let changedPaths = null;
+  let comparison = null;
 
   if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit)) {
     console.log(`deploy marker: live ${deployMeta.commit} · expected ${expectedCommit}`);
     if (deployMeta.commit !== expectedCommit) {
-      changedPaths = await deployRelevantChangesSince(deployMeta.commit, expectedCommit);
+      comparison = await deployRelevantChangesSince(deployMeta.commit, expectedCommit);
+      changedPaths = comparison?.changedPaths ?? null;
       if (Array.isArray(changedPaths) && changedPaths.length) {
         annotate(`::notice::Live marker is behind main and ${changedPaths.length} deploy-relevant paths changed: ${changedPaths.slice(0, 12).join(', ')}`);
       } else if (Array.isArray(changedPaths)) {
@@ -404,17 +403,20 @@ async function main() {
     console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); checking assets but Netlify Function freshness remains UNVERIFIABLE`);
   }
 
-  const { results, decision } = await compare({ origin, graceSeconds });
-  // A static asset match alone does not prove that separately deployed
-  // Netlify Functions are current. Check all deploy-relevant path timestamps
-  // only where a nonzero grace window could excuse recent changes.
-  const changedAtSeconds = Array.isArray(changedPaths) && changedPaths.length > 0 &&
-    changedPaths.length <= 100 && graceSeconds > 0
-    ? await Promise.all(changedPaths.map(name => lastChangedAt(name)))
+  const { results, decision } = await compare({
+    origin, graceSeconds, oldestComparedCommitAt: comparison?.oldestComparedCommitAt ?? NaN,
+  });
+  // The same complete compare response supplies a conservative earliest
+  // unshipped commit date for every deploy path. We must not infer age from
+  // the latest edit, or make one HTTP request for every changed filename.
+  const changedAtSeconds = Array.isArray(changedPaths) && comparison
+    ? changedPaths.map(() => comparison.oldestComparedCommitAt)
     : [];
   const integrity = assessDeploymentIntegrity({
     expectedCommit, markerCommit: deployMeta.ok ? deployMeta.commit : null,
-    changedPaths, changedAtSeconds, assetDecision: decision, graceSeconds,
+    changedPaths, changedAtSeconds,
+    markerCommittedAt: comparison?.markerCommittedAt ?? NaN,
+    assetDecision: decision, graceSeconds,
   });
 
   const width = Math.max(...results.map((r) => r.name.length));
