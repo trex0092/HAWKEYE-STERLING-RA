@@ -2042,6 +2042,45 @@
       "chainHash": "3ca7ae3b8601face8895c9f06ba59bf3f0929706212bad68ec2811217e01342c",
       "latencyHours": 0,
       "resolutionHash": "5e47de63517fc5b08f3a4142b67a2fc47085a70604c2cb03ae3ec89d732eb889"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-10T02:38:36.544Z",
+      "prevCount": 19417,
+      "newCount": 19417,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "3ca7ae3b8601face8895c9f06ba59bf3f0929706212bad68ec2811217e01342c",
+      "chainHash": "c363a82e12ef36c3c74636f3d362420ca2a86856390331af432c0756c922e22c"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-10T02:38:36.544Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "c363a82e12ef36c3c74636f3d362420ca2a86856390331af432c0756c922e22c",
+      "chainHash": "0a6226585ce0c2a634b1ce498468a57051be30353c4493437abf68517fd249cc"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-10T02:38:36.544Z",
+      "prevCount": 19619,
+      "newCount": 19616,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "0a6226585ce0c2a634b1ce498468a57051be30353c4493437abf68517fd249cc",
+      "chainHash": "ac590e9ed22c71310f3d0363f0a92850c4ce63939e12946a4683222b353e0e3a"
     }
   ]
 }
