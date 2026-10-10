@@ -205,8 +205,17 @@ export function assessDeploymentIntegrity({
       return { verdict: 'drift', ok: false,
         reason: 'stale commit marker with deploy-relevant code/functions outside verified lag' };
     }
-    // Only docs/CI have changed; still verify actual assets before declaring
-    // current. The older early return here masked missing production files.
+    // Only docs/CI have changed. A root asset mismatch therefore cannot be
+    // explained by an in-flight app build (the previous early-return bug).
+    return assetDecision.verdict === 'current'
+      ? { verdict: 'current', ok: true,
+          reason: 'only non-deploy files changed and every live root asset still matches' }
+      : { verdict: 'integrity_failure', ok: false,
+          reason: 'docs-only deploy-marker gap cannot excuse missing, unreadable or modified assets' };
+  }
+  if (knownExpected && !knownMarker) {
+    return { verdict: 'unverifiable', ok: false,
+      reason: 'missing/invalid live deploy marker: static assets cannot prove Netlify Functions are current' };
   }
   return { verdict: assetDecision.verdict, ok: assetDecision.ok === true,
     reason: assetDecision.reason };
