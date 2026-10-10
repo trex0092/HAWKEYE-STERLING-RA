@@ -41,7 +41,7 @@ on:
       - 'assets/**'
       - 'netlify/**'
       - 'netlify.toml'
-      - 'manifest.webmanifest'
+      - '*.webmanifest'  # Keep in step with Site Currency's discovered manifest inventory
       - 'robots.txt'
       # Browser-fetched advisory suggestions are served data, not daily state
       # snapshots. This is an input display update, NOT permission to apply
