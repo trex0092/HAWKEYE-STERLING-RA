@@ -23,11 +23,24 @@
 
    Usage: node scripts/state-crypto.mjs encrypt|decrypt <file> [file...]
    Pure helpers (encryptText/decryptText) are exported for offline tests. */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
 
 const MAGIC = 'HSSE1';
+
+function writeAtomic(file, contents) {
+  // The runner may be interrupted while persisting a state overlay. Never
+  // replace an existing encrypted checkpoint (or recovered plaintext) with a
+  // partially written file; keep plaintext temporary files owner-only.
+  const temp = file + '.tmp-' + process.pid + '-' + randomBytes(8).toString('hex');
+  try {
+    writeFileSync(temp, contents, { flag: 'wx', mode: 0o600 });
+    renameSync(temp, file);
+  } finally {
+    if (existsSync(temp)) unlinkSync(temp);
+  }
+}
 
 function deriveKey(secret, salt) {
   return scryptSync(String(secret), salt, 32);
@@ -49,6 +62,9 @@ export function decryptText(payload, secret) {
   const salt = Buffer.from(parts[1], 'base64');
   const nonce = Buffer.from(parts[2], 'base64');
   const blob = Buffer.from(parts[3], 'base64');
+  if (salt.length !== 16 || nonce.length !== 12) {
+    throw new Error('invalid state encryption salt or nonce');
+  }
   // ct may be empty (encrypting '' is valid): blob = ct + 16-byte GCM tag.
   if (blob.length < 16) throw new Error('payload too short');
   const ct = blob.subarray(0, blob.length - 16);
@@ -73,7 +89,7 @@ function main() {
     }
     for (const f of files) {
       if (!existsSync(f)) { console.log('state-crypto: skip missing ' + f); continue; }
-      writeFileSync(f + '.enc', encryptText(readFileSync(f, 'utf8'), key) + '\n');
+      writeAtomic(f + '.enc', encryptText(readFileSync(f, 'utf8'), key) + '\n');
       console.log('state-crypto: encrypted ' + f + ' -> ' + f + '.enc');
     }
     return;
@@ -89,7 +105,7 @@ function main() {
       continue;
     }
     try {
-      writeFileSync(f, decryptText(readFileSync(enc, 'utf8'), key));
+      writeAtomic(f, decryptText(readFileSync(enc, 'utf8'), key));
       console.log('state-crypto: decrypted ' + enc + ' -> ' + f);
     } catch (e) {
       console.error('state-crypto: FAILED to decrypt ' + enc + ' (' + e.message + ') - wrong key or tampered state');

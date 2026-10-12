@@ -7,9 +7,11 @@
    subject-data workflows decrypt state on overlay and encrypt it on
    persist whenever the STATE_ENCRYPTION_KEY secret is set.
    Usage: node test/state-crypto.test.mjs */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync, statSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { encryptText, decryptText } from '../scripts/state-crypto.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,6 +45,32 @@ check('a tampered ciphertext fails closed', throws(() => decryptText(tampered, K
 check('a non-HSSE1 payload is rejected', throws(() => decryptText('nonsense', KEY)));
 check('an empty secret is rejected on encrypt and decrypt',
   throws(() => encryptText(doc, '')) && throws(() => decryptText(payload, '')));
+check('invalid encoded state salt and nonce lengths fail before decryption',
+  throws(() => decryptText([parts[0], Buffer.from('short').toString('base64'), parts[2], parts[3]].join('.'), KEY))
+  && throws(() => decryptText([parts[0], parts[1], Buffer.from('short').toString('base64'), parts[3]].join('.'), KEY)));
+
+const scratch = mkdtempSync(join(tmpdir(), 'hsra-state-crypto-'));
+try {
+  const state = join(scratch, 'screen-state.json');
+  const cli = fileURLToPath(new URL('../scripts/state-crypto.mjs', import.meta.url));
+  const env = { ...process.env, STATE_ENCRYPTION_KEY: KEY };
+  writeFileSync(state, doc);
+  const encryptRun = spawnSync(process.execPath, [cli, 'encrypt', state], { env, encoding: 'utf8' });
+  check('CLI encrypt creates a decryptable encrypted checkpoint',
+    encryptRun.status === 0
+    && decryptText(readFileSync(state + '.enc', 'utf8'), KEY) === doc);
+  writeFileSync(state, 'outdated plaintext');
+  const decryptRun = spawnSync(process.execPath, [cli, 'decrypt', state], { env, encoding: 'utf8' });
+  check('CLI decrypt atomically replaces plaintext without a partial restore',
+    decryptRun.status === 0 && readFileSync(state, 'utf8') === doc);
+  check('state checkpoint and restored plaintext have owner-only permissions',
+    (statSync(state).mode & 0o777) === 0o600
+    && (statSync(state + '.enc').mode & 0o777) === 0o600);
+  check('atomic encryption and restore never leave temporary state blobs behind',
+    readdirSync(scratch).every(name => !name.includes('.tmp-')));
+} finally {
+  rmSync(scratch, { recursive: true, force: true });
+}
 
 /* workflow wiring: both subject-data branches must decrypt on overlay and
    encrypt on persist, with the secret plumbed into the steps */

@@ -70,15 +70,35 @@ export function assessRuntime({
   pepMaxAgeHours = DEFAULT_PEP_MAX_AGE_HOURS,
   expectedAdverseMatrix = LOCALES.length,
 } = {}) {
+  const screenedCountValid = Number.isSafeInteger(results?.screened) && results.screened > 0;
   const requiredEntries = arr(contract?.domains?.sanctions?.sources)
     .filter(s => s && s.required !== false && String(s.id || ''));
   const requiredSanctions = requiredEntries.map(s => String(s.id));
   const fallbackOf = new Map(requiredEntries.map(s => [String(s.id), String(s.fallbackSourceId || '')]));
+  // Coverage floors mirror the sanctions registry, but are pinned in the
+  // assurance contract so the proof can be independently evaluated from the
+  // persisted run counts. A nonempty but truncated list is NOT complete.
+  const floorById = new Map(requiredEntries.map(s => [String(s.id), s.minNames]));
+  for (const entry of requiredEntries) {
+    const fb = String(entry.fallbackSourceId || '');
+    if (fb && !floorById.has(fb)) floorById.set(fb, entry.fallbackMinNames);
+  }
+  const invalidFloors = requiredEntries.filter(s =>
+    !Number.isSafeInteger(s.minNames) || s.minNames <= 0 ||
+    (s.fallbackSourceId && (!Number.isSafeInteger(s.fallbackMinNames) || s.fallbackMinNames <= 0)));
   const loaded = arr(results?.lists);
+  const loadedIds = loaded.map(x => String(x?.id || ''));
+  const duplicateLoaded = loadedIds.filter((id, i) => loadedIds.indexOf(id) !== i);
+  const duplicateContract = requiredSanctions.filter((id, i) => requiredSanctions.indexOf(id) !== i);
   const loadedById = new Map(loaded.map(x => [String(x?.id || ''), x]));
+  const malformedLoaded = loaded.filter(x =>
+    !x || typeof x.id !== 'string' || !x.id ||
+    !Number.isSafeInteger(x.count) || x.count < 0 || typeof x.partial !== 'boolean');
   const complete = id => {
     const x = loadedById.get(id);
-    return !!x && x.partial !== true && num(x.count) > 0;
+    const floor = floorById.get(id);
+    return !!x && x.partial !== true && Number.isSafeInteger(x.count)
+      && Number.isSafeInteger(floor) && floor > 0 && x.count >= floor;
   };
   /* A required source that did not load completely is covered only by its
      contract-declared fallback, and only when that fallback loaded complete
@@ -93,10 +113,22 @@ export function assessRuntime({
   const missingRequired = unresolvedRequired.filter(id => !loadedById.has(id));
   const partialRequired = unresolvedRequired.filter(id => loadedById.get(id)?.partial === true);
   const emptyRequired = unresolvedRequired.filter(id => num(loadedById.get(id)?.count) <= 0);
+  const undersizedRequired = unresolvedRequired.filter(id => {
+    const x = loadedById.get(id);
+    return !!x && x.partial !== true && !complete(id);
+  });
   const currentRunIssue = runDateIssue(results?.date, nowMs);
   const sanctionsReasons = [];
   if (currentRunIssue) sanctionsReasons.push(currentRunIssue);
+  if (!screenedCountValid) sanctionsReasons.push('screened subject count is missing or invalid');
+  if (malformedLoaded.length) sanctionsReasons.push('sanctions source evidence has malformed counts or partial flags');
   if (!requiredSanctions.length) sanctionsReasons.push('sanctions contract defines no required sources');
+  if (invalidFloors.length) sanctionsReasons.push('required sanctions coverage floors absent or invalid: '
+    + invalidFloors.map(s => s.id).join(', '));
+  if (duplicateContract.length) sanctionsReasons.push('duplicate required sanctions source IDs in contract: '
+    + [...new Set(duplicateContract)].join(', '));
+  if (duplicateLoaded.length) sanctionsReasons.push('duplicate sanctions source IDs in run evidence: '
+    + [...new Set(duplicateLoaded)].join(', '));
   const sanctionsWarnings = servedByFallback.map(x => 'required sanctions source ' + x.id
     + ' did not load completely - screened via its declared fallback ' + x.fallback
     + ' (' + x.fallbackCount + ' names)');
@@ -104,6 +136,9 @@ export function assessRuntime({
   if (missingRequired.length) sanctionsReasons.push('required sanctions sources missing: ' + missingRequired.join(', '));
   if (partialRequired.length) sanctionsReasons.push('required sanctions sources partial: ' + partialRequired.join(', '));
   if (emptyRequired.length) sanctionsReasons.push('required sanctions sources empty: ' + emptyRequired.join(', '));
+  if (undersizedRequired.length) sanctionsReasons.push('required sanctions source counts below verified coverage floor: '
+    + undersizedRequired.map(id => id + ' (' + String(loadedById.get(id)?.count)
+      + ' < ' + String(floorById.get(id)) + ')').join(', '));
   /* The worldwide-screening contract defines five consolidated sources as the
      required sanctions baseline. National/regional sources are supplements:
      losing one must remain visible, but it is not equivalent to losing OFAC,
@@ -115,6 +150,7 @@ export function assessRuntime({
     screenedSubjects: num(results?.screened),
     loadedSources: loaded.map(x => ({ id: x?.id || '', name: x?.name || '', count: num(x?.count), partial: !!x?.partial })),
     requiredSourceIds: requiredSanctions,
+    sourceFloors: [...floorById].map(([id, minNames]) => ({ id, minNames })),
     servedByFallback,
     notes: arr(results?.failures),
   }, sanctionsWarnings);
@@ -124,7 +160,17 @@ export function assessRuntime({
   const backboneFailures = e.amBackboneFailures || {};
   const adverseReasons = [];
   if (currentRunIssue) adverseReasons.push(currentRunIssue);
+  if (!screenedCountValid) adverseReasons.push('screened subject count is missing or invalid');
   const adverseWarnings = [];
+  // Absent error counters previously became zero via num(undefined), allowing a
+  // broken report to claim no unscreened subjects. Require explicit bounded
+  // integers from the screen, not coercible strings or missing properties.
+  const mandatoryCounters = ['amErrors', 'amPartial', 'skipped', 'amLocalesPerSubject', 'amMatrixTotal'];
+  const invalidCounters = mandatoryCounters.filter(key =>
+    !Number.isSafeInteger(e[key]) || e[key] < 0 ||
+    (['amErrors', 'amPartial', 'skipped'].includes(key) && e[key] > num(results?.screened)));
+  if (invalidCounters.length) adverseReasons.push('adverse-media result counters missing or invalid: '
+    + invalidCounters.join(', '));
   // The summary is derived from per-subject backbone outcomes. If the
   // counters or membership list are omitted or contradictory, an ostensibly
   // zero-error run has no trustworthy coverage provenance.
@@ -196,6 +242,7 @@ export function assessRuntime({
 
   const pepReasons = [];
   if (currentRunIssue) pepReasons.push(currentRunIssue);
+  if (!screenedCountValid) pepReasons.push('screened subject count is missing or invalid');
   const pepWarnings = [];
   const pepRun = e.pepWorldwide || {};
   const pepCount = num(pepDataset?.count);
@@ -204,6 +251,18 @@ export function assessRuntime({
   const pepSourceUnscreenable = arr(pepDataset?.sourceUnscreenable);
   const pepAge = ageHours(pepDataset?.harvested, nowMs);
   if (!pepDataset || typeof pepDataset !== 'object') pepReasons.push('worldwide PEP artifact is missing');
+  if (!Number.isSafeInteger(pepDataset?.count) || pepDataset.count < 0
+    || !Number.isSafeInteger(pepRun.count) || pepRun.count < 0) {
+    pepReasons.push('PEP dataset or consumed population count is missing or invalid');
+  }
+  // The daily screen and assurance may both read a stale count header; verify
+  // that the downloaded artifact really contains that many person records.
+  if (!Array.isArray(pepDataset?.entries) || pepDataset.entries.length !== pepCount) {
+    pepReasons.push('worldwide PEP artifact population count does not match actual entries');
+  }
+  if (pepRun.partial !== false && pepRun.partial !== true) {
+    pepReasons.push('daily PEP evidence has no valid partial/completeness status');
+  }
   if (pepRun.active !== true) pepReasons.push('daily screen did not load the worldwide PEP artifact');
   if (num(pepRun.count) !== pepCount) pepReasons.push('daily screen PEP count does not match the harvested artifact');
   if (!pepRun.harvested) pepReasons.push('daily screen did not identify the consumed PEP harvest');
