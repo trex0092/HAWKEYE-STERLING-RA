@@ -150,6 +150,26 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance passes only when all three domains have complete current evidence',
     ok.operational && ok.domains.sanctions.operational && ok.domains.adverseMedia.operational && ok.domains.pep.operational);
 
+  const noBackboneCounts = structuredClone(results);
+  delete noBackboneCounts.enrichment.amBackboneFailures;
+  const nbc = assessRuntime({ results: noBackboneCounts, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance refuses adverse-media success without per-provider coverage counts',
+    !nbc.domains.adverseMedia.operational
+    && nbc.domains.adverseMedia.reasons.some(r => r.includes('missing or invalid')));
+  const contradictoryBackbones = structuredClone(results);
+  contradictoryBackbones.enrichment.amBackbones = [];
+  const cb = assessRuntime({ results: contradictoryBackbones, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance rejects a backbone summary that contradicts zero-failure counters',
+    !cb.domains.adverseMedia.operational
+    && cb.domains.adverseMedia.reasons.some(r => r.includes('contradicts')));
+  const incompletePep = assessRuntime({
+    results, pepDataset: { ...pep, expected: pep.count + 1, partial: false },
+    contract, nowMs, expectedAdverseMatrix: 79,
+  });
+  check('PEP expected-population shortfalls cannot be hidden by a false partial flag',
+    !incompletePep.domains.pep.operational
+    && incompletePep.domains.pep.reasons.some(r => r.includes('below its declared expected population')));
+
   const noOfac = structuredClone(results);
   noOfac.lists = noOfac.lists.filter(x => x.id !== 'ofac-sdn');
   const miss = assessRuntime({ results: noOfac, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });

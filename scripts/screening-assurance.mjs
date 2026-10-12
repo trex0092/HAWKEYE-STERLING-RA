@@ -125,6 +125,22 @@ export function assessRuntime({
   const adverseReasons = [];
   if (currentRunIssue) adverseReasons.push(currentRunIssue);
   const adverseWarnings = [];
+  // The summary is derived from per-subject backbone outcomes. If the
+  // counters or membership list are omitted or contradictory, an ostensibly
+  // zero-error run has no trustworthy coverage provenance.
+  const backboneNames = [
+    ['googleNews', 'Google News RSS'],
+    ['gdelt', 'GDELT global index'],
+    ['bing', 'Bing News'],
+  ];
+  const countersValid = !!e.amBackboneFailures && Array.isArray(e.amBackbones)
+    && backboneNames.every(([key]) => Number.isSafeInteger(backboneFailures[key])
+      && backboneFailures[key] >= 0 && backboneFailures[key] <= num(results?.screened));
+  if (!countersValid) {
+    adverseReasons.push('adverse-media backbone coverage evidence is missing or invalid');
+  } else if (backboneNames.some(([key, label]) => (backboneFailures[key] === 0) !== backbones.has(label))) {
+    adverseReasons.push('adverse-media backbone summary contradicts its failure counts');
+  }
   if (num(results?.screened) <= 0) adverseReasons.push('no subjects were screened');
   if (num(e.skipped) > 0) adverseReasons.push(num(e.skipped) + ' subjects skipped enrichment');
   /* amErrors means a subject had ZERO working global backbone after the
@@ -197,6 +213,7 @@ export function assessRuntime({
   if (pepRun.partial === true) pepReasons.push('daily screen reports the worldwide PEP layer as partial');
   if (pepCount < PEP_FLOOR) pepReasons.push('worldwide PEP artifact below floor: ' + pepCount + ' < ' + PEP_FLOOR);
   if (pepDataset?.partial === true) pepReasons.push('worldwide PEP artifact is partial' + (pepExpected ? ': ' + pepCount + '/' + pepExpected : ''));
+  if (pepExpected > pepCount) pepReasons.push('worldwide PEP artifact count is below its declared expected population: ' + pepCount + '/' + pepExpected);
   if (!Number.isFinite(pepAge)) pepReasons.push('worldwide PEP artifact has no valid harvest timestamp');
   else if (pepAge < -MAX_FUTURE_SKEW_HOURS) pepReasons.push('worldwide PEP artifact harvest timestamp is in the future');
   else if (pepAge > pepMaxAgeHours) pepReasons.push('worldwide PEP artifact is stale: ' + Math.round(pepAge) + 'h > ' + pepMaxAgeHours + 'h');
