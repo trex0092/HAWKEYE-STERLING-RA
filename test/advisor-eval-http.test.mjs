@@ -85,7 +85,8 @@ for (const [script, report, model] of [
     const body = readFileSync(join(root, report), 'utf8');
     check(script + ' refuses malformed model list with no live requests',
       run.status === 1 && body.includes('**Result: INCOMPLETE') &&
-      body.includes('No ') && !body.includes('all 0 guardrail cases held') &&
+      /\bno\b[^.]*evaluated/i.test(body) &&
+      !body.includes('all 0 guardrail cases held') &&
       run.stderr.includes('invalid model routing configuration'));
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
