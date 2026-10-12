@@ -1,3 +1,7 @@
+import {
+  validateApiPriceTable, parseApiPriceTable, quoteApiTokenCost
+} from '../scripts/api-cost.mjs';
+
 /* No-network checks for Regulatory Watch AI budget, source/filename safety,
  * provider quota classification and usage telemetry. */
 import {
@@ -138,6 +142,59 @@ check('provider usage telemetry counts all billing categories with no content',
 check('malformed and negative provider usage never inflate totals',
   Object.values(usageCounts({input_tokens: -2, output_tokens: '500',
     cache_creation_input_tokens: Infinity})).every(n => n === 0));
+
+
+/* Synthetic prices below are mathematical fixtures, NOT market prices. No
+ * production price is bundled: operator evidence is required on every call. */
+const prices = { schema: 1, models: [
+  { provider: 'openai', model: 'fixture-openai', verified_on: '2026-10-10',
+    source_url: 'https://platform.openai.com/docs/pricing',
+    usd_per_million: { input: '2.00', cached_input: '0.50', output: '8.00' } },
+  { provider: 'anthropic', model: 'fixture-anthropic', verified_on: '2026-10-10',
+    source_url: 'https://docs.anthropic.com/en/docs/about-claude/pricing',
+    usd_per_million: { input: '1.00', cached_read: '0.10', cached_write: '1.25', output: '5.00' } },
+] };
+const at = { nowMs: Date.parse('2026-10-12T12:00:00Z') };
+check('explicit dated publisher evidence validates; no prices are hard-coded',
+  validateApiPriceTable(prices, at).ok &&
+  parseApiPriceTable(JSON.stringify(prices), at).ok);
+const openaiQuote = quoteApiTokenCost(prices, {
+  provider: 'openai', model: 'fixture-openai',
+  usage: { input_tokens: 1000, cached_input_tokens: 200, output_tokens: 100 },
+}, at);
+check('exact openai token arithmetic excludes cached tokens from normal input',
+  openaiQuote.status === 'priced' && openaiQuote.micro_usd === '2500' &&
+  openaiQuote.usd === '0.002500' && openaiQuote.token_counts.input === 800);
+const anthropicQuote = quoteApiTokenCost(prices, {
+  provider: 'anthropic', model: 'fixture-anthropic',
+  usage: { input_tokens: 500, cache_read_input_tokens: 200,
+    cache_creation_input_tokens: 100, output_tokens: 100 },
+}, at);
+check('anthropic cached-read/write and output are individually billed once',
+  anthropicQuote.status === 'priced' && anthropicQuote.micro_usd === '1145');
+check('fractional micro-USD costs conservatively round UP',
+  quoteApiTokenCost(prices, { provider: 'openai', model: 'fixture-openai',
+    usage: { input_tokens: 1, output_tokens: 0 } }, at).micro_usd === '2');
+check('unpriced and unknown model never silently imply zero cost',
+  quoteApiTokenCost(null, { provider: 'openai', model: 'fixture-openai',
+    usage: { input_tokens: 100, output_tokens: 20 } }, at).status === 'unpriced' &&
+  quoteApiTokenCost(prices, { provider: 'openai', model: 'new-unapproved-model',
+    usage: { input_tokens: 100, output_tokens: 20 } }, at).reason === 'model_has_no_verified_price');
+check('reject double-counted or malformed cached token usage',
+  quoteApiTokenCost(prices, { provider: 'openai', model: 'fixture-openai',
+    usage: { input_tokens: 2, cached_input_tokens: 3, output_tokens: 1 } }, at).status === 'unpriced' &&
+  quoteApiTokenCost(prices, { provider: 'openai', model: 'fixture-openai',
+    usage: { input_tokens: '2', output_tokens: 1 } }, at).status === 'unpriced');
+check('reject invented, stale future, duplicated and ambiguous price evidence',
+  !validateApiPriceTable({ ...prices, models: [prices.models[0], prices.models[0]] }, at).ok &&
+  !validateApiPriceTable({ ...prices, models: [{ ...prices.models[0], verified_on: '2026-10-30' }] }, at).ok &&
+  !validateApiPriceTable({ ...prices, models: [{ ...prices.models[0],
+    source_url: 'https://openai.com.attacker.test/pricing' }] }, at).ok &&
+  !validateApiPriceTable({ ...prices, models: [{ ...prices.models[0],
+    usd_per_million: { ...prices.models[0].usd_per_million, output: '-0.1' } }] }, at).ok);
+check('invalid pricing JSON does not reveal raw input or become zero cost',
+  !parseApiPriceTable('{secret', at).ok &&
+  !parseApiPriceTable(JSON.stringify({ schema: 1, models: [] }), at).ok);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
