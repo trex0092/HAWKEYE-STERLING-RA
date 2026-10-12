@@ -81,7 +81,8 @@ self.addEventListener('fetch', (event) => {
         // below). A non-OK page is returned to the user but not stored.
         if (fresh && fresh.ok) {
           const cache = await caches.open(CACHE);
-          cache.put(req, fresh.clone()).catch(() => {});
+          // Keep the cache write alive after the response is delivered.
+          event.waitUntil(cache.put(req, fresh.clone()).catch(() => {}));
         }
         return fresh;
       } catch (_) {
@@ -102,7 +103,9 @@ self.addEventListener('fetch', (event) => {
       const cache = await caches.open(CACHE);
       try {
         const fresh = await fetch(req);
-        if (fresh && fresh.ok) cache.put(req, fresh.clone()).catch(() => {});
+        if (fresh && fresh.ok) {
+          event.waitUntil(cache.put(req, fresh.clone()).catch(() => {}));
+        }
         return fresh;
       } catch (_) {
         return (await cache.match(req)) || Response.error();
@@ -116,9 +119,14 @@ self.addEventListener('fetch', (event) => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req);
     const network = fetch(req).then((res) => {
-      if (res && res.ok) cache.put(req, res.clone()).catch(() => {});
+      if (res && res.ok) {
+        event.waitUntil(cache.put(req, res.clone()).catch(() => {}));
+      }
       return res;
     }).catch(() => null);
+    // Without waitUntil, returning a cached response can end the fetch event
+    // before its background network revalidation even starts or finishes.
+    if (cached) event.waitUntil(network);
     return cached || (await network) || Response.error();
   })());
 });

@@ -33,6 +33,11 @@ check('browser-fetched country suggestion JSON is network-first',
 check('static shell cache is version-bumped for network-first asset policy',
   cacheVer === 'hsra-shell-v6');
 
+check('successful navigation and script cache writes outlive their fetch responses',
+  (sw.match(/event\.waitUntil\(cache\.put\(req, fresh\.clone\(\)\)\.catch\(\(\) => \{\}\)\)/g) || []).length === 2);
+check('stale-while-revalidate keeps background revalidation alive on cache hits',
+  sw.includes('if (cached) event.waitUntil(network)'));
+
 /* The static-GET branch keeps its own res.ok guard. */
 check('static-GET branch still guards on res.ok', /if\s*\(\s*res\s*&&\s*res\.ok\s*\)/.test(sw));
 
