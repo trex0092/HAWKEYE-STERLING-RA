@@ -11,6 +11,14 @@ import { createHash } from 'node:crypto';
 
 const ELIGIBLE_ROLES = new Set(['Analyst', 'Reviewer-MLRO', 'Admin']);
 const TENANT_ID = /^[A-Za-z0-9._:-]{1,96}$/;
+const CITATION_KEYS = ['article', 'basis', 'locator', 'quote', 'source_url', 'verified_by', 'verified_on'];
+const HUMAN_VERIFIERS = new Set(['MLRO', 'Counsel']);
+const CITATION_ID = /^[A-Za-z0-9._:-]{1,96}$/;
+
+function citationShapeValid(c) {
+  return !!c && typeof c === 'object' && !Array.isArray(c) &&
+    Object.keys(c).sort().join('|') === [...CITATION_KEYS].sort().join('|');
+}
 
 /* Defense in depth, NOT comprehensive prompt-injection classification.
    All retrieved words remain untrusted source DATA, even if no signature is
@@ -29,7 +37,10 @@ function suspiciousSourceText(value) {
    Rows without an access_scope belong ONLY to the current public law register;
    confidential data must not be added there without explicit scope metadata. */
 function authorizedForScope(accessScope, principal = {}) {
-  if (accessScope == null) return true;
+  // An omitted scope is permitted only for the existing public-law register.
+  // An explicitly null scope is ambiguous and cannot be treated as PUBLIC.
+  if (accessScope === undefined) return true;
+  if (accessScope === null) return false;
   if (!accessScope || typeof accessScope !== 'object' || Array.isArray(accessScope)) return false;
   const keys = Object.keys(accessScope);
   if (accessScope.visibility === 'public') {
@@ -43,7 +54,8 @@ function authorizedForScope(accessScope, principal = {}) {
       accessScope.allowed_roles.length === 0 ||
       accessScope.allowed_roles.length > ELIGIBLE_ROLES.size ||
       accessScope.allowed_roles.some(role => !ELIGIBLE_ROLES.has(role))) return false;
-  return typeof principal.tenantId === 'string' &&
+  return !!principal && typeof principal === 'object' &&
+    typeof principal.tenantId === 'string' &&
     principal.tenantId === accessScope.tenant_id &&
     accessScope.allowed_roles.includes(principal.role);
 }
@@ -72,19 +84,30 @@ function sourceHostAllowed(url, approvedHosts) {
 
 function buildVerifiedLegalCorpus(registry, approvedHosts, asOf, principal = {}) {
   if (!registry || !Array.isArray(registry.obligations) || !dateValid(asOf)) return [];
-  const approved = [...new Set((approvedHosts || [])
-    .filter(x => typeof x === 'string').map(x => x.trim().toLowerCase()))];
+  // A malformed server-side allowlist must fail closed, not crash a caller
+  // or accidentally turn into an unrestricted source list.
+  const approved = Array.isArray(approvedHosts)
+    ? [...new Set(approvedHosts.filter(x => typeof x === 'string')
+      .map(x => x.trim().toLowerCase()))]
+    : [];
   const out = [];
   for (const row of registry.obligations) {
-    if (!row || typeof row !== 'object' || typeof row.id !== 'string' ||
-        typeof row.obligation !== 'string' || typeof row.instrument !== 'string') continue;
+    if (!row || typeof row !== 'object' || Array.isArray(row) ||
+        typeof row.id !== 'string' || !CITATION_ID.test(row.id) ||
+        typeof row.obligation !== 'string' || !row.obligation.trim() || row.obligation.length > 3000 ||
+        typeof row.instrument !== 'string' || !row.instrument.trim() || row.instrument.length > 512) continue;
     const c = row.source_citation;
-    if (!c || c.basis !== 'sourced' || typeof c.article !== 'string' || !c.article.trim() ||
-        typeof c.quote !== 'string' || c.quote.trim().length < 20 ||
-        c.quote.length > 5000 || typeof c.locator !== 'string' || !c.locator.trim() ||
-        typeof c.verified_by !== 'string' || !c.verified_by.trim() ||
+    if (!citationShapeValid(c) || c.basis !== 'sourced' ||
+        typeof c.article !== 'string' || !c.article.trim() || c.article.length > 256 ||
+        typeof c.quote !== 'string' || c.quote.trim().length < 20 || c.quote.length > 5000 ||
+        typeof c.locator !== 'string' || !c.locator.trim() || c.locator.length > 512 ||
+        !HUMAN_VERIFIERS.has(c.verified_by) ||
         !dateValid(c.verified_on) || c.verified_on > asOf ||
-        suspiciousSourceText(c.quote) ||
+        // Check ALL fields that could be inserted into an LLM context,
+        // not only the quoted legislation. This is a narrow refusal guard,
+        // not a substitute for treating the entire returned record as data.
+        [row.obligation, row.instrument, c.article, c.locator, c.quote].some(suspiciousSourceText) ||
+        /\bPROPOSED\b/i.test(c.quote) || /\.\.\.|\u2026/u.test(c.quote) ||
         !authorizedForScope(row.access_scope, principal) ||
         !sourceHostAllowed(c.source_url, approved)) continue;
     out.push({
@@ -101,7 +124,19 @@ function buildVerifiedLegalCorpus(registry, approvedHosts, asOf, principal = {})
       /* Change detection only: a hash is NOT publisher authenticity or
          an electronic MLRO signature. No customer data is hashed here. */
       content_sha256: createHash('sha256')
-        .update(JSON.stringify([row.id, c.source_url, c.article, c.quote, c.verified_on]))
+        // Bind every returned claim and its source authorization metadata.
+        // Previously, changing the obligation, locator, verifier or visibility
+        // left the alleged evidence hash unchanged.
+        .update(JSON.stringify([
+          row.id, row.obligation, row.instrument, c.source_url, c.article,
+          c.quote, c.locator, c.verified_by, c.verified_on, row.status || 'unknown',
+          row.access_scope === undefined ? null : {
+            visibility: row.access_scope.visibility,
+            tenant_id: row.access_scope.tenant_id || null,
+            allowed_roles: Array.isArray(row.access_scope.allowed_roles)
+              ? [...row.access_scope.allowed_roles].sort() : null,
+          }
+        ]))
         .digest('hex'),
       untrusted_source_text: true
     });
@@ -111,7 +146,8 @@ function buildVerifiedLegalCorpus(registry, approvedHosts, asOf, principal = {})
 
 function retrieveVerifiedLegal(registry, query, options = {}) {
   /* Caller authentication must occur before this deterministic scoped library. */
-  if (!ELIGIBLE_ROLES.has(options.role)) return { status: 'forbidden', results: [] };
+  if (!options || typeof options !== 'object' || Array.isArray(options) ||
+      !ELIGIBLE_ROLES.has(options.role)) return { status: 'forbidden', results: [] };
   if (typeof query !== 'string' || !query.trim() || query.length > 400) {
     return { status: 'invalid_query', results: [] };
   }
