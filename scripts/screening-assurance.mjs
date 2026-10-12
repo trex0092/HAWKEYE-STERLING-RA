@@ -70,6 +70,7 @@ export function assessRuntime({
   pepMaxAgeHours = DEFAULT_PEP_MAX_AGE_HOURS,
   expectedAdverseMatrix = LOCALES.length,
 } = {}) {
+  const screenedCountValid = Number.isSafeInteger(results?.screened) && results.screened > 0;
   const requiredEntries = arr(contract?.domains?.sanctions?.sources)
     .filter(s => s && s.required !== false && String(s.id || ''));
   const requiredSanctions = requiredEntries.map(s => String(s.id));
@@ -90,6 +91,9 @@ export function assessRuntime({
   const duplicateLoaded = loadedIds.filter((id, i) => loadedIds.indexOf(id) !== i);
   const duplicateContract = requiredSanctions.filter((id, i) => requiredSanctions.indexOf(id) !== i);
   const loadedById = new Map(loaded.map(x => [String(x?.id || ''), x]));
+  const malformedLoaded = loaded.filter(x =>
+    !x || typeof x.id !== 'string' || !x.id ||
+    !Number.isSafeInteger(x.count) || x.count < 0 || typeof x.partial !== 'boolean');
   const complete = id => {
     const x = loadedById.get(id);
     const floor = floorById.get(id);
@@ -116,6 +120,8 @@ export function assessRuntime({
   const currentRunIssue = runDateIssue(results?.date, nowMs);
   const sanctionsReasons = [];
   if (currentRunIssue) sanctionsReasons.push(currentRunIssue);
+  if (!screenedCountValid) sanctionsReasons.push('screened subject count is missing or invalid');
+  if (malformedLoaded.length) sanctionsReasons.push('sanctions source evidence has malformed counts or partial flags');
   if (!requiredSanctions.length) sanctionsReasons.push('sanctions contract defines no required sources');
   if (invalidFloors.length) sanctionsReasons.push('required sanctions coverage floors absent or invalid: '
     + invalidFloors.map(s => s.id).join(', '));
@@ -154,7 +160,17 @@ export function assessRuntime({
   const backboneFailures = e.amBackboneFailures || {};
   const adverseReasons = [];
   if (currentRunIssue) adverseReasons.push(currentRunIssue);
+  if (!screenedCountValid) adverseReasons.push('screened subject count is missing or invalid');
   const adverseWarnings = [];
+  // Absent error counters previously became zero via num(undefined), allowing a
+  // broken report to claim no unscreened subjects. Require explicit bounded
+  // integers from the screen, not coercible strings or missing properties.
+  const mandatoryCounters = ['amErrors', 'amPartial', 'skipped', 'amLocalesPerSubject', 'amMatrixTotal'];
+  const invalidCounters = mandatoryCounters.filter(key =>
+    !Number.isSafeInteger(e[key]) || e[key] < 0 ||
+    (['amErrors', 'amPartial', 'skipped'].includes(key) && e[key] > num(results?.screened)));
+  if (invalidCounters.length) adverseReasons.push('adverse-media result counters missing or invalid: '
+    + invalidCounters.join(', '));
   // The summary is derived from per-subject backbone outcomes. If the
   // counters or membership list are omitted or contradictory, an ostensibly
   // zero-error run has no trustworthy coverage provenance.
@@ -226,6 +242,7 @@ export function assessRuntime({
 
   const pepReasons = [];
   if (currentRunIssue) pepReasons.push(currentRunIssue);
+  if (!screenedCountValid) pepReasons.push('screened subject count is missing or invalid');
   const pepWarnings = [];
   const pepRun = e.pepWorldwide || {};
   const pepCount = num(pepDataset?.count);
@@ -234,6 +251,13 @@ export function assessRuntime({
   const pepSourceUnscreenable = arr(pepDataset?.sourceUnscreenable);
   const pepAge = ageHours(pepDataset?.harvested, nowMs);
   if (!pepDataset || typeof pepDataset !== 'object') pepReasons.push('worldwide PEP artifact is missing');
+  if (!Number.isSafeInteger(pepDataset?.count) || pepDataset.count < 0
+    || !Number.isSafeInteger(pepRun.count) || pepRun.count < 0) {
+    pepReasons.push('PEP dataset or consumed population count is missing or invalid');
+  }
+  if (pepRun.partial !== false && pepRun.partial !== true) {
+    pepReasons.push('daily PEP evidence has no valid partial/completeness status');
+  }
   if (pepRun.active !== true) pepReasons.push('daily screen did not load the worldwide PEP artifact');
   if (num(pepRun.count) !== pepCount) pepReasons.push('daily screen PEP count does not match the harvested artifact');
   if (!pepRun.harvested) pepReasons.push('daily screen did not identify the consumed PEP harvest');

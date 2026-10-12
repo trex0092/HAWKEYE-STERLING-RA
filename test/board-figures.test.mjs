@@ -150,6 +150,32 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance passes only when all three domains have complete current evidence',
     ok.operational && ok.domains.sanctions.operational && ok.domains.adverseMedia.operational && ok.domains.pep.operational);
 
+  const missingAdverseErrorCount = structuredClone(results);
+  delete missingAdverseErrorCount.enrichment.amErrors;
+  const mac = assessRuntime({ results: missingAdverseErrorCount, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('missing adverse-media error counts cannot be silently converted to zero',
+    !mac.domains.adverseMedia.operational && mac.domains.adverseMedia.reasons.some(r => r.includes('amErrors')));
+  const stringAdverseErrorCount = structuredClone(results);
+  stringAdverseErrorCount.enrichment.amErrors = '0';
+  check('a string zero is not valid adverse-media coverage evidence',
+    !assessRuntime({ results: stringAdverseErrorCount, pepDataset: pep, contract, nowMs,
+      expectedAdverseMatrix: 79 }).domains.adverseMedia.operational);
+  const nonBooleanPartial = structuredClone(results);
+  nonBooleanPartial.lists[0].partial = 'false';
+  check('non-boolean partial flags never certify complete sanctions sources',
+    !assessRuntime({ results: nonBooleanPartial, pepDataset: pep, contract, nowMs,
+      expectedAdverseMatrix: 79 }).domains.sanctions.operational);
+  const stringSubjectCount = structuredClone(results);
+  stringSubjectCount.screened = '12';
+  const cnt = assessRuntime({ results: stringSubjectCount, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('all three runtime domains reject non-numeric subject count evidence',
+    Object.values(cnt.domains).every(d => !d.operational && d.reasons.some(r => r.includes('subject count'))));
+  const missingPepCompleteness = structuredClone(results);
+  delete missingPepCompleteness.enrichment.pepWorldwide.partial;
+  check('missing PEP completeness status cannot yield an operational PEP verdict',
+    !assessRuntime({ results: missingPepCompleteness, pepDataset: pep, contract, nowMs,
+      expectedAdverseMatrix: 79 }).domains.pep.operational);
+
   const noBackboneCounts = structuredClone(results);
   delete noBackboneCounts.enrichment.amBackboneFailures;
   const nbc = assessRuntime({ results: noBackboneCounts, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
