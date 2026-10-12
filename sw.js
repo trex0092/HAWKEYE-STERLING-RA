@@ -14,7 +14,7 @@
      • Netlify functions (/.netlify/) → always network, never cached.
    Bump CACHE to invalidate the old shell on the next visit. */
 
-const CACHE = 'hsra-shell-v5';
+const CACHE = 'hsra-shell-v6';
 const SHELL = [
   './',
   './index.html',
@@ -91,12 +91,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App logic scripts: NETWORK-FIRST (coherent with the network-first HTML above).
-  // Stale-while-revalidate here served the NEW HTML with the OLD cached JS on the
-  // first visit after a deploy — a data-* / element-id mismatch until reload.
-  // Network-first keeps HTML and its scripts in lockstep; cache is the offline
-  // fallback only.
-  if (/\/(app|console|advisor|i18n|sw-register)\.js$/.test(url.pathname)) {
+  // All JavaScript must be NETWORK-FIRST, not just a short list of root scripts.
+  // assets/super-data.js, telemetry.js and any new same-origin JS module must
+  // agree with the network-first HTML and app.js on the first post-update visit.
+  // The browser-loaded country suggestion JSON also needs current-version
+  // precedence, while the cache remains a documented offline fallback.
+  const currentReferenceData = url.pathname.endsWith('/data/country-score-suggested.json');
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.mjs') || currentReferenceData) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE);
       try {
@@ -110,7 +111,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Other same-origin static GETs (CSS, fonts, icons, reference data): stale-while-revalidate.
+  // Other same-origin static GETs (CSS, fonts, icons): stale-while-revalidate.
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req);

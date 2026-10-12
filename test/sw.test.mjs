@@ -23,6 +23,16 @@ for (const asset of ['app.js', 'console.js', 'advisor.js', 'app.css', 'console.c
 const cacheVer = (sw.match(/const CACHE\s*=\s*'([^']+)'/) || [])[1] || '';
 check('CACHE version is bumped past v1', cacheVer !== '' && cacheVer !== 'hsra-shell-v1');
 
+/* JavaScript reference data and browser-visible country suggestions must not
+   be served from the previous release's cache while HTML/app.js are current.
+   Keep offline fallback for an actual fetch failure. */
+check('all same-origin JavaScript, including assets/super-data.js, is network-first',
+  sw.includes("url.pathname.endsWith('.js') || url.pathname.endsWith('.mjs')"));
+check('browser-fetched country suggestion JSON is network-first',
+  sw.includes("url.pathname.endsWith('/data/country-score-suggested.json')"));
+check('static shell cache is version-bumped for network-first asset policy',
+  cacheVer === 'hsra-shell-v6');
+
 /* The static-GET branch keeps its own res.ok guard. */
 check('static-GET branch still guards on res.ok', /if\s*\(\s*res\s*&&\s*res\.ok\s*\)/.test(sw));
 
