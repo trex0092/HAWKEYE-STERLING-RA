@@ -52,6 +52,21 @@ check('missing, invalid and duplicated manifest entries fail loudly',
   && throws(() => parseManifest('[{"file":"x"}]'))
   && throws(() => parseManifest(JSON.stringify([entry1, entry1]))));
 
+// Audit the existing committed retention history as well as synthetic
+// fixtures. This catches a pre-existing mismatch BEFORE the runtime starts
+// using the stronger archive verification gate.
+const archiveBase = fileURLToPath(new URL('../data/retention/', import.meta.url));
+const committedManifest = parseManifest(readFileSync(join(archiveBase, 'manifest.json'), 'utf8'));
+check('committed retention manifest has valid historical entries',
+  committedManifest.length > 0);
+check('every committed legacy snapshot still matches its registered size and SHA-256',
+  committedManifest.every(e => {
+    const file = join(archiveBase, e.file);
+    if (!existsSync(file)) return false;
+    const bytes = readFileSync(file);
+    return bytes.length === e.bytes && sha256(bytes) === e.sha256;
+  }));
+
 // Real CLI exercised only against temporary synthetic data, never the
 // repository's committed retention history or any customer data.
 const root = mkdtempSync(join(tmpdir(), 'hsra-retain-state-'));
