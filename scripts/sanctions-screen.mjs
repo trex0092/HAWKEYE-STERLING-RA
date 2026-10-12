@@ -661,6 +661,16 @@ export function parseOfacApiResponse(d) {
     : { status: 'no-match', matchCount: 0 };
 }
 
+/* Names/keys of people and entities that left the current screened population
+ * stay in private Asana evidence and encrypted state, NEVER public CI logs.
+ * A count is sufficient for workflow monitoring and recovery routing. */
+export function describeUnscreenedHold(entries) {
+  const n = Array.isArray(entries) ? entries.length : 0;
+  return 'sanctions-screen: ' + n + ' standing match(es) left the screened population; '
+    + 'cases HELD for human disposition, not auto-cleared. '
+    + 'Inspect the restricted screening evidence in Asana for identifiers.';
+}
+
 export function diffState(prevState, results, today, threshold, screenedLists, evaluatedSignals) {
   const prev = (prevState && prevState.subjects) || {};
   const nextSubjects = { ...prev };
@@ -2369,9 +2379,7 @@ async function main() {
   const { alerts, cleared, notScreened, matchCount, nextState } =
     diffState(prevState, screen.results, today, cfg.threshold, screenedLists, evaluatedSignals);
   if (notScreened && notScreened.length) {
-    console.log(`sanctions-screen: ${notScreened.length} standing match(es) left the screened population — `
-      + 'cases HELD for manual disposition, not auto-cleared: '
-      + notScreened.map(n => n.name || n.key).join(', '));
+    console.log(describeUnscreenedHold(notScreened));
   }
 
   /* SECOND OPINION (OFAC-API) — independent corroboration on the NEW/CHANGED
