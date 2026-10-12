@@ -1,3 +1,5 @@
+import { validateApiCostEvent, parseApiCostEvents, summarizeApiCostEvents,
+  renderApiCostDashboard } from '../scripts/api-cost-dashboard.mjs';
 import { makeApiUsdBudget, parseUsdMicro } from '../scripts/api-cost-budget.mjs';
 import {
   validateApiPriceTable, parseApiPriceTable, quoteApiTokenCost
@@ -251,6 +253,40 @@ check('Anthropic reservations cover the most expensive eligible cache class',
 check('invalid token sizes cannot reduce the cap reservation',
   !guardSetup().preflight({ inputBytes: '100', maxOutputTokens: 500 }).ok &&
   !guardSetup().preflight({ inputBytes: -1, maxOutputTokens: 500 }).ok);
+
+
+const eventA = {
+  schema: 1, observed_at: '2026-10-12T12:00:00.000Z',
+  provider: 'openai', model: 'fixture-openai', workflow: 'screening-digest',
+  requests: 1, status: 'priced', estimated_usd: '0.002500',
+  input_tokens: 1000, output_tokens: 100,
+};
+const eventB = { ...eventA, status: 'unknown_reserved', estimated_usd: '0.030000' };
+const eventC = { ...eventA, requests: 0, status: 'blocked', estimated_usd: null };
+const lineRecords = [eventA, eventB, eventC].map(x => JSON.stringify(x)).join('\n') + '\n';
+const parsedEvents = parseApiCostEvents(lineRecords);
+const costSummary = summarizeApiCostEvents(parsedEvents.events);
+check('metadata-only events parse into distinct quoted, reserved and blocked states',
+  parsedEvents.ok && parsedEvents.events.length === 3 && costSummary.ok &&
+  costSummary.requests === 2 && costSummary.blocked_events === 1);
+check('dashboard keeps actual-usage estimates distinct from unknown-usage reservations',
+  costSummary.priced_estimate_usd === '0.002500' &&
+  costSummary.unknown_usage_reserved_usd === '0.030000' &&
+  renderApiCostDashboard(costSummary).includes('Unknown usage reserved'));
+check('empty data never masquerades as a verified zero vendor invoice',
+  renderApiCostDashboard(summarizeApiCostEvents([])).includes('Missing telemetry is not evidence of zero spending'));
+check('unexpected customer names, prompt content and secret-bearing fields are disallowed',
+  !validateApiCostEvent({ ...eventA, customer_name: 'SYNTHETIC PRIVATE' }) &&
+  !validateApiCostEvent({ ...eventA, prompt: 'SYNTHETIC PRIVATE' }));
+check('invalid provider, model, date, monetary values and negative tokens fail closed',
+  !validateApiCostEvent({ ...eventA, provider: 'third_party' }) &&
+  !validateApiCostEvent({ ...eventA, model: 'fake | markdown' }) &&
+  !validateApiCostEvent({ ...eventA, observed_at: 'yesterday' }) &&
+  !validateApiCostEvent({ ...eventA, estimated_usd: '-1' }) &&
+  !validateApiCostEvent({ ...eventA, input_tokens: -5 }));
+check('a bad JSON line cannot be silently discarded from the cost dashboard',
+  !parseApiCostEvents(JSON.stringify(eventA) + '\n{broken').ok &&
+  !parseApiCostEvents(JSON.stringify({ ...eventA, cost_usd: '0' })).ok);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
