@@ -11,14 +11,10 @@ name: Freshness Check
 #
 # Needs the ASANA_ACCESS_TOKEN repository secret to route the alert to Asana.
 
+# This workflow's status badge is a LIVE operational attestation. Running a
+# unit-test-only push path makes the latest badge green even while the real
+# weekly/quarterly control is overdue. Those unit tests remain mandatory in CI.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/**'
-      - 'scripts/freshness-check.mjs'
-      - 'scripts/control-retry.mjs'
-      - 'data/**'
   schedule:
     - cron: '9 9 * * *' # 09:09 UTC daily — after sanctions-watch (05:07), the screening runs and regulatory-watch (06:19)
     - cron: '9 12 * * *' # second firing — re-verifies after the Control Retry dispatcher's healing passes (07:37/10:07), and heals this alarm's own badge if the first firing died transiently. Idempotent read-only check; a still-stale control simply alerts twice, which is the point.
@@ -61,22 +57,14 @@ jobs:
 
       - name: Verify mandatory controls ran inside their cadence window
         id: freshness
-        # A push can happen before the day's mandatory controls have run. The
-        # previous workflow executed the live freshness alarm on every workflow
-        # edit and therefore produced false "stale" failures early in the UTC
-        # day. Runtime freshness is only meaningful on the scheduled checks or
-        # an explicit manual verification.
-        if: github.event_name != 'push'
+        # Run the REAL operational probe on every trigger. Never substitute
+        # offline unit tests for a successful Actions history query.
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/freshness-check.mjs
 
-      - name: Validate freshness-check code on push
-        if: github.event_name == 'push'
-        run: node --test test/freshness-check.test.mjs
-
       - name: Alert in Asana on stale control
-        if: failure() && github.event_name != 'push'
+        if: failure()
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
