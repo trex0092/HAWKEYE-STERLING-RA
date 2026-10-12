@@ -6357,6 +6357,22 @@ with tempfile.TemporaryDirectory() as d:
 
     with open(manifest_file, "w", encoding="utf-8") as f:
         json.dump(manifest, f)
+
+    _original_read = txn_feed._json_bytes
+    _manifest_reads = []
+    def _audit_json_read(path, limit):
+        _manifest_reads.append(path)
+        return _original_read(path, limit)
+    try:
+        txn_feed._json_bytes = _audit_json_read
+        _summary = txn_feed.validation_summary(feed_file, manifest_file)
+        check("transaction preflight metadata comes from the single validated manifest snapshot",
+              _manifest_reads == [feed_file, manifest_file]
+              and _summary["sha256"] == manifest["sha256"]
+              and _summary["source_id"] == manifest["source_id"])
+    finally:
+        txn_feed._json_bytes = _original_read
+
     with open(feed_file, "wb") as f:
         f.write(raw + b" ")
     check("tampered raw export rejected by SHA-256 digest", _txnfeed_error(
