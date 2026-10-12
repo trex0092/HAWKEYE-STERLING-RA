@@ -1,154 +1,111 @@
-/* Non-identifying API cost dashboard, generated from local approved telemetry.
- *
- * This dashboard reports VERIFIED-PRICE ESTIMATES, not provider invoices,
- * vendor credit balances, nor an account-wide global spending ledger.
- * All events are strictly metadata-only. Customer names, prompts, response
- * bodies, tokens, secrets and account identifiers are forbidden.
- */
-import { appendFileSync, readFileSync, existsSync } from 'node:fs';
+/* Privacy-minimizing offline API cost dashboard. Supplied data is not an invoice. */
+import { readFileSync, appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { parseUsdMicro } from './api-cost-budget.mjs';
+import { parseApiPriceTable, quoteApiTokenCost } from './api-cost.mjs';
 
-export const API_COST_EVENTS_FILE = 'api-cost-events.jsonl';
-const VALID_MODEL = /^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/;
-const FIELDS = ['schema', 'observed_at', 'provider', 'model', 'workflow',
-  'requests', 'status', 'estimated_usd', 'input_tokens', 'output_tokens'];
-const PROVIDERS = new Set(['openai', 'anthropic']);
-const FLOWS = new Set(['screening-digest', 'regulatory-watch']);
-const STATUSES = new Set(['priced', 'unknown_reserved', 'blocked']);
-
-export function validateApiCostEvent(event) {
-  if (!event || typeof event !== 'object' || Array.isArray(event) ||
-      Object.keys(event).sort().join('|') !== [...FIELDS].sort().join('|')) return false;
-  if (event.schema !== 1 || !PROVIDERS.has(event.provider) ||
-      !FLOWS.has(event.workflow) || !STATUSES.has(event.status) ||
-      typeof event.model !== 'string' || !VALID_MODEL.test(event.model) ||
-      typeof event.observed_at !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(event.observed_at) ||
-      !Number.isFinite(Date.parse(event.observed_at)) ||
-      !Number.isSafeInteger(event.requests) || event.requests < 0 ||
-      event.requests > 1000 ||
-      !Number.isSafeInteger(event.input_tokens) || event.input_tokens < 0 ||
-      !Number.isSafeInteger(event.output_tokens) || event.output_tokens < 0) return false;
-  const priced = event.status !== 'blocked';
-  return priced
-    ? parseUsdMicro(event.estimated_usd) !== null && event.requests > 0
-    : event.estimated_usd === null;
+const HASH = /^[a-f0-9]{64}$/;
+const LABEL = /^[A-Za-z0-9._-]{1,64}$/;
+const MODEL = /^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/;
+const FIELDS = ['receipt_hash', 'recorded_at', 'provider', 'model', 'workflow', 'usage'];
+const MICRO = 1000000n;
+function validEvent(e) {
+  if (!e || typeof e !== 'object' || Array.isArray(e) ||
+      Object.keys(e).sort().join('|') !== [...FIELDS].sort().join('|') ||
+      typeof e.receipt_hash !== 'string' || !HASH.test(e.receipt_hash) ||
+      typeof e.workflow !== 'string' || !LABEL.test(e.workflow) ||
+      typeof e.model !== 'string' || !MODEL.test(e.model) ||
+      !['openai', 'anthropic'].includes(e.provider) ||
+      typeof e.recorded_at !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(e.recorded_at) ||
+      !Number.isFinite(Date.parse(e.recorded_at)) ||
+      new Date(e.recorded_at).toISOString().slice(0, 10) !== e.recorded_at.slice(0, 10) ||
+      !e.usage || typeof e.usage !== 'object' || Array.isArray(e.usage)) return false;
+  const keys = e.provider === 'openai' ?
+    ['input_tokens', 'output_tokens', 'cached_input_tokens'] :
+    ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'];
+  return Object.keys(e.usage).sort().join('|') === [...keys].sort().join('|') &&
+    keys.every(key => Number.isSafeInteger(e.usage[key]) && e.usage[key] >= 0);
 }
-
-export function appendApiCostEvent(event) {
-  if (!validateApiCostEvent(event)) {
-    return { ok: false, reason: 'invalid_nonidentifying_cost_event' };
-  }
-  // Fixed path, owner-only permissions, validated exact schema. Never accept
-  // a client-provided path or freeform metadata as a log field.
-  appendFileSync(API_COST_EVENTS_FILE, JSON.stringify(event) + '\n', {
-    encoding: 'utf8', mode: 0o600, flag: 'a',
-  });
-  return { ok: true };
+function usd(m) {
+  return (m / MICRO).toString() + '.' + (m % MICRO).toString().padStart(6, '0');
 }
-
-export function parseApiCostEvents(text) {
-  if (typeof text !== 'string' || text.length > 256000)
-    return { ok: false, reason: 'cost_telemetry_missing_or_oversized' };
-  if (!text.trim()) return { ok: true, events: [] };
-  const lines = text.trimEnd().split('\n');
-  if (lines.length > 2000 || lines.some(line => line.length > 2000)) {
-    return { ok: false, reason: 'cost_telemetry_missing_or_oversized' };
+export function buildApiCostDashboard(ledger, priceTable, options = {}) {
+  if (!ledger || typeof ledger !== 'object' || Array.isArray(ledger) ||
+      ledger.schema !== 1 || !Array.isArray(ledger.records) ||
+      ledger.records.length > 5000) {
+    return { status: 'incomplete', reason: 'missing_or_invalid_usage_ledger' };
   }
-  const events = [];
-  try {
-    for (const line of lines) {
-      const event = JSON.parse(line);
-      if (!validateApiCostEvent(event)) {
-        return { ok: false, reason: 'cost_event_schema_invalid' };
-      }
-      events.push(event);
+  const seen = new Map(), providers = new Map(), workflows = new Map(), days = new Map();
+  let rejected = 0, unpriced = 0, duplicate = 0, collisions = 0, priced = 0;
+  let total = 0n;
+  for (const e of ledger.records) {
+    if (!validEvent(e)) { rejected++; continue; }
+    const canonical = JSON.stringify(e);
+    if (seen.has(e.receipt_hash)) {
+      if (seen.get(e.receipt_hash) !== canonical) collisions++;
+      else duplicate++;
+      continue;
     }
-    return { ok: true, events };
-  } catch {
-    return { ok: false, reason: 'cost_event_schema_invalid' };
+    seen.set(e.receipt_hash, canonical);
+    const quote = quoteApiTokenCost(priceTable, e, options);
+    if (quote.status !== 'priced') { unpriced++; continue; }
+    const micro = BigInt(quote.micro_usd);
+    total += micro;
+    priced++;
+    for (const [map, key] of [
+      [providers, e.provider], [workflows, e.workflow], [days, e.recorded_at.slice(0, 10)]
+    ]) map.set(key, (map.get(key) || 0n) + micro);
   }
+  const complete = rejected === 0 && unpriced === 0 && collisions === 0 &&
+    ledger.records.length > 0;
+  const rows = map => [...map].sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([name, amount]) => ({ name, estimated_usd: usd(amount) }));
+  return {
+    status: complete ? 'priced_estimate' : 'incomplete',
+    currency: 'USD', estimated_usd_of_priced_usage: usd(total),
+    priced, unpriced, rejected, duplicate, collisions,
+    total_input_records: ledger.records.length,
+    by_provider: rows(providers), by_workflow: rows(workflows), by_utc_day: rows(days),
+    note: 'Usage-based estimate only, not invoiced charges. Unpriced or invalid events make this incomplete.'
+  };
 }
-
-function usd(micro) {
-  return (micro / 1000000n).toString() + '.' +
-    (micro % 1000000n).toString().padStart(6, '0');
-}
-
-export function summarizeApiCostEvents(events) {
-  if (!Array.isArray(events) || events.some(e => !validateApiCostEvent(e))) {
-    return { ok: false, reason: 'invalid_cost_telemetry' };
+export function renderApiCostDashboard(result) {
+  if (!result || !['priced_estimate', 'incomplete'].includes(result.status)) {
+    return '# API cost dashboard\n\nUnavailable: no verified usage summary.\n';
   }
-  const groups = new Map();
-  for (const e of events) {
-    const key = e.provider + '|' + e.model + '|' + e.workflow;
-    let row = groups.get(key);
-    if (!row) {
-      row = { provider: e.provider, model: e.model, workflow: e.workflow,
-        requests: 0, observed_events: 0, priced: 0n, unknown: 0n, blocked: 0 };
-      groups.set(key, row);
+  const output = ['# API cost dashboard', '', '**Estimate only, not a provider invoice.**', '',
+    'Coverage: **' + (result.status === 'priced_estimate' ? 'Complete for supplied records' : 'INCOMPLETE') + '**',
+    '', 'Estimated total from priced events: **$' + result.estimated_usd_of_priced_usage + ' USD**',
+    '', 'Events: priced ' + result.priced + ', unpriced ' + result.unpriced +
+       ', invalid ' + result.rejected + ', duplicates ' + result.duplicate +
+       ', collisions ' + result.collisions + '.', '',
+    '## By provider', '', '| Provider | Estimated USD |', '| --- | ---: |'];
+  for (const row of result.by_provider || []) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
+  output.push('', '## By workflow', '', '| Workflow | Estimated USD |', '| --- | ---: |');
+  for (const row of result.by_workflow || []) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
+  output.push('', '## By UTC day', '', '| Day | Estimated USD |', '| --- | ---: |');
+  for (const row of result.by_utc_day || []) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
+  output.push('', 'No prompts, customer identifiers, API keys or response bodies are displayed.');
+  return output.join('\n') + '\n';
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const args = process.argv.slice(2);
+  if (args.length !== 4 || args[0] !== '--ledger' || args[2] !== '--prices') {
+    console.error('Usage: node scripts/api-cost-dashboard.mjs --ledger <sanitized.json> --prices <verified-prices.json>');
+    process.exitCode = 2;
+  } else {
+    try {
+      const raw = readFileSync(args[1], 'utf8');
+      if (raw.length > 2_000_000) throw new Error('usage file too large');
+      const prices = parseApiPriceTable(readFileSync(args[3], 'utf8'));
+      const result = buildApiCostDashboard(JSON.parse(raw), prices.ok ? prices.table : null);
+      const output = renderApiCostDashboard(result);
+      console.log(output);
+      if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, output);
+      if (result.status !== 'priced_estimate') process.exitCode = 1;
+    } catch {
+      console.error('API dashboard unavailable: invalid or missing sanitized evidence');
+      process.exitCode = 1;
     }
-    row.requests += e.requests;
-    row.observed_events++;
-    if (e.status === 'priced') row.priced += parseUsdMicro(e.estimated_usd);
-    else if (e.status === 'unknown_reserved') row.unknown += parseUsdMicro(e.estimated_usd);
-    else row.blocked++;
   }
-  const rows = [...groups.values()].sort((a,b) =>
-    (a.provider+a.model+a.workflow).localeCompare(b.provider+b.model+b.workflow))
-    .map(row => ({
-      provider: row.provider, model: row.model, workflow: row.workflow,
-      requests: row.requests, observed_events: row.observed_events,
-      priced_estimate_usd: usd(row.priced),
-      unknown_usage_reserved_usd: usd(row.unknown),
-      blocked_events: row.blocked,
-    }));
-  return { ok: true, rows, observed_events: events.length,
-    requests: rows.reduce((n, x) => n + x.requests, 0),
-    // Totals kept separate because unknown-usage reservations are NOT invoices.
-    priced_estimate_usd: usd([...groups.values()].reduce((n,x)=>n+x.priced,0n)),
-    unknown_usage_reserved_usd: usd([...groups.values()].reduce((n,x)=>n+x.unknown,0n)),
-    blocked_events: rows.reduce((n,x)=>n+x.blocked_events,0) };
 }
-
-export function renderApiCostDashboard(summary) {
-  if (!summary || summary.ok !== true) {
-    return '# API cost dashboard\n\nTelemetry invalid or unavailable; costs are UNKNOWN, not zero.\n';
-  }
-  const intro = ['# API Cost Dashboard', '',
-    'Estimated USD from operator-verified model rates. These are not provider invoices or current account balances.',
-    '',
-    'Observed events: ' + summary.observed_events +
-      ', paid requests: ' + summary.requests +
-      ', blocked events: ' + summary.blocked_events + '.',
-    'Priced usage estimate: $' + summary.priced_estimate_usd +
-      '. Unknown-usage reservations: $' + summary.unknown_usage_reserved_usd + '.',
-    '', '| Provider | Model | Workflow | Paid calls | Priced estimate (USD) | Unknown usage reserved (USD) | Blocked |',
-    '| --- | --- | --- | ---: | ---: | ---: | ---: |'];
-  for (const row of summary.rows) {
-    intro.push('| ' + [row.provider, row.model, row.workflow,
-      row.requests, row.priced_estimate_usd,
-      row.unknown_usage_reserved_usd, row.blocked_events].join(' | ') + ' |');
-  }
-  intro.push('', 'Missing telemetry is not evidence of zero spending. Compare with provider invoices and independently maintained spending limits.', '');
-  return intro.join('\n');
-}
-
-function main() {
-  let summary;
-  try {
-    const parsed = parseApiCostEvents(existsSync(API_COST_EVENTS_FILE)
-      ? readFileSync(API_COST_EVENTS_FILE, 'utf8') : '');
-    summary = parsed.ok ? summarizeApiCostEvents(parsed.events) : parsed;
-  } catch {
-    summary = { ok: false };
-  }
-  const markdown = renderApiCostDashboard(summary);
-  console.log(markdown);
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown, 'utf8');
-  }
-  if (!summary.ok) process.exitCode = 1;
-}
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) main();
