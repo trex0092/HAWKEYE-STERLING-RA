@@ -265,6 +265,31 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const stale = checkStored({ ...ok, generatedAt: '2026-09-20T00:00:00.000Z' },
     { nowMs, maxAgeHours: 36 });
   check('stored runtime assurance fails closed when evidence is stale', !stale.ok);
+
+  const futureAssurance = checkStored({ ...ok, generatedAt: '2026-12-28T00:00:00.000Z' },
+    { nowMs, maxAgeHours: 36 });
+  check('stored runtime assurance rejects a future-dated record instead of treating it as fresh',
+    !futureAssurance.ok && futureAssurance.reasons.some(r => r.includes('future')));
+  const futurePep = assessRuntime({ results, pepDataset: { ...pep, harvested: '2026-12-28T00:00:00.000Z' },
+    contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance rejects a PEP artifact whose harvest date is in the future',
+    !futurePep.domains.pep.operational && futurePep.domains.pep.reasons.some(r => r.includes('future')));
+  check('stored runtime assurance enforces the top-level operational verdict',
+    !checkStored({ ...ok, operational: false }, { nowMs }).ok);
+  const noRequiredContract = structuredClone(contract);
+  noRequiredContract.domains.sanctions.sources = [];
+  const emptyContractVerdict = assessRuntime({ results, pepDataset: pep, contract: noRequiredContract,
+    nowMs, expectedAdverseMatrix: 79 });
+  check('a sanctions contract without any required sources cannot be marked operational',
+    !emptyContractVerdict.domains.sanctions.operational
+    && emptyContractVerdict.domains.sanctions.reasons.some(r => r.includes('no required sources')));
+  const missingPepHarvest = structuredClone(results);
+  delete missingPepHarvest.enrichment.pepWorldwide.harvested;
+  const missingHarvestVerdict = assessRuntime({ results: missingPepHarvest, pepDataset: pep,
+    contract, nowMs, expectedAdverseMatrix: 79 });
+  check('daily PEP evidence must identify the exact harvest consumed by screening',
+    !missingHarvestVerdict.domains.pep.operational
+    && missingHarvestVerdict.domains.pep.reasons.some(r => r.includes('did not identify')));
 }
 
 /* FATF black/grey lists: data/fatf-assessments.json (the assessment text),

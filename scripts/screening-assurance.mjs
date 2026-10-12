@@ -38,8 +38,11 @@ const arr = v => Array.isArray(v) ? v : [];
 
 function ageHours(iso, nowMs) {
   const t = Date.parse(String(iso || ''));
-  return Number.isFinite(t) ? Math.max(0, (nowMs - t) / 3600000) : Infinity;
+  // Preserve negative ages so a future-dated assurance record cannot be
+  // silently interpreted as newly generated. Allow only minor clock skew.
+  return Number.isFinite(t) ? (nowMs - t) / 3600000 : Infinity;
 }
+const MAX_FUTURE_SKEW_HOURS = 5 / 60;
 
 function domain(ok, reasons, evidence, warnings = []) {
   return { operational: !!ok, reasons: reasons.filter(Boolean), warnings: warnings.filter(Boolean), evidence };
@@ -77,6 +80,7 @@ export function assessRuntime({
   const partialRequired = unresolvedRequired.filter(id => loadedById.get(id)?.partial === true);
   const emptyRequired = unresolvedRequired.filter(id => num(loadedById.get(id)?.count) <= 0);
   const sanctionsReasons = [];
+  if (!requiredSanctions.length) sanctionsReasons.push('sanctions contract defines no required sources');
   const sanctionsWarnings = servedByFallback.map(x => 'required sanctions source ' + x.id
     + ' did not load completely - screened via its declared fallback ' + x.fallback
     + ' (' + x.fallbackCount + ' names)');
@@ -168,13 +172,15 @@ export function assessRuntime({
   if (!pepDataset || typeof pepDataset !== 'object') pepReasons.push('worldwide PEP artifact is missing');
   if (pepRun.active !== true) pepReasons.push('daily screen did not load the worldwide PEP artifact');
   if (num(pepRun.count) !== pepCount) pepReasons.push('daily screen PEP count does not match the harvested artifact');
-  if (pepRun.harvested && pepDataset?.harvested && pepRun.harvested !== pepDataset.harvested) {
+  if (!pepRun.harvested) pepReasons.push('daily screen did not identify the consumed PEP harvest');
+  else if (pepDataset?.harvested && pepRun.harvested !== pepDataset.harvested) {
     pepReasons.push('daily screen consumed a different PEP harvest than the assurance artifact');
   }
   if (pepRun.partial === true) pepReasons.push('daily screen reports the worldwide PEP layer as partial');
   if (pepCount < PEP_FLOOR) pepReasons.push('worldwide PEP artifact below floor: ' + pepCount + ' < ' + PEP_FLOOR);
   if (pepDataset?.partial === true) pepReasons.push('worldwide PEP artifact is partial' + (pepExpected ? ': ' + pepCount + '/' + pepExpected : ''));
   if (!Number.isFinite(pepAge)) pepReasons.push('worldwide PEP artifact has no valid harvest timestamp');
+  else if (pepAge < -MAX_FUTURE_SKEW_HOURS) pepReasons.push('worldwide PEP artifact harvest timestamp is in the future');
   else if (pepAge > pepMaxAgeHours) pepReasons.push('worldwide PEP artifact is stale: ' + Math.round(pepAge) + 'h > ' + pepMaxAgeHours + 'h');
 
   /* The complete worldwide artifact is the operative PEP screening layer: it
@@ -252,8 +258,10 @@ export function writeAssurance(assurance) {
 export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAULT_ASSURANCE_MAX_AGE_HOURS } = {}) {
   const reasons = [];
   if (!assurance || assurance.version !== 1) reasons.push('assurance artifact missing or invalid');
+  if (assurance?.operational !== true) reasons.push('overall screening assurance is not operational');
   const age = ageHours(assurance?.generatedAt, nowMs);
   if (!Number.isFinite(age)) reasons.push('assurance timestamp missing or invalid');
+  else if (age < -MAX_FUTURE_SKEW_HOURS) reasons.push('assurance timestamp is in the future');
   else if (age > maxAgeHours) reasons.push('assurance evidence is stale: ' + Math.round(age) + 'h > ' + maxAgeHours + 'h');
   for (const key of ['sanctions','adverseMedia','pep']) {
     if (assurance?.domains?.[key]?.operational !== true) reasons.push(key + ' is not operational');
