@@ -19,11 +19,17 @@ import {
   manualDraftSection, approvedWatchSource, approvedWatchSourceDetails,
   deferredDraftCause, providerStopReason, usageCounts
 } from './reg-draft-budget.mjs';
+import { makeApiUsdBudget } from './api-cost-budget.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
 const OUT_DIR = 'docs/research/auto';
 const BUDGET = draftBudget(process.env);
+const USD_GUARD = makeApiUsdBudget({
+  provider: 'anthropic', model: MODEL,
+  priceTableJson: process.env.API_USD_RATES_JSON,
+  limitUsd: process.env.REG_DRAFT_MAX_USD_PER_RUN,
+});
 const APPROVED_SOURCES = JSON.parse(readFileSync(new URL('../data/reg-sources.json', import.meta.url), 'utf8')).sources;
 
 function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection-only PR).'); process.exit(0); }
@@ -146,6 +152,22 @@ async function draftFor(c) {
     '(HIGH = new/changed obligations, thresholds, instruments or deadlines; MEDIUM = substantive update worth review; LOW = routine site churn.)'
   ].join('\n');
 
+  // When pricing or a USD cap is absent, retain a manual-review entry for
+  // every changed source without sending any paid request.
+  const hold = USD_GUARD.preflight({
+    inputBytes: Buffer.byteLength(prompt, 'utf8'), maxOutputTokens: BUDGET.maxTokens,
+  });
+  if (!hold.ok) {
+    const why = USD_GUARD.ready ? 'API USD budget exhausted' : 'API USD budget unavailable';
+    return { text: manualDraftSection(c, why), ok: false, attempted: false,
+      halt: true, haltReason: why };
+  }
+  let settled = false;
+  const settle = usage => {
+    if (settled) return null;
+    settled = true;
+    return USD_GUARD.settle(hold.id, usage);
+  };
   /* Bound each paid request, including the time spent reading the response.
      Never retry blindly: a 429/quota failure would repeat for every source. */
   const ctrl = new AbortController();
@@ -169,6 +191,7 @@ async function draftFor(c) {
         halt: true, haltReason: reason };
     }
     const data = await res.json();
+    settle(data && data.usage);
     const text = ((data && Array.isArray(data.content)) ? data.content : [])
       .filter(b => b && b.type === 'text' && typeof b.text === 'string')
       .map(b => b.text).join('\n').trim();
@@ -187,6 +210,7 @@ async function draftFor(c) {
       haltReason: 'provider timeout or network failure'
     };
   } finally {
+    if (!settled) settle(null); // unknown provider usage consumes the full hold
     clearTimeout(timer);
   }
 }
@@ -226,7 +250,9 @@ for (const c of changes) {
 console.log('reg-draft: provider calls=' + apiCalls + '/' + BUDGET.maxCalls +
   ' successful=' + successful + ' manual-review=' + deferred +
   ' tokens=input:' + usageTotal.input + ',output:' + usageTotal.output +
-  ',cacheRead:' + usageTotal.cacheRead + ',cacheWrite:' + usageTotal.cacheWrite);
+  ',cacheRead:' + usageTotal.cacheRead + ',cacheWrite:' + usageTotal.cacheWrite +
+  ' estimated_usd=' + (USD_GUARD.snapshot().estimated_committed_usd || 'unpriced') +
+  ' configured_cap_usd=' + (USD_GUARD.snapshot().limit_usd || 'missing'));
 
 /* Persist the (possibly AI-refined) severities so the Asana notify step —
    which runs after this one — renders the final triage labels. */

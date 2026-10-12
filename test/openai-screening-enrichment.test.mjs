@@ -6,8 +6,17 @@ import {
   boundedInt, safeOpenAIError, safeUsage,
   screeningEvidence, prioritySampleAlerts, isHealthyCleanRun, adaptiveOutputTokens,
   REQUIRED_NOTE_SECTIONS, validateAnalystNote, buildEnrichmentPrompt, evidenceJsonWithinBudget,
-  extractResponseText, enrichScreeningResults
+  extractResponseText, enrichScreeningResults as actualEnrichScreeningResults
 } from '../scripts/openai-screening-enrichment.mjs';
+const TEST_PRICE_TABLE = JSON.stringify({ schema: 1, models: [{
+  provider: 'openai', model: 'gpt-6-luna', verified_on: '2026-10-10',
+  source_url: 'https://platform.openai.com/docs/pricing',
+  usd_per_million: { input: '2.00', cached_input: '0.50', output: '8.00' },
+}] });
+const enrichScreeningResults = (results, opts = {}) =>
+  actualEnrichScreeningResults(results, {
+    apiPriceTableJson: TEST_PRICE_TABLE, maxUsdPerCall: '1.000000', ...opts,
+  });
 
 let passed = 0, failed = 0;
 function check(label, condition) {
@@ -342,6 +351,34 @@ const invalidModel=await enrichScreeningResults(fixture,{
 check('invalid model settings fail closed before an API request',
   invalidModel.text==='' && invalidModel.error.includes('model configuration invalid') &&
   called===0);
+
+let noBudgetApiCalls = 0;
+const noBudget = await actualEnrichScreeningResults(fixture, {
+  enabled: true, apiKey: 'SYNTHETIC_PROVIDER_KEY',
+  apiPriceTableJson: TEST_PRICE_TABLE, maxUsdPerCall: undefined,
+  fetchImpl: async () => { noBudgetApiCalls++; },
+});
+check('paid OpenAI calls fail closed when an approved USD cap is missing',
+  noBudget.text === '' && noBudget.cost_control.allowed === false && noBudgetApiCalls === 0);
+const noPrice = await actualEnrichScreeningResults(fixture, {
+  enabled: true, apiKey: 'SYNTHETIC_PROVIDER_KEY',
+  apiPriceTableJson: '', maxUsdPerCall: '9.00',
+  fetchImpl: async () => { noBudgetApiCalls++; },
+});
+check('paid OpenAI calls fail closed if model pricing is unknown',
+  noPrice.cost_control.allowed === false && noBudgetApiCalls === 0);
+const tooLittle = await actualEnrichScreeningResults(fixture, {
+  enabled: true, apiKey: 'SYNTHETIC_PROVIDER_KEY',
+  apiPriceTableJson: TEST_PRICE_TABLE, maxUsdPerCall: '0.000001',
+  fetchImpl: async () => { noBudgetApiCalls++; },
+});
+check('request above hard preflight USD cap never reaches the provider',
+  tooLittle.text === '' && tooLittle.cost_control.reason.includes('exhausted') &&
+  noBudgetApiCalls === 0);
+check('successful OpenAI usage exposes a priced estimate distinct from provider invoice',
+  ok.cost_estimate.status === 'priced' &&
+  ok.cost_estimate.usd === '0.000760' &&
+  ok.cost_estimate.reservation_usd !== '0.000000');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
