@@ -99,6 +99,23 @@ for (const f of files) {
   }
 }
 
+/* A historical gitleaks alert may involve documented, publicly shareable
+ * Asana object IDs rather than authentication tokens. Only those two exact
+ * historical IDs and one clearly instructional key placeholder are exempted.
+ * A whole-file exemption would allow later REAL secrets to go undetected. */
+{
+  const gitleaks = readFileSync('.gitleaks.toml', 'utf8');
+  const exactIds = ['1218785568483509', '1218452114962158'];
+  check('historical Asana IDs are exempted by exact value only, not by source file',
+    exactIds.every(id => gitleaks.includes("'''" + id + "'''")) &&
+    !gitleaks.includes("'''screen\\.py'''") &&
+    !gitleaks.includes("'''\\.github/workflows/"));
+  check('instructional Composio placeholder has narrow, non-secret wording exemption',
+    gitleaks.includes("'''<?project API key>?'''") &&
+    !gitleaks.includes("'''COMPOSIO_API_KEY'''") &&
+    !gitleaks.includes("'''docs/composio-integration"));
+}
+
 /* The exceptions table itself must stay honest: no empty reasons. */
 for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
   check(`exception ${id} carries a quoted reason`, typeof reason === 'string' && reason.trim().length > 10);
