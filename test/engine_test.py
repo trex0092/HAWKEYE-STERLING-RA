@@ -6333,6 +6333,46 @@ with tempfile.TemporaryDirectory() as d:
           lambda: txn_feed.validate_batch([{**sample[0], "amount": float("nan")}], manifest)))
     check("out-of-window transaction rejected", _txnfeed_error(
           lambda: txn_feed.validate_batch([{**sample[0], "date": "2026-10-02"}], manifest)))
+
+    # JSON parsers usually use the last occurrence of a duplicate key. The
+    # completeness manifest and the AML amount must have a single meaning.
+    dup_feed = raw.replace(b'"amount": 100.0', b'"amount": 0, "amount": 100.0')
+    with open(feed_file, "wb") as f:
+        f.write(dup_feed)
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        json.dump({**manifest, "sha256": hashlib.sha256(dup_feed).hexdigest()}, f)
+    check("duplicate amount key rejected even when the manifest digest matches",
+          dup_feed != raw and _txnfeed_error(
+              lambda: txn_feed.read_validated_feed(feed_file, manifest_file)))
+
+    with open(feed_file, "wb") as f:
+        f.write(raw)
+    ambiguous_manifest = json.dumps(manifest).replace(
+        '"complete": true', '"complete": false, "complete": true')
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        f.write(ambiguous_manifest)
+    check("duplicate manifest complete flag is rejected, regardless of last value",
+          ambiguous_manifest != json.dumps(manifest) and _txnfeed_error(
+              lambda: txn_feed.read_validated_feed(feed_file, manifest_file)))
+
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        json.dump(manifest, f)
+
+    _original_read = txn_feed._json_bytes
+    _manifest_reads = []
+    def _audit_json_read(path, limit):
+        _manifest_reads.append(path)
+        return _original_read(path, limit)
+    try:
+        txn_feed._json_bytes = _audit_json_read
+        _summary = txn_feed.validation_summary(feed_file, manifest_file)
+        check("transaction preflight metadata comes from the single validated manifest snapshot",
+              _manifest_reads == [feed_file, manifest_file]
+              and _summary["sha256"] == manifest["sha256"]
+              and _summary["source_id"] == manifest["source_id"])
+    finally:
+        txn_feed._json_bytes = _original_read
+
     with open(feed_file, "wb") as f:
         f.write(raw + b" ")
     check("tampered raw export rejected by SHA-256 digest", _txnfeed_error(

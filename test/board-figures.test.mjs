@@ -106,11 +106,11 @@ console.log('\n— runtime worldwide screening assurance —\n');
     domains: {
       sanctions: {
         sources: [
-          { id: 'un-consolidated', required: true },
-          { id: 'ofac-sdn', required: true },
-          { id: 'ofac-consolidated', required: true },
-          { id: 'uk-ofsi', required: true },
-          { id: 'eu-fsf', required: true, fallbackSourceId: 'fr-dgt' },
+          { id: 'un-consolidated', required: true, minNames: 500 },
+          { id: 'ofac-sdn', required: true, minNames: 9000 },
+          { id: 'ofac-consolidated', required: true, minNames: 100 },
+          { id: 'uk-ofsi', required: true, minNames: 9000 },
+          { id: 'eu-fsf', required: true, minNames: 20000, fallbackSourceId: 'fr-dgt', fallbackMinNames: 9800 },
         ],
       },
     },
@@ -143,12 +143,38 @@ console.log('\n— runtime worldwide screening assurance —\n');
     },
   };
   const pep = {
-    count: 50000, harvested: '2026-09-27T00:00:00.000Z', entries: [],
+    count: 50000, harvested: '2026-09-27T00:00:00.000Z', entries: Array(50000).fill({ synthetic: true }),
   };
   const nowMs = Date.parse('2026-09-28T00:00:00.000Z');
   const ok = assessRuntime({ results, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
   check('runtime assurance passes only when all three domains have complete current evidence',
     ok.operational && ok.domains.sanctions.operational && ok.domains.adverseMedia.operational && ok.domains.pep.operational);
+
+  const missingAdverseErrorCount = structuredClone(results);
+  delete missingAdverseErrorCount.enrichment.amErrors;
+  const mac = assessRuntime({ results: missingAdverseErrorCount, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('missing adverse-media error counts cannot be silently converted to zero',
+    !mac.domains.adverseMedia.operational && mac.domains.adverseMedia.reasons.some(r => r.includes('amErrors')));
+  const stringAdverseErrorCount = structuredClone(results);
+  stringAdverseErrorCount.enrichment.amErrors = '0';
+  check('a string zero is not valid adverse-media coverage evidence',
+    !assessRuntime({ results: stringAdverseErrorCount, pepDataset: pep, contract, nowMs,
+      expectedAdverseMatrix: 79 }).domains.adverseMedia.operational);
+  const nonBooleanPartial = structuredClone(results);
+  nonBooleanPartial.lists[0].partial = 'false';
+  check('non-boolean partial flags never certify complete sanctions sources',
+    !assessRuntime({ results: nonBooleanPartial, pepDataset: pep, contract, nowMs,
+      expectedAdverseMatrix: 79 }).domains.sanctions.operational);
+  const stringSubjectCount = structuredClone(results);
+  stringSubjectCount.screened = '12';
+  const cnt = assessRuntime({ results: stringSubjectCount, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('all three runtime domains reject non-numeric subject count evidence',
+    Object.values(cnt.domains).every(d => !d.operational && d.reasons.some(r => r.includes('subject count'))));
+  const missingPepCompleteness = structuredClone(results);
+  delete missingPepCompleteness.enrichment.pepWorldwide.partial;
+  check('missing PEP completeness status cannot yield an operational PEP verdict',
+    !assessRuntime({ results: missingPepCompleteness, pepDataset: pep, contract, nowMs,
+      expectedAdverseMatrix: 79 }).domains.pep.operational);
 
   const noBackboneCounts = structuredClone(results);
   delete noBackboneCounts.enrichment.amBackboneFailures;
@@ -162,6 +188,20 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance rejects a backbone summary that contradicts zero-failure counters',
     !cb.domains.adverseMedia.operational
     && cb.domains.adverseMedia.reasons.some(r => r.includes('contradicts')));
+  const truncatedPepEntries = assessRuntime({
+    results, pepDataset: { ...pep, entries: pep.entries.slice(0, 1000), partial: false },
+    contract, nowMs, expectedAdverseMatrix: 79,
+  });
+  check('PEP assurance detects a truncated person array even when its count header is unchanged',
+    !truncatedPepEntries.domains.pep.operational
+    && truncatedPepEntries.domains.pep.reasons.some(r => r.includes('actual entries')));
+  const missingPepEntries = assessRuntime({
+    results, pepDataset: { ...pep, entries: undefined },
+    contract, nowMs, expectedAdverseMatrix: 79,
+  });
+  check('PEP assurance rejects missing member records instead of trusting a count header',
+    !missingPepEntries.domains.pep.operational);
+
   const incompletePep = assessRuntime({
     results, pepDataset: { ...pep, expected: pep.count + 1, partial: false },
     contract, nowMs, expectedAdverseMatrix: 79,
@@ -169,6 +209,33 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('PEP expected-population shortfalls cannot be hidden by a false partial flag',
     !incompletePep.domains.pep.operational
     && incompletePep.domains.pep.reasons.some(r => r.includes('below its declared expected population')));
+
+  const underfloor = structuredClone(results);
+  underfloor.lists = underfloor.lists.map(x => x.id === 'ofac-sdn' ? { ...x, count: 100, partial: false } : x);
+  const floorFail = assessRuntime({ results: underfloor, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('a truncated required list cannot be accepted as complete merely because partial is false',
+    !floorFail.domains.sanctions.operational
+    && floorFail.domains.sanctions.reasons.some(r => r.includes('coverage floor') && r.includes('ofac-sdn')));
+  const underfloorFallback = structuredClone(results);
+  underfloorFallback.lists = underfloorFallback.lists.filter(x => x.id !== 'eu-fsf');
+  underfloorFallback.lists.push({ id: 'fr-dgt', count: 1200, partial: false });
+  const fbFloorFail = assessRuntime({ results: underfloorFallback, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('a small fallback never certifies an unavailable required sanctions source',
+    !fbFloorFail.domains.sanctions.operational && fbFloorFail.domains.sanctions.evidence.servedByFallback.length === 0);
+  const duplicateSource = structuredClone(results);
+  duplicateSource.lists.push({ id: 'ofac-sdn', count: 10000, partial: false });
+  const dupFail = assessRuntime({ results: duplicateSource, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('duplicate sanctions source records cannot masquerade as one complete list',
+    !dupFail.domains.sanctions.operational && dupFail.domains.sanctions.reasons.some(r => r.includes('duplicate sanctions source')));
+  const badContract = structuredClone(contract);
+  delete badContract.domains.sanctions.sources[0].minNames;
+  const badFloor = assessRuntime({ results, pepDataset: pep, contract: badContract, nowMs, expectedAdverseMatrix: 79 });
+  check('missing contract coverage floors never yield an operational result',
+    !badFloor.domains.sanctions.operational && badFloor.domains.sanctions.reasons.some(r => r.includes('floors absent')));
+  const badCount = structuredClone(results);
+  badCount.lists[0].count = '1000';
+  check('non-integer string source counts are not accepted as evidence of full load',
+    !assessRuntime({ results: badCount, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 }).domains.sanctions.operational);
 
   const noOfac = structuredClone(results);
   noOfac.lists = noOfac.lists.filter(x => x.id !== 'ofac-sdn');
