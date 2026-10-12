@@ -3,6 +3,8 @@
    review-currency check, suite roll-up, GovernanceScore, task naming and the
    report body. No network. */
 import { readFileSync } from 'node:fs';
+import { SCHEMA, ZERO_HASH, sealEvidenceReceipt, verifyEvidenceReceipts }
+  from '../scripts/evidence-receipts.mjs';
 import {
   CONTROL_GROUPS, classifyRun, classifyRegisterReview, summarise, addRow,
   governanceScore, previousScore, buildTaskName, buildReportNotes, dateLabel
@@ -145,6 +147,32 @@ check('governance mapping cites ISO 42001, NIST AI RMF and FATF R.15',
   notes.includes('ISO/IEC 42001') && notes.includes('NIST AI RMF') && notes.includes('FATF R.15'));
 check('report keeps the human-in-the-loop line',
   notes.includes('Detection is automatic; remediation stays a reviewed decision.'));
+
+/* ── External audit-receipt anchors (offline, synthetic evidence only) ── */
+const auditKey = 'synthetic-governance-receipt-secret-0123456789012345';
+const auditReceipt = sealEvidenceReceipt({
+  schema: SCHEMA, sequence: 1, case_ref: 'CASE-ABCDEF',
+  event_time: '2026-10-12T08:00:00.000Z',
+  actor_ref: 'actor:synthetic-01', actor_role: 'Analyst',
+  action: 'REVIEW_REQUESTED', outcome: 'REVIEW_REQUIRED',
+  evidence_hashes: ['a'.repeat(64)], review_receipt_hash: null, prev_hash: ZERO_HASH,
+}, auditKey);
+check('valid anchored evidence receipt remains verifiable',
+  verifyEvidenceReceipts([auditReceipt], auditKey,
+    { expectedHeadHash: auditReceipt.hash, expectedCount: 1 }).valid);
+check('an explicitly empty, null or invalid external head cannot bypass audit anchoring',
+  ['', null, false, 0, undefined].every(head =>
+    verifyEvidenceReceipts([auditReceipt], auditKey, { expectedHeadHash: head })
+      .reason === 'external_anchor_mismatch'));
+check('an explicitly undefined or nonnumeric expected count cannot bypass the count anchor',
+  [undefined, null, '1', true].every(count =>
+    verifyEvidenceReceipts([auditReceipt], auditKey, { expectedCount: count })
+      .reason === 'external_count_mismatch'));
+check('malformed external anchor options cannot certify a receipt chain',
+  [null, [], 'invalid'].every(options =>
+    !verifyEvidenceReceipts([auditReceipt], auditKey, options).valid));
+check('standalone local receipt verification still flags its lack of an external anchor',
+  verifyEvidenceReceipts([auditReceipt], auditKey).valid === true);
 
 /* ── date label ── */
 check('dateLabel renders a UTC date as D Mon YYYY', dateLabel(new Date(Date.UTC(2026, 6, 2))) === '2 Jul 2026');
