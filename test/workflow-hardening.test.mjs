@@ -1,3 +1,4 @@
+import { decideUniqueDispatch, dispatchOnce } from '../scripts/github-workflow-dispatch-guard.mjs';
 /* Workflow-hardening ratchet — the 2026-08-05 full-estate audit found every
    deviation documented in-file; this guard FREEZES that state so a future
    workflow (or edit) cannot regress it silently. Line-based checks (no YAML
@@ -284,5 +285,60 @@ for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
     pinnedAll.length === 0);
 }
 
+
+const dedupeNow = Date.parse('2026-10-12T12:00:00Z');
+const dedupeRun = (patch={}) => ({
+  id: 100, head_branch: 'main', event: 'workflow_dispatch',
+  status: 'completed', conclusion: 'success', created_at: '2026-10-12T11:56:00Z', ...patch
+});
+check('duplicate dispatch gate prevents any active workflow being re-triggered',
+  decideUniqueDispatch([dedupeRun({status:'in_progress'})],
+    {nowMs:dedupeNow}).action === 'skip');
+check('recent completed or failed dispatches still have a quiet period',
+  decideUniqueDispatch([dedupeRun({conclusion:'failure'})],
+    {nowMs:dedupeNow}).action === 'skip');
+check('older completed runs can be retried after the quiet period',
+  decideUniqueDispatch([dedupeRun({created_at:'2026-10-12T10:00:00Z'})],
+    {nowMs:dedupeNow}).action === 'dispatch');
+check('future and unreadable run timestamps fail closed',
+  decideUniqueDispatch([dedupeRun({created_at:'invalid'})],
+    {nowMs:dedupeNow}).action === 'unknown' &&
+  decideUniqueDispatch([dedupeRun({created_at:'2026-10-15T00:00:00Z'})],
+    {nowMs:dedupeNow}).action === 'unknown');
+let dedupeCalls = [];
+const fakeApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  if (!options) return { data: { workflow_runs: [dedupeRun()] } };
+  return null;
+};
+const double = await dispatchOnce(fakeApi, '/actions/workflows/sanctions-screen.yml',
+  {nowMs:dedupeNow});
+check('just-in-time run listing suppresses duplicate POSTs',
+  double.action === 'skip' && dedupeCalls.join('|') === 'GET');
+dedupeCalls = [];
+const emptyApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  return options ? null : { data: { workflow_runs: [] } };
+};
+const dispatchedOnce = await dispatchOnce(emptyApi, '/actions/workflows/sanctions-screen.yml',
+  {nowMs:dedupeNow});
+check('genuinely missing run is dispatched once after a current history read',
+  dispatchedOnce.action === 'dispatched' && dedupeCalls.join('|') === 'GET|POST');
+dedupeCalls = [];
+const uncertainApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  if (!options) return { data: {} };
+  throw Error('should not call');
+};
+check('unavailable or malformed run listings block blind dispatches',
+  (await dispatchOnce(uncertainApi, '/actions/workflows/sanctions-screen.yml',
+    {nowMs:dedupeNow})).action === 'unknown' && dedupeCalls.join('|') === 'GET');
+let posts = 0;
+const ambiguous = await dispatchOnce(async (_path,opt) => {
+  if (!opt) return {data:{workflow_runs:[]}};
+  posts++; throw Error('POST outcome unknown');
+}, '/actions/workflows/sanctions-screen.yml', {nowMs:dedupeNow});
+check('ambiguous POST outcomes never cause an automatic replay',
+  ambiguous.action === 'unknown' && posts === 1);
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
