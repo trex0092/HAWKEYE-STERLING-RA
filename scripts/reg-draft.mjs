@@ -13,6 +13,8 @@
    (override with ANTHROPIC_MODEL, e.g. claude-sonnet-5 to cut cost). */
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { extractText, CHANGES_FILE, fetchWithFallback, parseAnalysis } from './reg-watch.mjs';
+import { parseApiPriceTable } from './api-cost.mjs';
+import { evaluateApiSpend, conservativeInputTokenBound } from './api-spend-guard.mjs';
 import {
   draftBudget, validatedReportDate, boundedLines, boundedItems,
   evidenceCount, missingExcerptNotice,
@@ -24,6 +26,8 @@ const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
 const OUT_DIR = 'docs/research/auto';
 const BUDGET = draftBudget(process.env);
+const PRICE_EVIDENCE = parseApiPriceTable(process.env.API_VERIFIED_PRICES_JSON || '');
+let reservedRunMicro = '0';
 const APPROVED_SOURCES = JSON.parse(readFileSync(new URL('../data/reg-sources.json', import.meta.url), 'utf8')).sources;
 
 function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection-only PR).'); process.exit(0); }
@@ -146,6 +150,22 @@ async function draftFor(c) {
     '(HIGH = new/changed obligations, thresholds, instruments or deadlines; MEDIUM = substantive update worth review; LOW = routine site churn.)'
   ].join('\n');
 
+  const permission = evaluateApiSpend({
+    priceTable: PRICE_EVIDENCE.ok ? PRICE_EVIDENCE.table : null,
+    provider: 'anthropic', model: MODEL,
+    maxInputTokens: conservativeInputTokenBound(prompt), maxOutputTokens: BUDGET.maxTokens,
+    maxUsdPerCall: process.env.REG_DRAFT_MAX_USD_PER_CALL,
+    maxUsdPerRun: process.env.REG_DRAFT_MAX_USD_PER_RUN,
+    reservedMicroUsd: reservedRunMicro,
+  });
+  if (!permission.allowed) return {
+    text: manualDraftSection(c, 'API USD budget evidence unavailable'),
+    ok: false, attempted: false, halt: true,
+    haltReason: 'API USD budget evidence unavailable'
+  };
+  // Reserve BEFORE the network call, even when the provider may later time
+  // out; do not accidentally grant that possible charge to a later request.
+  reservedRunMicro = permission.next_run_reserved_micro_usd;
   /* Bound each paid request, including the time spent reading the response.
      Never retry blindly: a 429/quota failure would repeat for every source. */
   const ctrl = new AbortController();

@@ -124,6 +124,7 @@ export function manualDraftSection(source, cause) {
     'input source unavailable', 'empty source text', 'source not approved', 'API request budget exhausted',
     'provider error', 'provider rate limit', 'provider billing or authentication failure',
     'provider timeout or network failure', 'provider empty or truncated response',
+    'API USD budget evidence unavailable',
   ]);
   const reason = allowed.has(cause) ? cause : 'provider error';
   return '### ' + label + '\n_AI analysis skipped (' + reason + '). MLRO must inspect the primary source manually: ' + url + '_';
