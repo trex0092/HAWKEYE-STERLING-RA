@@ -21,6 +21,11 @@ paths = [
   '''\.env\.example''',
 ]
 regexes = [
+  # In a historical documentation commit only, an *instructional placeholder*
+  # was used as COMPOSIO_API_KEY's example value. Its words, including spaces,
+  # cannot be an actual vendor credential. Match ONLY that literal phrase, not
+  # arbitrary COMPOSIO_API_KEY assignments. Do not exempt documentation paths.
+  '''<?project API key>?''',
   # EU FSF public access token embedded in the sanctions-list download URL.
   # Matched as the BARE value (no token= prefix): the generic-api-key rule's
   # secret group captures only the value, so a prefixed regex misses it when
@@ -38,6 +43,12 @@ regexes = [
   '''1218451960830318''',  # section: Screening Sanctions Update
   '''1218979441933783''',  # section: Screening Adverse Media & PEP's Update
   '''1218985347982681''',  # section: AI & Platform Governance (live gid, approved in asana-sections.mjs 2026-10-03)
+  # Historical Asana section identifiers, not authentication secrets.
+  # Gitleaks scanned pre-migration Git history and flagged these two former
+  # literal section defaults (advisor-eval.yml, weekly-summary.yml, screen.py).
+  # Keep these EXACT 16-digit allowlisted values, never a generic GID rule.
+  '''1218785568483509''',  # historical Governance weekly/evaluation section
+  '''1218452114962158''',  # historical daily screening report section
   '''1216239131596624''',  # HR Employees Training/Workshops project, live screening population
   '''1218451989290544''',  # section: FATF list moves (fatf-watchdog.yml, since #525 -- missed at the time)
   '''1213914392047129''',  # Ongoing Monitoring project (watcher alerts + monitoring log) -- RETIRED as a live default by #518, kept only so git history still scans clean

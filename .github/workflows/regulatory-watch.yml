@@ -157,20 +157,38 @@ jobs:
           # Authorized USD pricing and ceiling are required for paid drafting.
           API_USD_RATES_JSON: ${{ vars.API_USD_RATES_JSON }}
           REG_DRAFT_MAX_USD_PER_RUN: ${{ vars.REG_DRAFT_MAX_USD_PER_RUN }}
+          # This journal holds ONLY provider/model/token metadata, no source or
+          # customer text; the cost dashboard reads it in the next step.
+          API_COST_TELEMETRY_ENABLED: '1'
         run: node scripts/reg-draft.mjs < reg-watch-changes.json
 
-      - name: Cost estimate dashboard (metadata only)
-        if: steps.watch.outputs.has_changes == 'true'
-        continue-on-error: true
-        run: node scripts/api-cost-dashboard.mjs
-
-      - name: API credit/quota alerts (sanitized categories only)
+      - name: Cost estimate dashboard (metadata only, never an invoice)
         if: steps.watch.outputs.has_changes == 'true'
         continue-on-error: true
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          API_QUOTA_ALERT_ISSUES: '1'
-        run: node scripts/api-quota-alerts.mjs
+          # Dated, independently approved publisher rates; never embed a
+          # commercial price in source or assume an absent price is zero.
+          API_USD_RATES_JSON: ${{ vars.API_USD_RATES_JSON }}
+        run: |
+          # Optional AI absence, missing prices and unpriced provider usage
+          # remain visibly INCOMPLETE. The regulatory detection job continues.
+          if [ ! -s api-cost-ledger.jsonl ] || [ -z "${API_USD_RATES_JSON:-}" ]; then
+            echo 'API cost dashboard: INCOMPLETE (missing verified prices or sanitized usage receipts)' 
+            echo '## API Cost Dashboard' >> "$GITHUB_STEP_SUMMARY"
+            echo 'INCOMPLETE: No verified price table and sanitized paid-usage receipts were both available.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            umask 077
+            PRICE_FILE="${RUNNER_TEMP}/hawkeye-verified-api-prices.json"
+            trap 'rm -f "$PRICE_FILE"' EXIT
+            printf '%s' "$API_USD_RATES_JSON" > "$PRICE_FILE"
+            node scripts/api-cost-dashboard.mjs --ledger api-cost-ledger.jsonl --prices "$PRICE_FILE"
+          fi
+
+      # API credit/quota warnings now come directly from reg-draft.mjs at the
+      # point of a 429/401/402/403. The old standalone script has no CLI
+      # entrypoint after the API migration and would silently do nothing.
+      # Creating deduplicated GitHub issues additionally requires a separate
+      # reviewed issues:write permission and explicit owner authorization.
 
       - name: Notify Asana — HAWKEYE STERLING APP + the law-change queue
         id: asana
