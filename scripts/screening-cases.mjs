@@ -278,7 +278,17 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
   h.push('<h2>New matches</h2>');
   const alerts = Array.isArray(r.alerts) ? r.alerts : [];
   if (!alerts.length) {
-    h.push('No new or changed matches — every subject screened clean against the loaded lists today.');
+    // "No NEW matches" is not "no ACTIVE matches". The previous wording
+    // falsely described every subject as clean even when matchCount > 0:
+    // unchanged sanctions/PEP matches may still require an MLRO decision.
+    if (Number.isSafeInteger(r.matchCount) && r.matchCount > 0) {
+      h.push('No new or changed matches. ' + esc(String(r.matchCount))
+        + ' standing match(es) remain in the screening registry and require ongoing MLRO review. '
+        + 'Do not interpret this update as a clearance.');
+    } else {
+      h.push('No new or changed matches reported. This is not an all-clear: '
+        + 'confirm complete current-run sources, retained cases and analyst decisions before any clearance.');
+    }
   } else {
     h.push('<ul>');
     for (const a of alerts) {
