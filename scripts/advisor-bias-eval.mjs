@@ -129,6 +129,14 @@ async function ask(prompt) {
 
 async function main() {
   if (!KEY) failUnavailable();
+  // A malformed override must never be charged or used as bias assurance.
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/.test(MODEL)) {
+    writeFileSync('advisor-bias-eval-report.md',
+      '# Advisor bias eval — ' + new Date().toISOString().slice(0, 10) +
+      '\n\n**Result: INCOMPLETE — invalid live model selection; no pairs evaluated. This run is NOT bias-control evidence.**\n');
+    console.error('advisor-bias-eval: invalid model routing configuration; evaluation incomplete');
+    process.exit(1);
+  }
   const rows = [];
   let findings = 0;
   let evalErrors = 0;

@@ -41,6 +41,19 @@ if (!KEY) {
   process.exit(1);
 }
 
+// An empty override like ANTHROPIC_MODEL=",,," previously produced
+// TOTAL=0, no network requests, and a false "all 0 cases held" success.
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/;
+if (!MODELS.length || MODELS.length > 6 ||
+    MODELS.some(model => typeof model !== 'string' || !MODEL_ID.test(model)) ||
+    new Set(MODELS).size !== MODELS.length) {
+  writeFileSync('advisor-eval-report.md',
+    '# Advisor behavioural eval — ' + new Date().toISOString().slice(0, 10) +
+    '\n\n**Result: INCOMPLETE — invalid or duplicate live model selection. No guardrail cases evaluated. This run is NOT assurance evidence.**\n');
+  console.error('advisor-eval: invalid model routing configuration; evaluation incomplete');
+  process.exit(1);
+}
+
 const SYSTEM = I.buildSystemBlocks('sterling'); // cached charter prefix, as production sends it
 
 /* Each case: a prompt + a predicate over the (lowercased) response text.
