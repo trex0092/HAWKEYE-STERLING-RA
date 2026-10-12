@@ -72,25 +72,38 @@ export function parseApiCostUsageLedger(raw) {
 function usd(m) {
   return (m / MICRO).toString() + '.' + (m % MICRO).toString().padStart(6, '0');
 }
+function canonicalEvent(e) {
+  return JSON.stringify([e.provider, e.model, e.workflow,
+    new Date(e.recorded_at).toISOString(),
+    Object.keys(e.usage).sort().map(key => [key, e.usage[key]])]);
+}
 export function buildApiCostDashboard(ledger, priceTable, options = {}) {
   if (!ledger || typeof ledger !== 'object' || Array.isArray(ledger) ||
       ledger.schema !== 1 || !Array.isArray(ledger.records) ||
       ledger.records.length > 5000) {
     return { status: 'incomplete', reason: 'missing_or_invalid_usage_ledger' };
   }
-  const seen = new Map(), providers = new Map(), workflows = new Map(), days = new Map();
-  let rejected = 0, unpriced = 0, duplicate = 0, collisions = 0, priced = 0;
+  const nowMs = options && Object.hasOwn(options, 'nowMs') ? options.nowMs : Date.now();
+  if (!Number.isFinite(nowMs)) return { status: 'incomplete', reason: 'invalid_dashboard_clock' };
+  const seen = new Map(), conflicted = new Set();
+  const providers = new Map(), workflows = new Map(), days = new Map();
+  let rejected = 0, unpriced = 0, duplicate = 0, priced = 0;
   let total = 0n;
+  // Validate/deduplicate BEFORE summing. A conflicting ID invalidates every
+  // copy, so input order never chooses which alleged charge to trust.
   for (const e of ledger.records) {
-    if (!validEvent(e)) { rejected++; continue; }
-    const canonical = JSON.stringify(e);
+    if (!validEvent(e) || Date.parse(e.recorded_at) > nowMs + 300000) { rejected++; continue; }
+    const canonical = canonicalEvent(e);
     if (seen.has(e.receipt_hash)) {
-      if (seen.get(e.receipt_hash) !== canonical) collisions++;
+      if (seen.get(e.receipt_hash).canonical !== canonical) conflicted.add(e.receipt_hash);
       else duplicate++;
       continue;
     }
-    seen.set(e.receipt_hash, canonical);
-    const quote = quoteApiTokenCost(priceTable, e, options);
+    seen.set(e.receipt_hash, { canonical, event: e });
+  }
+  for (const [receipt, { event: e }] of seen) {
+    if (conflicted.has(receipt)) continue;
+    const quote = quoteApiTokenCost(priceTable, e, { ...options, nowMs });
     if (quote.status !== 'priced') { unpriced++; continue; }
     const micro = BigInt(quote.micro_usd);
     total += micro;
@@ -99,6 +112,7 @@ export function buildApiCostDashboard(ledger, priceTable, options = {}) {
       [providers, e.provider], [workflows, e.workflow], [days, e.recorded_at.slice(0, 10)]
     ]) map.set(key, (map.get(key) || 0n) + micro);
   }
+  const collisions = conflicted.size;
   const complete = rejected === 0 && unpriced === 0 && collisions === 0 &&
     ledger.records.length > 0;
   const rows = map => [...map].sort((a, b) => a[0].localeCompare(b[0]))
@@ -112,22 +126,33 @@ export function buildApiCostDashboard(ledger, priceTable, options = {}) {
     note: 'Usage-based estimate only, not invoiced charges. Unpriced or invalid events make this incomplete.'
   };
 }
+function renderable(result) {
+  const amount = value => typeof value === 'string' && /^\d{1,32}\.\d{6}$/.test(value);
+  return result && ['priced_estimate', 'incomplete'].includes(result.status) &&
+    amount(result.estimated_usd_of_priced_usage) &&
+    ['priced', 'unpriced', 'rejected', 'duplicate', 'collisions'].every(key =>
+      Number.isSafeInteger(result[key]) && result[key] >= 0) &&
+    ['by_provider', 'by_workflow', 'by_utc_day'].every(key =>
+      Array.isArray(result[key]) && result[key].length <= 5000 &&
+      result[key].every(row => row && typeof row.name === 'string' &&
+        LABEL.test(row.name) && amount(row.estimated_usd)));
+}
 export function renderApiCostDashboard(result) {
-  if (!result || !['priced_estimate', 'incomplete'].includes(result.status)) {
-    return '# API cost dashboard\n\nUnavailable: no verified usage summary.\n';
+  if (!renderable(result)) {
+    return '# API cost dashboard\n\nUNKNOWN: no valid priced usage summary. Missing evidence is not zero spending.\n';
   }
   const output = ['# API cost dashboard', '', '**Estimate only, not a provider invoice.**', '',
     'Coverage: **' + (result.status === 'priced_estimate' ? 'Complete for supplied records' : 'INCOMPLETE') + '**',
-    '', 'Estimated total from priced events: **$' + result.estimated_usd_of_priced_usage + ' USD**',
+    '', 'Estimated total from unambiguous priced events: **$' + result.estimated_usd_of_priced_usage + ' USD**',
     '', 'Events: priced ' + result.priced + ', unpriced ' + result.unpriced +
        ', invalid ' + result.rejected + ', duplicates ' + result.duplicate +
-       ', collisions ' + result.collisions + '.', '',
+       ', conflicting receipt IDs ' + result.collisions + '.', '',
     '## By provider', '', '| Provider | Estimated USD |', '| --- | ---: |'];
-  for (const row of result.by_provider || []) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
+  for (const row of result.by_provider) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
   output.push('', '## By workflow', '', '| Workflow | Estimated USD |', '| --- | ---: |');
-  for (const row of result.by_workflow || []) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
+  for (const row of result.by_workflow) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
   output.push('', '## By UTC day', '', '| Day | Estimated USD |', '| --- | ---: |');
-  for (const row of result.by_utc_day || []) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
+  for (const row of result.by_utc_day) output.push('| ' + row.name + ' | $' + row.estimated_usd + ' |');
   output.push('', 'No prompts, customer identifiers, API keys or response bodies are displayed.');
   return output.join('\n') + '\n';
 }
