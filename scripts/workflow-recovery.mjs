@@ -5,6 +5,7 @@
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL, URL, URLSearchParams } from 'node:url';
 import assert from 'node:assert/strict';
+import { dispatchOnce } from './github-workflow-dispatch-guard.mjs';
 
 const ACTIVE = new Set(['queued', 'in_progress', 'requested', 'waiting', 'pending']);
 const EVENTS = new Set(['schedule', 'workflow_dispatch']);
@@ -189,9 +190,14 @@ async function morning() {
         const runs = await readRuns(api, path + '/runs', { branch: 'main', created: '>=' + plan.targetDay });
         const decision = morningDecision(runs, plan.targetDayMs);
         if (decision.action === 'dispatch') {
-          await api(path + '/dispatches', { method: 'POST', body: { ref: 'main' } });
-          decision.action = 'dispatched';
-          decision.reason += '; request accepted, delivery NOT yet verified';
+          // Re-check actual live workflow runs immediately before the POST.
+          // A prior runner could have dispatched while this one was waiting.
+          const guarded = await dispatchOnce(api, path, {
+            branch: 'main', nowMs: Date.now(), sinceMs: plan.targetDayMs,
+            quietMs: GUARD_DISPATCH_GRACE_MS,
+          });
+          decision.action = guarded.action === 'skip' ? 'skip' : guarded.action;
+          decision.reason += '; ' + guarded.reason;
         }
         rows.push({ id, ...decision });
       } catch (err) {
@@ -335,12 +341,20 @@ async function guard() {
         redispatches: s.redispatches, lastDispatchMs: s.lastDispatchMs });
       if (step.action === 'done') s.doneAtMs = Date.now();
       if (step.action === 'redispatch') {
-        try {
-          await api(path + '/dispatches', { method: 'POST', body: { ref: 'main' } });
+        // Prevent another guard runner or a delayed GitHub response from
+        // duplicating a just-started screening workflow.
+        const guarded = await dispatchOnce(api, path, {
+          branch: 'main', nowMs: Date.now(), sinceMs: targetDayMs,
+          quietMs: GUARD_DISPATCH_GRACE_MS,
+        });
+        if (guarded.action === 'dispatched') {
           s.redispatches++;
           s.lastDispatchMs = Date.now();
           step.reason += `; re-dispatched (${s.redispatches}/${GUARD_MAX_REDISPATCH}), delivery NOT yet verified`;
-        } catch (err) { step.reason += '; re-dispatch FAILED: ' + err.message; }
+        } else {
+          step.action = guarded.action === 'skip' ? 'wait' : 'unknown';
+          step.reason += '; ' + guarded.reason;
+        }
       }
       s.last = `${step.action}: ${step.reason}${step.action === 'unknown' ? evidenceError : ''}`;
       console.log(`deadline-guard: ${s.id} -> ${s.last}`);
@@ -437,8 +451,13 @@ async function main() {
   // Re-check the actual estate after new evidence lands. This check does not
   // convert accepted dispatches to green; it independently fails if still stale.
   if (!dispatched && !activeRuns.some(r => r.path === '.github/workflows/freshness-check.yml')) {
-    try { await api('/actions/workflows/freshness-check.yml/dispatches', { method: 'POST', body: { ref: branch } }); }
-    catch (err) { rows.push({ id: 'freshness-check.yml', action: 'unknown', reason: String(err.message) }); }
+    // Freshness verification should never be retriggered blindly on every
+    // control-recovery invocation. This gate does not touch any deployment
+    // workflow or change the independent existing control dispatch decisions.
+    const check = await dispatchOnce(api, '/actions/workflows/freshness-check.yml', {
+      branch, nowMs: Date.now(), quietMs: 30 * 60000,
+    });
+    rows.push({ id: 'freshness-check.yml', action: check.action, reason: check.reason });
   }
   const cell = value => String(value).replaceAll('|', '/').replace(/[\r\n]/g, ' ');
   const report = ['# Operational control recovery', '',

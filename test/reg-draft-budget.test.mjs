@@ -1,7 +1,8 @@
 import { classifyApiQuotaSignal, renderApiQuotaAlert, emitApiQuotaAlert }
   from '../scripts/api-quota-alerts.mjs';
 import {
-  validateApiPriceTable, parseApiPriceTable, quoteApiTokenCost
+  validateApiPriceTable, parseApiPriceTable, quoteApiTokenCost,
+  normalizeProviderUsage, quoteProviderResponseCost
 } from '../scripts/api-cost.mjs';
 
 /* No-network checks for Regulatory Watch AI budget, source/filename safety,
