@@ -154,7 +154,23 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ARCHIVE_SPN_KEYS: ${{ secrets.ARCHIVE_SPN_KEYS }}
+          # Authorized USD pricing and ceiling are required for paid drafting.
+          API_USD_RATES_JSON: ${{ vars.API_USD_RATES_JSON }}
+          REG_DRAFT_MAX_USD_PER_RUN: ${{ vars.REG_DRAFT_MAX_USD_PER_RUN }}
         run: node scripts/reg-draft.mjs < reg-watch-changes.json
+
+      - name: Cost estimate dashboard (metadata only)
+        if: steps.watch.outputs.has_changes == 'true'
+        continue-on-error: true
+        run: node scripts/api-cost-dashboard.mjs
+
+      - name: API credit/quota alerts (sanitized categories only)
+        if: steps.watch.outputs.has_changes == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          API_QUOTA_ALERT_ISSUES: '1'
+        run: node scripts/api-quota-alerts.mjs
 
       - name: Notify Asana — HAWKEYE STERLING APP + the law-change queue
         id: asana

@@ -21,6 +21,9 @@ import {
   manualDraftSection, approvedWatchSource, approvedWatchSourceDetails,
   deferredDraftCause, providerStopReason, usageCounts
 } from './reg-draft-budget.mjs';
+import { makeApiUsdBudget } from './api-cost-budget.mjs';
+import { appendApiCostEvent } from './api-cost-dashboard.mjs';
+import { classifyApiQuotaFailure, appendApiQuotaEvent } from './api-quota-alerts.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
@@ -184,11 +187,21 @@ async function draftFor(c) {
          logged, stored in the proposal or surfaced to the caller. */
       const detail = await res.text().catch(() => '');
       const reason = providerStopReason(res.status, detail.slice(0, 2048));
+      const cause = classifyApiQuotaFailure(res.status, reason);
+      if (cause) {
+        const recorded = appendApiQuotaEvent({
+          schema: 1, observed_at: new Date().toISOString(),
+          provider: 'anthropic', workflow: 'regulatory-watch', model: MODEL,
+          http_status: res.status, cause,
+        });
+        if (!recorded.ok) console.warn('reg-draft: sanitized quota telemetry unavailable');
+      }
       console.warn('reg-draft: Anthropic request stopped: HTTP ' + res.status + ' (' + reason + ')');
       return { text: manualDraftSection(c, reason), ok: false, attempted: true,
         halt: true, haltReason: reason };
     }
     const data = await res.json();
+    settle(data && data.usage);
     const text = ((data && Array.isArray(data.content)) ? data.content : [])
       .filter(b => b && b.type === 'text' && typeof b.text === 'string')
       .map(b => b.text).join('\n').trim();
@@ -207,6 +220,7 @@ async function draftFor(c) {
       haltReason: 'provider timeout or network failure'
     };
   } finally {
+    if (!settled) settle(null); // unknown provider usage consumes the full hold
     clearTimeout(timer);
   }
 }
@@ -243,10 +257,25 @@ for (const c of changes) {
   }
   sections.push(text);
 }
+// Store only bounded, non-identifying provider/model counters for the
+// GitHub Actions cost summary. Never store sourced page text or prompts.
+if (apiCalls > 0 || (providerHaltReason && providerHaltReason.startsWith('API USD budget'))) {
+  const snap = USD_GUARD.snapshot();
+  const event = { schema: 1, observed_at: new Date().toISOString(),
+    provider: 'anthropic', model: MODEL, workflow: 'regulatory-watch',
+    requests: apiCalls,
+    status: apiCalls ? (unknownUsdUsage ? 'unknown_reserved' : 'priced') : 'blocked',
+    estimated_usd: apiCalls ? snap.estimated_committed_usd : null,
+    input_tokens: usageTotal.input, output_tokens: usageTotal.output };
+  const recorded = appendApiCostEvent(event);
+  if (!recorded.ok) console.warn('reg-draft: non-identifying cost telemetry unavailable');
+}
 console.log('reg-draft: provider calls=' + apiCalls + '/' + BUDGET.maxCalls +
   ' successful=' + successful + ' manual-review=' + deferred +
   ' tokens=input:' + usageTotal.input + ',output:' + usageTotal.output +
-  ',cacheRead:' + usageTotal.cacheRead + ',cacheWrite:' + usageTotal.cacheWrite);
+  ',cacheRead:' + usageTotal.cacheRead + ',cacheWrite:' + usageTotal.cacheWrite +
+  ' estimated_usd=' + (USD_GUARD.snapshot().estimated_committed_usd || 'unpriced') +
+  ' configured_cap_usd=' + (USD_GUARD.snapshot().limit_usd || 'missing'));
 
 /* Persist the (possibly AI-refined) severities so the Asana notify step —
    which runs after this one — renders the final triage labels. */

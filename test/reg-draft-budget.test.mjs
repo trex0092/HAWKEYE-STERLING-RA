@@ -1,5 +1,11 @@
+import { classifyApiQuotaFailure, validApiQuotaEvent, parseApiQuotaEvents,
+  renderQuotaSummary, notifyApiQuotaIssues } from '../scripts/api-quota-alerts.mjs';
+import { validateApiCostEvent, parseApiCostEvents, summarizeApiCostEvents,
+  renderApiCostDashboard } from '../scripts/api-cost-dashboard.mjs';
+import { makeApiUsdBudget, parseUsdMicro } from '../scripts/api-cost-budget.mjs';
 import {
-  validateApiPriceTable, parseApiPriceTable, quoteApiTokenCost
+  validateApiPriceTable, parseApiPriceTable, quoteApiTokenCost,
+  normalizeProviderUsage, quoteProviderResponseCost
 } from '../scripts/api-cost.mjs';
 
 /* No-network checks for Regulatory Watch AI budget, source/filename safety,
@@ -195,6 +201,31 @@ check('reject invented, stale future, duplicated and ambiguous price evidence',
 check('invalid pricing JSON does not reveal raw input or become zero cost',
   !parseApiPriceTable('{secret', at).ok &&
   !parseApiPriceTable(JSON.stringify({ schema: 1, models: [] }), at).ok);
+
+check('provider response pricing requires the actual usage object, never missing-as-zero',
+  quoteProviderResponseCost(prices, { provider: 'openai', model: 'fixture-openai',
+    response: { status: 'completed' } }, at).status === 'unpriced' &&
+  quoteProviderResponseCost(prices, { provider: 'openai', model: 'fixture-openai',
+    response: { usage: { input_tokens: 100, output_tokens: '50' } } }, at).status === 'unpriced');
+check('provider-native OpenAI and Anthropic usage maps to the exact cached categories',
+  quoteProviderResponseCost(prices, { provider: 'openai', model: 'fixture-openai',
+    response: { usage: { input_tokens: 1000, output_tokens: 100,
+      input_tokens_details: { cached_tokens: 200 } } } }, at).micro_usd === '2500' &&
+  quoteProviderResponseCost(prices, { provider: 'anthropic', model: 'fixture-anthropic',
+    response: { usage: { input_tokens: 500, output_tokens: 100,
+      cache_read_input_tokens: 200, cache_creation_input_tokens: 100 } } }, at).micro_usd === '1145');
+check('invalid cached usage is rejected without guessing a cheaper price',
+  normalizeProviderUsage('openai', { usage: { input_tokens: 2, output_tokens: 4,
+    input_tokens_details: { cached_tokens: 3 } } }) === null &&
+  normalizeProviderUsage('anthropic', { usage: { input_tokens: 2, output_tokens: 4,
+    cache_read_input_tokens: -1 } }) === null);
+check('stale verified prices must be reapproved before quoting dollar values',
+  quoteApiTokenCost({ ...prices, models: [{ ...prices.models[0], verified_on: '2026-01-01' }] },
+    { provider: 'openai', model: 'fixture-openai', usage: { input_tokens: 10, output_tokens: 10 } },
+    at).status === 'unpriced');
+check('an explicit 365-day age policy can only be used by the authorized price-table caller',
+  validateApiPriceTable({ ...prices, models: [{ ...prices.models[0], verified_on: '2026-01-01' }] },
+    { ...at, maxPriceAgeDays: 365 }).ok);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

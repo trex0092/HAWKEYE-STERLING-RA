@@ -66,6 +66,7 @@ export const EXEMPT = {
   'delivery-watchdog.yml': 'daily-report delivery probe (Asana task filed vs expected); self-alerting to Asana on a missing report, red badge is the alarm',
   'fortify.yml': 'third-party SAST/SCA scanner (Fortify) requiring live FoD/SSC account credentials that are not currently configured in this repo; not a compliance-screening control with a regulatory ingestion/eval duty, so a failed or missing run has no freshness window to enforce',
   'freshness-check.yml': 'this alarm itself',
+  'github-api-rate-dashboard.yml': 'read-only GitHub API quota observability; no regulatory screening, data ingestion or model evaluation duty, and its own scheduled run reports UNKNOWN on unavailable quota evidence',
   'function-health.yml': 'site operations probe; self-alerting',
   'governance-report.yml': 'reports ON control state; the controls it reads are monitored individually',
   'link-check.yml': 'documentation hygiene',

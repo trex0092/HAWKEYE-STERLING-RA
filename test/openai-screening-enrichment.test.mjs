@@ -7,8 +7,17 @@ import {
   boundedInt, safeOpenAIError, safeUsage,
   screeningEvidence, prioritySampleAlerts, isHealthyCleanRun, adaptiveOutputTokens,
   REQUIRED_NOTE_SECTIONS, validateAnalystNote, buildEnrichmentPrompt, evidenceJsonWithinBudget,
-  extractResponseText, enrichScreeningResults
+  extractResponseText, enrichScreeningResults as actualEnrichScreeningResults
 } from '../scripts/openai-screening-enrichment.mjs';
+const TEST_PRICE_TABLE = JSON.stringify({ schema: 1, models: [{
+  provider: 'openai', model: 'gpt-6-luna', verified_on: '2026-10-10',
+  source_url: 'https://platform.openai.com/docs/pricing',
+  usd_per_million: { input: '2.00', cached_input: '0.50', output: '8.00' },
+}] });
+const enrichScreeningResults = (results, opts = {}) =>
+  actualEnrichScreeningResults(results, {
+    apiPriceTableJson: TEST_PRICE_TABLE, maxUsdPerCall: '1.000000', ...opts,
+  });
 
 let passed = 0, failed = 0;
 function check(label, condition) {

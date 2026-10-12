@@ -16,6 +16,13 @@ const ALLOWED_HOSTS = Object.freeze({
   anthropic: ['anthropic.com', 'claude.com'],
 });
 const MICRO = 1000000n;
+const MAX_PRICE_AGE_DAYS = 90; // publisher prices must be reverified at least quarterly
+
+function recentEnough(day, now, days = MAX_PRICE_AGE_DAYS) {
+  if (!Number.isSafeInteger(days) || days < 0 || days > 365) return false;
+  return validDate(day, now) &&
+    now - Date.parse(day + 'T00:00:00Z') <= (days + 1) * 86400000;
+}
 
 function permittedPublisher(provider, location) {
   if (typeof location !== 'string') return false;
@@ -41,7 +48,7 @@ function microPerMillion(value) {
   return micro > 0n ? micro : null;
 }
 
-export function validateApiPriceTable(table, { nowMs = Date.now() } = {}) {
+export function validateApiPriceTable(table, { nowMs = Date.now(), maxPriceAgeDays = MAX_PRICE_AGE_DAYS } = {}) {
   if (!table || typeof table !== 'object' || Array.isArray(table) ||
       table.schema !== 1 || !Array.isArray(table.models) ||
       table.models.length === 0 || table.models.length > 100 ||
@@ -52,7 +59,7 @@ export function validateApiPriceTable(table, { nowMs = Date.now() } = {}) {
         !Object.hasOwn(PROPERTIES, row.provider) || typeof row.model !== 'string' ||
         !MODEL.test(row.model) ||
         !permittedPublisher(row.provider, row.source_url) ||
-        !validDate(row.verified_on, nowMs) ||
+        !recentEnough(row.verified_on, nowMs, maxPriceAgeDays) ||
         !row.usd_per_million || typeof row.usd_per_million !== 'object' ||
         Array.isArray(row.usd_per_million)) {
       return { ok: false, reason: 'invalid_model_price_evidence' };
@@ -127,4 +134,33 @@ export function quoteApiTokenCost(table, { provider, model, usage } = {}, opts =
     source_url: row.source_url, verified_on: row.verified_on,
     token_counts: Object.fromEntries(components.map(([name, tokens]) => [name, Number(tokens)])),
   };
+}
+
+/* Normalize RAW provider usage. Do not estimate a bill from safeUsage() or
+ * usageCounts() defaults: absent raw counts are UNKNOWN, not zero. */
+export function normalizeProviderUsage(provider, response) {
+  if (!response || typeof response !== 'object' || Array.isArray(response) ||
+      !response.usage || typeof response.usage !== 'object' || Array.isArray(response.usage)) return null;
+  const u = response.usage;
+  if (count(u.input_tokens) === null || count(u.output_tokens) === null) return null;
+  if (provider === 'openai') {
+    const cached = u.input_tokens_details?.cached_tokens ?? 0;
+    if (count(cached) === null || cached > u.input_tokens) return null;
+    return { input_tokens: u.input_tokens, output_tokens: u.output_tokens,
+      cached_input_tokens: cached };
+  }
+  if (provider === 'anthropic') {
+    const read = u.cache_read_input_tokens ?? 0;
+    const write = u.cache_creation_input_tokens ?? 0;
+    if (count(read) === null || count(write) === null) return null;
+    return { input_tokens: u.input_tokens, output_tokens: u.output_tokens,
+      cache_read_input_tokens: read, cache_creation_input_tokens: write };
+  }
+  return null;
+}
+
+export function quoteProviderResponseCost(table, { provider, model, response } = {}, opts = {}) {
+  const usage = normalizeProviderUsage(provider, response);
+  if (!usage) return { status: 'unpriced', reason: 'raw_provider_usage_missing_or_invalid' };
+  return quoteApiTokenCost(table, { provider, model, usage }, opts);
 }
