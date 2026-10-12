@@ -62,6 +62,18 @@ check('scoreAdverseMedia does not flag a clean headline', noTerm.hit === false);
 
 const noName = scoreAdverseMedia('Zzz Holdings', items);
 check('scoreAdverseMedia requires the customer name in the headline', noName.hit === false);
+check('adverse-media name matching does not accept unrelated name substrings',
+  scoreAdverseMedia('John Smith',
+    [{ title: 'Johnny Smithson charged with money laundering' }]).hit === false
+  && scoreAdverseMedia('Ann King',
+    [{ title: 'Joann Kingston investigated for financial fraud' }]).hit === false);
+check('adverse-media name matching keeps real whole-name hits',
+  scoreAdverseMedia('John Smith',
+    [{ title: 'John Smith charged with money laundering' }]).hit === true);
+check('adverse-media name matching rejects company names embedded in unrelated words',
+  scoreAdverseMedia('Acme',
+    [{ title: 'AcmeFinancial implicated in accounting fraud' }]).hit === false);
+
 
 const weak = scoreAdverseMedia('Acme Co', [{ title: 'Acme Co accused of corruption', link: '' }]);
 check('scoreAdverseMedia uses medium band for a non-strong risk term', weak.hit === true && weak.band === 'medium');
@@ -508,8 +520,8 @@ resetGdeltBreaker();
     stub(() => reply(503, 'temporarily unavailable'));
     let allErrored = true;
     for (let i = 0; i < GDELT_BREAKER_AFTER; i++) allErrored = (await checkAdverseMedia(subject, opts)).errored === true && allErrored;
-    check('gdelt live path: wide AND base failing counts as one failure per subject; the breaker opens at the threshold',
-      gdeltBreakerState.open === true && calls.length === 2 * GDELT_BREAKER_AFTER);
+    check('gdelt live path: HTTP 503 gets no redundant base-query retry; the breaker still opens',
+      gdeltBreakerState.open === true && calls.length === GDELT_BREAKER_AFTER);
     check('gdelt live path: a subject GDELT could not answer is errored, never a silent clear',
       allErrored);
     stub(() => reply(200, hitBody));

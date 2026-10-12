@@ -848,7 +848,11 @@ export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
     const title = normalize(it.title);
     const desc = normalize(it.description || '');
     const hay = desc ? title + ' ' + desc : title;
-    const hasName = nameTokens.length > 0 && nameTokens.every(t => hay.includes(t));
+    // Compare whole normalized tokens. Substring checks incorrectly matched
+    // John Smith against Johnny Smithson (or Ann King against Joann Kingston),
+    // creating unsupported adverse-media flags from unrelated articles.
+    const hayTokens = new Set(hay.split(/\s+/u).filter(Boolean));
+    const hasName = nameTokens.length > 0 && nameTokens.every(t => hayTokens.has(t));
     if (!hasName) continue;
     const hitTerms = terms.filter(t => hay.includes(normalize(t)));
     if (!hitTerms.length) continue;
@@ -1103,8 +1107,13 @@ async function fetchGdelt(name, timeoutMs) {
   const noteWide = (_ok, status) => { wideStatus = status; };
   let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,
     'application/json', timeoutMs, noteWide, _gdeltGate, permit);
-  // A 429 is not a query rejection. A shorter query consumes the same quota.
-  if (gd === null && wideStatus !== 429 && wide.length > GDELT_RISK_TERMS.length && permit()) {
+  // Retry the smaller query only when GDELT has actually rejected the query
+  // syntax/size or replied HTTP 200 with an invalid body. Server errors,
+  // throttling, network failures and timeouts are not query rejections:
+  // retrying immediately on the same provider doubles outage traffic and
+  // cannot fix a 503. Keep those failures visible to the circuit breaker.
+  const queryRejected = [200, 400, 413, 414, 422, 431].includes(wideStatus);
+  if (gd === null && queryRejected && wide.length > GDELT_RISK_TERMS.length && permit()) {
     console.warn('adverse-media: GDELT rejected the widened query; retrying on the base term set');
     gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt,
       'application/json', timeoutMs, null, _gdeltGate, permit);
