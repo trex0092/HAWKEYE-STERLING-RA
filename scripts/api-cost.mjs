@@ -93,6 +93,12 @@ function count(value) {
   return Number.isSafeInteger(value) && value >= 0 ? BigInt(value) : null;
 }
 
+// Only an OMITTED optional counter has the documented zero default.
+// Explicit null/undefined/string/negative counters are unknown evidence.
+function optionalCount(record, key) {
+  return Object.hasOwn(record, key) ? count(record[key]) : 0n;
+}
+
 function toUsd(micro) {
   const whole = micro / MICRO;
   const cents = (micro % MICRO).toString().padStart(6, '0');
@@ -112,12 +118,12 @@ export function quoteApiTokenCost(table, { provider, model, usage } = {}, opts =
   if (input === null || output === null) return { status: 'unpriced', reason: 'usage_missing_or_invalid' };
   let components;
   if (provider === 'openai') {
-    const cached = count(usage.cached_input_tokens ?? 0);
+    const cached = optionalCount(usage, 'cached_input_tokens');
     if (cached === null || cached > input) return { status: 'unpriced', reason: 'usage_missing_or_invalid' };
     components = [['input', input - cached], ['cached_input', cached], ['output', output]];
   } else {
-    const read = count(usage.cache_read_input_tokens ?? 0);
-    const write = count(usage.cache_creation_input_tokens ?? 0);
+    const read = optionalCount(usage, 'cache_read_input_tokens');
+    const write = optionalCount(usage, 'cache_creation_input_tokens');
     if (read === null || write === null) return { status: 'unpriced', reason: 'usage_missing_or_invalid' };
     components = [['input', input], ['cached_read', read], ['cached_write', write], ['output', output]];
   }
@@ -144,17 +150,22 @@ export function normalizeProviderUsage(provider, response) {
   const u = response.usage;
   if (count(u.input_tokens) === null || count(u.output_tokens) === null) return null;
   if (provider === 'openai') {
-    const cached = u.input_tokens_details?.cached_tokens ?? 0;
-    if (count(cached) === null || cached > u.input_tokens) return null;
+    let cached = 0n;
+    if (Object.hasOwn(u, 'input_tokens_details')) {
+      const details = u.input_tokens_details;
+      if (!details || typeof details !== 'object' || Array.isArray(details)) return null;
+      cached = optionalCount(details, 'cached_tokens');
+    }
+    if (cached === null || cached > BigInt(u.input_tokens)) return null;
     return { input_tokens: u.input_tokens, output_tokens: u.output_tokens,
-      cached_input_tokens: cached };
+      cached_input_tokens: Number(cached) };
   }
   if (provider === 'anthropic') {
-    const read = u.cache_read_input_tokens ?? 0;
-    const write = u.cache_creation_input_tokens ?? 0;
-    if (count(read) === null || count(write) === null) return null;
+    const read = optionalCount(u, 'cache_read_input_tokens');
+    const write = optionalCount(u, 'cache_creation_input_tokens');
+    if (read === null || write === null) return null;
     return { input_tokens: u.input_tokens, output_tokens: u.output_tokens,
-      cache_read_input_tokens: read, cache_creation_input_tokens: write };
+      cache_read_input_tokens: Number(read), cache_creation_input_tokens: Number(write) };
   }
   return null;
 }
@@ -162,5 +173,16 @@ export function normalizeProviderUsage(provider, response) {
 export function quoteProviderResponseCost(table, { provider, model, response } = {}, opts = {}) {
   const usage = normalizeProviderUsage(provider, response);
   if (!usage) return { status: 'unpriced', reason: 'raw_provider_usage_missing_or_invalid' };
+  // An alias can resolve to a snapshot or a provider may return a fallback.
+  // Do not attribute a different model to the requested-model usage ledger.
+  // The caller must explicitly configure the reported snapshot before pricing it.
+  if (Object.hasOwn(response, 'model')) {
+    if (typeof response.model !== 'string' || !MODEL.test(response.model)) {
+      return { status: 'unpriced', reason: 'reported_model_invalid' };
+    }
+    if (response.model !== model) {
+      return { status: 'unpriced', reason: 'reported_model_mismatch' };
+    }
+  }
   return quoteApiTokenCost(table, { provider, model, usage }, opts);
 }

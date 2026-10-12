@@ -93,5 +93,19 @@ for (const s of new Set(ciDriftChecks)) {
   check(`scripts/run-tests.mjs also runs ${s} --check locally`, runnerChecks.includes(s));
 }
 
+/* 5. API-platform contract suites are discovered and executed here, in BOTH
+   CI and npm test. Keeping them in a subdirectory lets each feature PR add
+   its own regressions without editing the same large test or workflow file.
+   These suites use synthetic records and injected transports, never secrets
+   or live paid provider calls. An import failure is a test failure. */
+const apiSuites = readdirSync(new URL('./api-platform/', import.meta.url))
+  .filter(name => /^[a-z0-9-]+\.mjs$/.test(name)).sort();
+check('API-platform contract regression suites are present', apiSuites.length > 0);
+for (const filename of apiSuites) {
+  const suite = await import(new URL('./api-platform/' + filename, import.meta.url));
+  check('API contract suite exports run(check): ' + filename, typeof suite.run === 'function');
+  if (typeof suite.run === 'function') await suite.run(check);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
