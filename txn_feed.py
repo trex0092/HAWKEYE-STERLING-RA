@@ -29,6 +29,21 @@ def _fail(detail):
     raise FeedValidationError(detail)
 
 
+def _unique_json_members(pairs):
+    """Reject ambiguous JSON objects instead of silently taking the last key.
+
+    Duplicate "amount", "transaction_id", "complete" or "sha256" keys can
+    make the same attested file mean different things to different parsers.
+    Never include field values or customer data in validation errors.
+    """
+    obj = {}
+    for key, value in pairs:
+        if key in obj:
+            _fail("ambiguous transaction JSON contains duplicate object keys")
+        obj[key] = value
+    return obj
+
+
 def _json_bytes(path, limit):
     if not path or not os.path.isfile(path):
         _fail("feed or manifest missing; no all-clear permitted")
@@ -41,7 +56,8 @@ def _json_bytes(path, limit):
         if len(raw) != size or len(raw) > limit:
             _fail("feed or manifest changed during read")
         data = json.loads(raw.decode("utf-8"),
-                          parse_constant=lambda _value: _fail("non-finite JSON number"))
+                          parse_constant=lambda _value: _fail("non-finite JSON number"),
+                          object_pairs_hook=_unique_json_members)
     except (OSError, ValueError, UnicodeError) as exc:
         if isinstance(exc, FeedValidationError):
             raise
