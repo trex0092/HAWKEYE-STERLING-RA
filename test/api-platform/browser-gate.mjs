@@ -22,6 +22,14 @@ export function run(check) {
     workflow.replace(command, 'if: false\n        ' + command)));
   check('reject a job-level browser failure waiver', !blockingBrowserGate(
     workflow.replace('  smoke:\n', '  smoke:\n    continue-on-error: true\n')));
+  const push = /^  push:\n    branches: \[main\]\n    paths: \[([^\n]+)\]/m.exec(workflow);
+  check('changes to browser workflow, axe spec and failure gate re-run real browser tests on main',
+    !!push && [
+      '.github/workflows/cross-browser.yml',
+      'test/api-platform/browser-gate.mjs',
+      'test/axe.spec.mjs',
+      'test/cross-browser.spec.mjs'
+    ].every(path => push[1].includes("'" + path + "'")));
   check('retain failure artifacts for diagnosis',
     workflow.includes('      - name: Upload report\n        if: always()'));
 }
