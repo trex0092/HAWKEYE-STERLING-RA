@@ -43,8 +43,8 @@ function labelMatches(name, label) {
   // (e.g. "Xi Bo") so a real PEP namesake is not silently missed.
   let want = normalize(name).split(' ').filter(t => t.length >= 3);
   if (!want.length) want = normalize(name).split(' ').filter(t => t.length >= 2);
-  const have = normalize(label);
-  return want.length > 0 && want.every(t => have.includes(t));
+  const have = new Set(normalize(label).split(' ').filter(Boolean));
+  return want.length > 0 && want.every(t => have.has(t));
 }
 
 /* Score a Wikidata wbsearchentities response for a subject. Returns
@@ -56,7 +56,9 @@ export function scorePep(name, json) {
     const desc = String(r.description || '');
     const dn = normalize(desc);
     if (!dn) continue;
-    if (!PEP_KEYWORDS.some(k => dn.includes(normalize(k)))) continue;
+    // Match political roles as whole words, not embedded in terms such as
+    // 'banking' (which contains the substring 'king').
+    if (!PEP_KEYWORDS.some(k => (' ' + dn + ' ').includes(' ' + normalize(k) + ' '))) continue;
     if (!labelMatches(name, r.label || r.match && r.match.text || '')) continue;
     hits.push({ id: r.id, label: r.label || '', description: desc });
   }

@@ -40,8 +40,8 @@ function nameMatches(subject, notice) {
   // (e.g. "Xi Bo") so a real Red Notice namesake is not silently missed.
   let want = normalize(subject).split(' ').filter(t => t.length >= 3);
   if (!want.length) want = normalize(subject).split(' ').filter(t => t.length >= 2);
-  const have = normalize((notice.forename || '') + ' ' + (notice.name || ''));
-  return want.length > 0 && want.every(t => have.includes(t));
+  const have = new Set(normalize((notice.forename || '') + ' ' + (notice.name || '')).split(' ').filter(Boolean));
+  return want.length > 0 && want.every(t => have.has(t));
 }
 
 /* Extract the notices array from the HAL response (or a plain array fallback). */

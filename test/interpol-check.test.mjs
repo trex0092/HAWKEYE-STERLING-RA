@@ -35,6 +35,9 @@ check('hit carries nationalities', Array.isArray(r.match.nationalities) && r.mat
 r = scoreInterpol('Ramzan Akhmadov', halJson);
 check('no hit when not all subject tokens match (namesake guard)', r.hit === false);
 
+check('a longer unrelated forename/surname is never a whole-token match',
+  scoreInterpol('John Smith', { notices: [{ forename: 'Johnny', name: 'Smithson' }] }).hit === false);
+
 // unrelated subject
 r = scoreInterpol('Jane Doe', halJson);
 check('no hit for an unrelated subject', r.hit === false && r.count === 0);

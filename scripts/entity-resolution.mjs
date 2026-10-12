@@ -19,24 +19,43 @@ export function normId(v) {
 export function normDate(v) {
   const s = String(v == null ? '' : v).trim();
   if (!s) return '';
-  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+
+  // Only complete calendar dates or an explicitly supplied birth year are
+  // corroborating evidence. Invalid dates and years embedded in arbitrary
+  // text must not earn a partial/near-exact DOB match.
+  const iso = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/.exec(s);
   const dmy = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(s);
-  if (dmy) return dmy[3] + '-' + dmy[2].padStart(2, '0') + '-' + dmy[1].padStart(2, '0');
-  const y = /\b(?:19|20)\d{2}\b/.exec(s);
-  return y ? y[0] : normText(s);
+  if (!iso && !dmy) return /^(?:18|19|20)\d{2}$/.test(s) ? s : '';
+
+  const year = Number(iso ? iso[1] : dmy[3]);
+  const month = Number(iso ? iso[2] : dmy[2]);
+  const day = Number(iso ? iso[3] : dmy[1]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const date = new Date(timestamp);
+  if (year < 1800 || !Number.isFinite(timestamp) || timestamp > Date.now()
+      || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1
+      || date.getUTCDate() !== day) return '';
+  return String(year).padStart(4, '0') + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
 }
+
 
 export function tokens(v) {
   return new Set(normText(v).split(' ').filter(Boolean));
 }
 
-function overlap(a, b) {
-  const A = tokens(a), B = tokens(b);
-  if (!A.size || !B.size) return false;
-  for (const t of A) if (B.has(t)) return true;
-  return false;
+function countryMention(jurisdiction, text) {
+  const country = normText(jurisdiction);
+  if (!country) return false;
+  // Two-letter codes such as US, IN and NO are ordinary English words when
+  // lowercased. Require an explicit uppercase code in article evidence.
+  if (/^[a-z]{2}$/.test(country)) {
+    return new RegExp('\\b' + country.toUpperCase() + '\\b').test(String(text));
+  }
+  // Entire country name as a token-bounded phrase, never a shared word such
+  // as "United" (US vs UAE) or "Republic" (different countries).
+  return (' ' + normText(text) + ' ').includes(' ' + country + ' ');
 }
+
 
 function same(a, b, normalizer = normText) {
   const A = normalizer(a), B = normalizer(b);
@@ -62,18 +81,25 @@ export function corroborateIdentity(subject = {}, candidate = {}, { nameScore = 
   }
 
   if (subject.dob && candidate.dob) {
-    if (same(subject.dob, candidate.dob, normDate)) { points += 30; evidence.push('date of birth exact'); }
-    else {
-      const sy = normDate(subject.dob).slice(0, 4), cy = normDate(candidate.dob).slice(0, 4);
-      if (sy && cy && sy === cy) { points += 10; evidence.push('birth year corroborated'); }
-      else conflicts.push('date of birth mismatch');
+    const subjectDob = normDate(subject.dob);
+    const candidateDob = normDate(candidate.dob);
+    if (subjectDob && candidateDob) {
+      if (subjectDob.length === 10 && candidateDob.length === 10) {
+        if (subjectDob === candidateDob) { points += 30; evidence.push('date of birth exact'); }
+        else conflicts.push('date of birth mismatch');
+      } else if (subjectDob.slice(0, 4) === candidateDob.slice(0, 4)) {
+        // Partial year-only evidence can never be scored as an exact DOB.
+        points += 10;
+        evidence.push('birth year corroborated');
+      } else conflicts.push('date of birth mismatch');
     }
   }
+
 
   const sj = subject.nationality || subject.jurisdiction || subject.country;
   const cj = candidate.nationality || candidate.jurisdiction || candidate.country;
   if (sj && cj) {
-    if (same(sj, cj) || overlap(sj, cj)) { points += 15; evidence.push('country/nationality corroborated'); }
+    if (same(sj, cj)) { points += 15; evidence.push('country/nationality corroborated'); }
     else conflicts.push('country/nationality differs');
   }
 
@@ -95,7 +121,7 @@ export function corroborateIdentity(subject = {}, candidate = {}, { nameScore = 
 export function corroborateArticleIdentity(subject = {}, article = {}) {
   const text = [article.title, article.snippet, article.source].filter(Boolean).join(' ');
   const j = subject.nationality || subject.jurisdiction || subject.country || '';
-  const country = j && overlap(j, text);
+  const country = j && countryMention(j, text);
   return {
     level: country ? 'corroborated' : 'name-only',
     evidence: country ? ['CDD country/nationality mentioned in article evidence'] : [],

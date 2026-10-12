@@ -52,7 +52,10 @@ function titleMatches(subject, item) {
   const aliases = item && item.aliases;
   if (Array.isArray(aliases)) candidates.push(...aliases.map(a => String(a || '')));
   else if (typeof aliases === 'string') candidates.push(aliases);
-  return candidates.some(c => { const have = normalize(c); return have && want.every(t => have.includes(t)); });
+  return candidates.some(c => {
+    const have = new Set(normalize(c).split(' ').filter(Boolean));
+    return want.every(t => have.has(t));
+  });
 }
 
 /* Score an FBI Wanted API response for a subject. Returns
