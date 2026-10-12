@@ -25,7 +25,7 @@ import { pathToFileURL } from 'node:url';
 import { asana, asanaEnabled, esc, runUrl, notifyAsana,
   fitAsanaHtml, fitAsanaName } from './asana-notify.mjs';
 import { enrichScreeningResults } from './openai-screening-enrichment.mjs';
-import { appendApiCostEvent } from './api-cost-dashboard.mjs';
+import { appendApiCostUsage } from './api-cost-dashboard.mjs';
 import { SECTIONS, caseSection } from './asana-sections.mjs';
 
 export const SCREEN_STATE_FILE = 'data/sanctions-screen-state.json';
@@ -531,18 +531,18 @@ async function main() {
       const ai = await enrichScreeningResults(results);
       // Separate priced estimates and unknown provider billing; never log
       // the subject name, match evidence, prompt or model response.
+      // Only a successful raw-provider quote certifies these token counters.
+      // A missing/unknown-usage response is NOT recorded as a zero-dollar call.
       if (process.env.API_COST_TELEMETRY_ENABLED === '1' &&
-          ai.cost_estimate && ai.model) {
-        const u = ai.usage || {};
-        const count = n => Number.isSafeInteger(n) && n >= 0 ? n : 0;
-        const event = {
-          schema: 1, observed_at: new Date().toISOString(),
+          ai.cost_estimate?.status === 'priced_estimate' && ai.model && ai.usage) {
+        const recorded = appendApiCostUsage({
           provider: 'openai', model: ai.model, workflow: 'screening-digest',
-          requests: 1, status: ai.cost_estimate.status === 'priced' ? 'priced' : 'unknown_reserved',
-          estimated_usd: ai.cost_estimate.usd,
-          input_tokens: count(u.input_tokens), output_tokens: count(u.output_tokens),
-        };
-        const recorded = appendApiCostEvent(event);
+          usage: {
+            input_tokens: ai.usage.input_tokens,
+            cached_input_tokens: ai.usage.cached_input_tokens,
+            output_tokens: ai.usage.output_tokens,
+          }
+        });
         if (!recorded.ok) console.warn('screening-cases: cost metadata unavailable');
       }
       const digestResults = { ...results, ai_enrichment: ai };
