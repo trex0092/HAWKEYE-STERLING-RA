@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { classifyApiQuotaSignal, renderApiQuotaAlert, emitApiQuotaAlert }
   from '../scripts/api-quota-alerts.mjs';
 import {
@@ -243,5 +244,19 @@ check('AI integrations do not import the removed quota and dashboard telemetry A
   sources.every(source => !/\b(?:appendApiCostEvent|appendApiQuotaEvent|classifyApiQuotaFailure|USD_GUARD)\b/.test(source)));
 check('AI integrations no longer call undefined legacy settlement helpers',
   sources.every(source => !/\bsettle\s*\(/.test(source)));
+// Workflow-level wiring must match the actual dashboard CLI contract. A
+// success-status no-argument invocation had silently run under continue-on-error.
+const watchWorkflow = readFileSync(new URL('../.github/workflows/regulatory-watch.yml',
+  import.meta.url), 'utf8');
+check('Regulatory Watch turns on privacy-minimized usage receipts for paid drafts',
+  watchWorkflow.includes("API_COST_TELEMETRY_ENABLED: '1'") &&
+  watchWorkflow.includes('API_USD_RATES_JSON:'));
+check('dashboard gets the exact sanitized journal and verified-price arguments',
+  watchWorkflow.includes('node scripts/api-cost-dashboard.mjs --ledger api-cost-ledger.jsonl --prices "$PRICE_FILE"') &&
+  watchWorkflow.includes('INCOMPLETE: No verified price table'));
+check('remove obsolete green no-op issue notification step while keeping inline quota warning',
+  !watchWorkflow.includes('run: node scripts/api-quota-alerts.mjs') &&
+  watchWorkflow.includes('API credit/quota warnings now come directly from reg-draft.mjs'));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
