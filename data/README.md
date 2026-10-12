@@ -53,11 +53,13 @@ the real state lives only in the encrypted copy.
 
 ## retention/ — why the dates have gaps
 
-`scripts/retain-state.mjs` (called by `sanctions-watch.yml`) writes an
-immutable copy of `sanctions-state.json` named for the state's **`updated`**
-date, plus a SHA-256 entry in the append-only `retention/manifest.json`.
-A snapshot appears **only when a list fingerprint actually changed** —
-retain-on-change, not retain-daily. A date gap therefore means "no designation
-list changed" (the daily watcher still ran and stayed green), not "the control
-stopped". A corrupt manifest fails loud rather than resetting — the chain is
-tamper-evident, and FDL 10/2025 record-keeping is the reason it exists.
+`scripts/retain-state.mjs` (called by `sanctions-watch.yml`) retains
+snapshots of `sanctions-state.json` by **update date and content hash**, so
+multiple changed editions on the same day remain available. Legacy date-only
+archives remain readable and verifiable. The SHA-256 manifest is append-only:
+prior records must match their archived bytes before a new edition is stored.
+Snapshots are created on change, not every day. A date gap therefore means
+"no designation list changed", not "the control stopped". The manifest
+provides local digest consistency, **not an externally signed hash chain or
+proof against coordinated history rewrites**. Independent signed retention
+anchors remain an operational control to implement.
