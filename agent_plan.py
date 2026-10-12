@@ -12,6 +12,7 @@ LLM directly to this library.
 """
 import hashlib
 import json
+import math
 import time
 from copy import deepcopy
 from types import MappingProxyType
@@ -90,9 +91,10 @@ def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
     remain only in the returned in-memory map.
     """
     safe_base = {"authorized_for_action": False, "events": [], "results": {}}
-    if verified_role not in HUMAN_ROLES or not isinstance(authorized_tools, (set, frozenset)) \
+    if type(verified_role) is not str or verified_role not in HUMAN_ROLES \
+            or not isinstance(authorized_tools, (set, frozenset)) \
             or not isinstance(tool_handlers, dict) or type(max_seconds) not in (int, float) \
-            or not 0 < max_seconds <= MAX_SECONDS:
+            or not 0 < max_seconds <= MAX_SECONDS or not callable(clock):
         return {"status": "HOLD", "reason": "missing trusted execution context", **safe_base}
     try:
         steps = _validated_steps(plan, authorized_tools)
@@ -106,11 +108,28 @@ def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
     results = {}
     calls = 0
     total_result_bytes = 0
-    start = clock()
+
+    def safe_clock():
+        # Although supplied by trusted code, the timing source must not be
+        # able to silently return NaN, infinity, decreasing time, or throw.
+        try:
+            value = clock()
+            return value if type(value) in (int, float) and math.isfinite(value) else None
+        except Exception:
+            return None
+
+    start = safe_clock()
+    if start is None:
+        return {"status": "HOLD", "reason": "invalid trusted timing source", **safe_base}
+
+    def time_unreliable_or_expired():
+        now = safe_clock()
+        return now is None or now < start or now - start >= max_seconds
+
     for step in steps:
         for attempt in range(step["retries"] + 1):
-            if calls >= MAX_TOTAL_CALLS or clock() - start >= max_seconds:
-                return {"status": "DEGRADED", "reason": "execution budget exhausted",
+            if calls >= MAX_TOTAL_CALLS or time_unreliable_or_expired():
+                return {"status": "DEGRADED", "reason": "execution budget exhausted or timing source degraded",
                         "authorized_for_action": False, "events": events, "results": results}
             calls += 1
             try:
@@ -128,8 +147,8 @@ def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
                 if total_result_bytes + len(raw) > MAX_TOTAL_RESULT_BYTES:
                     raise ValueError("cumulative tool evidence budget exceeded")
                 snapshot = json.loads(raw.decode("utf8"))
-                if clock() - start >= max_seconds:
-                    raise TimeoutError("step exceeded total budget")
+                if time_unreliable_or_expired():
+                    raise TimeoutError("step exceeded budget or timing source degraded")
                 total_result_bytes += len(raw)
                 results[step["id"]] = snapshot
                 events.append({"step": step["id"], "tool": step["tool"],
@@ -139,7 +158,7 @@ def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
             except Exception:
                 events.append({"step": step["id"], "tool": step["tool"],
                                "attempt": attempt + 1, "outcome": "DEGRADED"})
-                if attempt >= step["retries"] or clock() - start >= max_seconds:
+                if attempt >= step["retries"] or time_unreliable_or_expired():
                     return {"status": "DEGRADED",
                             "reason": "read-only step failed, MLRO follow-up required",
                             "authorized_for_action": False, "events": events,

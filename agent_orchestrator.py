@@ -105,7 +105,9 @@ def execute_human_approved(plan, dispatcher=None, *, verified_role=None,
     """
     steps = _validated(plan)
     task_id = plan["task_id"]
-    if verified_role not in APPROVED_ROLES or signed_human_approval is not True:
+    # A role from an improperly decoded identity payload may be an array or
+    # object. Membership on such a value raises TypeError; deny safely instead.
+    if type(verified_role) is not str or verified_role not in APPROVED_ROLES or signed_human_approval is not True:
         return {"task_id": task_id, "status": "AWAITING_HUMAN",
                 "executed": 0, "results": [], "events": []}
     if type(replan_count) is not int or not 0 <= replan_count <= MAX_REPLANS:

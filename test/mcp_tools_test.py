@@ -733,6 +733,10 @@ def _spy(tool, args):
 r = orch.execute_human_approved(_plan(), _spy, verified_role="Analyst", signed_human_approval=True)
 check("orchestrator: an Analyst role cannot execute — the dispatcher is never called",
       r["status"] == "AWAITING_HUMAN" and r["executed"] == 0 and _calls == [])
+check("orchestrator: malformed decoded role types deny instead of raising a TypeError",
+      all(orch.execute_human_approved(
+          _plan(), _spy, verified_role=bad, signed_human_approval=True)["status"] == "AWAITING_HUMAN"
+          for bad in ([], {}, 123, True)) and _calls == [])
 r = orch.execute_human_approved(_plan(), _spy, verified_role="Reviewer-MLRO", signed_human_approval=False)
 check("orchestrator: without the approval flag nothing executes",
       r["status"] == "AWAITING_HUMAN" and _calls == [])
