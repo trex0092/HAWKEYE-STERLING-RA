@@ -10,6 +10,30 @@ CI guard: `.github/workflows/site-currency.yml`
 Build trigger: `.github/workflows/netlify-production-deploy.yml`
 Exact content comparison: `scripts/site-currency.mjs`
 
+### Runtime-asset release coverage
+
+The static asset probe compares all root HTML, JavaScript, CSS and webmanifest
+files, plus the published `robots.txt` and the browser-fetched
+`data/country-score-suggested.json`. The Netlify build-hook workflow's
+`push.paths` matches this asset set, including `privacy-policy.html`,
+`terms.html` and `404.html`, so changing any of those files alone schedules
+a deploy. `test/netlify-deploy-workflow-privacy.test.mjs` enforces that
+**every** probed runtime asset activates the production deploy trigger.
+
+Do not add `data/**` wholesale to the build trigger: other files under `data/`
+are audit state, transient screening results or governance snapshots and can
+change daily without affecting the served app. Deploying the country-score
+*suggestion* file is only a publication update. It does **not** approve or
+apply proposed changes to the underlying country-risk model or ASM gold
+EDD thresholds.
+
+This trigger/monitor parity is a **repository-side safeguard only**. It
+does not fix stopped Netlify builds, a locked production deployment, a
+wrong project/branch connection, or missing Netlify permissions. The
+site's actual live content must still pass Site Currency before being
+called published/current.
+
+
 ## Evidence and incident boundary (2026-10-09)
 
 - The Site Currency run [37950228106](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/37950228106)
