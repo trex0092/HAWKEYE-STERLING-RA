@@ -21,6 +21,7 @@ import {
 } from './reg-draft-budget.mjs';
 import { makeApiUsdBudget } from './api-cost-budget.mjs';
 import { appendApiCostEvent } from './api-cost-dashboard.mjs';
+import { classifyApiQuotaFailure, appendApiQuotaEvent } from './api-quota-alerts.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
@@ -190,6 +191,15 @@ async function draftFor(c) {
          logged, stored in the proposal or surfaced to the caller. */
       const detail = await res.text().catch(() => '');
       const reason = providerStopReason(res.status, detail.slice(0, 2048));
+      const cause = classifyApiQuotaFailure(res.status, reason);
+      if (cause) {
+        const recorded = appendApiQuotaEvent({
+          schema: 1, observed_at: new Date().toISOString(),
+          provider: 'anthropic', workflow: 'regulatory-watch', model: MODEL,
+          http_status: res.status, cause,
+        });
+        if (!recorded.ok) console.warn('reg-draft: sanitized quota telemetry unavailable');
+      }
       console.warn('reg-draft: Anthropic request stopped: HTTP ' + res.status + ' (' + reason + ')');
       return { text: manualDraftSection(c, reason), ok: false, attempted: true,
         halt: true, haltReason: reason };

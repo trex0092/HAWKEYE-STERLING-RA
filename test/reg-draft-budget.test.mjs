@@ -1,3 +1,5 @@
+import { classifyApiQuotaFailure, validApiQuotaEvent, parseApiQuotaEvents,
+  renderQuotaSummary, notifyApiQuotaIssues } from '../scripts/api-quota-alerts.mjs';
 import { validateApiCostEvent, parseApiCostEvents, summarizeApiCostEvents,
   renderApiCostDashboard } from '../scripts/api-cost-dashboard.mjs';
 import { makeApiUsdBudget, parseUsdMicro } from '../scripts/api-cost-budget.mjs';
@@ -287,6 +289,50 @@ check('invalid provider, model, date, monetary values and negative tokens fail c
 check('a bad JSON line cannot be silently discarded from the cost dashboard',
   !parseApiCostEvents(JSON.stringify(eventA) + '\n{broken').ok &&
   !parseApiCostEvents(JSON.stringify({ ...eventA, cost_usd: '0' })).ok);
+
+
+const quotaEvent = { schema: 1, observed_at: '2026-10-12T12:00:00.000Z',
+  provider: 'anthropic', workflow: 'regulatory-watch', model: 'test-model',
+  http_status: 429, cause: 'rate_or_quota' };
+check('quota detection distinguishes throttling from provider billing/auth failures',
+  classifyApiQuotaFailure(429) === 'rate_or_quota' &&
+  classifyApiQuotaFailure(400, 'provider billing or authentication failure') === 'billing_or_auth' &&
+  classifyApiQuotaFailure(503) === null);
+check('metadata-only quota event passes and raw provider error bodies are impossible',
+  validApiQuotaEvent(quotaEvent) &&
+  !validApiQuotaEvent({ ...quotaEvent, error_body: 'PRIVATE CUSTOMER ACCOUNT' }) &&
+  !validApiQuotaEvent({ ...quotaEvent, model: 'bad | injected' }));
+const parsedQuota = parseApiQuotaEvents(JSON.stringify(quotaEvent) + '\n');
+check('quota events retain only approved classifications and preserve source', parsedQuota.ok &&
+  parsedQuota.events.length === 1 &&
+  renderQuotaSummary(parsedQuota.events).includes('rate_or_quota'));
+check('invalid quota telemetry cannot silently disappear',
+  !parseApiQuotaEvents('{bad}').ok &&
+  !parseApiQuotaEvents(JSON.stringify({ ...quotaEvent, token: 'SECRET' })).ok);
+let apiCalls = [];
+const mockFetch = async (url, opts) => {
+  apiCalls.push({ url, method: opts.method || 'GET' });
+  if (!opts.method) return { ok: true, headers: { get: () => null },
+    json: async () => [{ title: 'API quota alert: anthropic / regulatory-watch / rate_or_quota' }] };
+  return { ok: true };
+};
+const dedupQuota = await notifyApiQuotaIssues([quotaEvent], {
+  repository: 'owner/repo', token: 'SYNTHETIC_TOKEN', fetchImpl: mockFetch,
+});
+check('quota issue notifications are deduplicated against existing open issues',
+  dedupQuota.ok && dedupQuota.already_open === 1 &&
+  apiCalls.length === 1 && apiCalls[0].method === 'GET');
+const incompleteIndex = await notifyApiQuotaIssues([quotaEvent], {
+  repository: 'owner/repo', token: 'SYNTHETIC_TOKEN',
+  fetchImpl: async () => ({ ok: true, headers: { get: () => '<next>; rel="next"' },
+    json: async () => [] }),
+});
+check('unverified paginated issue history cannot trigger duplicate issue creation',
+  !incompleteIndex.ok && incompleteIndex.reason === 'github_issue_index_unavailable');
+check('quota issue notifier fails safely without a GitHub token and never calls fetch',
+  !(await notifyApiQuotaIssues([quotaEvent], {
+    repository: 'owner/repo', fetchImpl: async () => { throw Error('should not call'); }
+  })).ok);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -164,6 +164,14 @@ jobs:
         continue-on-error: true
         run: node scripts/api-cost-dashboard.mjs
 
+      - name: API credit/quota alerts (sanitized categories only)
+        if: steps.watch.outputs.has_changes == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          API_QUOTA_ALERT_ISSUES: '1'
+        run: node scripts/api-quota-alerts.mjs
+
       - name: Notify Asana — HAWKEYE STERLING APP + the law-change queue
         id: asana
         # Don't fail the run if Asana is unreachable; the issue fallback covers it.
