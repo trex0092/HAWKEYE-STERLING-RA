@@ -123,7 +123,8 @@ check('invalid date or arbitrary prefix is refused by the daily-only guard',
   globalThis.fetch = async (url, opts = {}) => {
     const path = String(url).replace('https://app.asana.com/api/1.0', '');
     if (path.startsWith('/sections/') && !path.endsWith('/addTask'))
-      return response({ gid: section, project: { gid: project } });
+      return response({ gid: section, name: 'Screening Sanctions Update',
+        project: { gid: project } });
     if (path.startsWith('/projects/' + project + '/tasks?')) {
       return { ...response(rows), json: async () => ({ data: rows, next_page: null }) };
     }
