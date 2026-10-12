@@ -57,11 +57,9 @@ jobs:
           npx playwright install --with-deps chromium firefox webkit
 
       - name: Cross-browser smoke
-        # Non-blocking, mirroring the Visual Regression workflow's browser step:
-        # the report is uploaded for inspection, but a single-engine quirk or a
-        # flaky browser launch never blocks the merge. Findings live in the
-        # uploaded artifact and the step annotation.
-        continue-on-error: true
+        # Required browser evidence must fail the job on a real test failure.
+        # Upload the report on both success and failure for diagnosis, but
+        # never convert a failing Playwright result into a green check.
         run: npx playwright test --config=playwright.cross-browser.config.mjs
 
       - name: Upload report
