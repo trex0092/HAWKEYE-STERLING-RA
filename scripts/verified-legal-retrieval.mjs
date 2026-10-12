@@ -14,6 +14,13 @@ const TENANT_ID = /^[A-Za-z0-9._:-]{1,96}$/;
 const CITATION_KEYS = ['article', 'basis', 'locator', 'quote', 'source_url', 'verified_by', 'verified_on'];
 const HUMAN_VERIFIERS = new Set(['MLRO', 'Counsel']);
 const CITATION_ID = /^[A-Za-z0-9._:-]{1,96}$/;
+const CONTROL_STATUSES = new Set(['met', 'partial', 'pending', 'monitored']);
+const QUERY_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'this', 'that', 'these', 'those',
+  'what', 'which', 'when', 'where', 'who', 'why', 'how', 'are', 'was',
+  'were', 'has', 'have', 'had', 'you', 'your', 'our', 'their', 'can',
+  'could', 'would', 'should', 'about', 'under', 'into', 'than'
+]);
 
 function citationShapeValid(c) {
   return !!c && typeof c === 'object' && !Array.isArray(c) &&
@@ -25,7 +32,7 @@ function citationShapeValid(c) {
    present. Refuse overt instruction/spoofing markers for human resourcing. */
 function suspiciousSourceText(value) {
   if (typeof value !== 'string') return true;
-  return /[\u0000-\u0008\u000B-\u001F\u007F\u202A-\u202E]/u.test(value) ||
+  return /[\u0000-\u0008\u000B-\u001F\u007F\u202A-\u202E\u2066-\u2069]/u.test(value) ||
     /<\s*\/?\s*(?:system|developer|assistant|tool)\s*>/i.test(value) ||
     /\[\s*\/?INST\s*\]/i.test(value) ||
     /\b(?:ignore|disregard|override|forget)\s+(?:(?:all|your|the)\s+)?(?:prior|previous|system|developer)\s+(?:instructions?|prompts?|rules?)\b/i.test(value) ||
@@ -90,10 +97,22 @@ function buildVerifiedLegalCorpus(registry, approvedHosts, asOf, principal = {})
     ? [...new Set(approvedHosts.filter(x => typeof x === 'string')
       .map(x => x.trim().toLowerCase()))]
     : [];
+  // Citation IDs are provenance keys, not display names. Duplicate IDs are
+  // ambiguous even if each row claims to be signed off; reject every copy
+  // rather than allowing a downstream consumer to pick an arbitrary record.
+  const ids = new Set();
+  const ambiguousIds = new Set();
+  for (const row of registry.obligations) {
+    if (row && typeof row.id === 'string') {
+      if (ids.has(row.id)) ambiguousIds.add(row.id);
+      ids.add(row.id);
+    }
+  }
   const out = [];
   for (const row of registry.obligations) {
     if (!row || typeof row !== 'object' || Array.isArray(row) ||
-        typeof row.id !== 'string' || !CITATION_ID.test(row.id) ||
+        typeof row.id !== 'string' || !CITATION_ID.test(row.id) || ambiguousIds.has(row.id) ||
+        (row.status !== undefined && !CONTROL_STATUSES.has(row.status)) ||
         typeof row.obligation !== 'string' || !row.obligation.trim() || row.obligation.length > 3000 ||
         typeof row.instrument !== 'string' || !row.instrument.trim() || row.instrument.length > 512) continue;
     const c = row.source_citation;
@@ -155,7 +174,9 @@ function retrieveVerifiedLegal(registry, query, options = {}) {
   if (!dateValid(asOf)) return { status: 'invalid_date', results: [] };
   const corpus = buildVerifiedLegalCorpus(registry, options.approvedHosts, asOf,
     { role: options.role, tenantId: options.tenantId });
-  const terms = tokens(query);
+  // Filler words alone must not turn an unrelated quotation into apparent
+  // legal evidence. The public token helper is unchanged for other callers.
+  const terms = tokens(query).filter(term => !QUERY_STOPWORDS.has(term));
   if (!terms.length) return { status: 'invalid_query', results: [] };
   const ranked = [];
   for (const item of corpus) {
