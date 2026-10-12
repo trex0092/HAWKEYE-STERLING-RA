@@ -6457,6 +6457,29 @@ check("plan lacking independently verified role is held before any tool call",
       agent_plan.run_review_plan(
           _proposed, authorized_tools=set(_handlers),
           tool_handlers=_handlers)["status"] == "HOLD")
+check("malformed human roles are held instead of crashing trusted plan execution",
+      all(agent_plan.run_review_plan(
+          _proposed, verified_role=bad, authorized_tools=set(_handlers),
+          tool_handlers=_handlers)["status"] == "HOLD"
+          for bad in ([], {}, 42, True)))
+check("noncallable and nonfinite timing sources cannot authorize read-only execution",
+      agent_plan.run_review_plan(
+          _proposed, verified_role="Analyst", authorized_tools=set(_handlers),
+          tool_handlers=_handlers, clock="not a clock")["status"] == "HOLD"
+      and agent_plan.run_review_plan(
+          _proposed, verified_role="Analyst", authorized_tools=set(_handlers),
+          tool_handlers=_handlers, clock=lambda: float("nan"))["status"] == "HOLD")
+_backward_time = iter((30.0, 29.0))
+_clock_calls = []
+def _must_not_run(args, state):
+    _clock_calls.append(1)
+    return {"ok": True}
+_clock_out = agent_plan.run_review_plan(
+    _proposed, verified_role="Admin", authorized_tools=set(_handlers),
+    tool_handlers={k: _must_not_run for k in _handlers}, clock=lambda: next(_backward_time))
+check("backwards clock fails closed before invoking any read-only callback",
+      _clock_out["status"] == "DEGRADED" and _clock_calls == [])
+
 check("plan lacking a trusted tool registry is held",
       agent_plan.run_review_plan(
           _proposed, verified_role="Analyst", authorized_tools=set(),
