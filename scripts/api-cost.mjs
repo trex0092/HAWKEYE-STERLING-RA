@@ -174,12 +174,15 @@ export function quoteProviderResponseCost(table, { provider, model, response } =
   const usage = normalizeProviderUsage(provider, response);
   if (!usage) return { status: 'unpriced', reason: 'raw_provider_usage_missing_or_invalid' };
   // An alias can resolve to a snapshot or a provider may return a fallback.
-  // Price the REPORTED model when present, never assume it costs the same.
+  // Do not attribute a different model to the requested-model usage ledger.
+  // The caller must explicitly configure the reported snapshot before pricing it.
   if (Object.hasOwn(response, 'model')) {
     if (typeof response.model !== 'string' || !MODEL.test(response.model)) {
       return { status: 'unpriced', reason: 'reported_model_invalid' };
     }
-    model = response.model;
+    if (response.model !== model) {
+      return { status: 'unpriced', reason: 'reported_model_mismatch' };
+    }
   }
   return quoteApiTokenCost(table, { provider, model, usage }, opts);
 }
