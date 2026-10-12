@@ -29,6 +29,13 @@ for (const source of domains.sanctions?.sources || []) {
   }
   if (found.enabled === false) fail("sanctions: required source disabled: " + source.id);
   if (!found.url && !found.file) fail("sanctions: required source has no load target: " + source.id);
+  // This contract is also consumed by the runtime assurance checker.
+  // Enforce identical positive floors so a registry floor change cannot
+  // silently leave the assurance status green on an undersized source.
+  if (!Number.isSafeInteger(source.minNames) || source.minNames <= 0
+      || source.minNames !== found.minNames) {
+    fail("sanctions: source count floor for " + source.id + " differs from registry");
+  }
   /* The contract's fallback must be the one the loader honours (the
      registry entry's fallbackSourceId) and must itself be loadable. */
   const fb = source.fallbackSourceId || "";
@@ -39,6 +46,10 @@ for (const source of domains.sanctions?.sources || []) {
     const f = sanctionsCore.find((s) => s.id === fb) || sanctionsExtra.find((s) => s.id === fb);
     if (!f || f.enabled === false || (!f.url && !f.file)) fail("sanctions: declared fallback " + fb + " for " + source.id + " is missing, disabled or has no load target");
     else if (!(Number(f.minNames) > 0)) fail("sanctions: declared fallback " + fb + " for " + source.id + " has no minNames floor");
+    else if (!Number.isSafeInteger(source.fallbackMinNames)
+      || source.fallbackMinNames !== f.minNames) {
+      fail("sanctions: fallback floor for " + fb + " differs from registry");
+    }
   }
 }
 

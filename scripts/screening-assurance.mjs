@@ -74,11 +74,27 @@ export function assessRuntime({
     .filter(s => s && s.required !== false && String(s.id || ''));
   const requiredSanctions = requiredEntries.map(s => String(s.id));
   const fallbackOf = new Map(requiredEntries.map(s => [String(s.id), String(s.fallbackSourceId || '')]));
+  // Coverage floors mirror the sanctions registry, but are pinned in the
+  // assurance contract so the proof can be independently evaluated from the
+  // persisted run counts. A nonempty but truncated list is NOT complete.
+  const floorById = new Map(requiredEntries.map(s => [String(s.id), s.minNames]));
+  for (const entry of requiredEntries) {
+    const fb = String(entry.fallbackSourceId || '');
+    if (fb && !floorById.has(fb)) floorById.set(fb, entry.fallbackMinNames);
+  }
+  const invalidFloors = requiredEntries.filter(s =>
+    !Number.isSafeInteger(s.minNames) || s.minNames <= 0 ||
+    (s.fallbackSourceId && (!Number.isSafeInteger(s.fallbackMinNames) || s.fallbackMinNames <= 0)));
   const loaded = arr(results?.lists);
+  const loadedIds = loaded.map(x => String(x?.id || ''));
+  const duplicateLoaded = loadedIds.filter((id, i) => loadedIds.indexOf(id) !== i);
+  const duplicateContract = requiredSanctions.filter((id, i) => requiredSanctions.indexOf(id) !== i);
   const loadedById = new Map(loaded.map(x => [String(x?.id || ''), x]));
   const complete = id => {
     const x = loadedById.get(id);
-    return !!x && x.partial !== true && num(x.count) > 0;
+    const floor = floorById.get(id);
+    return !!x && x.partial !== true && Number.isSafeInteger(x.count)
+      && Number.isSafeInteger(floor) && floor > 0 && x.count >= floor;
   };
   /* A required source that did not load completely is covered only by its
      contract-declared fallback, and only when that fallback loaded complete
@@ -93,10 +109,20 @@ export function assessRuntime({
   const missingRequired = unresolvedRequired.filter(id => !loadedById.has(id));
   const partialRequired = unresolvedRequired.filter(id => loadedById.get(id)?.partial === true);
   const emptyRequired = unresolvedRequired.filter(id => num(loadedById.get(id)?.count) <= 0);
+  const undersizedRequired = unresolvedRequired.filter(id => {
+    const x = loadedById.get(id);
+    return !!x && x.partial !== true && !complete(id);
+  });
   const currentRunIssue = runDateIssue(results?.date, nowMs);
   const sanctionsReasons = [];
   if (currentRunIssue) sanctionsReasons.push(currentRunIssue);
   if (!requiredSanctions.length) sanctionsReasons.push('sanctions contract defines no required sources');
+  if (invalidFloors.length) sanctionsReasons.push('required sanctions coverage floors absent or invalid: '
+    + invalidFloors.map(s => s.id).join(', '));
+  if (duplicateContract.length) sanctionsReasons.push('duplicate required sanctions source IDs in contract: '
+    + [...new Set(duplicateContract)].join(', '));
+  if (duplicateLoaded.length) sanctionsReasons.push('duplicate sanctions source IDs in run evidence: '
+    + [...new Set(duplicateLoaded)].join(', '));
   const sanctionsWarnings = servedByFallback.map(x => 'required sanctions source ' + x.id
     + ' did not load completely - screened via its declared fallback ' + x.fallback
     + ' (' + x.fallbackCount + ' names)');
@@ -104,6 +130,9 @@ export function assessRuntime({
   if (missingRequired.length) sanctionsReasons.push('required sanctions sources missing: ' + missingRequired.join(', '));
   if (partialRequired.length) sanctionsReasons.push('required sanctions sources partial: ' + partialRequired.join(', '));
   if (emptyRequired.length) sanctionsReasons.push('required sanctions sources empty: ' + emptyRequired.join(', '));
+  if (undersizedRequired.length) sanctionsReasons.push('required sanctions source counts below verified coverage floor: '
+    + undersizedRequired.map(id => id + ' (' + String(loadedById.get(id)?.count)
+      + ' < ' + String(floorById.get(id)) + ')').join(', '));
   /* The worldwide-screening contract defines five consolidated sources as the
      required sanctions baseline. National/regional sources are supplements:
      losing one must remain visible, but it is not equivalent to losing OFAC,
@@ -115,6 +144,7 @@ export function assessRuntime({
     screenedSubjects: num(results?.screened),
     loadedSources: loaded.map(x => ({ id: x?.id || '', name: x?.name || '', count: num(x?.count), partial: !!x?.partial })),
     requiredSourceIds: requiredSanctions,
+    sourceFloors: [...floorById].map(([id, minNames]) => ({ id, minNames })),
     servedByFallback,
     notes: arr(results?.failures),
   }, sanctionsWarnings);

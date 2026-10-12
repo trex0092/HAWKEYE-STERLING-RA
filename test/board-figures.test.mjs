@@ -106,11 +106,11 @@ console.log('\n— runtime worldwide screening assurance —\n');
     domains: {
       sanctions: {
         sources: [
-          { id: 'un-consolidated', required: true },
-          { id: 'ofac-sdn', required: true },
-          { id: 'ofac-consolidated', required: true },
-          { id: 'uk-ofsi', required: true },
-          { id: 'eu-fsf', required: true, fallbackSourceId: 'fr-dgt' },
+          { id: 'un-consolidated', required: true, minNames: 500 },
+          { id: 'ofac-sdn', required: true, minNames: 9000 },
+          { id: 'ofac-consolidated', required: true, minNames: 100 },
+          { id: 'uk-ofsi', required: true, minNames: 9000 },
+          { id: 'eu-fsf', required: true, minNames: 20000, fallbackSourceId: 'fr-dgt', fallbackMinNames: 9800 },
         ],
       },
     },
@@ -169,6 +169,33 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('PEP expected-population shortfalls cannot be hidden by a false partial flag',
     !incompletePep.domains.pep.operational
     && incompletePep.domains.pep.reasons.some(r => r.includes('below its declared expected population')));
+
+  const underfloor = structuredClone(results);
+  underfloor.lists = underfloor.lists.map(x => x.id === 'ofac-sdn' ? { ...x, count: 100, partial: false } : x);
+  const floorFail = assessRuntime({ results: underfloor, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('a truncated required list cannot be accepted as complete merely because partial is false',
+    !floorFail.domains.sanctions.operational
+    && floorFail.domains.sanctions.reasons.some(r => r.includes('coverage floor') && r.includes('ofac-sdn')));
+  const underfloorFallback = structuredClone(results);
+  underfloorFallback.lists = underfloorFallback.lists.filter(x => x.id !== 'eu-fsf');
+  underfloorFallback.lists.push({ id: 'fr-dgt', count: 1200, partial: false });
+  const fbFloorFail = assessRuntime({ results: underfloorFallback, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('a small fallback never certifies an unavailable required sanctions source',
+    !fbFloorFail.domains.sanctions.operational && fbFloorFail.domains.sanctions.evidence.servedByFallback.length === 0);
+  const duplicateSource = structuredClone(results);
+  duplicateSource.lists.push({ id: 'ofac-sdn', count: 10000, partial: false });
+  const dupFail = assessRuntime({ results: duplicateSource, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('duplicate sanctions source records cannot masquerade as one complete list',
+    !dupFail.domains.sanctions.operational && dupFail.domains.sanctions.reasons.some(r => r.includes('duplicate sanctions source')));
+  const badContract = structuredClone(contract);
+  delete badContract.domains.sanctions.sources[0].minNames;
+  const badFloor = assessRuntime({ results, pepDataset: pep, contract: badContract, nowMs, expectedAdverseMatrix: 79 });
+  check('missing contract coverage floors never yield an operational result',
+    !badFloor.domains.sanctions.operational && badFloor.domains.sanctions.reasons.some(r => r.includes('floors absent')));
+  const badCount = structuredClone(results);
+  badCount.lists[0].count = '1000';
+  check('non-integer string source counts are not accepted as evidence of full load',
+    !assessRuntime({ results: badCount, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 }).domains.sanctions.operational);
 
   const noOfac = structuredClone(results);
   noOfac.lists = noOfac.lists.filter(x => x.id !== 'ofac-sdn');

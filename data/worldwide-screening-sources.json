@@ -12,28 +12,32 @@
           "name": "UN Security Council Consolidated List",
           "kind": "official-consolidated",
           "required": true,
-          "registry": "data/sanctions-sources.json"
+          "registry": "data/sanctions-sources.json",
+          "minNames": 500
         },
         {
           "id": "ofac-sdn",
           "name": "US OFAC SDN",
           "kind": "official-consolidated",
           "required": true,
-          "registry": "data/sanctions-sources.json"
+          "registry": "data/sanctions-sources.json",
+          "minNames": 9000
         },
         {
           "id": "ofac-consolidated",
           "name": "US OFAC Consolidated non-SDN",
           "kind": "official-consolidated",
           "required": true,
-          "registry": "data/sanctions-sources.json"
+          "registry": "data/sanctions-sources.json",
+          "minNames": 100
         },
         {
           "id": "uk-ofsi",
           "name": "UK Sanctions List",
           "kind": "official-consolidated",
           "required": true,
-          "registry": "data/sanctions-sources.json"
+          "registry": "data/sanctions-sources.json",
+          "minNames": 9000
         },
         {
           "id": "eu-fsf",
@@ -41,7 +45,9 @@
           "kind": "official-consolidated",
           "required": true,
           "registry": "data/sanctions-sources.json",
-          "fallbackSourceId": "fr-dgt"
+          "fallbackSourceId": "fr-dgt",
+          "minNames": 20000,
+          "fallbackMinNames": 9800
         }
       ],
       "supplements": "data/sanctions-extra.json",
