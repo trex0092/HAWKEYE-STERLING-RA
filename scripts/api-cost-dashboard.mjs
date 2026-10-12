@@ -1,5 +1,6 @@
 /* Privacy-minimizing offline API cost dashboard. Supplied data is not an invoice. */
 import { readFileSync, appendFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { parseApiPriceTable, quoteApiTokenCost } from './api-cost.mjs';
 
@@ -26,6 +27,48 @@ function validEvent(e) {
   return Object.keys(e.usage).sort().join('|') === [...keys].sort().join('|') &&
     keys.every(key => Number.isSafeInteger(e.usage[key]) && e.usage[key] >= 0);
 }
+/* Only an allowlisted metadata schema can reach the journal; no names,
+ * prompts, source excerpts, credentials or response bodies are accepted.
+ * The receipt is random: it is not a customer or GitHub identifier. */
+export function prepareApiCostUsageEvent({
+  provider, model, workflow, usage,
+  recordedAt = new Date().toISOString(), receiptHash = randomBytes(32).toString('hex')
+} = {}) {
+  const event = { receipt_hash: receiptHash, recorded_at: recordedAt,
+    provider, model, workflow, usage };
+  return validEvent(event) ? event : null;
+}
+
+export function appendApiCostUsage(payload) {
+  const event = prepareApiCostUsageEvent(payload);
+  if (!event) return { ok: false, reason: 'invalid_sanitized_usage' };
+  try {
+    appendFileSync('api-cost-ledger.jsonl', JSON.stringify(event) + '\n', {
+      mode: 0o600, flag: 'a', encoding: 'utf8'
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: 'usage_journal_unavailable' };
+  }
+}
+
+export function parseApiCostUsageLedger(raw) {
+  if (typeof raw !== 'string' || raw.length > 2_000_000 || !raw.trim()) return null;
+  try {
+    const input = JSON.parse(raw);
+    if (input?.schema === 1 && Array.isArray(input.records) &&
+        input.records.length <= 5000) return input;
+  } catch {
+    // A bounded JSONL journal is the normal producer format.
+  }
+  const lines = raw.trimEnd().split('\n');
+  if (!lines.length || lines.length > 5000 || lines.some(line => line.length > 3000)) return null;
+  try {
+    const records = lines.map(line => JSON.parse(line));
+    return records.every(validEvent) ? { schema: 1, records } : null;
+  } catch { return null; }
+}
+
 function usd(m) {
   return (m / MICRO).toString() + '.' + (m % MICRO).toString().padStart(6, '0');
 }
@@ -98,7 +141,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       const raw = readFileSync(args[1], 'utf8');
       if (raw.length > 2_000_000) throw new Error('usage file too large');
       const prices = parseApiPriceTable(readFileSync(args[3], 'utf8'));
-      const result = buildApiCostDashboard(JSON.parse(raw), prices.ok ? prices.table : null);
+      const result = buildApiCostDashboard(parseApiCostUsageLedger(raw),
+        prices.ok ? prices.table : null);
       const output = renderApiCostDashboard(result);
       console.log(output);
       if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, output);

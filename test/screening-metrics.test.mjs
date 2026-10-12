@@ -1,7 +1,8 @@
 /* Unit tests for screening-metrics pure logic (offline).
    Usage: node test/screening-metrics.test.mjs */
 import { computeMetrics, buildReport } from '../scripts/screening-metrics.mjs';
-import { buildApiCostDashboard, renderApiCostDashboard } from '../scripts/api-cost-dashboard.mjs';
+import { buildApiCostDashboard, renderApiCostDashboard, prepareApiCostUsageEvent,
+  parseApiCostUsageLedger } from '../scripts/api-cost-dashboard.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -75,6 +76,22 @@ check('free-text and confidential fields are never accepted into the ledger',
     costPrices, costOpts).rejected === 1 &&
   buildApiCostDashboard({ schema: 1, records: [{ ...costEvt, workflow: 'bad\nline' }] },
     costPrices, costOpts).rejected === 1);
+check('producer journal accepts only exact usage categories and randomly scoped receipt IDs',
+  prepareApiCostUsageEvent({ provider: 'openai', model: 'fixture-model',
+    workflow: 'screening-digest', usage: costEvt.usage,
+    recordedAt: '2026-10-12T07:20:00Z', receiptHash: 'd'.repeat(64) })?.receipt_hash === 'd'.repeat(64) &&
+  prepareApiCostUsageEvent({ provider: 'openai', model: 'fixture-model',
+    workflow: 'screening-digest', usage: { ...costEvt.usage, subject: 'SECRET' } }) === null);
+const journalEvent = prepareApiCostUsageEvent({
+  provider: 'openai', model: 'fixture-model', workflow: 'screening-digest',
+  usage: costEvt.usage, receiptHash: 'f'.repeat(64),
+  recordedAt: '2026-10-12T07:20:00Z'
+});
+const parsedJournal = parseApiCostUsageLedger(JSON.stringify(journalEvent) + '\n');
+check('dashboard imports producer JSONL journals without guessing missing usage',
+  parsedJournal?.records.length === 1 &&
+  buildApiCostDashboard(parsedJournal, costPrices, costOpts).status === 'priced_estimate' &&
+  parseApiCostUsageLedger('{"usage":{"prompt":"SECRET"}}\n') === null);
 check('missing and empty ledgers are explicitly incomplete',
   buildApiCostDashboard({ schema: 1, records: [] }, costPrices, costOpts).status === 'incomplete' &&
   buildApiCostDashboard({}, costPrices, costOpts).status === 'incomplete');

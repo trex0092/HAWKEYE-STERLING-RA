@@ -20,7 +20,9 @@ import {
   manualDraftSection, approvedWatchSource, approvedWatchSourceDetails,
   deferredDraftCause, providerStopReason, usageCounts
 } from './reg-draft-budget.mjs';
-import { parseApiPriceTable, quoteProviderResponseCost } from './api-cost.mjs';
+import { parseApiPriceTable, quoteProviderResponseCost,
+  normalizeProviderUsage } from './api-cost.mjs';
+import { appendApiCostUsage } from './api-cost-dashboard.mjs';
 import { evaluateApiSpend, conservativeInputTokenBound } from './api-spend-guard.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
@@ -205,6 +207,13 @@ async function draftFor(c) {
     if (quote.status === 'priced') {
       const cost = BigInt(quote.micro_usd);
       pricedUsageMicro += cost;
+      if (process.env.API_COST_TELEMETRY_ENABLED === '1') {
+        const recorded = appendApiCostUsage({
+          provider: 'anthropic', model: MODEL, workflow: 'regulatory-watch',
+          usage: normalizeProviderUsage('anthropic', data)
+        });
+        if (!recorded.ok) console.warn('reg-draft: sanitized cost journal unavailable');
+      }
       if (cost > BigInt(permission.reserved_micro_usd)) {
         // The conservative preflight was exceeded. Retain the excess and stop
         // further optional calls instead of treating the billed attempt as free.
