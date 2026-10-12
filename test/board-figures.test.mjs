@@ -143,7 +143,7 @@ console.log('\n— runtime worldwide screening assurance —\n');
     },
   };
   const pep = {
-    count: 50000, harvested: '2026-09-27T00:00:00.000Z', entries: [],
+    count: 50000, harvested: '2026-09-27T00:00:00.000Z', entries: Array(50000).fill({ synthetic: true }),
   };
   const nowMs = Date.parse('2026-09-28T00:00:00.000Z');
   const ok = assessRuntime({ results, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
@@ -188,6 +188,20 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance rejects a backbone summary that contradicts zero-failure counters',
     !cb.domains.adverseMedia.operational
     && cb.domains.adverseMedia.reasons.some(r => r.includes('contradicts')));
+  const truncatedPepEntries = assessRuntime({
+    results, pepDataset: { ...pep, entries: pep.entries.slice(0, 1000), partial: false },
+    contract, nowMs, expectedAdverseMatrix: 79,
+  });
+  check('PEP assurance detects a truncated person array even when its count header is unchanged',
+    !truncatedPepEntries.domains.pep.operational
+    && truncatedPepEntries.domains.pep.reasons.some(r => r.includes('actual entries')));
+  const missingPepEntries = assessRuntime({
+    results, pepDataset: { ...pep, entries: undefined },
+    contract, nowMs, expectedAdverseMatrix: 79,
+  });
+  check('PEP assurance rejects missing member records instead of trusting a count header',
+    !missingPepEntries.domains.pep.operational);
+
   const incompletePep = assessRuntime({
     results, pepDataset: { ...pep, expected: pep.count + 1, partial: false },
     contract, nowMs, expectedAdverseMatrix: 79,

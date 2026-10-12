@@ -255,6 +255,11 @@ export function assessRuntime({
     || !Number.isSafeInteger(pepRun.count) || pepRun.count < 0) {
     pepReasons.push('PEP dataset or consumed population count is missing or invalid');
   }
+  // The daily screen and assurance may both read a stale count header; verify
+  // that the downloaded artifact really contains that many person records.
+  if (!Array.isArray(pepDataset?.entries) || pepDataset.entries.length !== pepCount) {
+    pepReasons.push('worldwide PEP artifact population count does not match actual entries');
+  }
   if (pepRun.partial !== false && pepRun.partial !== true) {
     pepReasons.push('daily PEP evidence has no valid partial/completeness status');
   }
