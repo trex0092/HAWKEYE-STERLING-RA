@@ -664,6 +664,64 @@ def _boom(tool, args):
 r = orch.execute_human_approved(_plan(), _boom, verified_role="Admin", signed_human_approval=True)
 check("orchestrator: a dispatcher failure stops at NEEDS_HUMAN without leaking the exception",
       r["status"] == "NEEDS_HUMAN" and r["executed"] == 0 and "Zeta" not in json.dumps(r))
+oversized = orch.execute_human_approved(
+    _plan(), lambda *_: {"secret": "A" * (orch.MAX_RESULT_BYTES + 1)},
+    verified_role="Admin", signed_human_approval=True)
+check("orchestrator: an oversized tool response fails closed without leaking its content",
+      oversized["status"] == "NEEDS_HUMAN" and oversized["executed"] == 0
+      and oversized["results"] == [] and "AAA" not in json.dumps(oversized))
+bad_json = orch.execute_human_approved(
+    _plan(), lambda *_: {"score": float("nan")},
+    verified_role="Admin", signed_human_approval=True)
+check("orchestrator: non-finite tool evidence is rejected, not counted as a success",
+      bad_json["status"] == "NEEDS_HUMAN" and bad_json["executed"] == 0)
+bad_type = orch.execute_human_approved(
+    _plan(), lambda *_: ["a tool should return an evidence object"],
+    verified_role="Admin", signed_human_approval=True)
+check("orchestrator: tools must return a bounded structured JSON object",
+      bad_type["status"] == "NEEDS_HUMAN" and bad_type["results"] == [])
+cumulative = orch.execute_human_approved(
+    _plan([{"tool": "hawkeye_normalize_name", "arguments": {"name": "Zeta Quantum"}}] * 8),
+    lambda *_: {"evidence": "x" * 7500},
+    verified_role="Admin", signed_human_approval=True)
+check("orchestrator: cumulative evidence budget cannot be exhausted by multiple small tool results",
+      cumulative["status"] == "NEEDS_HUMAN" and 0 < cumulative["executed"] < 8
+      and len(cumulative["results"]) == cumulative["executed"])
+_mutable_result = {"nested": ["original"]}
+def _later_mutates_result(tool, args):
+    if tool == "hawkeye_name_variants":
+        _mutable_result["nested"].append("later modified")
+        return {"ok": True}
+    return _mutable_result
+snapshots = orch.execute_human_approved(
+    _plan([{"tool": "hawkeye_normalize_name", "arguments": {"name": "Zeta Quantum"}},
+           {"tool": "hawkeye_name_variants", "arguments": {"name": "Zeta Quantum"}}]),
+    _later_mutates_result, verified_role="Admin", signed_human_approval=True)
+check("orchestrator: recorded results are isolated from later tool mutations",
+      snapshots["status"] == "DRAFT_COMPLETE"
+      and snapshots["results"][0]["value"]["nested"] == ["original"]
+      and _mutable_result["nested"] == ["original", "later modified"])
+_mutable_plan = _plan([
+    {"tool": "hawkeye_normalize_name", "arguments": {"name": "Zeta Quantum"}},
+    {"tool": "hawkeye_name_variants", "arguments": {"name": "Zeta Quantum"}},
+])
+_executed_tools = []
+def _alter_plan_after_validation(tool, args):
+    _executed_tools.append((tool, args.get("name")))
+    if len(_executed_tools) == 1:
+        _mutable_plan["task_id"] = "tampered-after-approval"
+        _mutable_plan["steps"][1]["tool"] = "hawkeye_assemble_str_dossier"
+        _mutable_plan["steps"][1]["arguments"]["name"] = "changed evidence"
+    return {"ok": True}
+immutable_plan_result = orch.execute_human_approved(
+    _mutable_plan, _alter_plan_after_validation,
+    verified_role="Reviewer-MLRO", signed_human_approval=True)
+check("orchestrator: approved plan tool/arguments and task ID cannot change mid-execution",
+      immutable_plan_result["status"] == "DRAFT_COMPLETE"
+      and immutable_plan_result["task_id"] == "case-42"
+      and _executed_tools == [
+          ("hawkeye_normalize_name", "Zeta Quantum"),
+          ("hawkeye_name_variants", "Zeta Quantum")])
 _reordered = {"steps": _plan()["steps"], "objective": _plan()["objective"], "task_id": "case-42"}
 check("orchestrator: proposal digest is canonical (key order) and binds the exact plan",
       orch.proposal_digest(_plan()) == orch.proposal_digest(_reordered)
