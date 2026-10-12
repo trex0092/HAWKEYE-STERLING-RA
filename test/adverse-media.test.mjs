@@ -70,6 +70,11 @@ check('adverse-media name matching does not accept unrelated name substrings',
 check('adverse-media name matching keeps real whole-name hits',
   scoreAdverseMedia('John Smith',
     [{ title: 'John Smith charged with money laundering' }]).hit === true);
+check('a two-character given name must match even when the surname is long',
+  scoreAdverseMedia('Li Wang',
+    [{ title: 'Ming Wang charged with money laundering' }]).hit === false
+  && scoreAdverseMedia('Li Wang',
+    [{ title: 'Li Wang charged with money laundering' }]).hit === true);
 check('adverse-media name matching rejects company names embedded in unrelated words',
   scoreAdverseMedia('Acme',
     [{ title: 'AcmeFinancial implicated in accounting fraud' }]).hit === false);

@@ -28,6 +28,13 @@ const wrongName = scorePep('John Smith', { search: [
 check('scorePep requires the subject name in the result label', wrongName.hit === false);
 
 check('scorePep tolerates an empty response', scorePep('Acme Co', {}).hit === false);
+check('two-character given names are not discarded when a surname is longer',
+  scorePep('Li Wang', { search: [
+    { id: 'Qbad', label: 'Ming Wang', description: 'Politician' }
+  ] }).hit === false
+  && scorePep('Li Wang', { search: [
+    { id: 'Qok', label: 'Li Wang', description: 'Politician' }
+  ] }).hit === true);
 check('a label containing longer unrelated name tokens cannot match',
   scorePep('John Smith', { search: [
     { id: 'QX', label: 'Johnny Smithson', description: 'Politician and senator' }

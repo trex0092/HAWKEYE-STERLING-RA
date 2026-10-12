@@ -38,6 +38,10 @@ check('no hit when not all subject tokens match (namesake guard)', r.hit === fal
 check('a longer unrelated forename/surname is never a whole-token match',
   scoreInterpol('John Smith', { notices: [{ forename: 'Johnny', name: 'Smithson' }] }).hit === false);
 
+check('two-letter given name remains required when the surname is longer',
+  scoreInterpol('Li Wang', { notices: [{ forename: 'Ming', name: 'Wang' }] }).hit === false
+  && scoreInterpol('Li Wang', { notices: [{ forename: 'Li', name: 'Wang' }] }).hit === true);
+
 // unrelated subject
 r = scoreInterpol('Jane Doe', halJson);
 check('no hit for an unrelated subject', r.hit === false && r.count === 0);

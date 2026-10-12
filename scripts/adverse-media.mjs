@@ -831,11 +831,10 @@ const CORP_STOP_MEDIA = new Set([
    multi-language stream. */
 export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
   const nm = normalize(name);
-  // Prefer tokens ≥3 chars; but for short multi-token names (e.g. "Xi Bo",
-  // common in East-Asian names) that filter is empty — fall back to ≥2 so the
-  // subject is still matchable rather than silently never flagged.
-  let nameTokens = nm.split(' ').filter(t => t.length >= 3);
-  if (!nameTokens.length) nameTokens = nm.split(' ').filter(t => t.length >= 2);
+  // Retain meaningful two-character given names even when the surname is
+  // longer. Otherwise "Li Wang" is reduced to "Wang" and any unrelated Wang
+  // can trigger a false adverse-media flag.
+  let nameTokens = nm.split(' ').filter(t => t.length >= 2);
   // Drop corporate/legal boilerplate so a headline needn't carry "LLC / General
   // Trading" to match; keep the full set only when the name is all boilerplate.
   const sig = nameTokens.filter(t => !CORP_STOP_MEDIA.has(t));

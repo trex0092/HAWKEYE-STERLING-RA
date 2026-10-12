@@ -39,10 +39,9 @@ function normalize(s) {
 /* Does a result label plausibly match the subject? All significant subject
    tokens must appear in the result label (guards against unrelated namesakes). */
 function labelMatches(name, label) {
-  // ≥3-char tokens normally; fall back to ≥2 for short multi-token names
-  // (e.g. "Xi Bo") so a real PEP namesake is not silently missed.
-  let want = normalize(name).split(' ').filter(t => t.length >= 3);
-  if (!want.length) want = normalize(name).split(' ').filter(t => t.length >= 2);
+  // Keep two-character given names even alongside longer surnames. Ignoring
+  // "Li" in "Li Wang" would falsely corroborate a different "Ming Wang".
+  const want = normalize(name).split(' ').filter(t => t.length >= 2);
   const have = new Set(normalize(label).split(' ').filter(Boolean));
   return want.length > 0 && want.every(t => have.has(t));
 }

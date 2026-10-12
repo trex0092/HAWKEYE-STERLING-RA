@@ -45,8 +45,8 @@ function normalize(s) {
 /* All significant subject tokens must appear in the item's title or one of
    its aliases — same namesake guard as the Interpol / PEP layers. */
 function titleMatches(subject, item) {
-  let want = normalize(subject).split(' ').filter(t => t.length >= 3);
-  if (!want.length) want = normalize(subject).split(' ').filter(t => t.length >= 2);
+  // Keep all non-initial name tokens, including two-character given names.
+  const want = normalize(subject).split(' ').filter(t => t.length >= 2);
   if (!want.length) return false;
   const candidates = [item && item.title || ''];
   const aliases = item && item.aliases;
