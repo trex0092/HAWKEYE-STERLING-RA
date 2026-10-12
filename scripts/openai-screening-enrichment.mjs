@@ -14,6 +14,9 @@ import { classifyApiQuotaFailure, appendApiQuotaEvent } from './api-quota-alerts
 
 // Published, lower-cost Responses API model. Access still depends on the
 // organization's enabled models and separately approved processor controls.
+import { parseApiPriceTable } from './api-cost.mjs';
+import { evaluateApiSpend, conservativeInputTokenBound } from './api-spend-guard.mjs';
+
 export const DEFAULT_OPENAI_SCREENING_MODEL = 'gpt-6-luna';
 export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
@@ -384,8 +387,11 @@ export async function enrichScreeningResults(results, {
   timeoutMs = process.env.OPENAI_SCREENING_TIMEOUT_MS,
   maxInputChars = process.env.OPENAI_SCREENING_MAX_INPUT_CHARS,
   maxOutputTokens = process.env.OPENAI_SCREENING_MAX_OUTPUT_TOKENS,
-  apiPriceTableJson = process.env.API_USD_RATES_JSON,
-  maxUsdPerCall = process.env.OPENAI_SCREENING_MAX_USD_PER_CALL
+  costGuard = {
+    priceTable: parseApiPriceTable(process.env.API_VERIFIED_PRICES_JSON || '').table || null,
+    maxUsdPerCall: process.env.OPENAI_SCREENING_MAX_USD_PER_CALL,
+    maxUsdPerRun: process.env.OPENAI_SCREENING_MAX_USD_PER_RUN
+  }
 } = {}) {
   if (enabled !== true) {
     return { enabled: false, text: '',
@@ -408,27 +414,16 @@ export async function enrichScreeningResults(results, {
   }
   const input = buildEnrichmentPrompt(results, { maxInputChars });
   const outputBudget = adaptiveOutputTokens(results, maxOutputTokens);
-  // A paid enhancement must have both a verified per-model price and a
-  // per-request USD limit before any confidential evidence is transmitted.
-  // Per-run reservations are NOT a substitute for provider account limits.
-  const usdGuard = makeApiUsdBudget({
-    provider: 'openai', model, priceTableJson: apiPriceTableJson,
-    limitUsd: maxUsdPerCall,
+  const permission = evaluateApiSpend({
+    priceTable: costGuard?.priceTable, provider: 'openai', model,
+    maxInputTokens: conservativeInputTokenBound(input), maxOutputTokens: outputBudget,
+    maxUsdPerCall: costGuard?.maxUsdPerCall, maxUsdPerRun: costGuard?.maxUsdPerRun
   });
-  const hold = usdGuard.preflight({
-    inputBytes: Buffer.byteLength(input, 'utf8'), maxOutputTokens: outputBudget,
-  });
-  if (!hold.ok) {
-    return { enabled: true, text: '',
-      error: 'OpenAI paid request blocked by USD budget or unverified pricing; manual review required',
-      cost_control: { allowed: false, reason: hold.reason } };
+  if (!permission.allowed) {
+    return { enabled: true, text: '', model,
+      error: 'OpenAI USD budget or verified pricing unavailable; manual review required',
+      budget_reason: permission.reason };
   }
-  let settled = false;
-  const settle = usage => {
-    if (settled) return null;
-    settled = true;
-    return usdGuard.settle(hold.id, usage);
-  };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), boundedInt(timeoutMs, 30000, 5000, 60000));
   try {

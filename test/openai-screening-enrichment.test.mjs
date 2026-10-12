@@ -1,6 +1,7 @@
 /* Offline contract tests: optional OpenAI screening digest is bounded,
  * source-grounded, never leaks upstream diagnostic bodies, and cannot mutate
  * the screening results. No provider credentials or live customer data. */
+import { evaluateApiSpend, conservativeInputTokenBound } from '../scripts/api-spend-guard.mjs';
 import {
   DEFAULT_OPENAI_SCREENING_MODEL, OPENAI_RESPONSES_URL,
   boundedInt, safeOpenAIError, safeUsage,
@@ -226,6 +227,44 @@ check('adaptive ceiling reserves more space only for complex runs',
   adaptiveOutputTokens({alerts:Array(12).fill({})},1800)===1400 &&
   adaptiveOutputTokens({alerts:Array(12).fill({})},256)===256);
 
+// Pricing is deliberately synthetic test arithmetic, not a market rate.
+const testPrice = { schema: 1, models: [{
+  provider: 'openai', model: 'gpt-6-luna',
+  verified_on: new Date().toISOString().slice(0, 10),
+  source_url: 'https://platform.openai.com/docs/pricing',
+  usd_per_million: { input: '2', cached_input: '2', output: '8' }
+}] };
+const fixtureCostGuard = {
+  priceTable: testPrice, maxUsdPerCall: '1.000000', maxUsdPerRun: '1.000000'
+};
+check('preflight USD budget rejects missing pricing and absent limits before paid use',
+  !evaluateApiSpend({ provider: 'openai', model: 'gpt-6-luna',
+    maxInputTokens: 5000, maxOutputTokens: 850,
+    maxUsdPerCall: '0.100000', maxUsdPerRun: '0.100000' }).allowed);
+check('budget preflight reserves noncached worst-case tokens and enforces both ceilings',
+  evaluateApiSpend({ ...fixtureCostGuard, provider: 'openai', model: 'gpt-6-luna',
+    maxInputTokens: 5000, maxOutputTokens: 1000 }).allowed &&
+  !evaluateApiSpend({ ...fixtureCostGuard, provider: 'openai', model: 'gpt-6-luna',
+    maxInputTokens: 5000, maxOutputTokens: 1000, maxUsdPerCall: '0.000001' }).allowed &&
+  !evaluateApiSpend({ ...fixtureCostGuard, provider: 'openai', model: 'gpt-6-luna',
+    maxInputTokens: 5000, maxOutputTokens: 1000, reservedMicroUsd: '990000' }).allowed);
+check('Anthropic cached price categories are reserved conservatively as ordinary input',
+  evaluateApiSpend({ priceTable: { schema: 1, models: [{
+    provider: 'anthropic', model: 'fixture-model',
+    verified_on: new Date().toISOString().slice(0, 10),
+    source_url: 'https://docs.anthropic.com/en/docs/about-claude/pricing',
+    usd_per_million: { input: '1', cached_read: '0.1', cached_write: '2', output: '3' }
+  }] }, provider: 'anthropic', model: 'fixture-model',
+  maxInputTokens: 1000, maxOutputTokens: 1000,
+  maxUsdPerCall: '0.01', maxUsdPerRun: '0.02' }).reserved_micro_usd === '4000');
+check('USD budgets never accept zero, negative, exponent or partial evidence',
+  ['0', '-1', '1e4', '1.1234567'].every(x =>
+    !evaluateApiSpend({ ...fixtureCostGuard, provider: 'openai', model: 'gpt-6-luna',
+      maxInputTokens: 5000, maxOutputTokens: 1000, maxUsdPerCall: x }).allowed));
+check('input reservation reflects UTF8 text bytes and fixed conservative overhead',
+  conservativeInputTokenBound('A') === 4097 &&
+  conservativeInputTokenBound('é') === 4098);
+
 let called = 0;
 const disabled = await enrichScreeningResults(fixture,{
   enabled:false, apiKey:'SYNTHETIC_PROVIDER_KEY',fetchImpl:async()=>{called++;}
@@ -234,18 +273,18 @@ check('API key alone never authorizes customer-screening evidence egress',
   disabled.enabled === false && disabled.reason.includes('explicit processor/transfer approval') &&
   called === 0);
 const cleanDay = await enrichScreeningResults({...verifiedClean,matchCount:5},{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>{called++;throw new Error('MUST NOT BE CALLED');}
 });
 check('fully covered zero-change run avoids a paid model call, even with standing matches',
   cleanDay.enabled===true && cleanDay.skipped==='healthy_clean_run' &&
   cleanDay.text==='' && called===0);
-const noKey = await enrichScreeningResults(fixture,{enabled:true,apiKey:'',fetchImpl:async()=>{called++;}});
+const noKey = await enrichScreeningResults(fixture,{enabled:true,costGuard:fixtureCostGuard,apiKey:'',fetchImpl:async()=>{called++;}});
 check('missing key means no API call or customer-data egress',
   noKey.enabled === false && called === 0);
 let captured;
 const ok = await enrichScreeningResults(fixture,{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'gpt-6-luna',maxInputChars:5000,
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'gpt-6-luna',maxInputChars:5000,
   maxOutputTokens:999999,timeoutMs:99999999,
   fetchImpl:async(url,request)=>{
     captured={url,request};
@@ -269,7 +308,7 @@ check('success returns only model output and numeric usage metadata',
 const oneAlert = await enrichScreeningResults({
   ...fixture,alerts:[fixture.alerts[0]],newMatches:1
 }, {
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',maxOutputTokens:1800,
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',maxOutputTokens:1800,
   fetchImpl:async(_url,request)=>({
     ok:true,status:200,
     json:async()=>({
@@ -283,7 +322,7 @@ check('small, single-alert request reserves only the smaller output budget',
   oneAlert.text===validNote);
 let structureCalls=0;
 const invalidNote = await enrichScreeningResults(fixture,{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>{
     structureCalls++;
     return {ok:true,status:200,json:async()=>({
@@ -299,7 +338,7 @@ check('completed API response with missing headings fails closed while preservin
   invalidNote.usage.output_tokens===17);
 
 const headingOnlyReply = await enrichScreeningResults(fixture, {
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>({ok:true,status:200,json:async()=>({
     status:'completed',output:[{content:[{type:'output_text',text:headingsOnly}]}],
     usage:{input_tokens:150,output_tokens:40,total_tokens:190}
@@ -312,7 +351,7 @@ check('API responses with all headings but no content fail closed with numeric u
 
 let readErrorBody=0;
 const bad=await enrichScreeningResults(fixture,{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>({ok:false,status:429,json:async()=>{
     readErrorBody++;
     return {error:{message:'REFLECTED_SECRET_OR_PRIVATE_ACCOUNT_ID'}};
@@ -322,14 +361,14 @@ check('429 provider error bodies are never parsed, returned or leaked into logs'
   bad.text==='' && bad.error.includes('429') && readErrorBody===0 &&
   !JSON.stringify(bad).includes('REFLECTED_SECRET_OR_PRIVATE_ACCOUNT_ID'));
 const thrown=await enrichScreeningResults(fixture,{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>{throw new Error('REFLECTED_CUSTOMER_ID_AND_KEY');}
 });
 check('network exception messages are redacted, never echoed',
   thrown.error.includes('transport failed') &&
   !JSON.stringify(thrown).includes('REFLECTED_CUSTOMER_ID_AND_KEY'));
 const incomplete=await enrichScreeningResults(fixture,{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>({ok:true,status:200,json:async()=>({
     status:'incomplete',output:[{content:[{type:'output_text',text:'TRUNCATED'}]}]
   })})
@@ -337,7 +376,7 @@ const incomplete=await enrichScreeningResults(fixture,{
 check('partially generated answers cannot masquerade as complete analysis',
   incomplete.text==='' && incomplete.error.includes('incomplete'));
 const statusMissing = await enrichScreeningResults(fixture,{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',
   fetchImpl:async()=>({ok:true,status:200,json:async()=>({
     output:[{type:'message',content:[{type:'output_text',text:'Unconfirmed completion'}]}]
   })})
@@ -345,40 +384,28 @@ const statusMissing = await enrichScreeningResults(fixture,{
 check('missing Responses API completion status cannot masquerade as a usable MLRO note',
   statusMissing.text === '' && statusMissing.error.includes('incomplete'));
 const invalidModel=await enrichScreeningResults(fixture,{
-  enabled:true,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'invalid model with spaces',
+  enabled:true,costGuard:fixtureCostGuard,apiKey:'SYNTHETIC_PROVIDER_KEY',model:'invalid model with spaces',
   fetchImpl:async()=>{called++;}
 });
 check('invalid model settings fail closed before an API request',
   invalidModel.text==='' && invalidModel.error.includes('model configuration invalid') &&
   called===0);
 
-let noBudgetApiCalls = 0;
-const noBudget = await actualEnrichScreeningResults(fixture, {
+let budgetBlockedCalls = 0;
+const budgetMissing = await enrichScreeningResults(fixture, {
   enabled: true, apiKey: 'SYNTHETIC_PROVIDER_KEY',
-  apiPriceTableJson: TEST_PRICE_TABLE, maxUsdPerCall: undefined,
-  fetchImpl: async () => { noBudgetApiCalls++; },
+  costGuard: null,
+  fetchImpl: async () => { budgetBlockedCalls++; }
 });
-check('paid OpenAI calls fail closed when an approved USD cap is missing',
-  noBudget.text === '' && noBudget.cost_control.allowed === false && noBudgetApiCalls === 0);
-const noPrice = await actualEnrichScreeningResults(fixture, {
+const budgetExceeded = await enrichScreeningResults(fixture, {
   enabled: true, apiKey: 'SYNTHETIC_PROVIDER_KEY',
-  apiPriceTableJson: '', maxUsdPerCall: '9.00',
-  fetchImpl: async () => { noBudgetApiCalls++; },
+  costGuard: { ...fixtureCostGuard, maxUsdPerCall: '0.000001' },
+  fetchImpl: async () => { budgetBlockedCalls++; }
 });
-check('paid OpenAI calls fail closed if model pricing is unknown',
-  noPrice.cost_control.allowed === false && noBudgetApiCalls === 0);
-const tooLittle = await actualEnrichScreeningResults(fixture, {
-  enabled: true, apiKey: 'SYNTHETIC_PROVIDER_KEY',
-  apiPriceTableJson: TEST_PRICE_TABLE, maxUsdPerCall: '0.000001',
-  fetchImpl: async () => { noBudgetApiCalls++; },
-});
-check('request above hard preflight USD cap never reaches the provider',
-  tooLittle.text === '' && tooLittle.cost_control.reason.includes('exhausted') &&
-  noBudgetApiCalls === 0);
-check('successful OpenAI usage exposes a priced estimate distinct from provider invoice',
-  ok.cost_estimate.status === 'priced' &&
-  ok.cost_estimate.usd === '0.000760' &&
-  ok.cost_estimate.reservation_usd !== '0.000000');
+check('optional AI never transmits screening evidence without USD budget evidence',
+  budgetBlockedCalls === 0 &&
+  budgetMissing.budget_reason === 'missing_or_invalid_usd_budget' &&
+  budgetExceeded.budget_reason === 'usd_budget_exceeded');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
