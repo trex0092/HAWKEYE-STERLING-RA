@@ -56,6 +56,32 @@ export function caseTitle(key, s) {
   return '🧾 CASE-' + (gidTail || 'XXXXXX') + ' — ' + (s.name || 'unknown subject') + ' — ' + (s.recommendation || 'review');
 }
 
+/* Auto-closure requires fresh evidence for ALL three domains. A missing
+ * result, incomplete source, skipped subject, partial news sweep, stale PEP
+ * harvest or failed supplementary lookup cannot establish a negative result
+ * sufficient to close an existing human-review case. Conservative holds are
+ * intentional: they do not stop new match creation, escalation or SLA aging. */
+export function canAutoClearCases(results, today) {
+  if (!results || typeof results !== 'object' || Array.isArray(results) ||
+      results.date !== today || !Number.isSafeInteger(results.screened) ||
+      results.screened <= 0 || results.degraded !== false ||
+      !Array.isArray(results.failures) || results.failures.length !== 0 ||
+      !Array.isArray(results.lists) || results.lists.length === 0 ||
+      !results.lists.every(row => row && typeof row === 'object' &&
+        Number.isSafeInteger(row.count) && row.count > 0 && row.partial === false)) {
+    return false;
+  }
+  const e = results.enrichment;
+  if (!e || typeof e !== 'object' || Array.isArray(e) ||
+      !['amErrors', 'amPartial', 'skipped', 'pepErrors'].every(key =>
+        Number.isSafeInteger(e[key]) && e[key] === 0)) return false;
+  const pep = e.pepWorldwide;
+  return !!pep && typeof pep === 'object' && !Array.isArray(pep) &&
+    pep.active === true && pep.partial === false &&
+    Number.isSafeInteger(pep.count) && pep.count > 0 &&
+    typeof pep.harvested === 'string' && Number.isFinite(Date.parse(pep.harvested));
+}
+
 /* Pure planner: decide every case action from plain data.
      create — subject flagged today, no case yet; OR re-flagged after its case
               was cleared (owner-authorized design change: in the shipped
@@ -68,7 +94,7 @@ export function caseTitle(key, s) {
      age    — case open past the SLA, aging comment not yet posted
      clear  — subject no longer flagged today (or gone from the registry)
    Nothing is planned for under-review/escalated moves — those are human. */
-export function planCaseActions(subjects, casesState, today) {
+export function planCaseActions(subjects, casesState, today, { allowAutoClear = false } = {}) {
   const actions = [];
   const seen = new Set();
   for (const [key, s] of Object.entries(subjects || {})) {
@@ -96,7 +122,7 @@ export function planCaseActions(subjects, casesState, today) {
           priorCase: { taskGid: cs.taskGid || null, clearedAt: cs.clearedAt || null } });
       }
     } else if (active && cs && !cs.cleared) {
-      if (s.whitelistedOnly && !cs.escalated) {
+      if (s.whitelistedOnly && !cs.escalated && allowAutoClear === true) {
         /* The registry now covers every hit on this open case — close it with
            its own audit note (distinct from the not-flagged auto-clear). */
         actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid, reason: 'whitelist' });
@@ -109,11 +135,15 @@ export function planCaseActions(subjects, casesState, today) {
     } else if (!active && cs && !cs.cleared) {
       /* An escalated case is a human's: never auto-clear it, even when the
          subject drops off the day's flags. */
-      if (!cs.escalated) actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid });
+      if (!cs.escalated && allowAutoClear === true) {
+        actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid });
+      }
     }
   }
   for (const [key, cs] of Object.entries(casesState || {})) {
-    if (!seen.has(key) && !cs.cleared && !cs.escalated) actions.push({ type: 'clear', key, subject: null, caseGid: cs.taskGid });
+    if (!seen.has(key) && !cs.cleared && !cs.escalated && allowAutoClear === true) {
+      actions.push({ type: 'clear', key, subject: null, caseGid: cs.taskGid });
+    }
   }
   return actions;
 }
@@ -383,18 +413,31 @@ async function main() {
     process.exit(3);
   }
   const screen = readJson(SCREEN_STATE_FILE);
-  if (!screen || !screen.subjects) {
-    console.log('screening-cases: no screening state — nothing to manage.');
-    return;
+  if (!screen || !screen.subjects || typeof screen.subjects !== 'object' ||
+      Array.isArray(screen.subjects)) {
+    throw new Error('Screening registry missing or malformed; refusing Asana case actions');
   }
   if (screen.updated !== today) {
-    /* Never clear (or age) cases off stale data: if today's screen did not
-       run, skip cleanly. The workflow ordering makes this unusual. */
-    console.log('screening-cases: screen state is from ' + screen.updated + ', not today — skipping (no action on stale data).');
-    return;
+    // A stale registry must FAIL the workflow, not return a misleading green
+    // success while mandatory Asana cases and daily digest remain unchanged.
+    throw new Error('Screening registry is not current; refusing Asana case actions');
+  }
+  const results = readJson(RESULTS_FILE);
+  if (!results || results.date !== today || !Number.isSafeInteger(results.screened) ||
+      results.screened <= 0 || !Array.isArray(results.lists)) {
+    throw new Error('Current screening result missing or malformed; refusing Asana case actions');
   }
 
-  const casesState = readJson(CASES_FILE) || {};
+  // A missing or corrupt case ledger is NOT an empty first-run registry.
+  // Rebuilding blind could duplicate active AML investigations in Asana.
+  const casesState = readJson(CASES_FILE);
+  if (!casesState || typeof casesState !== 'object' || Array.isArray(casesState)) {
+    throw new Error('Existing Asana case state missing or corrupt; refusing duplicate-prone actions');
+  }
+  const allowAutoClear = canAutoClearCases(results, today);
+  if (!allowAutoClear) {
+    console.warn('screening-cases: source completeness not proven; all automatic case closures are HELD for human review');
+  }
 
   /* DISPOSITION READ-BACK — the analyst feedback loop. For every open case,
      read the task notes and parse the ticked disposition block the card
@@ -438,7 +481,8 @@ async function main() {
       + dispositionActions.map(a => a.type.replace('disposition-', '') + ':' + a.key).join(' '));
   }
 
-  const actions = [...dispositionActions, ...planCaseActions(screen.subjects, casesState, today)];
+  const actions = [...dispositionActions,
+    ...planCaseActions(screen.subjects, casesState, today, { allowAutoClear })];
   console.log('screening-cases: ' + actions.length + ' action(s) — '
     + ['create', 'age', 'clear', 'disposition-clear', 'disposition-escalate-ack']
       .map(t => t + '=' + actions.filter(a => a.type === t).length).join(' '));
@@ -532,7 +576,6 @@ async function main() {
      creation so each match links to its case; notifyAsana dedups the title
      within 6h so a same-day re-run cannot double-post. Failure to deliver
      the digest fails the step loudly. */
-  const results = readJson(RESULTS_FILE);
   if (results && results.date === today) {
     try {
       /* Optional, fail-open enrichment. This never mutates the screening state,
