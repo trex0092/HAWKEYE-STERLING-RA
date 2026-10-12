@@ -91,6 +91,9 @@ function equalHash(a, b) {
 
 function verifyEvidenceReceipts(entries, secret, opts = {}) {
   if (!secretValid(secret)) return { valid: false, reason: 'missing_verifier_secret' };
+  if (!opts || typeof opts !== 'object' || Array.isArray(opts)) {
+    return { valid: false, reason: 'invalid_external_anchor_options' };
+  }
   if (!Array.isArray(entries) || !entries.length || entries.length > MAX_ENTRIES) {
     return { valid: false, reason: 'invalid_chain_length' };
   }
@@ -116,10 +119,16 @@ function verifyEvidenceReceipts(entries, secret, opts = {}) {
     prior = expected;
     priorTime = Date.parse(data.event_time);
   }
-  if (opts.expectedHeadHash && !equalHash(prior, opts.expectedHeadHash)) {
+  // A caller-supplied but empty/null/invalid external anchor is an integrity
+  // failure, NOT permission to skip the anchor check. Truthiness previously
+  // let expectedHeadHash: '' silently validate a truncated chain.
+  if (Object.hasOwn(opts, 'expectedHeadHash') &&
+      !equalHash(prior, opts.expectedHeadHash)) {
     return { valid: false, reason: 'external_anchor_mismatch' };
   }
-  if (opts.expectedCount !== undefined && opts.expectedCount !== entries.length) {
+  if (Object.hasOwn(opts, 'expectedCount') &&
+      (!Number.isSafeInteger(opts.expectedCount) ||
+       opts.expectedCount !== entries.length)) {
     return { valid: false, reason: 'external_count_mismatch' };
   }
   return { valid: true, count: entries.length, head_hash: prior };
