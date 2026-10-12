@@ -568,6 +568,10 @@ check("prompts/list returns the prompt templates", len(pl) == len(mcp_server.PRO
 pg = rpc("prompts/get", {"name": "adverse_media_triage", "arguments": {"subject": "ACME FZE", "headline": "ACME fined for fraud"}})
 check("prompts/get builds a user message embedding the untrusted marker",
       pg["result"]["messages"][0]["role"] == "user" and "<<UNTRUSTED>>" in pg["result"]["messages"][0]["content"]["text"])
+check("adverse-media triage routes identity uncertainty to MLRO review, never a false clear",
+      "Choose 'uncertain'" in pg["result"]["messages"][0]["content"]["text"]
+      and "MLRO review" in pg["result"]["messages"][0]["content"]["text"]
+      and "choose 'no' if uncertain" not in pg["result"]["messages"][0]["content"]["text"])
 check("prompts/get errors when a required argument is missing",
       "error" in rpc("prompts/get", {"name": "adverse_media_triage", "arguments": {"subject": "X"}}))
 check("prompt fields cannot be lists, objects or extra undeclared keys",
