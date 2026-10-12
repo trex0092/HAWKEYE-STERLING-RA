@@ -11,6 +11,8 @@
 
 // Published, lower-cost Responses API model. Access still depends on the
 // organization's enabled models and separately approved processor controls.
+import { classifyApiQuotaSignal, emitApiQuotaAlert } from './api-quota-alerts.mjs';
+
 export const DEFAULT_OPENAI_SCREENING_MODEL = 'gpt-6-luna';
 export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
@@ -425,7 +427,10 @@ export async function enrichScreeningResults(results, {
     // Provider error bodies can contain org/account IDs, sensitive request
     // echoes or billing metadata. Never return or log the raw error.message.
     if (!response.ok) {
-      return { enabled: true, text: '', error: safeOpenAIError(response.status), model };
+      const quota_alert = classifyApiQuotaSignal('openai', response.status, response.headers);
+      if (quota_alert) emitApiQuotaAlert(quota_alert);
+      return { enabled: true, text: '', error: safeOpenAIError(response.status), model,
+        ...(quota_alert ? { quota_alert } : {}) };
     }
     const payload = await response.json().catch(() => null);
     const usage = safeUsage(payload && payload.usage);

@@ -1,3 +1,5 @@
+import { classifyApiQuotaSignal, renderApiQuotaAlert, emitApiQuotaAlert }
+  from '../scripts/api-quota-alerts.mjs';
 import {
   validateApiPriceTable, parseApiPriceTable, quoteApiTokenCost
 } from '../scripts/api-cost.mjs';
@@ -196,5 +198,28 @@ check('invalid pricing JSON does not reveal raw input or become zero cost',
   !parseApiPriceTable('{secret', at).ok &&
   !parseApiPriceTable(JSON.stringify({ schema: 1, models: [] }), at).ok);
 
+
+check('provider 429 is ambiguous rate/quota, not proof of exhausted credits',
+  classifyApiQuotaSignal('openai', 429).condition === 'rate_or_quota' &&
+  renderApiQuotaAlert(classifyApiQuotaSignal('openai', 429)).includes('No actual credit balance'));
+const rateHeaders = { get: key => ({
+  'retry-after': '47', 'x-ratelimit-remaining-requests': '0',
+  'x-ratelimit-remaining-tokens': '120'
+})[key] ?? null };
+check('valid numeric provider rate headers produce bounded useful warnings',
+  classifyApiQuotaSignal('anthropic', 429, rateHeaders).retry_after_seconds === 47 &&
+  classifyApiQuotaSignal('anthropic', 429, rateHeaders).remaining_tokens === 120);
+check('arbitrary provider header data is never reflected into audit warnings',
+  classifyApiQuotaSignal('openai', 429, { get: () => 'Bearer PRIVATE_KEY' }).retry_after_seconds === null &&
+  !renderApiQuotaAlert(classifyApiQuotaSignal('openai', 429,
+    { get: () => 'Bearer PRIVATE_KEY' })).includes('PRIVATE_KEY'));
+check('billing access is distinct from rate limit; other errors are not quota events',
+  classifyApiQuotaSignal('openai', 401).condition === 'billing_or_access' &&
+  classifyApiQuotaSignal('anthropic', 403).condition === 'billing_or_access' &&
+  classifyApiQuotaSignal('openai', 503) === null && classifyApiQuotaSignal('openai', 200) === null);
+check('fixed provider/status whitelist prevents warning injection',
+  emitApiQuotaAlert(classifyApiQuotaSignal('openai', 429), { summaryPath: '', warn: () => {} }) &&
+  !emitApiQuotaAlert({ schema: 1, provider: 'openai\n::error', condition: 'rate_or_quota',
+    http_status: 429 }, { summaryPath: '', warn: () => {} }));
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

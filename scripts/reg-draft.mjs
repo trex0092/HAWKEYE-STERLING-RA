@@ -13,6 +13,7 @@
    (override with ANTHROPIC_MODEL, e.g. claude-sonnet-5 to cut cost). */
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { extractText, CHANGES_FILE, fetchWithFallback, parseAnalysis } from './reg-watch.mjs';
+import { classifyApiQuotaSignal, emitApiQuotaAlert } from './api-quota-alerts.mjs';
 import {
   draftBudget, validatedReportDate, boundedLines, boundedItems,
   evidenceCount, missingExcerptNotice,
@@ -163,6 +164,8 @@ async function draftFor(c) {
       /* Error body is examined only for broad category detection and NEVER
          logged, stored in the proposal or surfaced to the caller. */
       const detail = await res.text().catch(() => '');
+      const quota_alert = classifyApiQuotaSignal('anthropic', res.status, res.headers);
+      if (quota_alert) emitApiQuotaAlert(quota_alert);
       const reason = providerStopReason(res.status, detail.slice(0, 2048));
       console.warn('reg-draft: Anthropic request stopped: HTTP ' + res.status + ' (' + reason + ')');
       return { text: manualDraftSection(c, reason), ok: false, attempted: true,
