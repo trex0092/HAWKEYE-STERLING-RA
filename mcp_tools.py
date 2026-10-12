@@ -802,8 +802,11 @@ def call_tool(name, arguments):
     if name not in TOOLS:
         raise KeyError(name)
     fn = TOOLS[name][0]
-    args = arguments if isinstance(arguments, dict) else {}
-    return fn(**args)
+    # Silently converting a malformed array/string/null payload to {} obscures
+    # invalid tool inputs; reject the original shape explicitly.
+    if not isinstance(arguments, dict):
+        raise ValueError("tool arguments must be an object")
+    return fn(**arguments)
 
 
 # ── read-only reference resources (name -> (uri, mimeType, loader)) ───────────
