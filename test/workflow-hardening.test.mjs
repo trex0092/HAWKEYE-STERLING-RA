@@ -294,6 +294,15 @@ const dedupeRun = (patch={}) => ({
 check('duplicate dispatch gate prevents any active workflow being re-triggered',
   decideUniqueDispatch([dedupeRun({status:'in_progress'})],
     {nowMs:dedupeNow}).action === 'skip');
+check('a prior-day long-running active AML sweep blocks a duplicate dispatch',
+  decideUniqueDispatch([dedupeRun({
+    status: 'in_progress', conclusion: null,
+    created_at: '2026-10-11T22:00:00Z'
+  })], { nowMs: dedupeNow, sinceMs: Date.parse('2026-10-12T00:00:00Z') }).action === 'skip');
+check('older completed runs remain eligible while old active runs remain blocked',
+  decideUniqueDispatch([dedupeRun({
+    status: 'completed', created_at: '2026-10-11T22:00:00Z'
+  })], { nowMs: dedupeNow }).action === 'dispatch');
 check('recent completed or failed dispatches still have a quiet period',
   decideUniqueDispatch([dedupeRun({conclusion:'failure'})],
     {nowMs:dedupeNow}).action === 'skip');

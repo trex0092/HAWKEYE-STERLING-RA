@@ -26,10 +26,13 @@ export function decideUniqueDispatch(runs, {
       return { action: 'unknown', reason: 'run start time missing or future-dated' };
     }
   }
-  const scoped = relevant.filter(run => Date.parse(run.created_at) >= sinceMs);
-  if (scoped.some(run => ACTIVE.has(run.status))) {
-    return { action: 'skip', reason: 'workflow has a recent active run' };
+  // A screening sweep can run for hours. Never lose an ACTIVE workflow just
+  // because it began yesterday or before this invocation's quiet window.
+  // SinceMs only scopes completed/failed run cooldown checks.
+  if (relevant.some(run => ACTIVE.has(run.status))) {
+    return { action: 'skip', reason: 'workflow already has an active run' };
   }
+  const scoped = relevant.filter(run => Date.parse(run.created_at) >= sinceMs);
   if (scoped.some(run => nowMs - Date.parse(run.created_at) < quietMs)) {
     return { action: 'skip', reason: 'workflow dispatched or scheduled within quiet window' };
   }
