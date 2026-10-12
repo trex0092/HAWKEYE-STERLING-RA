@@ -261,6 +261,18 @@ for (const c of CONTROLS) {
     JSON.stringify(crons) === JSON.stringify(EXPECTED_CRONS[c.id]));
 }
 
+const freshnessWf = readFileSync(join(wfDir, 'freshness-check.yml'), 'utf8');
+const ciWorkflow = readFileSync(join(wfDir, 'ci.yml'), 'utf8');
+check('freshness status is never falsely green from a push-only unit-test run',
+  !/^  push:/m.test(freshnessWf)
+  && /^  schedule:/m.test(freshnessWf)
+  && /^  workflow_dispatch:/m.test(freshnessWf)
+  && !/name: Validate freshness-check code on push/.test(freshnessWf)
+  && !/github\.event_name != 'push'/.test(freshnessWf));
+check('freshness unit tests still run in required CI independently of operational status',
+  ciWorkflow.includes('node test/freshness-check.test.mjs')
+  && /name: Verify mandatory controls ran inside their cadence window/.test(freshnessWf));
+
 const assuranceWf = readFileSync(join(wfDir, 'screening-assurance.yml'), 'utf8');
 const pepWf = readFileSync(join(wfDir, 'pep-worldwide.yml'), 'utf8');
 const pepShardWf = readFileSync(join(wfDir, 'pep-shard-harvest.yml'), 'utf8');
