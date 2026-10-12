@@ -14,8 +14,7 @@ import { classifyApiQuotaFailure, appendApiQuotaEvent } from './api-quota-alerts
 
 // Published, lower-cost Responses API model. Access still depends on the
 // organization's enabled models and separately approved processor controls.
-import { parseApiPriceTable } from './api-cost.mjs';
-import { evaluateApiSpend, conservativeInputTokenBound } from './api-spend-guard.mjs';
+import { classifyApiQuotaSignal, emitApiQuotaAlert } from './api-quota-alerts.mjs';
 
 export const DEFAULT_OPENAI_SCREENING_MODEL = 'gpt-6-luna';
 export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
@@ -446,18 +445,10 @@ export async function enrichScreeningResults(results, {
     // Provider error bodies can contain org/account IDs, sensitive request
     // echoes or billing metadata. Never return or log the raw error.message.
     if (!response.ok) {
-      // Record only a sanitized HTTP category. Provider error bodies may
-      // contain identifiers and are NEVER parsed or written to GitHub.
-      const category = classifyApiQuotaFailure(response.status);
-      if (category && process.env.API_QUOTA_ALERT_TELEMETRY_ENABLED === '1') {
-        const recorded = appendApiQuotaEvent({
-          schema: 1, observed_at: new Date().toISOString(),
-          provider: 'openai', workflow: 'screening-digest', model,
-          http_status: response.status, cause: category,
-        });
-        if (!recorded.ok) console.warn('openai-screening: sanitized quota telemetry unavailable');
-      }
-      return { enabled: true, text: '', error: safeOpenAIError(response.status), model };
+      const quota_alert = classifyApiQuotaSignal('openai', response.status, response.headers);
+      if (quota_alert) emitApiQuotaAlert(quota_alert);
+      return { enabled: true, text: '', error: safeOpenAIError(response.status), model,
+        ...(quota_alert ? { quota_alert } : {}) };
     }
     const payload = await response.json().catch(() => null);
     const usage = safeUsage(payload && payload.usage);

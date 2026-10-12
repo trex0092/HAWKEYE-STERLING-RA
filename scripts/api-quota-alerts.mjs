@@ -1,153 +1,52 @@
-/* Redacted, non-customer API quota/billing alerts.
- * A provider HTTP status is NOT a provider balance measurement. Never log
- * raw error bodies, customer prompts, account identifiers, or API keys.
+/* Pure provider quota classification and redacted GitHub Actions notifications.
+ * A 429 cannot by itself prove that a customer's API credits are exhausted.
  */
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
-
-export const API_QUOTA_EVENTS_FILE = 'api-quota-alerts.jsonl';
-const PROVIDER = new Set(['openai', 'anthropic']);
-const FLOW = new Set(['screening-digest', 'regulatory-watch']);
-const CAUSES = new Set(['rate_or_quota', 'billing_or_auth']);
-const MODEL = /^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/;
-const FIELDS = ['schema','observed_at','provider','workflow','model','http_status','cause'];
-
-export function classifyApiQuotaFailure(status, sanitizedReason = '') {
-  const s = Number(status);
-  const safe = String(sanitizedReason || '').slice(0, 90);
-  if ([401,402,403].includes(s) || /billing|credit|authentication/i.test(safe))
-    return 'billing_or_auth';
-  if (s === 429 || /rate limit|quota/i.test(safe)) return 'rate_or_quota';
-  return null;
+import { appendFileSync } from 'node:fs';
+const PROVIDERS = new Set(['openai', 'anthropic']);
+function finiteCounter(s) {
+  if (s == null || !/^\d{1,12}$/.test(String(s))) return null;
+  const n = Number(s);
+  return Number.isSafeInteger(n) && n <= 1000000000 ? n : null;
 }
-
-export function validApiQuotaEvent(e) {
-  return !!e && typeof e === 'object' && !Array.isArray(e) &&
-    Object.keys(e).sort().join('|') === [...FIELDS].sort().join('|') &&
-    e.schema === 1 && PROVIDER.has(e.provider) && FLOW.has(e.workflow) &&
-    CAUSES.has(e.cause) && typeof e.model === 'string' && MODEL.test(e.model) &&
-    Number.isSafeInteger(e.http_status) && e.http_status >= 0 && e.http_status <= 599 &&
-    typeof e.observed_at === 'string' &&
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(e.observed_at) &&
-    Number.isFinite(Date.parse(e.observed_at));
+export function classifyApiQuotaSignal(provider, status, headers = null) {
+  if (!PROVIDERS.has(provider) || !Number.isInteger(status)) return null;
+  const condition = status === 429 ? 'rate_or_quota' :
+    [401, 402, 403].includes(status) ? 'billing_or_access' : null;
+  if (!condition) return null;
+  const get = key => {
+    try { return headers && typeof headers.get === 'function' ? headers.get(key) : null; }
+    catch { return null; }
+  };
+  return {
+    schema: 1, provider, condition, http_status: status,
+    retry_after_seconds: finiteCounter(get('retry-after')),
+    remaining_requests: finiteCounter(get('x-ratelimit-remaining-requests')),
+    remaining_tokens: finiteCounter(get('x-ratelimit-remaining-tokens'))
+  };
 }
-
-export function appendApiQuotaEvent(e) {
-  if (!validApiQuotaEvent(e)) return { ok: false, reason: 'quota_event_invalid' };
-  appendFileSync(API_QUOTA_EVENTS_FILE, JSON.stringify(e) + '\n', {
-    mode: 0o600, flag: 'a', encoding: 'utf8',
-  });
-  return { ok: true };
+export function renderApiQuotaAlert(signal) {
+  if (!signal || signal.schema !== 1 || !PROVIDERS.has(signal.provider) ||
+      !['rate_or_quota', 'billing_or_access'].includes(signal.condition) ||
+      ![401, 402, 403, 429].includes(signal.http_status)) return null;
+  const lines = ['# Provider API budget/limit alert', '', 'Provider: **' + signal.provider + '**',
+    'Category: **' + signal.condition.replaceAll('_',' ') + '**',
+    'HTTP: **' + signal.http_status + '**'];
+  if (signal.retry_after_seconds !== null) lines.push('Retry-after: **' + signal.retry_after_seconds + ' seconds**');
+  if (signal.remaining_requests !== null) lines.push('Requests remaining: **' + signal.remaining_requests + '**');
+  if (signal.remaining_tokens !== null) lines.push('Tokens remaining: **' + signal.remaining_tokens + '**');
+  lines.push('', 'Stop optional repeat calls and inspect the provider account manually.',
+    'No actual credit balance is inferred from HTTP 429 alone.');
+  return lines.join('\n') + '\n';
 }
-
-export function parseApiQuotaEvents(raw) {
-  if (typeof raw !== 'string' || raw.length > 64000) {
-    return { ok: false, reason: 'quota_events_oversized' };
+export function emitApiQuotaAlert(signal, { summaryPath = process.env.GITHUB_STEP_SUMMARY || '',
+  warn = message => console.warn(message) } = {}) {
+  const markdown = renderApiQuotaAlert(signal);
+  if (!markdown) return false;
+  if (summaryPath) {
+    try { appendFileSync(summaryPath, '\n' + markdown); }
+    catch { warn('API quota summary could not be written'); }
   }
-  if (!raw.trim()) return { ok: true, events: [] };
-  const lines = raw.trimEnd().split('\n');
-  if (lines.length > 100 || lines.some(line => line.length > 1200)) {
-    return { ok: false, reason: 'quota_events_oversized' };
-  }
-  try {
-    const events = lines.map(line => JSON.parse(line));
-    if (events.some(e => !validApiQuotaEvent(e))) throw new Error('bad-schema');
-    return { ok: true, events };
-  } catch { return { ok: false, reason: 'quota_events_invalid' }; }
+  if (process.env.GITHUB_ACTIONS === 'true') warn('::warning title=Provider API limit::Review ' +
+    signal.provider + ' account: HTTP ' + signal.http_status);
+  return true;
 }
-
-export function renderQuotaSummary(events) {
-  if (!Array.isArray(events) || events.some(e => !validApiQuotaEvent(e))) {
-    return '# API quota alerts\n\nStatus UNKNOWN: telemetry invalid.\n';
-  }
-  const groups = new Map();
-  for (const e of events) {
-    const key = e.provider + '/' + e.workflow + '/' + e.cause;
-    const g = groups.get(key) || { provider: e.provider, workflow: e.workflow, cause: e.cause, count: 0 };
-    g.count++; groups.set(key, g);
-  }
-  const rows = [...groups.values()];
-  return ['# API credit and quota alerts', '',
-    'HTTP and sanitized stop categories only. These are NOT verified vendor credit balances.',
-    '', 'Recorded stop events: ' + events.length + '.',
-    '', '| Provider | Workflow | Category | Occurrences |',
-    '| --- | --- | --- | ---: |',
-    ...rows.map(g => '| ' + [g.provider,g.workflow,g.cause,g.count].join(' | ') + ' |'),
-    '', 'If unavailable, inspect provider billing/rate limits and keep optional AI enrichment disabled. Continue deterministic screening and human review.', ''].join('\n');
-}
-
-// At most one GitHub issue per provider/flow/category; never create an issue
-// on uncertain API state. If the issue list is paginated, fail closed.
-export async function notifyApiQuotaIssues(events, {
-  repository, token, fetchImpl = globalThis.fetch
-} = {}) {
-  if (!Array.isArray(events) || events.some(e => !validApiQuotaEvent(e)))
-    return { ok: false, reason: 'quota_events_invalid' };
-  if (!events.length) return { ok: true, created: 0, already_open: 0 };
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository || '') ||
-      !token || typeof fetchImpl !== 'function') {
-    return { ok: false, reason: 'github_issue_delivery_not_configured' };
-  }
-  const [owner, name] = repository.split('/');
-  const url = 'https://api.github.com/repos/' + owner + '/' + name;
-  const hdrs = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' };
-  let existingResponse;
-  try {
-    existingResponse = await fetchImpl(url + '/issues?state=open&labels=api-quota&per_page=100', {
-      headers: hdrs,
-    });
-  } catch { return { ok: false, reason: 'github_issue_index_unavailable' }; }
-  if (!existingResponse.ok || String(existingResponse.headers?.get?.('link') || '').includes('rel="next"')) {
-    return { ok: false, reason: 'github_issue_index_unavailable' };
-  }
-  let existing;
-  try { existing = await existingResponse.json(); }
-  catch { return { ok: false, reason: 'github_issue_index_unavailable' }; }
-  if (!Array.isArray(existing)) return { ok: false, reason: 'github_issue_index_unavailable' };
-  const titles = new Set(existing.filter(e => e && typeof e.title === 'string').map(e => e.title));
-  const groups = [...new Set(events.map(e => e.provider + '/' + e.workflow + '/' + e.cause))];
-  let created = 0, alreadyOpen = 0;
-  for (const key of groups.slice(0, 5)) {
-    const [provider, workflow, cause] = key.split('/');
-    const title = 'API quota alert: ' + provider + ' / ' + workflow + ' / ' + cause;
-    if (titles.has(title)) { alreadyOpen++; continue; }
-    const body = [
-      'Optional AI provider call was stopped in the GitHub workflow.',
-      '',
-      'Provider: ' + provider,
-      'Workflow: ' + workflow,
-      'Sanitized classification: ' + cause,
-      '',
-      'Check provider billing and rate-limit dashboards; this notice does not know the credit balance.',
-      'Do not re-enable data egress or re-run paid calls without authorized review.',
-    ].join('\n');
-    let response;
-    try {
-      response = await fetchImpl(url + '/issues', { method: 'POST', headers: hdrs,
-        body: JSON.stringify({ title, body, labels: ['api-quota'] }) });
-    } catch { return { ok: false, reason: 'github_issue_creation_failed', created, already_open: alreadyOpen }; }
-    if (!response.ok) return { ok: false, reason: 'github_issue_creation_failed', created, already_open: alreadyOpen };
-    created++; titles.add(title);
-  }
-  return { ok: true, created, already_open: alreadyOpen };
-}
-
-async function main() {
-  let parsed;
-  try { parsed = parseApiQuotaEvents(existsSync(API_QUOTA_EVENTS_FILE)
-    ? readFileSync(API_QUOTA_EVENTS_FILE, 'utf8') : ''); }
-  catch { parsed = { ok: false }; }
-  const report = renderQuotaSummary(parsed.ok ? parsed.events : null);
-  console.log(report);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report, 'utf8');
-  if (!parsed.ok) { process.exitCode = 1; return; }
-  if (process.env.API_QUOTA_ALERT_ISSUES === '1' && parsed.events.length) {
-    const result = await notifyApiQuotaIssues(parsed.events, {
-      repository: process.env.GITHUB_REPOSITORY, token: process.env.GITHUB_TOKEN,
-    });
-    console.log('api-quota: issue delivery ' + (result.ok ? 'completed' : 'unverified')
-      + '; created=' + (result.created || 0));
-    if (!result.ok) process.exitCode = 1;
-  }
-}
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) await main();
