@@ -45,14 +45,17 @@ function normalize(s) {
 /* All significant subject tokens must appear in the item's title or one of
    its aliases — same namesake guard as the Interpol / PEP layers. */
 function titleMatches(subject, item) {
-  let want = normalize(subject).split(' ').filter(t => t.length >= 3);
-  if (!want.length) want = normalize(subject).split(' ').filter(t => t.length >= 2);
+  // Keep all non-initial name tokens, including two-character given names.
+  const want = normalize(subject).split(' ').filter(t => t.length >= 2);
   if (!want.length) return false;
   const candidates = [item && item.title || ''];
   const aliases = item && item.aliases;
   if (Array.isArray(aliases)) candidates.push(...aliases.map(a => String(a || '')));
   else if (typeof aliases === 'string') candidates.push(aliases);
-  return candidates.some(c => { const have = normalize(c); return have && want.every(t => have.includes(t)); });
+  return candidates.some(c => {
+    const have = new Set(normalize(c).split(' ').filter(Boolean));
+    return want.every(t => have.has(t));
+  });
 }
 
 /* Score an FBI Wanted API response for a subject. Returns

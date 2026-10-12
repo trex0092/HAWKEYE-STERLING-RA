@@ -948,6 +948,17 @@ check('FBI: missing-person posters never count as adverse (excluded, tallied)',
 check('FBI: alias matches count; unrelated namesakes do not',
   fbi.scoreFbi('Rico Vasquez', { items: [{ title: 'ENRIQUE GARCIA', aliases: ['Rico Vasquez'], poster_classification: 'default' }] }).hit === true
   && fbi.scoreFbi('Rico Vasquez', { items: [{ title: 'RICO ALVAREZ', poster_classification: 'default' }] }).hit === false);
+check('FBI: matches whole subject name tokens, not longer unrelated names',
+  fbi.scoreFbi('John Smith', { items: [
+    { title: 'JOHNNY SMITHSON', poster_classification: 'default' }
+  ] }).hit === false);
+check('FBI: short given names are required alongside longer surnames',
+  fbi.scoreFbi('Li Wang', { items: [
+    { title: 'MING WANG', poster_classification: 'default' }
+  ] }).hit === false
+  && fbi.scoreFbi('Li Wang', { items: [
+    { title: 'LI WANG', poster_classification: 'default' }
+  ] }).hit === true);
 check('FBI: an unrecognized poster class is excluded until reviewed, never promoted',
   fbi.scoreFbi('A B Test', { items: [{ title: 'A B TEST', poster_classification: 'brand-new-class' }] }).hit === false);
 check('FBI: victim/accomplice rows never screen as wanted subjects',

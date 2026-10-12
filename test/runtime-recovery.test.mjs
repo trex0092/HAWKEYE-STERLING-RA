@@ -103,7 +103,7 @@ try {
     am.resetAdverseMediaRateGates();
     globalThis.fetch = async () => reply(503, 'temporarily unavailable');
     const failed = await am.checkAdverseMedia('Example Uncovered LLC', { locales: [], timeoutMs: 100 });
-    check('failed wide and base recovery queries leave the subject errored',
+    check('a 503 still leaves the subject errored without a false circuit recovery',
       failed.errored && am.gdeltBreakerState.open && !am.gdeltBreakerState.probing);
 
     // Advance only the admission clock; reset gates so no real multi-minute wait occurs.

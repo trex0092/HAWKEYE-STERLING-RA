@@ -150,6 +150,26 @@ console.log('\n— runtime worldwide screening assurance —\n');
   check('runtime assurance passes only when all three domains have complete current evidence',
     ok.operational && ok.domains.sanctions.operational && ok.domains.adverseMedia.operational && ok.domains.pep.operational);
 
+  const noBackboneCounts = structuredClone(results);
+  delete noBackboneCounts.enrichment.amBackboneFailures;
+  const nbc = assessRuntime({ results: noBackboneCounts, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance refuses adverse-media success without per-provider coverage counts',
+    !nbc.domains.adverseMedia.operational
+    && nbc.domains.adverseMedia.reasons.some(r => r.includes('missing or invalid')));
+  const contradictoryBackbones = structuredClone(results);
+  contradictoryBackbones.enrichment.amBackbones = [];
+  const cb = assessRuntime({ results: contradictoryBackbones, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance rejects a backbone summary that contradicts zero-failure counters',
+    !cb.domains.adverseMedia.operational
+    && cb.domains.adverseMedia.reasons.some(r => r.includes('contradicts')));
+  const incompletePep = assessRuntime({
+    results, pepDataset: { ...pep, expected: pep.count + 1, partial: false },
+    contract, nowMs, expectedAdverseMatrix: 79,
+  });
+  check('PEP expected-population shortfalls cannot be hidden by a false partial flag',
+    !incompletePep.domains.pep.operational
+    && incompletePep.domains.pep.reasons.some(r => r.includes('below its declared expected population')));
+
   const noOfac = structuredClone(results);
   noOfac.lists = noOfac.lists.filter(x => x.id !== 'ofac-sdn');
   const miss = assessRuntime({ results: noOfac, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
@@ -265,6 +285,44 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const stale = checkStored({ ...ok, generatedAt: '2026-09-20T00:00:00.000Z' },
     { nowMs, maxAgeHours: 36 });
   check('stored runtime assurance fails closed when evidence is stale', !stale.ok);
+  const replay = assessRuntime({ results: { ...results, date: '2026-09-20' },
+    pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('refreshing a stale screening-results file cannot generate fresh operational assurance',
+    !replay.operational
+    && Object.values(replay.domains).every(d => !d.operational && d.reasons.some(r => r.includes('too old'))));
+  const yesterday = assessRuntime({ results: { ...results, date: '2026-09-27' },
+    pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('cross-midnight screening still accepts the previous UTC run date',
+    yesterday.operational);
+  const replayedStored = checkStored({ ...ok, run: { ...ok.run, date: '2026-09-20' } },
+    { nowMs, maxAgeHours: 36 });
+  check('stored assurance independently rejects a run date inconsistent with its issuance',
+    !replayedStored.ok && replayedStored.reasons.some(r => r.includes('too old')));
+
+  const futureAssurance = checkStored({ ...ok, generatedAt: '2026-12-28T00:00:00.000Z' },
+    { nowMs, maxAgeHours: 36 });
+  check('stored runtime assurance rejects a future-dated record instead of treating it as fresh',
+    !futureAssurance.ok && futureAssurance.reasons.some(r => r.includes('future')));
+  const futurePep = assessRuntime({ results, pepDataset: { ...pep, harvested: '2026-12-28T00:00:00.000Z' },
+    contract, nowMs, expectedAdverseMatrix: 79 });
+  check('runtime assurance rejects a PEP artifact whose harvest date is in the future',
+    !futurePep.domains.pep.operational && futurePep.domains.pep.reasons.some(r => r.includes('future')));
+  check('stored runtime assurance enforces the top-level operational verdict',
+    !checkStored({ ...ok, operational: false }, { nowMs }).ok);
+  const noRequiredContract = structuredClone(contract);
+  noRequiredContract.domains.sanctions.sources = [];
+  const emptyContractVerdict = assessRuntime({ results, pepDataset: pep, contract: noRequiredContract,
+    nowMs, expectedAdverseMatrix: 79 });
+  check('a sanctions contract without any required sources cannot be marked operational',
+    !emptyContractVerdict.domains.sanctions.operational
+    && emptyContractVerdict.domains.sanctions.reasons.some(r => r.includes('no required sources')));
+  const missingPepHarvest = structuredClone(results);
+  delete missingPepHarvest.enrichment.pepWorldwide.harvested;
+  const missingHarvestVerdict = assessRuntime({ results: missingPepHarvest, pepDataset: pep,
+    contract, nowMs, expectedAdverseMatrix: 79 });
+  check('daily PEP evidence must identify the exact harvest consumed by screening',
+    !missingHarvestVerdict.domains.pep.operational
+    && missingHarvestVerdict.domains.pep.reasons.some(r => r.includes('did not identify')));
 }
 
 /* FATF black/grey lists: data/fatf-assessments.json (the assessment text),

@@ -28,6 +28,25 @@ const wrongName = scorePep('John Smith', { search: [
 check('scorePep requires the subject name in the result label', wrongName.hit === false);
 
 check('scorePep tolerates an empty response', scorePep('Acme Co', {}).hit === false);
+check('two-character given names are not discarded when a surname is longer',
+  scorePep('Li Wang', { search: [
+    { id: 'Qbad', label: 'Ming Wang', description: 'Politician' }
+  ] }).hit === false
+  && scorePep('Li Wang', { search: [
+    { id: 'Qok', label: 'Li Wang', description: 'Politician' }
+  ] }).hit === true);
+check('a label containing longer unrelated name tokens cannot match',
+  scorePep('John Smith', { search: [
+    { id: 'QX', label: 'Johnny Smithson', description: 'Politician and senator' }
+  ] }).hit === false);
+check('a non-political banking description does not match the word king',
+  scorePep('Ann King', { search: [
+    { id: 'QY', label: 'Ann King', description: 'Banking executive' }
+  ] }).hit === false);
+check('both name and political-role substring false positives are rejected',
+  scorePep('Ann King', { search: [
+    { id: 'QZ', label: 'Joann Kingston', description: 'Banking executive' }
+  ] }).hit === false);
 check('PEP_KEYWORDS includes core political roles', PEP_KEYWORDS.includes('president') && PEP_KEYWORDS.includes('minister'));
 
 // Short multi-token names (every token <3 chars) must still match a real PEP

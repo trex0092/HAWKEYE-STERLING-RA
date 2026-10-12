@@ -38,7 +38,24 @@ const arr = v => Array.isArray(v) ? v : [];
 
 function ageHours(iso, nowMs) {
   const t = Date.parse(String(iso || ''));
-  return Number.isFinite(t) ? Math.max(0, (nowMs - t) / 3600000) : Infinity;
+  // Preserve negative ages so a future-dated assurance record cannot be
+  // silently interpreted as newly generated. Allow only minor clock skew.
+  return Number.isFinite(t) ? (nowMs - t) / 3600000 : Infinity;
+}
+const MAX_FUTURE_SKEW_HOURS = 5 / 60;
+
+// An assurance document must be based on the current screening run, not
+// yesterday's cached results with a freshly written generatedAt. A screening
+// started before UTC midnight may finish after midnight, so the previous UTC
+// calendar day remains a valid run date.
+function runDateIssue(runDate, referenceMs) {
+  if (!Number.isFinite(referenceMs)) return 'screening evidence generation timestamp is invalid';
+  const day = String(runDate || '');
+  const today = new Date(referenceMs).toISOString().slice(0, 10);
+  const yesterday = new Date(referenceMs - 86400000).toISOString().slice(0, 10);
+  if (day === today || day === yesterday) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return 'screening run date is missing or invalid';
+  return day > today ? 'screening run date is in the future' : 'screening run date is too old';
 }
 
 function domain(ok, reasons, evidence, warnings = []) {
@@ -76,7 +93,10 @@ export function assessRuntime({
   const missingRequired = unresolvedRequired.filter(id => !loadedById.has(id));
   const partialRequired = unresolvedRequired.filter(id => loadedById.get(id)?.partial === true);
   const emptyRequired = unresolvedRequired.filter(id => num(loadedById.get(id)?.count) <= 0);
+  const currentRunIssue = runDateIssue(results?.date, nowMs);
   const sanctionsReasons = [];
+  if (currentRunIssue) sanctionsReasons.push(currentRunIssue);
+  if (!requiredSanctions.length) sanctionsReasons.push('sanctions contract defines no required sources');
   const sanctionsWarnings = servedByFallback.map(x => 'required sanctions source ' + x.id
     + ' did not load completely - screened via its declared fallback ' + x.fallback
     + ' (' + x.fallbackCount + ' names)');
@@ -103,7 +123,24 @@ export function assessRuntime({
   const backbones = new Set(arr(e.amBackbones).map(String));
   const backboneFailures = e.amBackboneFailures || {};
   const adverseReasons = [];
+  if (currentRunIssue) adverseReasons.push(currentRunIssue);
   const adverseWarnings = [];
+  // The summary is derived from per-subject backbone outcomes. If the
+  // counters or membership list are omitted or contradictory, an ostensibly
+  // zero-error run has no trustworthy coverage provenance.
+  const backboneNames = [
+    ['googleNews', 'Google News RSS'],
+    ['gdelt', 'GDELT global index'],
+    ['bing', 'Bing News'],
+  ];
+  const countersValid = !!e.amBackboneFailures && Array.isArray(e.amBackbones)
+    && backboneNames.every(([key]) => Number.isSafeInteger(backboneFailures[key])
+      && backboneFailures[key] >= 0 && backboneFailures[key] <= num(results?.screened));
+  if (!countersValid) {
+    adverseReasons.push('adverse-media backbone coverage evidence is missing or invalid');
+  } else if (backboneNames.some(([key, label]) => (backboneFailures[key] === 0) !== backbones.has(label))) {
+    adverseReasons.push('adverse-media backbone summary contradicts its failure counts');
+  }
   if (num(results?.screened) <= 0) adverseReasons.push('no subjects were screened');
   if (num(e.skipped) > 0) adverseReasons.push(num(e.skipped) + ' subjects skipped enrichment');
   /* amErrors means a subject had ZERO working global backbone after the
@@ -158,6 +195,7 @@ export function assessRuntime({
   }, adverseWarnings);
 
   const pepReasons = [];
+  if (currentRunIssue) pepReasons.push(currentRunIssue);
   const pepWarnings = [];
   const pepRun = e.pepWorldwide || {};
   const pepCount = num(pepDataset?.count);
@@ -168,13 +206,16 @@ export function assessRuntime({
   if (!pepDataset || typeof pepDataset !== 'object') pepReasons.push('worldwide PEP artifact is missing');
   if (pepRun.active !== true) pepReasons.push('daily screen did not load the worldwide PEP artifact');
   if (num(pepRun.count) !== pepCount) pepReasons.push('daily screen PEP count does not match the harvested artifact');
-  if (pepRun.harvested && pepDataset?.harvested && pepRun.harvested !== pepDataset.harvested) {
+  if (!pepRun.harvested) pepReasons.push('daily screen did not identify the consumed PEP harvest');
+  else if (pepDataset?.harvested && pepRun.harvested !== pepDataset.harvested) {
     pepReasons.push('daily screen consumed a different PEP harvest than the assurance artifact');
   }
   if (pepRun.partial === true) pepReasons.push('daily screen reports the worldwide PEP layer as partial');
   if (pepCount < PEP_FLOOR) pepReasons.push('worldwide PEP artifact below floor: ' + pepCount + ' < ' + PEP_FLOOR);
   if (pepDataset?.partial === true) pepReasons.push('worldwide PEP artifact is partial' + (pepExpected ? ': ' + pepCount + '/' + pepExpected : ''));
+  if (pepExpected > pepCount) pepReasons.push('worldwide PEP artifact count is below its declared expected population: ' + pepCount + '/' + pepExpected);
   if (!Number.isFinite(pepAge)) pepReasons.push('worldwide PEP artifact has no valid harvest timestamp');
+  else if (pepAge < -MAX_FUTURE_SKEW_HOURS) pepReasons.push('worldwide PEP artifact harvest timestamp is in the future');
   else if (pepAge > pepMaxAgeHours) pepReasons.push('worldwide PEP artifact is stale: ' + Math.round(pepAge) + 'h > ' + pepMaxAgeHours + 'h');
 
   /* The complete worldwide artifact is the operative PEP screening layer: it
@@ -252,9 +293,16 @@ export function writeAssurance(assurance) {
 export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAULT_ASSURANCE_MAX_AGE_HOURS } = {}) {
   const reasons = [];
   if (!assurance || assurance.version !== 1) reasons.push('assurance artifact missing or invalid');
+  if (assurance?.operational !== true) reasons.push('overall screening assurance is not operational');
   const age = ageHours(assurance?.generatedAt, nowMs);
   if (!Number.isFinite(age)) reasons.push('assurance timestamp missing or invalid');
+  else if (age < -MAX_FUTURE_SKEW_HOURS) reasons.push('assurance timestamp is in the future');
   else if (age > maxAgeHours) reasons.push('assurance evidence is stale: ' + Math.round(age) + 'h > ' + maxAgeHours + 'h');
+  const issuedAtMs = Date.parse(String(assurance?.generatedAt || ''));
+  if (Number.isFinite(issuedAtMs)) {
+    const runProblem = runDateIssue(assurance?.run?.date, issuedAtMs);
+    if (runProblem) reasons.push(runProblem);
+  }
   for (const key of ['sanctions','adverseMedia','pep']) {
     if (assurance?.domains?.[key]?.operational !== true) reasons.push(key + ' is not operational');
   }

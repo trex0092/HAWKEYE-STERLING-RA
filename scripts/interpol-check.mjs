@@ -36,12 +36,11 @@ function normalize(s) {
    forename+name — guards against unrelated namesakes, same rule as the PEP
    layer's labelMatches. */
 function nameMatches(subject, notice) {
-  // ≥3-char tokens normally; fall back to ≥2 for short multi-token names
-  // (e.g. "Xi Bo") so a real Red Notice namesake is not silently missed.
-  let want = normalize(subject).split(' ').filter(t => t.length >= 3);
-  if (!want.length) want = normalize(subject).split(' ').filter(t => t.length >= 2);
-  const have = normalize((notice.forename || '') + ' ' + (notice.name || ''));
-  return want.length > 0 && want.every(t => have.includes(t));
+  // Preserve meaningful two-character given names (Li, Xi, Al). Dropping them
+  // whenever a longer surname exists lets "Li Wang" match "Ming Wang".
+  const want = normalize(subject).split(' ').filter(t => t.length >= 2);
+  const have = new Set(normalize((notice.forename || '') + ' ' + (notice.name || '')).split(' ').filter(Boolean));
+  return want.length > 0 && want.every(t => have.has(t));
 }
 
 /* Extract the notices array from the HAL response (or a plain array fallback). */
