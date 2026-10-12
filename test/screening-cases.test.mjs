@@ -176,8 +176,10 @@ const OPEN_CASE = { [KEY]: { taskGid: 'existing-case', createdAt: '2026-07-01', 
 check('no implicit permission to close missing or inactive cases',
   planCaseActions({}, OPEN_CASE, TODAY).length === 0 &&
   planCaseActions({ [KEY]: subj({ lastSeen: '2026-07-07' }) }, OPEN_CASE, TODAY).length === 0);
-check('even whitelist registry entries cannot close an open case without complete evidence',
-  planCaseActions({ [KEY]: subj({ whitelistedOnly: true }) }, OPEN_CASE, TODAY).length === 0);
+check('whitelisted findings cannot auto-close without complete evidence but SLA aging remains possible',
+  (() => { const actions = planCaseActions({ [KEY]: subj({ whitelistedOnly: true }) }, OPEN_CASE, TODAY);
+    return actions.every(a => a.type !== 'clear') && actions.some(a => a.type === 'age');
+  })());
 check('incomplete coverage still creates genuinely new cases while withholding clearance',
   (() => { const actions = planCaseActions({
     [KEY]: subj(), inactive: subj({ lastSeen: '2026-07-06' })
