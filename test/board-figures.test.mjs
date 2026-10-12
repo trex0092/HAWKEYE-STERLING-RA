@@ -265,6 +265,19 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const stale = checkStored({ ...ok, generatedAt: '2026-09-20T00:00:00.000Z' },
     { nowMs, maxAgeHours: 36 });
   check('stored runtime assurance fails closed when evidence is stale', !stale.ok);
+  const replay = assessRuntime({ results: { ...results, date: '2026-09-20' },
+    pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('refreshing a stale screening-results file cannot generate fresh operational assurance',
+    !replay.operational
+    && Object.values(replay.domains).every(d => !d.operational && d.reasons.some(r => r.includes('too old'))));
+  const yesterday = assessRuntime({ results: { ...results, date: '2026-09-27' },
+    pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('cross-midnight screening still accepts the previous UTC run date',
+    yesterday.operational);
+  const replayedStored = checkStored({ ...ok, run: { ...ok.run, date: '2026-09-20' } },
+    { nowMs, maxAgeHours: 36 });
+  check('stored assurance independently rejects a run date inconsistent with its issuance',
+    !replayedStored.ok && replayedStored.reasons.some(r => r.includes('too old')));
 
   const futureAssurance = checkStored({ ...ok, generatedAt: '2026-12-28T00:00:00.000Z' },
     { nowMs, maxAgeHours: 36 });
