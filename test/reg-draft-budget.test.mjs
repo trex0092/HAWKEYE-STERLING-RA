@@ -195,6 +195,16 @@ check('reject invented, stale future, duplicated and ambiguous price evidence',
     source_url: 'https://openai.com.attacker.test/pricing' }] }, at).ok &&
   !validateApiPriceTable({ ...prices, models: [{ ...prices.models[0],
     usd_per_million: { ...prices.models[0].usd_per_million, output: '-0.1' } }] }, at).ok);
+check('provider-native token parsing does not convert missing usage into zero-cost',
+  normalizeProviderUsage('openai', { status: 'completed' }) === null &&
+  normalizeProviderUsage('openai', { usage: { input_tokens: 3, output_tokens: 2,
+    input_tokens_details: { cached_tokens: 4 } } }) === null &&
+  quoteProviderResponseCost(prices, { provider: 'openai', model: 'fixture-openai',
+    response: { usage: { input_tokens: 1000, output_tokens: 100,
+      input_tokens_details: { cached_tokens: 200 } } } }, at).micro_usd === '2500' &&
+  quoteProviderResponseCost(prices, { provider: 'anthropic', model: 'fixture-anthropic',
+    response: { usage: { input_tokens: 500, output_tokens: 100,
+      cache_read_input_tokens: 200, cache_creation_input_tokens: 100 } } }, at).micro_usd === '1145');
 check('invalid pricing JSON does not reveal raw input or become zero cost',
   !parseApiPriceTable('{secret', at).ok &&
   !parseApiPriceTable(JSON.stringify({ schema: 1, models: [] }), at).ok);
@@ -222,5 +232,16 @@ check('fixed provider/status whitelist prevents warning injection',
   emitApiQuotaAlert(classifyApiQuotaSignal('openai', 429), { summaryPath: '', warn: () => {} }) &&
   !emitApiQuotaAlert({ schema: 1, provider: 'openai\n::error', condition: 'rate_or_quota',
     http_status: 429 }, { summaryPath: '', warn: () => {} }));
+// Guard against accidental reintroduction of incompatible, already removed
+// provider integrations. CI lint separately validates unresolved identifiers.
+const sources = await Promise.all(['../scripts/openai-screening-enrichment.mjs',
+  '../scripts/reg-draft.mjs'].map(async rel => {
+  const { readFileSync } = await import('node:fs');
+  return readFileSync(new URL(rel, import.meta.url), 'utf8');
+}));
+check('AI integrations do not import the removed quota and dashboard telemetry APIs',
+  sources.every(source => !/\b(?:appendApiCostEvent|appendApiQuotaEvent|classifyApiQuotaFailure|USD_GUARD)\b/.test(source)));
+check('AI integrations no longer call undefined legacy settlement helpers',
+  sources.every(source => !/\bsettle\s*\(/.test(source)));
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

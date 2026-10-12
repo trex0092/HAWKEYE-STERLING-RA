@@ -15,9 +15,7 @@ const TEST_PRICE_TABLE = JSON.stringify({ schema: 1, models: [{
   usd_per_million: { input: '2.00', cached_input: '0.50', output: '8.00' },
 }] });
 const enrichScreeningResults = (results, opts = {}) =>
-  actualEnrichScreeningResults(results, {
-    apiPriceTableJson: TEST_PRICE_TABLE, maxUsdPerCall: '1.000000', ...opts,
-  });
+  actualEnrichScreeningResults(results, opts);
 
 let passed = 0, failed = 0;
 function check(label, condition) {
@@ -296,6 +294,10 @@ const ok = await enrichScreeningResults(fixture,{
   }
 });
 const sent=JSON.parse(captured.request.body);
+check('real raw provider counts are priced only with the verified table and never called invoices',
+  ok.cost_estimate?.status === 'priced_estimate' &&
+  ok.cost_estimate?.usd === '0.000760' &&
+  ok.cost_estimate?.over_reservation === false);
 check('actual request is bounded and never stores the provider response',
   captured.url===OPENAI_RESPONSES_URL && sent.store===false &&
   sent.max_output_tokens===1400 && sent.input.length<=5000 &&
@@ -381,6 +383,9 @@ const statusMissing = await enrichScreeningResults(fixture,{
     output:[{type:'message',content:[{type:'output_text',text:'Unconfirmed completion'}]}]
   })})
 });
+check('missing provider usage is unknown and retains the preflight reserve, never zero',
+  statusMissing.cost_estimate?.status === 'unknown_reserved' &&
+  typeof statusMissing.cost_estimate?.reserved_max_usd === 'string');
 check('missing Responses API completion status cannot masquerade as a usable MLRO note',
   statusMissing.text === '' && statusMissing.error.includes('incomplete'));
 const invalidModel=await enrichScreeningResults(fixture,{

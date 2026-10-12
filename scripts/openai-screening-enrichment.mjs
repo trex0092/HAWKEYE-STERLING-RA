@@ -1,5 +1,5 @@
-import { makeApiUsdBudget } from './api-cost-budget.mjs';
-import { classifyApiQuotaFailure, appendApiQuotaEvent } from './api-quota-alerts.mjs';
+import { parseApiPriceTable, quoteProviderResponseCost } from './api-cost.mjs';
+import { evaluateApiSpend, conservativeInputTokenBound } from './api-spend-guard.mjs';
 
 /* Optional OpenAI enrichment for the Asana daily screening digest.
 
@@ -448,16 +448,22 @@ export async function enrichScreeningResults(results, {
       const quota_alert = classifyApiQuotaSignal('openai', response.status, response.headers);
       if (quota_alert) emitApiQuotaAlert(quota_alert);
       return { enabled: true, text: '', error: safeOpenAIError(response.status), model,
+        cost_estimate: { status: 'unknown_reserved', reserved_max_usd: permission.estimated_max_usd },
         ...(quota_alert ? { quota_alert } : {}) };
     }
     const payload = await response.json().catch(() => null);
     const usage = safeUsage(payload && payload.usage);
-    const priced = settle(payload && payload.usage);
-    const cost_estimate = {
-      status: priced.usage_status, usd: priced.estimated_usd,
-      over_reservation: priced.over_reservation,
-      reservation_usd: hold.reserved_usd,
-    };
+    // A response without RAW provider counters is unknown-cost, not $0.
+    // Never use safeUsage() defaults for pricing; it normalizes missing values
+    // for display and intentionally loses the distinction from actual zero.
+    const priced = quoteProviderResponseCost(costGuard?.priceTable, {
+      provider: 'openai', model, response: payload
+    });
+    const cost_estimate = priced.status === 'priced'
+      ? { status: 'priced_estimate', usd: priced.usd,
+        reserved_max_usd: permission.estimated_max_usd,
+        over_reservation: BigInt(priced.micro_usd) > BigInt(permission.reserved_micro_usd) }
+      : { status: 'unknown_reserved', reserved_max_usd: permission.estimated_max_usd };
     if (!payload || payload.error || payload.status !== 'completed') {
       return { enabled: true, text: '', error: 'OpenAI response incomplete or invalid; manual review required',
         model, usage, input_chars: input.length, output_token_budget: outputBudget, cost_estimate };
@@ -473,9 +479,9 @@ export async function enrichScreeningResults(results, {
   } catch (_) {
     // Do not surface network exception text: some SDKs/clients include query
     // parameters, provider account details or reflected credentials in errors.
-    return { enabled: true, text: '', error: 'OpenAI request timed out or transport failed; manual review required', model };
+    return { enabled: true, text: '', error: 'OpenAI request timed out or transport failed; manual review required', model,
+      cost_estimate: { status: 'unknown_reserved', reserved_max_usd: permission.estimated_max_usd } };
   } finally {
-    if (!settled) settle(null); // no usage, retain full reservation conservatively
     clearTimeout(timer);
   }
 }

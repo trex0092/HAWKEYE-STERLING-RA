@@ -20,16 +20,20 @@ import {
   manualDraftSection, approvedWatchSource, approvedWatchSourceDetails,
   deferredDraftCause, providerStopReason, usageCounts
 } from './reg-draft-budget.mjs';
-import { makeApiUsdBudget } from './api-cost-budget.mjs';
-import { appendApiCostEvent } from './api-cost-dashboard.mjs';
-import { classifyApiQuotaFailure, appendApiQuotaEvent } from './api-quota-alerts.mjs';
+import { parseApiPriceTable, quoteProviderResponseCost } from './api-cost.mjs';
+import { evaluateApiSpend, conservativeInputTokenBound } from './api-spend-guard.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
 const OUT_DIR = 'docs/research/auto';
 const BUDGET = draftBudget(process.env);
-const PRICE_EVIDENCE = parseApiPriceTable(process.env.API_VERIFIED_PRICES_JSON || '');
+// Keep the reviewed workflow's existing API_USD_RATES_JSON variable compatible.
+const PRICE_EVIDENCE = parseApiPriceTable(
+  process.env.API_VERIFIED_PRICES_JSON || process.env.API_USD_RATES_JSON || '');
 let reservedRunMicro = '0';
+let pricedUsageMicro = 0n;
+let unpricedUsageCalls = 0;
+let overReservationCalls = 0;
 const APPROVED_SOURCES = JSON.parse(readFileSync(new URL('../data/reg-sources.json', import.meta.url), 'utf8')).sources;
 
 function skip(msg) { console.log('reg-draft: ' + msg + ' — skipping (detection-only PR).'); process.exit(0); }
@@ -156,7 +160,7 @@ async function draftFor(c) {
     priceTable: PRICE_EVIDENCE.ok ? PRICE_EVIDENCE.table : null,
     provider: 'anthropic', model: MODEL,
     maxInputTokens: conservativeInputTokenBound(prompt), maxOutputTokens: BUDGET.maxTokens,
-    maxUsdPerCall: process.env.REG_DRAFT_MAX_USD_PER_CALL,
+    maxUsdPerCall: process.env.REG_DRAFT_MAX_USD_PER_CALL || process.env.REG_DRAFT_MAX_USD_PER_RUN,
     maxUsdPerRun: process.env.REG_DRAFT_MAX_USD_PER_RUN,
     reservedMicroUsd: reservedRunMicro,
   });
@@ -188,21 +192,33 @@ async function draftFor(c) {
       const quota_alert = classifyApiQuotaSignal('anthropic', res.status, res.headers);
       if (quota_alert) emitApiQuotaAlert(quota_alert);
       const reason = providerStopReason(res.status, detail.slice(0, 2048));
-      const cause = classifyApiQuotaFailure(res.status, reason);
-      if (cause) {
-        const recorded = appendApiQuotaEvent({
-          schema: 1, observed_at: new Date().toISOString(),
-          provider: 'anthropic', workflow: 'regulatory-watch', model: MODEL,
-          http_status: res.status, cause,
-        });
-        if (!recorded.ok) console.warn('reg-draft: sanitized quota telemetry unavailable');
-      }
       console.warn('reg-draft: Anthropic request stopped: HTTP ' + res.status + ' (' + reason + ')');
       return { text: manualDraftSection(c, reason), ok: false, attempted: true,
         halt: true, haltReason: reason };
     }
     const data = await res.json();
-    settle(data && data.usage);
+    // Price RAW counters only. The displayed usageCounts() fallback zeros are
+    // deliberately not authoritative cost evidence.
+    const quote = quoteProviderResponseCost(
+      PRICE_EVIDENCE.ok ? PRICE_EVIDENCE.table : null,
+      { provider: 'anthropic', model: MODEL, response: data });
+    if (quote.status === 'priced') {
+      const cost = BigInt(quote.micro_usd);
+      pricedUsageMicro += cost;
+      if (cost > BigInt(permission.reserved_micro_usd)) {
+        // The conservative preflight was exceeded. Retain the excess and stop
+        // further optional calls instead of treating the billed attempt as free.
+        reservedRunMicro = (BigInt(reservedRunMicro) +
+          cost - BigInt(permission.reserved_micro_usd)).toString();
+        overReservationCalls++;
+        return { text: manualDraftSection(c, 'API USD budget exceeded'),
+          ok: false, attempted: true, halt: true,
+          haltReason: 'API USD budget exceeded' };
+      }
+    } else {
+      // Unknown provider usage retains the full preflight reservation.
+      unpricedUsageCalls++;
+    }
     const text = ((data && Array.isArray(data.content)) ? data.content : [])
       .filter(b => b && b.type === 'text' && typeof b.text === 'string')
       .map(b => b.text).join('\n').trim();
@@ -221,7 +237,6 @@ async function draftFor(c) {
       haltReason: 'provider timeout or network failure'
     };
   } finally {
-    if (!settled) settle(null); // unknown provider usage consumes the full hold
     clearTimeout(timer);
   }
 }
@@ -258,25 +273,21 @@ for (const c of changes) {
   }
   sections.push(text);
 }
-// Store only bounded, non-identifying provider/model counters for the
-// GitHub Actions cost summary. Never store sourced page text or prompts.
-if (apiCalls > 0 || (providerHaltReason && providerHaltReason.startsWith('API USD budget'))) {
-  const snap = USD_GUARD.snapshot();
-  const event = { schema: 1, observed_at: new Date().toISOString(),
-    provider: 'anthropic', model: MODEL, workflow: 'regulatory-watch',
-    requests: apiCalls,
-    status: apiCalls ? (unknownUsdUsage ? 'unknown_reserved' : 'priced') : 'blocked',
-    estimated_usd: apiCalls ? snap.estimated_committed_usd : null,
-    input_tokens: usageTotal.input, output_tokens: usageTotal.output };
-  const recorded = appendApiCostEvent(event);
-  if (!recorded.ok) console.warn('reg-draft: non-identifying cost telemetry unavailable');
-}
+// Existing local reservations are estimates, not billed USD. Do not
+// misrepresent missing usage as $0 or manufacture a dashboard invoice.
+const reservedUsd = (BigInt(reservedRunMicro) / 1000000n).toString() + '.' +
+  (BigInt(reservedRunMicro) % 1000000n).toString().padStart(6, '0');
+const pricedUsd = (pricedUsageMicro / 1000000n).toString() + '.' +
+  (pricedUsageMicro % 1000000n).toString().padStart(6, '0');
 console.log('reg-draft: provider calls=' + apiCalls + '/' + BUDGET.maxCalls +
   ' successful=' + successful + ' manual-review=' + deferred +
   ' tokens=input:' + usageTotal.input + ',output:' + usageTotal.output +
   ',cacheRead:' + usageTotal.cacheRead + ',cacheWrite:' + usageTotal.cacheWrite +
-  ' estimated_usd=' + (USD_GUARD.snapshot().estimated_committed_usd || 'unpriced') +
-  ' configured_cap_usd=' + (USD_GUARD.snapshot().limit_usd || 'missing'));
+  ' reserved_usd_estimate=' + reservedUsd +
+  ' priced_usage_usd_estimate=' + pricedUsd +
+  ' unpriced_usage_calls=' + unpricedUsageCalls +
+  ' over_reservation_calls=' + overReservationCalls +
+  ' configured_run_cap_usd=' + (process.env.REG_DRAFT_MAX_USD_PER_RUN || 'missing'));
 
 /* Persist the (possibly AI-refined) severities so the Asana notify step —
    which runs after this one — renders the final triage labels. */
