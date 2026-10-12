@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-12T10:10:34.618Z",
-  "githubRunId": "38234567784",
-  "commit": "c42a87c7012ab4836f13893690b9257236817c8e",
+  "generatedAt": "2026-10-12T13:22:08.740Z",
+  "githubRunId": "38255068843",
+  "commit": "1f9103f0dff9d043ba1aad83a834bfc0e8a988d6",
   "screenedSubjects": 991,
   "requiredSourceIds": [
     "un-consolidated",
@@ -44,7 +44,7 @@
       {
         "id": "eu-fsf",
         "name": "EU — Consolidated financial sanctions list (CSV)",
-        "count": 31070,
+        "count": 31037,
         "partial": false
       },
       {
