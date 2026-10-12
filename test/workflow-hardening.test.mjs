@@ -1,5 +1,4 @@
-import { parseGitHubRateSnapshot, fetchGitHubRateSnapshot,
-  renderGitHubRateDashboard } from '../scripts/github-rate-dashboard.mjs';
+import { decideUniqueDispatch, dispatchOnce } from '../scripts/github-workflow-dispatch-guard.mjs';
 /* Workflow-hardening ratchet — the 2026-08-05 full-estate audit found every
    deviation documented in-file; this guard FREEZES that state so a future
    workflow (or edit) cannot regress it silently. Line-based checks (no YAML
@@ -287,48 +286,68 @@ for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
 }
 
 
-const ghAt = '2026-10-12T12:00:00.000Z';
-const ghRates = { resources: {
-  core: { limit: 5000, remaining: 4000, reset: 1791806400, used: 1000 },
-  graphql: { limit: 5000, remaining: 0, reset: 1791806400, used: 5000 },
-  search: { limit: 30, remaining: 2, reset: 1791806400, used: 28 }
-} };
-const ghSnap = parseGitHubRateSnapshot(ghRates, { observedAt: ghAt });
-check('GitHub API dashboard distinguishes depleted GraphQL from healthy REST core',
-  ghSnap.ok && ghSnap.rows.find(x=>x.resource==='core').state === 'normal' &&
-  ghSnap.rows.find(x=>x.resource==='graphql').state === 'exhausted' &&
-  ghSnap.rows.find(x=>x.resource==='search').state === 'low');
-check('rate summary includes reset instants and states without token usage charges',
-  renderGitHubRateDashboard(ghSnap).includes('Reset UTC') &&
-  renderGitHubRateDashboard(ghSnap).includes('does not prove'));
-check('malformed and absent core quotas are UNKNOWN, never healthy',
-  !parseGitHubRateSnapshot({ resources: { search: ghRates.resources.search } }).ok &&
-  !parseGitHubRateSnapshot({ resources: { core: {
-    limit: '5000', remaining: 5000, reset: 1791806400
-  } } }).ok &&
-  !parseGitHubRateSnapshot({ resources: { core: {
-    limit: 5000, remaining: 5100, reset: 1791806400
-  } } }).ok);
-let ghCalled = 0;
-const goodGh = await fetchGitHubRateSnapshot({
-  token: 'SYNTHETIC_GITHUB_TOKEN', observedAt: ghAt,
-  fetchImpl: async (url,opts) => { ghCalled++;
-    return { ok: true, status: 200, json: async () => ghRates };
-  },
+const dedupeNow = Date.parse('2026-10-12T12:00:00Z');
+const dedupeRun = (patch={}) => ({
+  id: 100, head_branch: 'main', event: 'workflow_dispatch',
+  status: 'completed', conclusion: 'success', created_at: '2026-10-12T11:56:00Z', ...patch
 });
-check('GitHub API rate dashboard uses one fixed read-only endpoint',
-  goodGh.ok && ghCalled === 1);
-const deniedGh = await fetchGitHubRateSnapshot({
-  token: 'SYNTHETIC_GITHUB_TOKEN',
-  fetchImpl: async () => ({ ok: false, status: 429 }),
-});
-check('GitHub secondary/API throttling stays explicitly unverified',
-  !deniedGh.ok && deniedGh.reason === 'github_rate_limited_or_denied');
-const missingGh = await fetchGitHubRateSnapshot({
-  token: '', fetchImpl: async () => { throw Error('unreachable'); },
-});
-check('rate dashboard will not call API without a GitHub token',
-  !missingGh.ok && missingGh.reason === 'github_credentials_or_transport_unavailable');
-
+check('duplicate dispatch gate prevents any active workflow being re-triggered',
+  decideUniqueDispatch([dedupeRun({status:'in_progress'})],
+    {nowMs:dedupeNow}).action === 'skip');
+check('a prior-day long-running active AML sweep blocks a duplicate dispatch',
+  decideUniqueDispatch([dedupeRun({
+    status: 'in_progress', conclusion: null,
+    created_at: '2026-10-11T22:00:00Z'
+  })], { nowMs: dedupeNow, sinceMs: Date.parse('2026-10-12T00:00:00Z') }).action === 'skip');
+check('older completed runs remain eligible while old active runs remain blocked',
+  decideUniqueDispatch([dedupeRun({
+    status: 'completed', created_at: '2026-10-11T22:00:00Z'
+  })], { nowMs: dedupeNow }).action === 'dispatch');
+check('recent completed or failed dispatches still have a quiet period',
+  decideUniqueDispatch([dedupeRun({conclusion:'failure'})],
+    {nowMs:dedupeNow}).action === 'skip');
+check('older completed runs can be retried after the quiet period',
+  decideUniqueDispatch([dedupeRun({created_at:'2026-10-12T10:00:00Z'})],
+    {nowMs:dedupeNow}).action === 'dispatch');
+check('future and unreadable run timestamps fail closed',
+  decideUniqueDispatch([dedupeRun({created_at:'invalid'})],
+    {nowMs:dedupeNow}).action === 'unknown' &&
+  decideUniqueDispatch([dedupeRun({created_at:'2026-10-15T00:00:00Z'})],
+    {nowMs:dedupeNow}).action === 'unknown');
+let dedupeCalls = [];
+const fakeApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  if (!options) return { data: { workflow_runs: [dedupeRun()] } };
+  return null;
+};
+const double = await dispatchOnce(fakeApi, '/actions/workflows/sanctions-screen.yml',
+  {nowMs:dedupeNow});
+check('just-in-time run listing suppresses duplicate POSTs',
+  double.action === 'skip' && dedupeCalls.join('|') === 'GET');
+dedupeCalls = [];
+const emptyApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  return options ? null : { data: { workflow_runs: [] } };
+};
+const dispatchedOnce = await dispatchOnce(emptyApi, '/actions/workflows/sanctions-screen.yml',
+  {nowMs:dedupeNow});
+check('genuinely missing run is dispatched once after a current history read',
+  dispatchedOnce.action === 'dispatched' && dedupeCalls.join('|') === 'GET|POST');
+dedupeCalls = [];
+const uncertainApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  if (!options) return { data: {} };
+  throw Error('should not call');
+};
+check('unavailable or malformed run listings block blind dispatches',
+  (await dispatchOnce(uncertainApi, '/actions/workflows/sanctions-screen.yml',
+    {nowMs:dedupeNow})).action === 'unknown' && dedupeCalls.join('|') === 'GET');
+let posts = 0;
+const ambiguous = await dispatchOnce(async (_path,opt) => {
+  if (!opt) return {data:{workflow_runs:[]}};
+  posts++; throw Error('POST outcome unknown');
+}, '/actions/workflows/sanctions-screen.yml', {nowMs:dedupeNow});
+check('ambiguous POST outcomes never cause an automatic replay',
+  ambiguous.action === 'unknown' && posts === 1);
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
