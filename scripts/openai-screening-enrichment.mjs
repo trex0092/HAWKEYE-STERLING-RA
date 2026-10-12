@@ -1,4 +1,5 @@
 import { makeApiUsdBudget } from './api-cost-budget.mjs';
+import { classifyApiQuotaFailure, appendApiQuotaEvent } from './api-quota-alerts.mjs';
 
 /* Optional OpenAI enrichment for the Asana daily screening digest.
 
@@ -450,6 +451,17 @@ export async function enrichScreeningResults(results, {
     // Provider error bodies can contain org/account IDs, sensitive request
     // echoes or billing metadata. Never return or log the raw error.message.
     if (!response.ok) {
+      // Record only a sanitized HTTP category. Provider error bodies may
+      // contain identifiers and are NEVER parsed or written to GitHub.
+      const category = classifyApiQuotaFailure(response.status);
+      if (category && process.env.API_QUOTA_ALERT_TELEMETRY_ENABLED === '1') {
+        const recorded = appendApiQuotaEvent({
+          schema: 1, observed_at: new Date().toISOString(),
+          provider: 'openai', workflow: 'screening-digest', model,
+          http_status: response.status, cause: category,
+        });
+        if (!recorded.ok) console.warn('openai-screening: sanitized quota telemetry unavailable');
+      }
       return { enabled: true, text: '', error: safeOpenAIError(response.status), model };
     }
     const payload = await response.json().catch(() => null);
