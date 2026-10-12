@@ -286,8 +286,10 @@ def dispatch(message):
     if params is not None and not isinstance(params, dict):
         return None if is_notification else _error(req_id, INVALID_PARAMS, "parameters must be an object")
 
-    # Notifications: acknowledge silently (no response is sent for any of them).
-    if method.startswith("notifications/"):
+    # JSON-RPC notifications have no id and must never produce responses or
+    # execute an ordinary tool/resource operation as an accidental fire-and-
+    # forget request. Do not run tool handlers on an invalid tool notification.
+    if is_notification:
         return None
 
     try:
@@ -316,7 +318,8 @@ def dispatch(message):
         log("internal MCP handler error: " + type(e).__name__)
         return None if is_notification else _error(req_id, INTERNAL_ERROR, "internal handler failure")
 
-    return None if is_notification else _error(req_id, METHOD_NOT_FOUND, f"unknown method '{method}'")
+    # The method string is client-controlled and may contain PII or secrets.
+    return _error(req_id, METHOD_NOT_FOUND, "unknown method; see the advertised MCP capabilities")
 
 
 def serve(stdin=None, stdout=None):

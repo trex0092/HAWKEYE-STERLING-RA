@@ -596,6 +596,15 @@ check("MCP method params must be JSON objects, not a list",
 
 check("unknown method → JSON-RPC -32601", rpc("no/such/method")["error"]["code"] == mcp_server.METHOD_NOT_FOUND)
 check("a notification (no id) yields no response", rpc("notifications/initialized", notification=True) is None)
+_before_notify = len(mcp_server.AUDIT_LOG.entries)
+check("a no-id tools/call cannot execute a tool or create an audit entry",
+      rpc("tools/call", {"name": "hawkeye_normalize_name",
+        "arguments": {"name": "PRIVATE CUSTOMER"}}, notification=True) is None
+      and len(mcp_server.AUDIT_LOG.entries) == _before_notify)
+check("unknown methods never echo an untrusted method containing private data",
+      "private-name@example.test" not in json.dumps(
+        rpc("private-name@example.test")) and
+      rpc("private-name@example.test")["error"]["code"] == mcp_server.METHOD_NOT_FOUND)
 check("non-2.0 message is rejected", mcp_server.dispatch({"id": 1, "method": "ping"})["error"]["code"] == mcp_server.INVALID_REQUEST)
 
 # ── mcp_server.serve — end-to-end stdio framing ───────────────────────────────────
