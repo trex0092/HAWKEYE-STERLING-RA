@@ -3,6 +3,11 @@
  * All API failures keep the eval INCOMPLETE rather than reporting a behavioural
  * regression or burning further API requests. */
 import { classifyAdvisorEvalFailure } from '../scripts/advisor-eval-http.mjs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 let passed = 0, failed = 0;
 function check(name, predicate) {
@@ -37,5 +42,28 @@ check('402 billing error stops run even if response has no JSON message',
 check('unknown status remains bounded and source-independent',
   classifyAdvisorEvalFailure(Number.NaN, sensitive).status_code === 0 &&
   !JSON.stringify(classifyAdvisorEvalFailure(0, sensitive)).includes(sensitive));
+// Drive BOTH real CLI entrypoints without a credential or network. A missing
+// key used to exit zero, so Freshness Check accepted the skipped evaluation
+// as genuine live assurance for the full cadence window.
+for (const [script, report] of [
+  ['advisor-eval.mjs', 'advisor-eval-report.md'],
+  ['advisor-bias-eval.mjs', 'advisor-bias-eval-report.md'],
+]) {
+  const root = mkdtempSync(join(tmpdir(), 'hsra-eval-no-key-'));
+  try {
+    const cli = fileURLToPath(new URL('../scripts/' + script, import.meta.url));
+    const run = spawnSync(process.execPath, [cli], {
+      cwd: root, encoding: 'utf8', timeout: 12000,
+      env: { ...process.env, ANTHROPIC_API_KEY: '' }
+    });
+    const body = readFileSync(join(root, report), 'utf8');
+    check(script + ' fails closed on missing credentials and writes actual INCOMPLETE evidence',
+      run.status === 1 && body.includes('**Result: INCOMPLETE') &&
+      body.includes('NOT ') && !body.includes('Result: all ') &&
+      !body.includes('no unexplained divergences'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

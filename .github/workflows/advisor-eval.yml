@@ -8,8 +8,9 @@ name: Advisor Eval
 # "Ongoing Monitoring" Asana project, falling back to a labelled
 # GitHub issue if Asana is unreachable so a regression is never lost.
 #
-# Runs ONLY if the ANTHROPIC_API_KEY secret is set; otherwise the eval skips and
-# the job is a no-op. The offline guardrail tests (test/advisor-assurance.test.js)
+# Missing ANTHROPIC_API_KEY is an operational assurance outage: the evaluator
+# writes an INCOMPLETE report and fails; it must never look like a completed eval.
+# The offline guardrail tests (test/advisor-assurance.test.js)
 # always run in CI regardless.
 
 on:
