@@ -20,11 +20,13 @@ import {
   deferredDraftCause, providerStopReason, usageCounts
 } from './reg-draft-budget.mjs';
 import { makeApiUsdBudget } from './api-cost-budget.mjs';
+import { appendApiCostEvent } from './api-cost-dashboard.mjs';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5';
 const OUT_DIR = 'docs/research/auto';
 const BUDGET = draftBudget(process.env);
+let unknownUsdUsage = 0;
 const USD_GUARD = makeApiUsdBudget({
   provider: 'anthropic', model: MODEL,
   priceTableJson: process.env.API_USD_RATES_JSON,
@@ -166,7 +168,9 @@ async function draftFor(c) {
   const settle = usage => {
     if (settled) return null;
     settled = true;
-    return USD_GUARD.settle(hold.id, usage);
+    const outcome = USD_GUARD.settle(hold.id, usage);
+    if (outcome.usage_status === 'unknown_reserved') unknownUsdUsage++;
+    return outcome;
   };
   /* Bound each paid request, including the time spent reading the response.
      Never retry blindly: a 429/quota failure would repeat for every source. */
@@ -246,6 +250,19 @@ for (const c of changes) {
     }
   }
   sections.push(text);
+}
+// Store only bounded, non-identifying provider/model counters for the
+// GitHub Actions cost summary. Never store sourced page text or prompts.
+if (apiCalls > 0 || (providerHaltReason && providerHaltReason.startsWith('API USD budget'))) {
+  const snap = USD_GUARD.snapshot();
+  const event = { schema: 1, observed_at: new Date().toISOString(),
+    provider: 'anthropic', model: MODEL, workflow: 'regulatory-watch',
+    requests: apiCalls,
+    status: apiCalls ? (unknownUsdUsage ? 'unknown_reserved' : 'priced') : 'blocked',
+    estimated_usd: apiCalls ? snap.estimated_committed_usd : null,
+    input_tokens: usageTotal.input, output_tokens: usageTotal.output };
+  const recorded = appendApiCostEvent(event);
+  if (!recorded.ok) console.warn('reg-draft: non-identifying cost telemetry unavailable');
 }
 console.log('reg-draft: provider calls=' + apiCalls + '/' + BUDGET.maxCalls +
   ' successful=' + successful + ' manual-review=' + deferred +

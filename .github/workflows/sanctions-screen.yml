@@ -285,7 +285,14 @@ jobs:
           # was merged into HAWKEYE STERLING APP.
           ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
+          # Telemetry-only, no external paid API is enabled by this variable.
+          API_COST_TELEMETRY_ENABLED: '1'
         run: node scripts/screening-cases.mjs
+
+      - name: API cost summary (metadata only)
+        if: always() && !cancelled()
+        continue-on-error: true
+        run: node scripts/api-cost-dashboard.mjs
 
       - name: Screening metrics (non-blocking observability)
         if: always()
