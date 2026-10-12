@@ -36,11 +36,12 @@ const sleep = ms => new Promise(res => setTimeout(res, ms));
 const MAX_ATTEMPTS = 3;
 
 export async function asana(path, opts = {}) {
+  const { noRetryOnUnknownOutcome = false, ...requestOptions } = opts;
   for (let attempt = 0; ; attempt++) {
     let r;
     try {
       r = await fetch('https://app.asana.com/api/1.0' + path, {
-        ...opts,
+        ...requestOptions,
         headers: {
           Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
           'Content-Type': 'application/json',
@@ -51,7 +52,7 @@ export async function asana(path, opts = {}) {
     } catch (e) {
       /* Network-level failure (reset, DNS, TLS) — as transient as a 503; retry
          with the same bounded backoff instead of dying on the first blip. */
-      if (attempt < MAX_ATTEMPTS - 1) {
+      if (!noRetryOnUnknownOutcome && attempt < MAX_ATTEMPTS - 1) {
         const delay = retryDelayMs(attempt);
         console.warn('asana-notify: network error (' + (e && e.message || e) + ') — retry ' + (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
         await sleep(delay);
@@ -64,7 +65,7 @@ export async function asana(path, opts = {}) {
     if (r.status === 401) {
       throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked. Rotate it in GitHub Settings → Secrets → ASANA_ACCESS_TOKEN.');
     }
-    if (attempt < MAX_ATTEMPTS - 1 && isRetryable(r.status)) {
+    if (!noRetryOnUnknownOutcome && attempt < MAX_ATTEMPTS - 1 && isRetryable(r.status)) {
       const delay = retryDelayMs(attempt, r.headers && r.headers.get && r.headers.get('retry-after'));
       console.warn('asana-notify: Asana ' + r.status + ' — retry ' + (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
       await sleep(delay);
@@ -102,6 +103,16 @@ export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6, dedupPr
   }) || null;
 }
 
+/* A dated daily digest remains unique across the entire UTC day, not 6h. */
+export function findDateScopedDailyDuplicates(tasks, prefix) {
+  const m = /^🛡️ Sanctions Screen — (\d{4}-\d\d-\d\d)$/u.exec(String(prefix || ''));
+  if (!m || !Number.isFinite(Date.parse(m[1] + 'T00:00:00Z')) ||
+      new Date(m[1] + 'T00:00:00Z').toISOString().slice(0, 10) !== m[1]) {
+    throw new Error('Invalid daily screening digest date prefix');
+  }
+  return (tasks || []).filter(t => String(t?.name || '').startsWith(prefix + ' — '));
+}
+
 /* Resolve a section GID by name within a project, creating it if absent —
    idempotent (an existing name is reused), shared by the schedulers that file
    under a named column. */
@@ -129,7 +140,7 @@ export async function ensureSection(projectGid, name) {
    the partial. Nothing that decides coverage reads through this helper. */
 export const ASANA_PAGE_CAP = Number(process.env.ASANA_PAGE_CAP) || 500;
 
-async function asanaPages(base, what) {
+async function asanaPages(base, what, { requireComplete = false } = {}) {
   const out = [];
   let path = base, pages = 0;
   while (path) {
@@ -137,6 +148,7 @@ async function asanaPages(base, what) {
     out.push(...(d.data || []));
     path = d.next_page ? base + '&offset=' + d.next_page.offset : null;
     if (path && ++pages >= ASANA_PAGE_CAP) {
+      if (requireComplete) throw new Error('Incomplete project task scan for daily digest');
       console.error('asana-notify: ' + what + ' — read ' + out.length + ' record(s) over ' + pages
         + ' pages and Asana still reports more; the page cap (' + ASANA_PAGE_CAP
         + ') was hit. Continuing on the PARTIAL read — raise ASANA_PAGE_CAP.');
@@ -147,9 +159,9 @@ async function asanaPages(base, what) {
 }
 
 /* All tasks in a project (name, created_at, permalink) — for the dedup guard. */
-export async function listProjectTasks(projectGid) {
+export async function listProjectTasks(projectGid, { requireComplete = false } = {}) {
   return asanaPages('/projects/' + projectGid + '/tasks?limit=100&opt_fields=name,created_at,permalink_url',
-    'task scan of project ' + projectGid);
+    'task scan of project ' + projectGid, { requireComplete });
 }
 
 /* Create one alert card in the Ongoing Monitoring project.
@@ -191,10 +203,45 @@ export async function notifyAsana(name, notes, opts = {}) {
       ...mirror.map(m => (m.section ? { project: m.project, section: m.section } : { project: m.project })),
     ];
   }
+  /* Date-scoped screening digests require a complete read of existing cards.
+   * On a same-day rerun update/read-back the ONE existing digest. Do not
+   * silently choose between duplicate audit records or post a third card. */
+  if (opts.dateScopedDigest === true) {
+    if (typeof opts.html !== 'string' || !opts.html.startsWith('<body>')) {
+      throw new Error('Complete HTML evidence required for screening digest');
+    }
+    const matches = findDateScopedDailyDuplicates(
+      await listProjectTasks(project, { requireComplete: true }), opts.dedupPrefix);
+    if (matches.length > 1) {
+      throw new Error('Existing duplicate daily screening digests require human reconciliation');
+    }
+    if (matches.length === 1) {
+      const existing = matches[0];
+      const id = String(existing.gid || '');
+      if (!/^\d+$/.test(id)) throw new Error('Invalid Asana daily screening task id');
+      await asana('/tasks/' + id, { method: 'PUT', body: JSON.stringify({ data: {
+        name: data.name, html_notes: fitAsanaHtml(opts.html), due_on: due
+      } }) });
+      if (opts.section) await asana('/sections/' + opts.section + '/addTask', {
+        method: 'POST', body: JSON.stringify({ data: { task: id } }) });
+      const readBack = (await asana('/tasks/' + id
+        + '?opt_fields=name,notes,memberships.project.gid,memberships.section.gid,permalink_url'))?.data;
+      if (readBack?.name !== data.name ||
+          typeof readBack.notes !== 'string' ||
+          !readBack.notes.includes('Daily sanctions screening') ||
+          !(readBack.memberships || []).some(m =>
+            String(m.project?.gid) === String(project) &&
+            String(m.section?.gid) === String(opts.section))) {
+        throw new Error('Daily screening report update not verified by Asana');
+      }
+      console.log('asana-notify: existing UTC-day screening digest updated and verified');
+      return readBack.permalink_url || existing.permalink_url || null;
+    }
+  }
   /* Idempotency guard — never double-post the same card on a workflow re-run.
      Best-effort: if the check itself fails we still post (losing an alert is
      worse than a rare duplicate). */
-  try {
+  if (opts.dateScopedDigest !== true) try {
     const dup = findRecentDuplicate(await listProjectTasks(project), data.name, Date.now(), 6, opts.dedupPrefix || null);
     if (dup) {
       if (String(project) === MONITORING_PROJECT && opts.section) {
@@ -215,7 +262,8 @@ export async function notifyAsana(name, notes, opts = {}) {
   if (opts.assignee !== null) data.assignee = opts.assignee || 'me';
   let d;
   try {
-    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
+    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }),
+      noRetryOnUnknownOutcome: opts.dateScopedDigest === true });
   } catch (e) {
     /* Backstop (screen.py post_unified_task parity): should Asana's accounting
        ever outgrow asanaHtmlSize, refit once on a smaller budget rather than
@@ -226,9 +274,13 @@ export async function notifyAsana(name, notes, opts = {}) {
       + smaller + '-byte rich-text budget (truncation disclosed in the card)');
     data.html_notes = fitAsanaHtml(opts.html, smaller);
     if (data.html_notes === opts.html) throw e;   // nothing left to cut
-    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
+    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }),
+      noRetryOnUnknownOutcome: opts.dateScopedDigest === true });
   }
   const gid = d.data && d.data.gid;
+  if (opts.dateScopedDigest === true && !/^\d+$/.test(String(gid || ''))) {
+    throw new Error('Asana did not confirm the new daily digest identifier');
+  }
   /* Placement is part of delivery. A card in the wrong section is not a
      successful delivery, so fail loudly instead of leaving it in the default
      section. */
