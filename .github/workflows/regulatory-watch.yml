@@ -159,6 +159,11 @@ jobs:
           REG_DRAFT_MAX_USD_PER_RUN: ${{ vars.REG_DRAFT_MAX_USD_PER_RUN }}
         run: node scripts/reg-draft.mjs < reg-watch-changes.json
 
+      - name: Cost estimate dashboard (metadata only)
+        if: steps.watch.outputs.has_changes == 'true'
+        continue-on-error: true
+        run: node scripts/api-cost-dashboard.mjs
+
       - name: Notify Asana — HAWKEYE STERLING APP + the law-change queue
         id: asana
         # Don't fail the run if Asana is unreachable; the issue fallback covers it.
