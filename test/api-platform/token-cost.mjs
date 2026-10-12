@@ -30,11 +30,11 @@ export async function run(check) {
   check('token costs: valid cache counts remain exact and do not double-charge',
     quoteProviderResponseCost(prices, { provider: 'openai', model: 'fixture-alias',
       response: { usage: { ...counts, input_tokens_details: { cached_tokens: 200 } } } }, opts).usd === '0.002600');
-  check('token costs: a returned model snapshot uses its own verified rate',
-    quoteProviderResponseCost(prices, { provider: 'openai', model: 'fixture-alias',
+  check('token costs: an explicitly configured model snapshot uses its verified rate',
+    quoteProviderResponseCost(prices, { provider: 'openai', model: 'fixture-snapshot',
       response: { model: 'fixture-snapshot', usage: counts } }, opts).usd === '0.005600');
-  check('token costs: unpriced or malformed returned models do not inherit the requested rate',
-    ['unknown-snapshot', null, 'bad model'].every(model =>
+  check('token costs: substituted models never inherit the requested-model accounting identity',
+    ['fixture-snapshot', 'unknown-snapshot', null, 'bad model'].every(model =>
       quoteProviderResponseCost(prices, { provider: 'openai', model: 'fixture-alias',
         response: { model, usage: counts } }, opts).status === 'unpriced'));
   check('token costs: a response without token counts remains unknown',
