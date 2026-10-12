@@ -66,6 +66,19 @@ file. **Neither signal can override a known failure in the other**:
   deploy-relevant files, including `netlify/functions/**`, must be accounted
   for. Only independently dated changes inside the site's configured grace
   window can be reported as **LAG**, which is not verified currency.
+- The GitHub Compare API exposes at most **300 file records**. A response
+  touching that ceiling is **truncated/UNVERIFIABLE**, not a complete record,
+  even if the returned files happen to be documentation only. Commit history
+  is verified to be complete, anchored at the immutable live commit and
+  ending at the expected `main` commit. Missing or non-ancestor history
+  fails closed; known stale assets still count as proven DRIFT.
+- A recent edit to a Function cannot erase its earlier unshipped revisions:
+  deploy-lag grace is accepted only when both the **deployed marker** and
+  the **oldest intervening commit** are inside the configured window.
+  Timestamp evidence comes from one complete compare response; per-file
+  GitHub history requests are not needed. This conservative control may
+  classify a late app change following old docs-only changes as DRIFT,
+  but cannot silently call a long-stale deployment current.
 - A failed GitHub commit comparison or undatable changed file is
   **UNVERIFIABLE/DRIFT**, not an implicit clean bill of health. A missing
   or malformed live deploy marker is likewise **UNVERIFIABLE** on GitHub
@@ -81,6 +94,51 @@ The check remains **read-only**, and does not trigger another paid Netlify
 build to attempt to conceal deployment drift. A failed Site Currency check
 is an operational incident requiring Netlify deploy inspection, not grounds
 to bypass production protections.
+
+## Optional API preflight, fail fast without weakening production proof
+
+The main branch build-hook workflow now supports a **read-only** Netlify
+preflight before its 18-minute exact-byte publishing poll. This is
+optional and makes **at most two GET requests** per triggered deployment.
+It never triggers builds, unlocks deploys, reads Netlify site environment
+variables, or changes production settings. Configure these in GitHub Actions
+(repository-level) only if approved by the Netlify project owner:
+
+- Secret: `NETLIFY_AUTH_TOKEN`, an approved Netlify access token, never
+  added to this repository or pasted into logs.
+- Secret or repository variable: `NETLIFY_SITE_ID`, the specific UUID of
+  the existing **hawkeye-sterling-ra** Netlify project. Prefer a secret if
+  your company classifies site identifiers as restricted metadata.
+
+The preflight reads the Netlify project's documented `build_settings`
+and published-deploy metadata, then the five latest production deploy
+statuses. It classifies these *confirmed* blockers early:
+
+| Read-only finding | Operator correction |
+| --- | --- |
+| `builds_stopped` | Activate builds in Netlify project build settings |
+| `production_deploy_locked` | Unlock auto-publishing on the published production deploy |
+| `wrong_production_branch` | Set the Netlify production branch to `main` |
+| `wrong_linked_repository` | Relink the **same approved** GitHub repository |
+| `matching_deploy_failed` | Inspect and remediate the actual Netlify deploy log |
+| `build_requires_manual_review` | Resolve the pending Netlify deploy-review gate |
+
+For a known blocker the workflow stays **red** and avoids wasting another
+18 minutes polling a deploy that cannot publish. Missing API credentials,
+HTTP 401/429, unavailable API responses, incomplete metadata, and deploys
+still in the queue produce a **warning**, not a fabricated green pass.
+The independent Site Currency content comparison remains authoritative
+in every case. If credentials are not configured, workflow behavior is
+unchanged: the existing exact-byte poll still runs.
+
+**This is a diagnostic, not a repair of Netlify account settings.** The
+10 October hook returned HTTP 200 but failed all 54 publish checks, and
+the live marker was still older than `main`. These observations do
+not establish whether Netlify builds were stopped, publishing locked,
+the hook linked to a different project, or a production build failed.
+Only actual Netlify site/deploy records can distinguish those causes.
+Do not repeatedly trigger paid builds until the account-level blocker is
+resolved and an exact Site Currency result is green.
 
 ## Operator recovery steps
 

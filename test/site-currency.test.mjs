@@ -11,7 +11,8 @@
         site is not a current site, and that distinction is the whole point.
 
    Usage: node test/site-currency.test.mjs */
-import { assessDeploymentIntegrity, decide, discoverServedAssets, firstDivergence, isDeployRelevantPath, sha256 } from '../scripts/site-currency.mjs';
+import { assessDeploymentIntegrity, decide, discoverServedAssets, firstDivergence,
+  isDeployRelevantPath, sha256, verifiedDeployComparison } from '../scripts/site-currency.mjs';
 
 let passed = 0, failed = 0;
 const check = (name, cond) => { if (cond) { passed++; console.log('  ok  ' + name); } else { failed++; console.log('FAIL  ' + name); } };
@@ -121,7 +122,24 @@ const opts = { graceSeconds: 86400, now: NOW };
   check('stale deploy SHA and RECENT changed function is classified only as lag',
     assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
       changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[at(60)],
-      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='lag');
+      markerCommittedAt:at(300), assetDecision:match,
+      graceSeconds:86400,now:NOW}).verdict==='lag');
+
+  check('a fresh edit cannot launder a weeks-old stale deployed marker',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],
+      changedAtSeconds:[at(60)],markerCommittedAt:at(900000),
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+  check('unknown marker date is not enough to excuse a stale Function',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],
+      changedAtSeconds:[at(60)],assetDecision:match,
+      graceSeconds:86400,now:NOW}).ok===false);
+  check('known stale static files remain DRIFT even when GitHub compare is truncated',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:null,assetDecision:decide([
+        {name:'app.js',status:'differ',changedAt:at(900000)}],opts)
+    }).verdict==='drift');
   check('zero lag budget cannot falsely call stale Function deployment current',
     assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
       changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[at(1)],
@@ -159,6 +177,68 @@ const opts = { graceSeconds: 86400, now: NOW };
       changedPaths:Array(101).fill('netlify/functions/example.js'),
       changedAtSeconds:Array(101).fill(at(1)),
       assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+}
+
+
+/* ---- GitHub compare API must be complete before granting Netlify grace ---- */
+{
+  const BASE = 'a'.repeat(40);
+  const HEAD = 'b'.repeat(40);
+  const makeCompare = ({
+    files = [{filename:'netlify/functions/brain-soul.js'}],
+    totalCommits = 2,
+    commits = [
+      {sha:'c'.repeat(40),commit:{committer:{date:'2026-10-09T06:00:00Z'}}},
+      {sha:HEAD,commit:{committer:{date:'2026-10-10T07:00:00Z'}}},
+    ],
+    markerDate = '2026-10-08T07:00:00Z',
+    mergeBase = BASE, base = BASE, status='ahead'
+  } = {}) => ({
+    status,files,total_commits:totalCommits,commits,
+    base_commit:{sha:base,commit:{committer:{date:markerDate}}},
+    merge_base_commit:{sha:mergeBase},
+  });
+  const sound = verifiedDeployComparison(makeCompare(),BASE,HEAD);
+  check('complete compare returns every deploy-relevant path and marker age',
+    sound.changedPaths.length===1 &&
+    sound.changedPaths[0]==='netlify/functions/brain-soul.js' &&
+    Number.isFinite(sound.markerCommittedAt) &&
+    Number.isFinite(sound.oldestComparedCommitAt) &&
+    sound.oldestComparedCommitAt < Math.floor(Date.parse('2026-10-10T07:00:00Z')/1000));
+  check('any comparison at GitHub 300-file hard cap is INCOMPLETE, not current',
+    verifiedDeployComparison(makeCompare({files:Array(300).fill({filename:'README.md'})}),BASE,HEAD)===null);
+  check('finite sub-limit comparison can verify docs-only changes',
+    verifiedDeployComparison(makeCompare({files:Array(299).fill({filename:'README.md'})}),BASE,HEAD)
+      .changedPaths.length===0);
+  check('incomplete commit page must never justify a grace period',
+    verifiedDeployComparison(makeCompare({totalCommits:251}),BASE,HEAD)===null);
+  check('divergent merge base cannot establish ancestor-to-main history',
+    verifiedDeployComparison(makeCompare({mergeBase:'e'.repeat(40)}),BASE,HEAD)===null);
+  check('a comparison not ending at expected HEAD is untrustworthy',
+    verifiedDeployComparison(makeCompare({commits:[
+      {sha:'c'.repeat(40),commit:{committer:{date:'2026-10-09T06:00:00Z'}}},
+      {sha:'d'.repeat(40),commit:{committer:{date:'2026-10-10T07:00:00Z'}}},
+    ]}),BASE,HEAD)===null);
+  check('unknown commit or deploy marker timestamps fail closed',
+    verifiedDeployComparison(makeCompare({markerDate:'not-a-date'}),BASE,HEAD)===null &&
+    verifiedDeployComparison(makeCompare({commits:[
+      {sha:'c'.repeat(40),commit:{committer:{date:'not-a-date'}}},
+      {sha:HEAD,commit:{committer:{date:'2026-10-10T07:00:00Z'}}},
+    ]}),BASE,HEAD)===null);
+  check('file history cannot be forged by a diff that does not identify a filename',
+    verifiedDeployComparison(makeCompare({files:[{}]}),BASE,HEAD)===null);
+  const early = Math.floor(Date.parse('2026-10-09T06:00:00Z')/1000);
+  const recent = Math.floor(Date.parse('2026-10-10T07:00:00Z')/1000);
+  check('earliest intervening commit is used even after later same-file edits',
+    sound.oldestComparedCommitAt===early && recent>early);
+  check('oldest deploy commit cannot be excused by a recent rewrite of same Function',
+    assessDeploymentIntegrity({
+      expectedCommit:HEAD,markerCommit:BASE,
+      changedPaths:sound.changedPaths,changedAtSeconds:[recent],
+      markerCommittedAt:sound.markerCommittedAt,
+      assetDecision:decide([{name:'index.html',status:'match'}],opts),
+      graceSeconds:86400,now:recent,
+    }).verdict==='drift');
 }
 
 /* ---- the asset list is discovered, not hardcoded ---- */

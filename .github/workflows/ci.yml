@@ -189,6 +189,8 @@ jobs:
         run: node test/advisor-eval-http.test.mjs
       - name: Guard Netlify deploy hook logging and publication provenance (offline)
         run: node test/netlify-deploy-workflow-privacy.test.mjs
+      - name: Test read-only Netlify API deployment diagnostics and early failure classifications
+        run: node test/netlify-deploy-preflight.test.mjs
       - name: Run Advisor bias-eval parser tests (level extraction incl. negated clauses)
         run: node test/advisor-bias-eval.test.mjs
       - name: Run AI asset register schema test
