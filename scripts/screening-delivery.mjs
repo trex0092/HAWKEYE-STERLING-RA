@@ -58,7 +58,8 @@ export function validateEvidence(results, assurance, state, { runId, nowMs = Dat
     throw new Error('Screening state is missing or belongs to a different screening date');
   }
   const generated = Date.parse(assurance?.generatedAt || '');
-  if (!record(assurance) || assurance.version !== 1 || !runId
+  if (!record(assurance) || assurance.version !== 1
+    || !/^\d{1,20}$/.test(String(runId ?? ''))
     || String(assurance.run?.githubRunId) !== String(runId)
     || assurance.run?.date !== results.date
     || assurance.run?.screenedSubjects !== results.screened
@@ -76,6 +77,15 @@ export function validateEvidence(results, assurance, state, { runId, nowMs = Dat
   }
   const operational = DOMAINS.every(domain => assurance.domains[domain].operational);
   if (assurance.operational !== operational) throw new Error('Contradictory overall assurance status');
+  // A green Asana report must never rest on an empty source inventory,
+  // zero-name/partial lists, or a separate degraded engine result. We still
+  // DELIVER honestly degraded reports so incident responders see the outage.
+  if (operational && (results.degraded !== false || results.lists.length === 0 ||
+      !results.lists.every(list => record(list) && typeof list.name === 'string' &&
+        !!list.name.trim() && Number.isSafeInteger(list.count) &&
+        list.count > 0 && list.partial === false))) {
+    throw new Error('Screening sources cannot support an OPERATIONAL Asana delivery');
+  }
   return operational;
 }
 
@@ -90,14 +100,19 @@ export const FINDINGS_COLUMNS = ['status', 'subject', 'entity_type', 'customer',
   'mechanism', 'confidence', 'source_url', 'first_seen', 'last_seen', 'case_priority', 'record_key'];
 export function csvCell(value) {
   let text = Array.isArray(value) ? value.join('; ') : String(value ?? '');
-  if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
+  // Spreadsheets may ignore leading whitespace/Unicode format characters
+  // before interpreting =, +, -, @ as a formula. Prefix the ORIGINAL cell
+  // before its whitespace to preserve analyst-visible evidence safely.
+  if (/^[\s\u200b\ufeff\u2060]*[=+\-@]/u.test(text) || /^[\t\r]/.test(text)) {
+    text = "'" + text;
+  }
   return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
 }
 export function findingsAttachmentName(domain, date, runId) {
   return 'screening-findings-' + domain + '-' + date + '-run' + String(runId) + '.csv';
 }
 export const FINDINGS_ATTACHMENT_RE = /^screening-findings-(?:sanctions|media)-\d{4}-\d{2}-\d{2}-run\d+\.csv$/;
-export function buildFindingsCsv(domain, standing, alerts, cleared) {
+export function buildFindingsCsv(domain, standing, alerts, cleared, { provisional = false } = {}) {
   const changed = new Set(alerts.map(row => row?.key).filter(Boolean));
   const lines = [FINDINGS_COLUMNS.join(',')];
   const push = cells => lines.push(FINDINGS_COLUMNS.map(column => csvCell(cells[column])).join(','));
@@ -117,7 +132,12 @@ export function buildFindingsCsv(domain, standing, alerts, cleared) {
     }
   }
   for (const name of Array.isArray(cleared) ? cleared : []) {
-    push({ status: 'CLEARED THIS RUN', subject: name });
+    // A missing match is a DETECTION result, not an MLRO disposition.
+    // If any required domain is degraded, even the negative evidence is
+    // provisional and requires manual review.
+    push({ status: provisional
+      ? 'NOT MATCHED - DEGRADED COVERAGE - REVIEW REQUIRED'
+      : 'NO MATCH ON THIS RUN - NOT MLRO CLEARANCE', subject: name });
   }
   return '\ufeff' + lines.join('\n') + '\n';
 }
@@ -174,7 +194,8 @@ export function buildReports(results, assurance, state, context) {
     return { domain, section, title, marker: 'HAWKEYE-SCREENING-V1:' + domain + ':' + results.date,
       summary: summary.join('\n'), pages,
       attachment: { name: attachment,
-        csv: buildFindingsCsv(domain, standing, alerts, domain === 'sanctions' ? results.cleared : []) } };
+        csv: buildFindingsCsv(domain, standing, alerts, domain === 'sanctions' ? results.cleared : [],
+          { provisional: !assurance.operational }) } };
   });
 }
 
