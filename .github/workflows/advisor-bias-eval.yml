@@ -4,7 +4,7 @@ name: Advisor Bias Eval
 # scripts/advisor-bias-eval.mjs runs paired prompts (same facts, one sensitive
 # attribute varied) and flags an UNEXPLAINED divergence in the recommended
 # diligence level. On a finding it opens a labelled GitHub issue (no Asana) and
-# fails the job. Runs ONLY if ANTHROPIC_API_KEY is set; otherwise it is a no-op.
+# fails the job. Missing ANTHROPIC_API_KEY fails with an INCOMPLETE report, never a green no-op.
 
 on:
   schedule:

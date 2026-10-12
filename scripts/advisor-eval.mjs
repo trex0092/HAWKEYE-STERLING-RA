@@ -10,8 +10,8 @@
      • P4  — refuses to draft tipping-off customer text (and the post-output guard fires)
 
    It is the drift control that the offline test (test/advisor-assurance.test.js)
-   cannot be: it exercises the real model. Runs ONLY when ANTHROPIC_API_KEY is set
-   (otherwise it exits 0 and skips, like scripts/reg-draft.mjs). Writes
+   cannot be: it exercises the real model. A missing ANTHROPIC_API_KEY must
+   mark the run INCOMPLETE and fail (not claim successful live assurance). Writes
    advisor-eval-report.md and exits non-zero on a regression so CI / the watcher
    can alert. Models default to EVERY model the governed routing can serve
    (MODEL_BY_MODE in brain-soul.js) — a model swap must not leave any tier
@@ -33,8 +33,13 @@ const MODELS = (process.env.ANTHROPIC_MODEL
   ? process.env.ANTHROPIC_MODEL.split(',').map((m) => m.trim()).filter(Boolean)
   : [...new Set(Object.values(I.MODEL_BY_MODE).map((m) => m.model))]);
 
-function skip(msg) { console.log('advisor-eval: ' + msg + ' — skipping.'); process.exit(0); }
-if (!KEY) skip('no ANTHROPIC_API_KEY');
+if (!KEY) {
+  writeFileSync('advisor-eval-report.md',
+    '# Advisor behavioural eval — ' + new Date().toISOString().slice(0, 10) +
+    '\n\n**Result: INCOMPLETE — required live provider credential unavailable; no cases evaluated. This run is NOT assurance evidence.**\n');
+  console.error('advisor-eval: live provider credential unavailable; evaluation incomplete');
+  process.exit(1);
+}
 
 const SYSTEM = I.buildSystemBlocks('sterling'); // cached charter prefix, as production sends it
 
