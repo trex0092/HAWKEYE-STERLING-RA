@@ -30,7 +30,7 @@ export async function run(check) {
     } });
   check('GitHub quota: one fixed read-only request carries an abort signal and denies redirects',
     calls === 1 && fetched.ok && fetched.rows[0].remaining === 0 &&
-    requestOptions.signal instanceof AbortSignal && requestOptions.redirect === 'error');
+    requestOptions.signal instanceof globalThis.AbortSignal && requestOptions.redirect === 'error');
   let reads = 0;
   const denied = await fetchGitHubRateSnapshot({ token: 'synthetic-token', observedAt,
     fetchImpl: async () => ({ ok: false, status: 429, json: async () => { reads++; return { secret: 'PRIVATE' }; } }) });
