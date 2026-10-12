@@ -1,3 +1,4 @@
+import { makeApiUsdBudget, parseUsdMicro } from '../scripts/api-cost-budget.mjs';
 import {
   validateApiPriceTable, parseApiPriceTable, quoteApiTokenCost
 } from '../scripts/api-cost.mjs';
@@ -195,6 +196,61 @@ check('reject invented, stale future, duplicated and ambiguous price evidence',
 check('invalid pricing JSON does not reveal raw input or become zero cost',
   !parseApiPriceTable('{secret', at).ok &&
   !parseApiPriceTable(JSON.stringify({ schema: 1, models: [] }), at).ok);
+
+
+/* Synthetic rates only. USD preflight never assumes absent account pricing. */
+const guardRates = { schema: 1, models: [
+  { provider: 'openai', model: 'fixture-openai', verified_on: '2026-10-10',
+    source_url: 'https://platform.openai.com/docs/pricing',
+    usd_per_million: { input: '2.00', cached_input: '0.50', output: '8.00' } },
+  { provider: 'anthropic', model: 'fixture-anthropic', verified_on: '2026-10-10',
+    source_url: 'https://docs.anthropic.com/en/docs/about-claude/pricing',
+    usd_per_million: { input: '1.00', cached_read: '0.10', cached_write: '1.25', output: '5.00' } },
+] };
+const guardNow = Date.parse('2026-10-12T12:00:00Z');
+const guardSetup = (limitUsd = '0.020000', provider = 'openai', model = 'fixture-openai', rates = JSON.stringify(guardRates)) =>
+  makeApiUsdBudget({ provider, model, limitUsd, priceTableJson: rates, nowMs: guardNow });
+check('USD limits parse precisely; malformed, negative and scientific values fail closed',
+  parseUsdMicro('0.020005') === 20005n &&
+  parseUsdMicro('0') === 0n &&
+  ['-1', 'NaN', 'Infinity', '1e6', 1, '', '0.0000001'].every(x => parseUsdMicro(x) === null));
+const guard = guardSetup();
+const reserved = guard.preflight({ inputBytes: 2000, maxOutputTokens: 800 });
+check('preflight reserves priced upper input and maximum output before a call',
+  guard.ready && reserved.ok && guard.snapshot().outstanding === 1 &&
+  guard.snapshot().reserved_pending_usd !== '0.000000');
+const denied = guard.preflight({ inputBytes: 200000, maxOutputTokens: 20000 });
+check('single request larger than remaining USD cap is denied before provider call',
+  !denied.ok && denied.reason.includes('exhausted') && guard.snapshot().outstanding === 1);
+const reconciled = guard.settle(reserved.id, { input_tokens: 250, output_tokens: 60 });
+check('actual billable usage settles reservation using verified model rates',
+  reconciled.ok && reconciled.usage_status === 'priced' &&
+  guard.snapshot().outstanding === 0 && guard.snapshot().estimated_committed_usd === '0.000980');
+check('a reservation cannot be refunded or settled twice',
+  !guard.settle(reserved.id, { input_tokens: 1, output_tokens: 1 }).ok);
+const unknownGuard = guardSetup();
+const uReservation = unknownGuard.preflight({ inputBytes: 3000, maxOutputTokens: 850 });
+const uSpend = unknownGuard.settle(uReservation.id, null);
+check('missing provider usage retains FULL reservation rather than treating request as free',
+  uSpend.usage_status === 'unknown_reserved' &&
+  uSpend.estimated_usd === uReservation.reserved_usd);
+check('missing rate table or USD cap always blocks paid requests',
+  !guardSetup(undefined, 'openai', 'fixture-openai', '').preflight({
+    inputBytes: 100, maxOutputTokens: 10 }).ok &&
+  !guardSetup('0.000000').preflight({ inputBytes: 100, maxOutputTokens: 10 }).ok);
+const badQuote = guardSetup('0.050000', 'openai', 'unapproved-model');
+check('a model without a verified pricing entry fails closed',
+  !badQuote.preflight({ inputBytes: 100, maxOutputTokens: 100 }).ok);
+const two = guardSetup('0.030000', 'anthropic', 'fixture-anthropic');
+const aRes = two.preflight({ inputBytes: 4000, maxOutputTokens: 900 });
+check('Anthropic reservations cover the most expensive eligible cache class',
+  aRes.ok && two.settle(aRes.id, {
+    input_tokens: 300, output_tokens: 80,
+    cache_read_input_tokens: 150, cache_creation_input_tokens: 50,
+  }).usage_status === 'priced');
+check('invalid token sizes cannot reduce the cap reservation',
+  !guardSetup().preflight({ inputBytes: '100', maxOutputTokens: 500 }).ok &&
+  !guardSetup().preflight({ inputBytes: -1, maxOutputTokens: 500 }).ok);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
