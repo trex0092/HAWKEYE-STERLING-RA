@@ -13,12 +13,14 @@ LLM directly to this library.
 import hashlib
 import json
 import time
+from copy import deepcopy
 from types import MappingProxyType
 
 MAX_STEPS = 6
 MAX_TOTAL_CALLS = 8
 MAX_SECONDS = 5.0
-MAX_RESULT_CHARS = 8192
+MAX_RESULT_CHARS = 8192  # Kept for callers; limit enforced on UTF-8 bytes.
+MAX_TOTAL_RESULT_BYTES = 32768
 READ_ONLY_TOOLS = frozenset(("normalize_name", "jurisdiction_risk", "name_variants"))
 HUMAN_ROLES = frozenset(("Analyst", "Reviewer-MLRO", "Admin"))
 ARGS_ALLOWED = {
@@ -70,7 +72,12 @@ def _validated_steps(plan, allowed_tools):
         total_calls += retries + 1
     if total_calls > MAX_TOTAL_CALLS:
         raise PlanDenied("total planned calls exceed fixed budget")
-    return steps
+    # Copy the validated plan before dispatch: a callback that still holds a
+    # reference to the caller's plan must not alter later authorized steps.
+    # All argument values are already validated strings, so shallow arg copies
+    # are sufficient and do not change their meaning.
+    return [{"id": s["id"], "tool": s["tool"], "args": dict(s["args"]),
+             "retries": s["retries"]} for s in steps]
 
 
 def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
@@ -98,6 +105,7 @@ def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
     events = []
     results = {}
     calls = 0
+    total_result_bytes = 0
     start = clock()
     for step in steps:
         for attempt in range(step["retries"] + 1):
@@ -109,17 +117,24 @@ def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
                 # Handlers come only from trusted server configuration, never
                 # from a model-selected executable name or arbitrary import.
                 result = tool_handlers[step["tool"]](
-                    dict(step["args"]), MappingProxyType(results.copy()))
-                text = json.dumps(result, sort_keys=True, allow_nan=False)
-                if len(text) > MAX_RESULT_CHARS:
+                    dict(step["args"]), MappingProxyType(deepcopy(results)))
+                # Store exactly the JSON bytes that were size-checked and
+                # hashed. Otherwise later callbacks may mutate prior results
+                # and leave the signed-off audit hash inconsistent with output.
+                raw = json.dumps(result, sort_keys=True, ensure_ascii=False,
+                                 allow_nan=False, separators=(",", ":")).encode("utf8")
+                if len(raw) > MAX_RESULT_CHARS:
                     raise ValueError("tool result exceeded bounded size")
+                if total_result_bytes + len(raw) > MAX_TOTAL_RESULT_BYTES:
+                    raise ValueError("cumulative tool evidence budget exceeded")
+                snapshot = json.loads(raw.decode("utf8"))
                 if clock() - start >= max_seconds:
                     raise TimeoutError("step exceeded total budget")
-                results[step["id"]] = result
+                total_result_bytes += len(raw)
+                results[step["id"]] = snapshot
                 events.append({"step": step["id"], "tool": step["tool"],
                                "attempt": attempt + 1, "outcome": "OK",
-                               "result_sha256": hashlib.sha256(
-                                   text.encode("utf-8")).hexdigest()})
+                               "result_sha256": hashlib.sha256(raw).hexdigest()})
                 break
             except Exception:
                 events.append({"step": step["id"], "tool": step["tool"],
