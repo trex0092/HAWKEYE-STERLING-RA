@@ -1,3 +1,5 @@
+import { parseGitHubRateSnapshot, fetchGitHubRateSnapshot,
+  renderGitHubRateDashboard } from '../scripts/github-rate-dashboard.mjs';
 /* Workflow-hardening ratchet — the 2026-08-05 full-estate audit found every
    deviation documented in-file; this guard FREEZES that state so a future
    workflow (or edit) cannot regress it silently. Line-based checks (no YAML
@@ -283,6 +285,50 @@ for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
   check(`no egress block pins a hosted-compute shard — the suffix rotates, so a pin is a reclaim bug${pinnedAll.length ? ' (offending: ' + pinnedAll.slice(0, 4).join(', ') + ')' : ''}`,
     pinnedAll.length === 0);
 }
+
+
+const ghAt = '2026-10-12T12:00:00.000Z';
+const ghRates = { resources: {
+  core: { limit: 5000, remaining: 4000, reset: 1791806400, used: 1000 },
+  graphql: { limit: 5000, remaining: 0, reset: 1791806400, used: 5000 },
+  search: { limit: 30, remaining: 2, reset: 1791806400, used: 28 }
+} };
+const ghSnap = parseGitHubRateSnapshot(ghRates, { observedAt: ghAt });
+check('GitHub API dashboard distinguishes depleted GraphQL from healthy REST core',
+  ghSnap.ok && ghSnap.rows.find(x=>x.resource==='core').state === 'normal' &&
+  ghSnap.rows.find(x=>x.resource==='graphql').state === 'exhausted' &&
+  ghSnap.rows.find(x=>x.resource==='search').state === 'low');
+check('rate summary includes reset instants and states without token usage charges',
+  renderGitHubRateDashboard(ghSnap).includes('Reset UTC') &&
+  renderGitHubRateDashboard(ghSnap).includes('does not prove'));
+check('malformed and absent core quotas are UNKNOWN, never healthy',
+  !parseGitHubRateSnapshot({ resources: { search: ghRates.resources.search } }).ok &&
+  !parseGitHubRateSnapshot({ resources: { core: {
+    limit: '5000', remaining: 5000, reset: 1791806400
+  } } }).ok &&
+  !parseGitHubRateSnapshot({ resources: { core: {
+    limit: 5000, remaining: 5100, reset: 1791806400
+  } } }).ok);
+let ghCalled = 0;
+const goodGh = await fetchGitHubRateSnapshot({
+  token: 'SYNTHETIC_GITHUB_TOKEN', observedAt: ghAt,
+  fetchImpl: async (url,opts) => { ghCalled++;
+    return { ok: true, status: 200, json: async () => ghRates };
+  },
+});
+check('GitHub API rate dashboard uses one fixed read-only endpoint',
+  goodGh.ok && ghCalled === 1);
+const deniedGh = await fetchGitHubRateSnapshot({
+  token: 'SYNTHETIC_GITHUB_TOKEN',
+  fetchImpl: async () => ({ ok: false, status: 429 }),
+});
+check('GitHub secondary/API throttling stays explicitly unverified',
+  !deniedGh.ok && deniedGh.reason === 'github_rate_limited_or_denied');
+const missingGh = await fetchGitHubRateSnapshot({
+  token: '', fetchImpl: async () => { throw Error('unreachable'); },
+});
+check('rate dashboard will not call API without a GitHub token',
+  !missingGh.ok && missingGh.reason === 'github_credentials_or_transport_unavailable');
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
