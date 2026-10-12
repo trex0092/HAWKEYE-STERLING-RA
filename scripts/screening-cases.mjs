@@ -148,6 +148,27 @@ export function planCaseActions(subjects, casesState, today, { allowAutoClear = 
   return actions;
 }
 
+/* A human-ticked disposition is NOT committed to local cleared-FP state
+ * until Asana confirms the corresponding audit comment and task completion.
+ * This pure transition runs ONLY after successful network writes. */
+export function confirmedDispositionState(existing, actionType, today, subject = null) {
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing) ||
+      typeof existing.taskGid !== 'string' || !existing.taskGid ||
+      !/^\d{4}-\d\d-\d\d$/.test(today)) {
+    throw new Error('Invalid existing case or disposition date');
+  }
+  if (actionType === 'disposition-clear') {
+    return { ...existing, cleared: true, clearedAt: today,
+      clearedBy: 'disposition:false-positive',
+      disposition: { kind: 'false-positive', at: today, caseGid: existing.taskGid,
+        hits: whitelistablePairs(subject?.hits) } };
+  }
+  if (actionType === 'disposition-escalate-ack') {
+    return { ...existing, escalated: true, escalatedAt: today };
+  }
+  throw new Error('Unrecognized case disposition');
+}
+
 /* Parse the MLRO's ticked disposition back out of a case task's notes. Only a
    literal "[x]" tick counts; the untouched "[ ]" template parses as null.
    Fail-safe precedence for a card with more than one tick: escalate (keeps
@@ -460,29 +481,28 @@ async function main() {
       const d = await asana('/tasks/' + cs.taskGid + '?opt_fields=notes');
       dis = parseDisposition(d.data && d.data.notes);
     } catch (e) {
-      console.warn('screening-cases: disposition read failed for ' + key + ': '
-        + String(e && e.message || e).slice(0, 120));
+      // Public CI logs must not serialize customer keys or raw API errors.
+      console.warn('screening-cases: a case disposition could not be read; case remains open for human review');
       continue;
     }
     if (dis === 'false-positive') {
-      const subj = (screen.subjects || {})[key];
-      casesState[key] = { ...cs, cleared: true, clearedAt: today, clearedBy: 'disposition:false-positive',
-        disposition: { kind: 'false-positive', at: today, caseGid: cs.taskGid,
-          hits: whitelistablePairs(subj && subj.hits) } };
+      // Stage intent ONLY. No local clearance/whitelist entry until Asana's
+      // audit story and completed task have both succeeded.
       dispositionActions.push({ type: 'disposition-clear', key, caseGid: cs.taskGid });
     } else if (dis === 'escalate') {
-      casesState[key] = { ...cs, escalated: true, escalatedAt: today };
       dispositionActions.push({ type: 'disposition-escalate-ack', key, caseGid: cs.taskGid });
     }
     /* 'investigating' and null need no action — the normal lifecycle applies. */
   }
   if (dispositionActions.length) {
-    console.log('screening-cases: ' + dispositionActions.length + ' disposition(s) read back from case cards — '
-      + dispositionActions.map(a => a.type.replace('disposition-', '') + ':' + a.key).join(' '));
+    console.log('screening-cases: ' + dispositionActions.length
+      + ' disposition(s) staged; awaiting Asana write confirmation');
   }
 
+  const pendingDispositionKeys = new Set(dispositionActions.map(a => a.key));
   const actions = [...dispositionActions,
-    ...planCaseActions(screen.subjects, casesState, today, { allowAutoClear })];
+    ...planCaseActions(screen.subjects, casesState, today, { allowAutoClear })
+      .filter(a => !pendingDispositionKeys.has(a.key))];
   console.log('screening-cases: ' + actions.length + ' action(s) — '
     + ['create', 'age', 'clear', 'disposition-clear', 'disposition-escalate-ack']
       .map(t => t + '=' + actions.filter(a => a.type === t).length).join(' '));
@@ -513,15 +533,16 @@ async function main() {
         /* REPLACES a cleared entry on a re-flag, so the digest's caseGidFor
            resolves to this new open case and the SLA/aging restart cleanly. */
         casesState[a.key] = newCaseStateEntry(gid, today, a.priorCase);
-        console.log('  ' + (a.priorCase ? 're-opened (fresh case after clearance — prior ' + a.priorCase.taskGid + ') ' : 'created case ')
-          + caseTitle(a.key, a.subject) + (d.data && d.data.permalink_url ? ' — ' + d.data.permalink_url : ''));
+        console.log(a.priorCase
+          ? 'screening-cases: re-opened an existing case under human review'
+          : 'screening-cases: created a new case requiring human review');
       } else if (a.type === 'age') {
         await asana('/tasks/' + a.caseGid + '/stories', {
           method: 'POST',
           body: JSON.stringify({ data: { text: '⏰ AGING — this screening case has been open ' + a.ageDays + ' days (SLA: ' + CASE_SLA_DAYS + '). Review and disposition required.' } })
         });
         casesState[a.key] = { ...casesState[a.key], agingAlerted: true };
-        console.log('  aging comment on case ' + a.key + ' (' + a.ageDays + 'd)');
+        console.log('screening-cases: SLA aging alert posted (' + a.ageDays + 'd)');
       } else if (a.type === 'clear') {
         const clearText = a.reason === 'whitelist'
           ? '✅ AUTO-CLEARED (cleared-FP registry) — every hit on this case is a designated-name pair an analyst already dispositioned as a false positive. The ' + today + ' screen keeps the subject on the report, annotated and demoted; a NEW or CHANGED designated name re-opens a fresh case.'
@@ -533,33 +554,38 @@ async function main() {
         await asana('/tasks/' + a.caseGid, { method: 'PUT', body: JSON.stringify({ data: { completed: true } }) });
         casesState[a.key] = { ...casesState[a.key], cleared: true, clearedAt: today,
           ...(a.reason === 'whitelist' ? { clearedBy: 'cleared-FP registry' } : {}) };
-        console.log('  auto-cleared case ' + a.key + (a.reason === 'whitelist' ? ' (cleared-FP registry)' : ''));
+        console.log('screening-cases: automatic disposition recorded after verified case update');
       } else if (a.type === 'disposition-clear') {
-        /* State already records the disposition. Keep the task in its approved
-           screening section, add the audit note, and complete it. */
+        /* Persist the clearance state ONLY after Asana has acknowledged BOTH
+           the audit story and completed-task update. */
         await asana('/tasks/' + a.caseGid + '/stories', {
           method: 'POST',
           body: JSON.stringify({ data: { text: '🏷️ DISPOSITIONED — FALSE POSITIVE (ticked on this card). Case cleared; the matched designated-name pair(s) join the cleared-FP registry from the next screening run: identical hits are demoted with this clearance cited, and a NEW or CHANGED designated name re-opens normally.' } })
         });
         await asana('/tasks/' + a.caseGid, { method: 'PUT', body: JSON.stringify({ data: { completed: true } }) });
-        console.log('  dispositioned FALSE POSITIVE — case ' + a.key + ' cleared, pairs registered');
+        casesState[a.key] = confirmedDispositionState(casesState[a.key], a.type, today, screen.subjects[a.key]);
+        console.log('screening-cases: false-positive disposition confirmed and audit-linked');
       } else if (a.type === 'disposition-escalate-ack') {
         await asana('/tasks/' + a.caseGid + '/stories', {
           method: 'POST',
           body: JSON.stringify({ data: { text: '🔺 ESCALATED (ticked on this card) — moved to Escalated; auto-clear is disabled for this case until a human closes it. TFS obligations (freeze / report without delay) are the MLRO’s call — see the sanctions decision tree.' } })
         });
-        console.log('  dispositioned ESCALATE — case ' + a.key + ' pinned open, moved to Escalated');
+        casesState[a.key] = confirmedDispositionState(casesState[a.key], a.type, today, screen.subjects[a.key]);
+        console.log('screening-cases: escalation acknowledged; automatic clearance disabled');
       }
     } catch (e) {
       failed++;
       const msg = String(e && e.message || e);
-      /* A 404 means the human deleted the case task — record it cleared so we
-         stop acting on it, and say so. Anything else is a real failure. */
-      if (a.caseGid && /404/.test(msg)) {
-        casesState[a.key] = { ...casesState[a.key], cleared: true, clearedAt: today, note: 'task deleted in Asana' };
-        console.warn('  case task for ' + a.key + ' no longer exists in Asana — marked closed in state.');
+      // Deleting an Asana task is NOT an MLRO false-positive decision. Never
+      // convert 404 into local cleared=true: that would silently whitelist a
+      // missing investigation, and future runs would stop retrying.
+      if (a.caseGid && /\b404\b/.test(msg)) {
+        casesState[a.key] = { ...casesState[a.key],
+          missingFromAsanaAt: today, requiresHumanRecovery: true };
+        console.error('screening-cases: a tracked Asana case is missing (404); NOT cleared; manual recovery required');
       } else {
-        console.error('  action ' + a.type + ' failed for ' + a.key + ': ' + msg.slice(0, 200));
+        // The exception may contain screened names or provider response text.
+        console.error('screening-cases: ' + a.type + ' failed; retained the last confirmed case state');
       }
     }
   }
@@ -645,5 +671,8 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(e => { console.error(e); process.exit(1); });
+  main().catch(() => {
+    console.error('screening-cases: fatal execution error; case delivery incomplete; operator review required');
+    process.exitCode = 1;
+  });
 }
