@@ -65,5 +65,30 @@ for (const [script, report] of [
     rmSync(root, { recursive: true, force: true });
   }
 }
+// Provider model overrides are untrusted configuration. Malformed overrides
+// must fail BEFORE fetching and never produce "all 0 cases held".
+for (const [script, report, model] of [
+  ['advisor-eval.mjs', 'advisor-eval-report.md', ',,,'],
+  ['advisor-eval.mjs', 'advisor-eval-report.md', 'claude-sonnet-5,claude-sonnet-5'],
+  ['advisor-eval.mjs', 'advisor-eval-report.md',
+    Array(7).fill('claude-sonnet-5').join(',')],
+  ['advisor-bias-eval.mjs', 'advisor-bias-eval-report.md', ','],
+]) {
+  const root = mkdtempSync(join(tmpdir(), 'hsra-eval-bad-model-'));
+  try {
+    const cli = fileURLToPath(new URL('../scripts/' + script, import.meta.url));
+    const run = spawnSync(process.execPath, [cli], {
+      cwd: root, encoding: 'utf8', timeout: 12000,
+      env: { ...process.env, ANTHROPIC_API_KEY: 'synthetic-offline-key',
+        ANTHROPIC_MODEL: model }
+    });
+    const body = readFileSync(join(root, report), 'utf8');
+    check(script + ' refuses malformed model list with no live requests',
+      run.status === 1 && body.includes('**Result: INCOMPLETE') &&
+      /\bno\b[^.]*evaluated/i.test(body) &&
+      !body.includes('all 0 guardrail cases held') &&
+      run.stderr.includes('invalid model routing configuration'));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
