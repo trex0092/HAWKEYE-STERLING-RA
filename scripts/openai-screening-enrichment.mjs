@@ -1,3 +1,6 @@
+import { makeApiUsdBudget } from './api-cost-budget.mjs';
+import { classifyApiQuotaFailure, appendApiQuotaEvent } from './api-quota-alerts.mjs';
+
 /* Optional OpenAI enrichment for the Asana daily screening digest.
 
    IMPORTANT: this module is additive only. It never changes sanctions/PEP/
@@ -380,7 +383,9 @@ export async function enrichScreeningResults(results, {
   fetchImpl = globalThis.fetch,
   timeoutMs = process.env.OPENAI_SCREENING_TIMEOUT_MS,
   maxInputChars = process.env.OPENAI_SCREENING_MAX_INPUT_CHARS,
-  maxOutputTokens = process.env.OPENAI_SCREENING_MAX_OUTPUT_TOKENS
+  maxOutputTokens = process.env.OPENAI_SCREENING_MAX_OUTPUT_TOKENS,
+  apiPriceTableJson = process.env.API_USD_RATES_JSON,
+  maxUsdPerCall = process.env.OPENAI_SCREENING_MAX_USD_PER_CALL
 } = {}) {
   if (enabled !== true) {
     return { enabled: false, text: '',
@@ -403,6 +408,27 @@ export async function enrichScreeningResults(results, {
   }
   const input = buildEnrichmentPrompt(results, { maxInputChars });
   const outputBudget = adaptiveOutputTokens(results, maxOutputTokens);
+  // A paid enhancement must have both a verified per-model price and a
+  // per-request USD limit before any confidential evidence is transmitted.
+  // Per-run reservations are NOT a substitute for provider account limits.
+  const usdGuard = makeApiUsdBudget({
+    provider: 'openai', model, priceTableJson: apiPriceTableJson,
+    limitUsd: maxUsdPerCall,
+  });
+  const hold = usdGuard.preflight({
+    inputBytes: Buffer.byteLength(input, 'utf8'), maxOutputTokens: outputBudget,
+  });
+  if (!hold.ok) {
+    return { enabled: true, text: '',
+      error: 'OpenAI paid request blocked by USD budget or unverified pricing; manual review required',
+      cost_control: { allowed: false, reason: hold.reason } };
+  }
+  let settled = false;
+  const settle = usage => {
+    if (settled) return null;
+    settled = true;
+    return usdGuard.settle(hold.id, usage);
+  };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), boundedInt(timeoutMs, 30000, 5000, 60000));
   try {
@@ -425,27 +451,45 @@ export async function enrichScreeningResults(results, {
     // Provider error bodies can contain org/account IDs, sensitive request
     // echoes or billing metadata. Never return or log the raw error.message.
     if (!response.ok) {
+      // Record only a sanitized HTTP category. Provider error bodies may
+      // contain identifiers and are NEVER parsed or written to GitHub.
+      const category = classifyApiQuotaFailure(response.status);
+      if (category && process.env.API_QUOTA_ALERT_TELEMETRY_ENABLED === '1') {
+        const recorded = appendApiQuotaEvent({
+          schema: 1, observed_at: new Date().toISOString(),
+          provider: 'openai', workflow: 'screening-digest', model,
+          http_status: response.status, cause: category,
+        });
+        if (!recorded.ok) console.warn('openai-screening: sanitized quota telemetry unavailable');
+      }
       return { enabled: true, text: '', error: safeOpenAIError(response.status), model };
     }
     const payload = await response.json().catch(() => null);
     const usage = safeUsage(payload && payload.usage);
+    const priced = settle(payload && payload.usage);
+    const cost_estimate = {
+      status: priced.usage_status, usd: priced.estimated_usd,
+      over_reservation: priced.over_reservation,
+      reservation_usd: hold.reserved_usd,
+    };
     if (!payload || payload.error || payload.status !== 'completed') {
       return { enabled: true, text: '', error: 'OpenAI response incomplete or invalid; manual review required',
-        model, usage, input_chars: input.length, output_token_budget: outputBudget };
+        model, usage, input_chars: input.length, output_token_budget: outputBudget, cost_estimate };
     }
     const text = extractResponseText(payload);
     const quality = validateAnalystNote(text);
     if (!quality.ok) {
       return { enabled: true, text: '', error: 'OpenAI analyst note failed structure/length quality gate; manual review required',
-        model, usage, input_chars: input.length, output_token_budget: outputBudget };
+        model, usage, input_chars: input.length, output_token_budget: outputBudget, cost_estimate };
     }
     return { enabled: true, text, model, usage,
-      input_chars: input.length, output_token_budget: outputBudget };
+      input_chars: input.length, output_token_budget: outputBudget, cost_estimate };
   } catch (_) {
     // Do not surface network exception text: some SDKs/clients include query
     // parameters, provider account details or reflected credentials in errors.
     return { enabled: true, text: '', error: 'OpenAI request timed out or transport failed; manual review required', model };
   } finally {
+    if (!settled) settle(null); // no usage, retain full reservation conservatively
     clearTimeout(timer);
   }
 }
