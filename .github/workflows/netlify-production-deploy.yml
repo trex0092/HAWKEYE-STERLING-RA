@@ -35,16 +35,18 @@ on:
     branches:
       - main
     paths:
-      - 'index.html'
-      - 'console.html'
-      - 'advisor.html'
+      - '*.html'  # Include legal pages and 404.html, not just the three app shells
       - '*.js'
       - '*.css'
       - 'assets/**'
       - 'netlify/**'
       - 'netlify.toml'
-      - 'manifest.webmanifest'
-      - 'fonts.css'
+      - '*.webmanifest'  # Keep in step with Site Currency's discovered manifest inventory
+      - 'robots.txt'
+      # Browser-fetched advisory suggestions are served data, not daily state
+      # snapshots. This is an input display update, NOT permission to apply
+      # proposed country-risk score reductions or change scoring methodology.
+      - 'data/country-score-suggested.json'
   # Daily safety net (07:00 UTC, one hour ahead of the Site Currency alarm):
   # the path filter above is deliberately narrow, so a merge that changes what
   # main ships WITHOUT touching a served path (a Docker-only config, a script
