@@ -4,7 +4,7 @@
    Usage: node test/sanctions-screen.test.mjs */
 import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, normalizeResult, normalizeScreenResponse,
-  isMatch, diffState, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
+  isMatch, diffState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
   whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
@@ -2211,5 +2211,20 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     /OPENSANCTIONS_DATA: \$\{\{ vars\.OPENSANCTIONS_DATA \}\}\n/.test(wf));
 }
 
+/* A previously shipped logging path printed every former customer name/key
+ * when a standing match left the population. CI logs are publicly readable. */
+{
+  const held = [{ name: 'Synthetic Sensitive Name', key: 'PRIVATE-CASE-KEY' },
+    { name: 'Synthetic Company', key: 'ENTITY-ID-FIXTURE' }];
+  const line = describeUnscreenedHold(held);
+  check('un-screened case count is visible without disclosing any subject identity',
+    line.includes('2 standing match(es)') &&
+    line.includes('cases HELD') &&
+    held.every(x => !line.includes(x.name) && !line.includes(x.key)));
+  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('screen runner emits only the safe held-population summary',
+    /console\.log\(describeUnscreenedHold\(notScreened\)\)/.test(src) &&
+    !/notScreened\.map\(n => n\.(name|key)/.test(src));
+}
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
