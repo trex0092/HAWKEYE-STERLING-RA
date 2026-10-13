@@ -2246,7 +2246,7 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
       catch (e) { return /Screening (state|history)/.test(String(e.message)); } }));
   const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
   check('runner refuses malformed existing state rather than starting fresh',
-    /return parseScreeningState\\(readFileSync\\(STATE_FILE, 'utf8'\\)\\)/.test(src) &&
+    /return parseScreeningState\(readFileSync\(STATE_FILE, 'utf8'\)\)/.test(src) &&
     !src.includes('state unreadable, starting fresh'));
 }
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
