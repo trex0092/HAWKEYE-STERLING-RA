@@ -2,7 +2,7 @@
    shared transient-failure policy (retry classification + backoff) and the
    re-run duplicate guard used by every monitoring delivery stream. */
 import {
-  isRetryable, retryDelayMs, findRecentDuplicate, findDateScopedDailyDuplicates,
+  asana, isRetryable, retryDelayMs, findRecentDuplicate, findDateScopedDailyDuplicates,
   esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
   listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize, appendOpenAlertEvidence,
@@ -31,6 +31,59 @@ check('backoff is capped at 8s', retryDelayMs(10) === 8000);
 check('Retry-After header wins when present', retryDelayMs(0, '5') === 5000);
 check('Retry-After is capped at 30s', retryDelayMs(0, '900') === 30000);
 check('garbage Retry-After falls back to backoff', retryDelayMs(1, 'soon') === 2000);
+
+/* Asana task creation is non-replayable after an ambiguous response.
+   On 429 the service explicitly did NOT accept the mutation, and bounded
+   Retry-After remains safe. All requests here are synthetic mocked fetches. */
+{
+  const old = globalThis.fetch;
+  const originalToken = process.env.ASANA_ACCESS_TOKEN;
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-test-only';
+  try {
+    let attempts = 0, failed = false;
+    globalThis.fetch = async () => { attempts++; throw new Error('synthetic lost response'); };
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'synthetic alert' } }) });
+    } catch { failed = true; }
+    check('ambiguous network outcome never replays a compliance task creation',
+      failed && attempts === 1);
+
+    attempts = 0; failed = false;
+    globalThis.fetch = async () => {
+      attempts++;
+      return { ok: false, status: 503,
+        headers: { get: () => null }, json: async () => ({ errors: [{ message: 'synthetic' }] }) };
+    };
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'synthetic alert' } }) });
+    } catch { failed = true; }
+    check('ambiguous server-500 class response does not create duplicate tasks on retry',
+      failed && attempts === 1);
+
+    attempts = 0;
+    globalThis.fetch = async () => {
+      attempts++;
+      return attempts === 1
+        ? { ok: false, status: 429, headers: { get: () => '0.001' },
+          json: async () => ({ errors: [{ message: 'rate limited' }] }) }
+        : { ok: true, status: 200, headers: { get: () => null },
+          json: async () => ({ data: { gid: '1219451234567890' } }) };
+    };
+    const delivered = await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+      body: JSON.stringify({ data: { name: 'synthetic alert' } }) });
+    check('definite 429 refusal still honors bounded retry without losing an Asana alert',
+      attempts === 2 && delivered.data.gid === '1219451234567890');
+    const source = readFileSync(new URL('../scripts/asana-alert.mjs', import.meta.url), 'utf8');
+    check('new compliance task creation opts out of replay on unknown Asana outcomes',
+      /const d = await asana\('\/tasks', \{[\s\S]*?method: 'POST',[\s\S]*?noRetryOnUnknownOutcome: true/.test(source));
+  } finally {
+    globalThis.fetch = old;
+    if (originalToken === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = originalToken;
+  }
+}
 
 /* Every newly issued compliance alert requires read-back proof that the
    actual task exists in its approved destination. Offline mocks only. */
