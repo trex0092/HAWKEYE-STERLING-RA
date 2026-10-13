@@ -4,6 +4,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { checkStored } from './screening-assurance.mjs';
 
 export const PROJECT = '1216203370612914';
 export const DESTINATIONS = Object.freeze({
@@ -86,6 +87,20 @@ export function validateEvidence(results, assurance, state, { runId, nowMs = Dat
         list.count > 0 && list.partial === false))) {
     throw new Error('Screening sources cannot support an OPERATIONAL Asana delivery');
   }
+  if (operational) {
+    // Reuse the verified persisted-evidence gate, not a parallel, weaker
+    // interpretation of the same source counters. Otherwise a flipped green
+    // flag over real zero-coverage subjects can be delivered to an MLRO as
+    // OPERATIONAL despite the assurance watchdog correctly rejecting it.
+    const checked = checkStored(assurance, { nowMs, maxAgeHours: 6 });
+    if (!checked.ok) {
+      // Keep the error generic: input source metadata may contain identifiers
+      // and must not be copied to the public Actions log.
+      throw new Error('Screening evidence contradicts the OPERATIONAL Asana delivery claim');
+    }
+  }
+  // A DEGRADED report is still delivered promptly with explicit failures and
+  // provisional negative results, not blocked by the operational-only gate.
   return operational;
 }
 
