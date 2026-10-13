@@ -68,6 +68,10 @@ try {
   } else {
     const d = await asana('/tasks', {
       method: 'POST',
+      // A lost response after remote creation is an UNKNOWN outcome. Retrying
+      // blindly duplicates a human-owned compliance alert; let the next run
+      // reconcile by exact open title before creating another task.
+      noRetryOnUnknownOutcome: true,
       body: JSON.stringify({ data: {
         name: title, notes, projects: [PROJECT_GID],
         ...(SECTION_GID ? { memberships: [{ project: PROJECT_GID, section: SECTION_GID }] } : {}),
