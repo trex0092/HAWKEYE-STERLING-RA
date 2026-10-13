@@ -142,7 +142,7 @@ export function planCaseActions(subjects, casesState, today) {
 export function confirmedDispositionState(existing, actionType, today, subject = null) {
   if (!existing || typeof existing !== 'object' || Array.isArray(existing) ||
       typeof existing.taskGid !== 'string' || !existing.taskGid ||
-      !/^\\d{4}-\\d\\d-\\d\\d$/.test(today)) {
+      !/^\d{4}-\d\d-\d\d$/.test(today)) {
     throw new Error('Invalid existing case or disposition date');
   }
   if (actionType === 'disposition-clear') {
