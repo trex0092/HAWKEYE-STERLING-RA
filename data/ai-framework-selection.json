@@ -1,0 +1,226 @@
+{
+  "schema": "hawkeye.ai-framework-selection/v1",
+  "as_of": "2026-10-13",
+  "owner": "Compliance Engineering; MLRO accountable for consequential decisions",
+  "purpose": "Disposition of twelve items shown in the user-provided framework infographic, mapped to this repository without new production runtime dependencies.",
+  "status_semantics": {
+    "reference-control": "Adopt security reference for controls/evaluations, not a runtime package or certification.",
+    "deferred": "Do not add package or deploy service absent an approved case, data/privacy review and performance/security evidence."
+  },
+  "frameworks": [
+    {
+      "id": "langgraph",
+      "name": "LangGraph",
+      "category": "agent-orchestration",
+      "decision": "deferred",
+      "evidence": [
+        "agent_orchestrator.py"
+      ],
+      "rationale": "Use only if an explicitly approved multi-step model agent is required; current workflows are deterministic and approval-gated.",
+      "adoption_gate": "model-action security design, role-bound approvals, data flow and failure-mode tests"
+    },
+    {
+      "id": "crewai",
+      "name": "CrewAI",
+      "category": "agent-orchestration",
+      "decision": "deferred",
+      "evidence": [
+        "agent_plan.py"
+      ],
+      "rationale": "Multiple independent AI personas add autonomous delegation, not screening coverage.",
+      "adoption_gate": "human-owned decision authority, least privilege, red-team and threat assessment"
+    },
+    {
+      "id": "microsoft-agent-framework",
+      "name": "Microsoft Agent Framework",
+      "category": "agent-orchestration",
+      "decision": "deferred",
+      "evidence": [
+        "agents.py"
+      ],
+      "rationale": "No need for a second production agent orchestrator or overlapping workflow engine.",
+      "adoption_gate": "new approved use case with signed action authorization and rollback/runbook"
+    },
+    {
+      "id": "haystack",
+      "name": "Haystack",
+      "category": "retrieval-orchestration",
+      "decision": "deferred",
+      "evidence": [
+        "scripts/verified-legal-retrieval.mjs"
+      ],
+      "rationale": "Legal citations already have deterministic source verification; no customer RAG index is in scope.",
+      "adoption_gate": "source provenance, retrieval accuracy, PII classification and poisoning evaluation"
+    },
+    {
+      "id": "faiss",
+      "name": "FAISS",
+      "category": "vector-retrieval",
+      "decision": "deferred",
+      "evidence": [
+        "scripts/verified-legal-retrieval.mjs"
+      ],
+      "rationale": "Semantic index is not needed for the current exact-evidence screening pipeline.",
+      "adoption_gate": "measured retrieval benefit, index integrity, access controls and accuracy gate"
+    },
+    {
+      "id": "vllm",
+      "name": "vLLM",
+      "category": "model-serving",
+      "decision": "deferred",
+      "evidence": [
+        "ai.py"
+      ],
+      "rationale": "No self-hosted LLM inference service is part of the authorized operating model.",
+      "adoption_gate": "GPU/hosting controls, license, residency, evaluations and cost/availability plan"
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama",
+      "category": "local-model-serving",
+      "decision": "deferred",
+      "evidence": [
+        "ai.py"
+      ],
+      "rationale": "A local model runner does not independently prove sanctions/media coverage or model accuracy.",
+      "adoption_gate": "approved model inventory, privacy impact, evals, resource bounds and operations owner"
+    },
+    {
+      "id": "chroma",
+      "name": "Chroma",
+      "category": "vector-database",
+      "decision": "deferred",
+      "evidence": [
+        "scripts/verified-legal-retrieval.mjs"
+      ],
+      "rationale": "Another retrieval store would introduce embedding access and poisoning risks without a current use case.",
+      "adoption_gate": "index tenant isolation, PII minimization, retention and deletion test"
+    },
+    {
+      "id": "pinecone-qdrant-weaviate",
+      "name": "Pinecone / Qdrant / Weaviate",
+      "category": "vector-databases",
+      "decision": "deferred",
+      "evidence": [
+        "data/ai-assets.json"
+      ],
+      "rationale": "Choose at most one only after a documented need for a governed semantic corpus.",
+      "adoption_gate": "data residency/vendor DPA, security review, per-record RBAC and deletion evidence"
+    },
+    {
+      "id": "mitre-atlas",
+      "name": "MITRE ATLAS",
+      "category": "ai-threat-knowledge-base",
+      "decision": "reference-control",
+      "evidence": [
+        "test/redteam_injection.py"
+      ],
+      "rationale": "Use to structure model abuse, data poisoning and prompt-injection attack hypotheses; reference, not a runtime dependency.",
+      "adoption_gate": "maintained AI threat scenarios and tested control evidence"
+    },
+    {
+      "id": "owasp-llm-top10",
+      "name": "OWASP Top 10 for LLM Applications",
+      "category": "llm-application-security",
+      "decision": "reference-control",
+      "evidence": [
+        "ai.py"
+      ],
+      "rationale": "Prioritize prompt injection, sensitive-data disclosure, poisoning, excessive agency and unbounded consumption.",
+      "adoption_gate": "red-team regression and documented residual-risk owners"
+    },
+    {
+      "id": "mitre-attack",
+      "name": "MITRE ATT&CK",
+      "category": "adversary-knowledge-base",
+      "decision": "reference-control",
+      "evidence": [
+        ".github/workflows/gitleaks.yml"
+      ],
+      "rationale": "Use for credential access, exfiltration and CI/supply-chain attack paths; not an AI hosting framework.",
+      "adoption_gate": "threat-informed investigation scenarios, log/audit evidence and controls"
+    }
+  ],
+  "threat_scenarios": [
+    {
+      "id": "owasp-llm01-prompt-injection",
+      "framework": "owasp-llm-top10",
+      "surface": "untrusted adverse-media title/publisher/date",
+      "control": "ai.py",
+      "tests": [
+        "test/redteam_injection.py"
+      ],
+      "status": "repo-regression",
+      "remaining": "Other languages, multimodal and adaptive attack variants require scheduled red teaming."
+    },
+    {
+      "id": "owasp-llm02-sensitive-information",
+      "framework": "owasp-llm-top10",
+      "surface": "LLM request and advisory outputs",
+      "control": "ai.py",
+      "tests": [
+        "test/engine_test.py"
+      ],
+      "status": "repo-regression",
+      "remaining": "Vendor processing terms, residency and DPA still require separately authorized legal evidence."
+    },
+    {
+      "id": "owasp-llm06-excessive-agency",
+      "framework": "owasp-llm-top10",
+      "surface": "read-only local MCP and planner",
+      "control": "agent_orchestrator.py",
+      "tests": [
+        "test/mcp_tools_test.py"
+      ],
+      "status": "repo-regression",
+      "remaining": "A production model-action adapter is not authorized; never infer signed MLRO approval from a boolean."
+    },
+    {
+      "id": "owasp-llm10-unbounded-consumption",
+      "framework": "owasp-llm-top10",
+      "surface": "LLM cost and request budgets",
+      "control": "scripts/api-spend-guard.mjs",
+      "tests": [
+        "test/api-integration-contracts.test.mjs"
+      ],
+      "status": "repo-regression",
+      "remaining": "Live provider quota and actual invoicing cannot be certified by unit tests."
+    },
+    {
+      "id": "mitre-atlas-news-poisoning",
+      "framework": "mitre-atlas",
+      "surface": "attacker-controlled public news data",
+      "control": "scripts/adverse-media.mjs",
+      "tests": [
+        "test/adverse-media.test.mjs",
+        "test/redteam_injection.py"
+      ],
+      "status": "repo-regression",
+      "remaining": "Independent news provider availability is degraded; source integrity does not prove subject coverage."
+    },
+    {
+      "id": "mitre-attack-credential-exposure",
+      "framework": "mitre-attack",
+      "surface": "CI workflows and automation credentials",
+      "control": ".github/workflows/gitleaks.yml",
+      "tests": [
+        "test/workflow-hardening.test.mjs"
+      ],
+      "status": "repo-regression",
+      "remaining": "A green secret scanner is not proof every security alert inventory is empty."
+    },
+    {
+      "id": "screening-operational-source-blackout",
+      "framework": "mitre-atlas",
+      "surface": "worldwide adverse-media external providers",
+      "control": "scripts/screening-assurance.mjs",
+      "tests": [
+        "test/sanctions-screen.test.mjs",
+        "test/board-figures.test.mjs"
+      ],
+      "status": "open-operational-evidence",
+      "remaining": "Latest 2026-10-13 live screening had 1 of 991 subjects without a verified adverse-media backbone; new live complete evidence and human review required."
+    }
+  ],
+  "operational_status": "NOT_CERTIFIED; fail-closed screening coverage still must be proven live"
+}

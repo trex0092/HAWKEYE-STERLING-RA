@@ -344,7 +344,9 @@ runner. Watchman matching benchmark added beside the yente one: a dispatch-only,
 workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
 no government list. Measurement only — no scored control changed.*
 
-Verified at HEAD: 73 workflows · 201 markdown documents under docs/ (168 excluding docs/research/auto).
+Verified at HEAD: 73 workflows · 202 markdown documents under docs/ (169 excluding docs/research/auto).
+
+*Estate-count reconciliation · 13 October 2026: one AI framework selection and threat-coverage document added. This updates documentary inventory counts only; it does not ratify an enterprise readiness score, approve an AI model, or close the currently degraded operational adverse-media screening assurance.*
 
 *Estate re-verification · 22 September 2026 — Stale Branch Audit added (#574): a weekly,
 read-only workflow that flags branches fully merged into `main` with a tip commit over 14 days
