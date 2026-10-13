@@ -222,7 +222,7 @@ test('rerun refreshes the same cards and evidence rather than keeping stale resu
 
 test('lost acknowledgement after Asana daily report creation does not replay the write', async () => {
   const input = fixture(), fake = api();
-  const title = buildReports(input.results, input.assurance, input)[0].title;
+  const title = buildReports(input.results, input.assurance, input.state, input)[0].title;
   let lost = false;
   fake.setIntercept((path, method, data) => {
     if (!lost && path === '/tasks' && method === 'POST' && data.name === title) {
