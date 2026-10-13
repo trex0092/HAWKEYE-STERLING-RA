@@ -34,7 +34,9 @@ test('failed screening and unconfirmed case/report synchronization escalate dire
   assert.match(alert, /if: always\(\)/);
   for (const source of [
     "steps.screen.outcome == 'failure'", "steps.screen.outputs.screen_error == 'true'",
-    "steps.cases.outcome == 'failure'", "steps.delivery.outcome == 'failure'"
+    "steps.cases.outcome == 'failure'", "steps.delivery.outcome == 'failure'",
+    "steps.assurance.outcome == 'failure'", "steps.persist.outcome == 'failure'",
+    "steps.refresh_assurance.outcome == 'failure'"
   ]) assert.ok(alert.includes(source), 'missing escalation condition: ' + source);
   assert.match(alert, /run: \|[\s\S]*node scripts\/asana-alert\.mjs/);
   assert.match(alert, /ASANA_ALERT_REFRESH_OPEN: '1'/);
@@ -48,11 +50,31 @@ test('failed screening and unconfirmed case/report synchronization escalate dire
   assert.doesNotMatch(alert, /continue-on-error/);
 });
 
+test('failed encrypted-state persistence and missing watchdog dispatch cannot silently bypass MLRO escalation', () => {
+  const alert = step('asana-failure-alert');
+  const watcher = step('refresh_assurance');
+  const persist = step('persist');
+  assert.ok(alert && watcher && persist);
+  assert.match(watcher, /id: refresh_assurance/);
+  assert.match(watcher, /steps\.persist\.outcome == 'success'/);
+  assert.match(alert, /PERSIST_FAILED: \$\{\{ steps\.persist\.outcome \}\}/);
+  assert.match(alert, /REFRESH_ASSURANCE_FAILED: \$\{\{ steps\.refresh_assurance\.outcome \}\}/);
+  assert.match(alert, /ASSURANCE_FAILED: \$\{\{ steps\.assurance\.outcome \}\}/);
+  assert.match(alert, /SCREENING EVIDENCE INTEGRITY FAILED/);
+  assert.match(alert, /do NOT infer clearance/);
+  assert.match(alert, /MLRO must reconcile case state/);
+  assert.match(alert, /node scripts\/asana-alert\.mjs/);
+  assert.doesNotMatch(alert, /continue-on-error|subjects\[|sanctions-screen-report\.md/);
+});
+
 test('public issue fallback handles assurance failures without exposing screening identities', () => {
   const issue = steps.find(text => text.includes('Open a GitHub issue when screening or coverage needs human attention'));
   assert.ok(issue);
   assert.match(issue, /steps\.screen\.outputs\.screen_error == 'true'/);
   assert.match(issue, /steps\.assurance\.outcome == 'failure'/);
+  assert.match(issue, /steps\.persist\.outcome == 'failure'/);
+  assert.match(issue, /steps\.refresh_assurance\.outcome == 'failure'/);
+  assert.match(issue, /state persistence or assurance dispatch requires review/);
   assert.match(issue, /steps\.cases\.outcome != 'success'/);
   assert.doesNotMatch(issue, /sanctions-screen-report\.md/);
   assert.doesNotMatch(issue, /body:\s*\(report/);

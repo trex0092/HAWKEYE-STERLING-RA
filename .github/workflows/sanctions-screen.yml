@@ -413,6 +413,7 @@ jobs:
           fi
 
       - name: Refresh runtime assurance watchdog
+        id: refresh_assurance
         if: always() && steps.screen.outputs.screen_error != 'true' && steps.persist.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -432,10 +433,11 @@ jobs:
 
       - name: Escalate incomplete screening or failed evidence delivery directly to Asana
         id: asana-failure-alert
-        # When screening aborts, both report and case steps are skipped.
-        # A GitHub issue alone cannot prove the MLRO's Asana queue was alerted.
-        # Fail visibly if Asana refuses this aggregate-only incident message.
-        if: always() && (steps.screen.outcome == 'failure' || steps.screen.outputs.screen_error == 'true' || steps.cases.outcome == 'failure' || steps.delivery.outcome == 'failure')
+        # Failure to publish encrypted screening/case state or dispatch the
+        # fresh assurance watchdog is also an operational evidence incident.
+        # Even if the Asana report appeared, those failures are not clearance.
+        # The MLRO queue must receive aggregate-only alert evidence.
+        if: always() && (steps.screen.outcome == 'failure' || steps.screen.outputs.screen_error == 'true' || steps.cases.outcome == 'failure' || steps.delivery.outcome == 'failure' || steps.assurance.outcome == 'failure' || steps.persist.outcome == 'failure' || steps.refresh_assurance.outcome == 'failure')
         timeout-minutes: 3
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
@@ -445,12 +447,19 @@ jobs:
           SCREEN_ERROR: ${{ steps.screen.outputs.screen_error }}
           CASES_FAILED: ${{ steps.cases.outcome }}
           DELIVERY_FAILED: ${{ steps.delivery.outcome }}
+          ASSURANCE_FAILED: ${{ steps.assurance.outcome }}
+          PERSIST_FAILED: ${{ steps.persist.outcome }}
+          REFRESH_ASSURANCE_FAILED: ${{ steps.refresh_assurance.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ "$SCREEN_FAILED" = "failure" ] || [ "$SCREEN_ERROR" = "true" ]; then
             node scripts/asana-alert.mjs \
               "SCREENING ABORTED: daily sanctions / adverse-media / PEP processing incomplete" \
               "The mandatory daily screening did not complete. Do NOT infer clearance, accept a clean result or close a case. Review the failed workflow, source availability and outstanding human-owned screening cases. Run: $RUN_URL"
+          elif [ "$PERSIST_FAILED" = "failure" ] || [ "$ASSURANCE_FAILED" = "failure" ] || [ "$REFRESH_ASSURANCE_FAILED" = "failure" ]; then
+            node scripts/asana-alert.mjs \
+              "SCREENING EVIDENCE INTEGRITY FAILED: case state or assurance not confirmed" \
+              "Screening state was not safely persisted, its assurance evidence could not be produced, or the independent runtime check could not be dispatched. Report delivery does NOT establish valid current evidence; MLRO must reconcile case state and verify a fresh completed assurance run. Keep cases open and do NOT infer clearance. Run: $RUN_URL"
           else
             node scripts/asana-alert.mjs \
               "SCREENING DELIVERY FAILED: compliance case or evidence synchronization" \
@@ -461,23 +470,31 @@ jobs:
         # Never copy the screening report into this public issue: it contains
         # customer, principal and employee names. Keep coverage failures red and
         # open an aggregate-only human follow-up.
-        if: always() && (steps.screen.outputs.screen_error == 'true' || steps.assurance.outcome == 'failure' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true' && steps.cases.outcome != 'success'))
+        if: always() && (steps.screen.outputs.screen_error == 'true' || steps.assurance.outcome == 'failure' || steps.persist.outcome == 'failure' || steps.refresh_assurance.outcome == 'failure' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true' && steps.cases.outcome != 'success'))
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           SCREEN_ERROR: ${{ steps.screen.outputs.screen_error }}
           ASSURANCE_OUTCOME: ${{ steps.assurance.outcome }}
+          PERSIST_OUTCOME: ${{ steps.persist.outcome }}
+          REFRESH_OUTCOME: ${{ steps.refresh_assurance.outcome }}
         with:
           script: |
             const assuranceFailed = process.env.ASSURANCE_OUTCOME === 'failure';
+            const evidenceStateFailed = process.env.PERSIST_OUTCOME === 'failure' ||
+              process.env.REFRESH_OUTCOME === 'failure';
             const screenFailed = process.env.SCREEN_ERROR === 'true';
-            const title = assuranceFailed
+            const title = evidenceStateFailed
+              ? 'Sanctions Screen — state persistence or assurance dispatch requires review'
+              : assuranceFailed
               ? 'Sanctions Screen — worldwide assurance requires review'
               : screenFailed
                 ? 'Sanctions Screen — run requires review'
                 : 'Sanctions Screen — delivery requires review';
             const runUrl = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY
               + '/actions/runs/' + process.env.GITHUB_RUN_ID;
-            const note = assuranceFailed
+            const note = evidenceStateFailed
+              ? 'Encrypted screening or case state was not confirmed as persisted, or the independent assurance dispatch failed. Human MLRO review and a fresh evidence-verified run are required; do not clear cases.'
+              : assuranceFailed
               ? 'Worldwide runtime assurance failed. Review the aggregate domain evidence on the restricted operational record; the run remains degraded until coverage is verified.'
               : screenFailed
                 ? 'The daily customer screen could not complete. No clearance can be inferred; investigate the run and retry after the cause is corrected.'
