@@ -645,7 +645,8 @@ async function main() {
          with different counts is still TODAY's digest — dedup on the stable
          date-scoped prefix, not the exact title. */
       const url = await notifyAsana(resultsDigestTitle(results), '', { project: projectGid, section: sectionGid, html, assignee: assignee, mirror,
-        dedupPrefix: '🛡️ Sanctions Screen — ' + today });
+        dedupPrefix: '🛡️ Sanctions Screen — ' + today,
+        dateScopedDigest: true });
       console.log('screening-cases: daily results digest posted to Asana' + (url ? ' — ' + url : ''));
     } catch (e) {
       failed++;
