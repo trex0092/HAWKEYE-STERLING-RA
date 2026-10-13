@@ -23,7 +23,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { asana, asanaEnabled, esc, runUrl, notifyAsana,
-  fitAsanaHtml, fitAsanaName, verifyNewMonitoringAlert } from './asana-notify.mjs';
+  fitAsanaHtml, fitAsanaName, verifyNewMonitoringAlert, appendOpenAlertEvidence } from './asana-notify.mjs';
 import { enrichScreeningResults } from './openai-screening-enrichment.mjs';
 import { appendApiCostUsage } from './api-cost-dashboard.mjs';
 import { SECTIONS, caseSection } from './asana-sections.mjs';
@@ -247,6 +247,91 @@ export function unverifiedCaseCreationState(existing, today) {
     requiresHumanRecovery: true,
     creationUnverifiedAt: today
   };
+}
+
+/* An MLRO tick in notes is only an INTENT. Before recording a consequential
+   disposition, independently verify that the task still carries that tick,
+   that its exact audit story exists remotely, and that Asana's final task
+   completion state matches the disposition. Never use a successful POST/PUT
+   response alone as proof of clearance. */
+export const CASE_FALSE_POSITIVE_AUDIT =
+  '🏷️ DISPOSITIONED — FALSE POSITIVE (ticked on this card). Case cleared; the matched designated-name pair(s) join the cleared-FP registry from the next screening run: identical hits are demoted with this clearance cited, and a NEW or CHANGED designated name re-opens normally.';
+export const CASE_ESCALATE_AUDIT =
+  '🔺 ESCALATED (ticked on this card) — moved to Escalated; auto-clear is disabled for this case until a human closes it. TFS obligations (freeze / report without delay) are the MLRO’s call — see the sanctions decision tree.';
+
+export async function verifyScreeningCaseAuditStory(request, taskGid, auditText) {
+  const id = String(taskGid || '');
+  if (typeof request !== 'function' || !/^\d{8,20}$/.test(id) || !auditText) {
+    throw new Error('Invalid screening disposition audit identity');
+  }
+  let offset = '';
+  const visited = new Set();
+  for (let page = 0; page < 10; page++) {
+    const path = '/tasks/' + id + '/stories?limit=100&opt_fields=gid,text'
+      + (offset ? '&offset=' + encodeURIComponent(offset) : '');
+    const result = await request(path);
+    if (!Array.isArray(result?.data)) {
+      throw new Error('Asana case audit history cannot be verified');
+    }
+    if (result.data.some(story => /^\d+$/.test(String(story?.gid || ''))
+      && story?.text === auditText)) return true;
+    if (!result?.next_page) return false;
+    offset = result.next_page.offset;
+    if (typeof offset !== 'string' || !offset || visited.has(offset)) {
+      throw new Error('Asana case audit history pagination invalid');
+    }
+    visited.add(offset);
+  }
+  throw new Error('Asana case audit history incomplete at page cap');
+}
+
+export async function applyVerifiedCaseDisposition(request, taskGid, actionType) {
+  const id = String(taskGid || '');
+  const clear = actionType === 'disposition-clear';
+  if (typeof request !== 'function' || !/^\d{8,20}$/.test(id) ||
+      (!clear && actionType !== 'disposition-escalate-ack')) {
+    throw new Error('Invalid case disposition request');
+  }
+  const expected = clear ? 'false-positive' : 'escalate';
+  const text = clear ? CASE_FALSE_POSITIVE_AUDIT : CASE_ESCALATE_AUDIT;
+  const taskPath = '/tasks/' + id + '?opt_fields=gid,notes,completed';
+  const load = async () => {
+    const task = (await request(taskPath))?.data;
+    if (String(task?.gid || '') !== id || typeof task.notes !== 'string' ||
+        typeof task.completed !== 'boolean') {
+      throw new Error('Asana case read-back incomplete or wrong task');
+    }
+    if (parseDisposition(task.notes) !== expected) {
+      throw new Error('Asana human disposition is missing, changed or conflicted');
+    }
+    return task;
+  };
+  const current = await load();
+  // A completed task with NO corresponding audit story is not evidence that
+  // this MLRO disposition completed. Refuse to invent local FP approval.
+  if (current.completed && (!clear ||
+      !(await verifyScreeningCaseAuditStory(request, id, text)))) {
+    throw new Error('Asana task completion not supported by this disposition evidence');
+  }
+  // Shared writer scans the entire bounded story history before posting.
+  // An ambiguous POST is not replayed. A later run will re-read the stories.
+  await appendOpenAlertEvidence(request, id, text);
+  if (!(await verifyScreeningCaseAuditStory(request, id, text))) {
+    throw new Error('Asana disposition audit story was not independently confirmed');
+  }
+  const afterStory = await load();
+  if (clear && !afterStory.completed) {
+    await request('/tasks/' + id, {
+      method: 'PUT', noRetryOnUnknownOutcome: true,
+      body: JSON.stringify({ data: { completed: true } }),
+    });
+  }
+  const final = await load();
+  if (final.completed !== clear ||
+      !(await verifyScreeningCaseAuditStory(request, id, text))) {
+    throw new Error('Asana disposition final task state or evidence is unverified');
+  }
+  return { confirmed: true, actionType, taskGid: id, completed: final.completed };
 }
 
 export function caseHtml(key, s, runLink, priorCase) {
@@ -597,22 +682,15 @@ async function main() {
           ...(a.reason === 'whitelist' ? { clearedBy: 'cleared-FP registry' } : {}) };
         console.log('screening-cases: automatic disposition recorded after verified case update');
       } else if (a.type === 'disposition-clear') {
-        /* Persist the clearance state ONLY after Asana has acknowledged BOTH
-           the audit story and completed-task update. */
-        await asana('/tasks/' + a.caseGid + '/stories', {
-          method: 'POST',
-          body: JSON.stringify({ data: { text: '🏷️ DISPOSITIONED — FALSE POSITIVE (ticked on this card). Case cleared; the matched designated-name pair(s) join the cleared-FP registry from the next screening run: identical hits are demoted with this clearance cited, and a NEW or CHANGED designated name re-opens normally.' } })
-        });
-        await asana('/tasks/' + a.caseGid, { method: 'PUT', body: JSON.stringify({ data: { completed: true } }) });
+        // Never commit a whitelist/clearance until the MLRO tick, exact audit
+        // story and completed task have all been independently read back.
+        await applyVerifiedCaseDisposition(asana, a.caseGid, a.type);
         casesState[a.key] = confirmedDispositionState(casesState[a.key], a.type, today, screen.subjects[a.key]);
-        console.log('screening-cases: false-positive disposition confirmed and audit-linked');
+        console.log('screening-cases: human false-positive disposition independently verified');
       } else if (a.type === 'disposition-escalate-ack') {
-        await asana('/tasks/' + a.caseGid + '/stories', {
-          method: 'POST',
-          body: JSON.stringify({ data: { text: '🔺 ESCALATED (ticked on this card) — moved to Escalated; auto-clear is disabled for this case until a human closes it. TFS obligations (freeze / report without delay) are the MLRO’s call — see the sanctions decision tree.' } })
-        });
+        await applyVerifiedCaseDisposition(asana, a.caseGid, a.type);
         casesState[a.key] = confirmedDispositionState(casesState[a.key], a.type, today, screen.subjects[a.key]);
-        console.log('screening-cases: escalation acknowledged; automatic clearance disabled');
+        console.log('screening-cases: escalation verified, case remains open');
       }
     } catch (e) {
       failed++;
