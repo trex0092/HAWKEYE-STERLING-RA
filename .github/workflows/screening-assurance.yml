@@ -56,6 +56,9 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_SECTION_GID: '1218451960830318'
+          # An existing MLRO alert keeps its task and human disposition, but
+          # each fresh failing run must be appended as remotely verified proof.
+          ASANA_ALERT_REFRESH_OPEN: '1'
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node scripts/asana-alert.mjs \

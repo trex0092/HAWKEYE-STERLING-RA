@@ -29,7 +29,7 @@
    always the SAME still-unresolved problem, not a new occurrence of it, so
    there's no time window to age out of — skip while it stays open, file
    again the first run after it's closed. */
-import { asana } from './asana-notify.mjs';
+import { asana, appendOpenAlertEvidence } from './asana-notify.mjs';
 import { requireApprovedSection, verifySection, alertSection } from './asana-sections.mjs';
 
 const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWKEYE STERLING APP */
@@ -57,7 +57,7 @@ try {
   let existing = null, offset = '';
   for (;;) {
     const path = '/tasks?project=' + PROJECT_GID + '&completed_since=now'
-      + '&opt_fields=name,permalink_url&limit=100' + (offset ? '&offset=' + offset : '');
+      + '&opt_fields=gid,name,permalink_url&limit=100' + (offset ? '&offset=' + offset : '');
     const d = await asana(path);
     existing = (d.data || []).find(t => t && t.name === title) || null;
     if (existing) break;
@@ -65,8 +65,15 @@ try {
     if (!offset) break;
   }
   if (existing) {
-    console.log('alert already open (' + (existing.permalink_url || existing.gid)
-      + ') — not filing a duplicate: "' + title + '"');
+    if (process.env.ASANA_ALERT_REFRESH_OPEN === '1') {
+      const updated = await appendOpenAlertEvidence(asana, existing.gid, notes);
+      console.log('alert already open (' + (existing.permalink_url || existing.gid)
+        + ') — newest failure evidence ' + (updated.posted ? 'confirmed in a new story' : 'already recorded')
+        + '; no duplicate task or human disposition changed');
+    } else {
+      console.log('alert already open (' + (existing.permalink_url || existing.gid)
+        + ') — not filing a duplicate: "' + title + '"');
+    }
   } else {
     const d = await asana('/tasks', {
       method: 'POST',
