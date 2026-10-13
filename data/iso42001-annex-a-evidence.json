@@ -1,0 +1,567 @@
+{
+  "schema": "hawkeye.iso42001.annex-a-provisional-crosswalk/v1",
+  "as_of": "2026-10-13",
+  "scope": "HAWKEYE Sterling AIMS: screening, entity risk, advisory and bounded agent tooling",
+  "approval_status": "pending_authorized_soa_review",
+  "applicability_policy": "provisional_applicable; owner must review and justify any exclusions",
+  "interpretation": "Document paths and enterprise-control status are NOT proof of active operations, supplier contract execution, internal audit, Board approval or certification.",
+  "controls": [
+    {
+      "id": "A.2.2",
+      "title": "AI policy",
+      "accountable_owner": "MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-POL-01"
+      ],
+      "evidence_paths": [
+        "docs/governance/ai-policy.md"
+      ],
+      "operational_proof_required": "Retain the approved current policy and evidence of staff communication"
+    },
+    {
+      "id": "A.2.3",
+      "title": "Alignment with other organisational policies",
+      "accountable_owner": "MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-POL-04"
+      ],
+      "evidence_paths": [
+        "docs/governance/ai-policy.md",
+        "docs/governance/ai-acceptable-use-policy.md"
+      ],
+      "operational_proof_required": "Reconcile AI rules with approved privacy, AML and information-security policies"
+    },
+    {
+      "id": "A.2.4",
+      "title": "Review of AI policy",
+      "accountable_owner": "MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-AUD-07"
+      ],
+      "evidence_paths": [
+        "docs/governance/policy-register.md"
+      ],
+      "operational_proof_required": "Retain a dated policy review and authorized change or no-change decision"
+    },
+    {
+      "id": "A.3.2",
+      "title": "AI roles and responsibilities",
+      "accountable_owner": "MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-ROL-01",
+        "EAI-ROL-02",
+        "EAI-ROL-03"
+      ],
+      "evidence_paths": [
+        "docs/governance/operating-model.md",
+        "docs/governance/ai-governance-committee-charter.md"
+      ],
+      "operational_proof_required": "Obtain formal committee/Board ownership decisions and prove operating RACI"
+    },
+    {
+      "id": "A.3.3",
+      "title": "Reporting of concerns",
+      "accountable_owner": "MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-ROL-04",
+        "EAI-MON-04",
+        "EAI-AUD-05"
+      ],
+      "evidence_paths": [
+        "docs/governance/ai-incident-runbook.md",
+        "docs/aims/stakeholder-feedback.md"
+      ],
+      "operational_proof_required": "Demonstrate an accessible concern channel and a dated triage and closure record"
+    },
+    {
+      "id": "A.4.2",
+      "title": "Resource documentation",
+      "accountable_owner": "Compliance Engineering",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-01"
+      ],
+      "evidence_paths": [
+        "docs/aims/ai-system-inventory.md",
+        "data/ai-assets.json"
+      ],
+      "operational_proof_required": "Reconcile every in-scope AI resource and its current accountable owner"
+    },
+    {
+      "id": "A.4.3",
+      "title": "Data resources",
+      "accountable_owner": "Data Owner",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-02"
+      ],
+      "evidence_paths": [
+        "docs/aims/data-quality-plan.md",
+        "docs/aims/ai-system-inventory.md"
+      ],
+      "operational_proof_required": "Reconcile lawful data source, purpose, classification, quality and retention evidence"
+    },
+    {
+      "id": "A.4.4",
+      "title": "Tooling resources",
+      "accountable_owner": "IT / Security",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-06"
+      ],
+      "evidence_paths": [
+        "docs/governance/tool-connector-register.md",
+        "data/tool-surfaces.json"
+      ],
+      "operational_proof_required": "Record versioned tool authorizations, usage restrictions and access reviews"
+    },
+    {
+      "id": "A.4.5",
+      "title": "System and computing resources",
+      "accountable_owner": "IT / Security",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-01",
+        "EAI-MON-03"
+      ],
+      "evidence_paths": [
+        "docs/aims/ai-system-inventory.md",
+        "docs/governance/backup-recovery.md"
+      ],
+      "operational_proof_required": "Reconcile compute capacity, access, recovery and protected infrastructure evidence"
+    },
+    {
+      "id": "A.4.6",
+      "title": "Human resources",
+      "accountable_owner": "MLRO / HR",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-ROL-01",
+        "EAI-AUD-07"
+      ],
+      "evidence_paths": [
+        "docs/aims/competency-records.md"
+      ],
+      "operational_proof_required": "Record actual named operator training, competence and second-operator readiness"
+    },
+    {
+      "id": "A.5.2",
+      "title": "AI system impact assessment process",
+      "accountable_owner": "MLRO / DPO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-RSK-01",
+        "EAI-RSK-03"
+      ],
+      "evidence_paths": [
+        "docs/aims/ai-impact-assessment.md",
+        "docs/governance/dpia-2026.md"
+      ],
+      "operational_proof_required": "Evidence the assessment method, triggers and appropriate independent review"
+    },
+    {
+      "id": "A.5.3",
+      "title": "Documentation of AI system impact assessments",
+      "accountable_owner": "MLRO / DPO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-RSK-03"
+      ],
+      "evidence_paths": [
+        "docs/aims/ai-impact-assessment.md",
+        "docs/governance/stakeholder-impact-assessment-2026.md"
+      ],
+      "operational_proof_required": "Retain system/version-specific impact results and their recorded approvals"
+    },
+    {
+      "id": "A.5.4",
+      "title": "Impact on individuals and groups",
+      "accountable_owner": "MLRO / DPO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-RSK-03",
+        "EAI-DMG-04"
+      ],
+      "evidence_paths": [
+        "docs/governance/stakeholder-impact-assessment-2026.md",
+        "docs/governance/advisor-bias-review-2026.md"
+      ],
+      "operational_proof_required": "Complete the first human-reviewed subgroup fairness and adverse-impact cycle"
+    },
+    {
+      "id": "A.5.5",
+      "title": "Societal impacts of AI systems",
+      "accountable_owner": "MLRO / Board",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-RSK-03",
+        "EAI-AUD-07"
+      ],
+      "evidence_paths": [
+        "docs/governance/stakeholder-impact-assessment-2026.md"
+      ],
+      "operational_proof_required": "Revisit broader social, economic and environmental impacts with dated sign-off"
+    },
+    {
+      "id": "A.6.1.2",
+      "title": "Objectives for responsible AI development",
+      "accountable_owner": "MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-POL-03",
+        "EAI-RSK-05"
+      ],
+      "evidence_paths": [
+        "docs/governance/ai-use-case-intake.md"
+      ],
+      "operational_proof_required": "Approve measurable safety, fairness and transparency objectives before material changes"
+    },
+    {
+      "id": "A.6.1.3",
+      "title": "Processes for responsible AI design and development",
+      "accountable_owner": "Compliance Engineering",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-RSK-04",
+        "EAI-DMG-03"
+      ],
+      "evidence_paths": [
+        "docs/governance/pbg-lifecycle-map-2026.md",
+        "docs/governance/model-risk-management-2026.md"
+      ],
+      "operational_proof_required": "Show enforced lifecycle gates and human approval for material changes"
+    },
+    {
+      "id": "A.6.2.2",
+      "title": "AI system requirements and specification",
+      "accountable_owner": "Product / MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-POL-03",
+        "EAI-DMG-03"
+      ],
+      "evidence_paths": [
+        "docs/governance/ai-use-case-intake.md",
+        "docs/governance/ai-asset-register.md"
+      ],
+      "operational_proof_required": "Trace each approved AI use case to scoped requirements and acceptance criteria"
+    },
+    {
+      "id": "A.6.2.3",
+      "title": "Documentation of AI system design and development",
+      "accountable_owner": "Compliance Engineering",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-03"
+      ],
+      "evidence_paths": [
+        "docs/governance/pbg-lifecycle-map-2026.md",
+        "docs/governance/adr-001-deterministic-vs-learned.md"
+      ],
+      "operational_proof_required": "Retain architecture, design decisions, threat analysis and version lineage"
+    },
+    {
+      "id": "A.6.2.4",
+      "title": "AI system verification and validation",
+      "accountable_owner": "MLRO / Model Validation",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-04"
+      ],
+      "evidence_paths": [
+        "docs/governance/model-validation-2026.md",
+        "docs/governance/eval-scorecard.md"
+      ],
+      "operational_proof_required": "Finish overdue model validation, live Advisor evaluation and human sign-off"
+    },
+    {
+      "id": "A.6.2.5",
+      "title": "AI system deployment",
+      "accountable_owner": "IT / MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-RSK-05",
+        "EAI-AUD-03"
+      ],
+      "evidence_paths": [
+        "docs/governance/ai-use-case-intake.md",
+        "docs/aims/ai-impact-assessment.md"
+      ],
+      "operational_proof_required": "Preserve pre-release sign-off, configuration approval and rollback evidence"
+    },
+    {
+      "id": "A.6.2.6",
+      "title": "AI system operation and monitoring",
+      "accountable_owner": "Compliance Engineering",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-MON-01",
+        "EAI-MON-02",
+        "EAI-MON-04"
+      ],
+      "evidence_paths": [
+        "docs/aims/runtime-monitoring.md",
+        "docs/governance/ai-control-testing-calendar.md"
+      ],
+      "operational_proof_required": "Produce fresh live quality, security, bias and incident monitoring run evidence"
+    },
+    {
+      "id": "A.6.2.7",
+      "title": "AI system technical documentation",
+      "accountable_owner": "Compliance Engineering",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-03",
+        "EAI-AUD-08"
+      ],
+      "evidence_paths": [
+        "docs/models/advisor-llm.md",
+        "docs/aims/ai-system-inventory.md"
+      ],
+      "operational_proof_required": "Version model limitations, uses, configurations and auditor documentation"
+    },
+    {
+      "id": "A.6.2.8",
+      "title": "AI system recording of event logs",
+      "accountable_owner": "IT / MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-AUD-04",
+        "EAI-AUD-01"
+      ],
+      "evidence_paths": [
+        "scripts/evidence-receipts.mjs",
+        "docs/governance/data-retention.md"
+      ],
+      "operational_proof_required": "Retain independently verifiable authorized event logs and retention access reviews"
+    },
+    {
+      "id": "A.7.2",
+      "title": "Data for development and enhancement",
+      "accountable_owner": "Data Owner",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-02"
+      ],
+      "evidence_paths": [
+        "docs/aims/data-quality-plan.md"
+      ],
+      "operational_proof_required": "Show documented data requirements and approved uses for every in-scope AI asset"
+    },
+    {
+      "id": "A.7.3",
+      "title": "Acquisition of data",
+      "accountable_owner": "Data Owner / Legal",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-02",
+        "EAI-DMG-05"
+      ],
+      "evidence_paths": [
+        "docs/aims/third-party-register.md",
+        "data/sanctions-sources.json"
+      ],
+      "operational_proof_required": "Prove lawful sourcing, selection, licenses and processor approvals"
+    },
+    {
+      "id": "A.7.4",
+      "title": "Quality of data for AI systems",
+      "accountable_owner": "Data Owner",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-02",
+        "EAI-MON-02"
+      ],
+      "evidence_paths": [
+        "docs/aims/data-quality-plan.md",
+        "docs/aims/runtime-monitoring.md"
+      ],
+      "operational_proof_required": "Retain dated data quality measurements, fail-closed counters and bias review"
+    },
+    {
+      "id": "A.7.5",
+      "title": "Data provenance",
+      "accountable_owner": "Data Owner",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-02",
+        "EAI-AUD-04"
+      ],
+      "evidence_paths": [
+        "docs/aims/data-quality-plan.md",
+        "data/retention/manifest.json"
+      ],
+      "operational_proof_required": "Retain origin, transforms, source version and independently anchored lineage"
+    },
+    {
+      "id": "A.7.6",
+      "title": "Data preparation",
+      "accountable_owner": "Data Owner",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-02",
+        "EAI-DMG-03"
+      ],
+      "evidence_paths": [
+        "docs/aims/data-quality-plan.md",
+        "docs/governance/pbg-lifecycle-map-2026.md"
+      ],
+      "operational_proof_required": "Reconstruct normalization and preparation rules applied to a reviewed result"
+    },
+    {
+      "id": "A.8.2",
+      "title": "System documentation and information for users",
+      "accountable_owner": "MLRO / Product",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-AUD-08",
+        "EAI-DMG-03"
+      ],
+      "evidence_paths": [
+        "docs/aims/interested-parties-information.md",
+        "docs/models/advisor-llm.md"
+      ],
+      "operational_proof_required": "Provide tested notices of intended use, limits and human review rights"
+    },
+    {
+      "id": "A.8.3",
+      "title": "External reporting",
+      "accountable_owner": "Legal / MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-AUD-08",
+        "EAI-AUD-06"
+      ],
+      "evidence_paths": [
+        "docs/governance/obligation-register.md",
+        "docs/aims/interested-parties-information.md"
+      ],
+      "operational_proof_required": "Verify actual reporting obligations, channel ownership and external-assurance decisions"
+    },
+    {
+      "id": "A.8.4",
+      "title": "Communication of incidents",
+      "accountable_owner": "MLRO / Security",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-MON-04",
+        "EAI-ROL-04"
+      ],
+      "evidence_paths": [
+        "docs/governance/ai-incident-runbook.md",
+        "docs/governance/incident-postmortem-template.md"
+      ],
+      "operational_proof_required": "Exercise notice recipients, legal clocks, independent alarms and dated outcomes"
+    },
+    {
+      "id": "A.8.5",
+      "title": "Information for interested parties",
+      "accountable_owner": "MLRO / DPO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-AUD-08",
+        "EAI-POL-04"
+      ],
+      "evidence_paths": [
+        "docs/aims/interested-parties.md",
+        "docs/aims/interested-parties-information.md"
+      ],
+      "operational_proof_required": "Record approved disclosures to each affected stakeholder category"
+    },
+    {
+      "id": "A.9.2",
+      "title": "Processes for responsible AI use",
+      "accountable_owner": "MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-POL-02",
+        "EAI-RSK-02",
+        "EAI-RSK-05"
+      ],
+      "evidence_paths": [
+        "docs/governance/ai-acceptable-use-policy.md",
+        "docs/governance/risk-appetite-statement-2026.md"
+      ],
+      "operational_proof_required": "Prove operator acknowledgement, human review and documented treatment of above-appetite risks"
+    },
+    {
+      "id": "A.9.3",
+      "title": "Objectives for responsible AI use",
+      "accountable_owner": "MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-POL-03",
+        "EAI-MON-05"
+      ],
+      "evidence_paths": [
+        "docs/aims/iso42001-mandatory-documents-index.md",
+        "data/grc-metrics.json"
+      ],
+      "operational_proof_required": "Demonstrate measured responsible-use objectives and review of KRI breaches"
+    },
+    {
+      "id": "A.9.4",
+      "title": "Intended use of the AI system",
+      "accountable_owner": "MLRO / Product",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-POL-02",
+        "EAI-DMG-06"
+      ],
+      "evidence_paths": [
+        "data/ai-assets.json",
+        "docs/aims/ai-system-inventory.md"
+      ],
+      "operational_proof_required": "Prove restricted intended use and human-only consequential decisions"
+    },
+    {
+      "id": "A.10.2",
+      "title": "Allocation of AI-related responsibilities",
+      "accountable_owner": "Legal / MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-05",
+        "EAI-ROL-02"
+      ],
+      "evidence_paths": [
+        "docs/aims/third-party-register.md",
+        "docs/governance/ai-vendor-assurance.md"
+      ],
+      "operational_proof_required": "Retain signed responsibility allocation for vendor and customer processing"
+    },
+    {
+      "id": "A.10.3",
+      "title": "Suppliers",
+      "accountable_owner": "Legal / MLRO",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-05"
+      ],
+      "evidence_paths": [
+        "docs/aims/third-party-register.md",
+        "docs/aims/anthropic-dpa-execution-pack.md"
+      ],
+      "operational_proof_required": "Verify DPAs, subprocessors, retention, location and independent supplier due diligence"
+    },
+    {
+      "id": "A.10.4",
+      "title": "Customers",
+      "accountable_owner": "MLRO / Legal",
+      "applicability": "provisional_applicable",
+      "eai_controls": [
+        "EAI-DMG-05",
+        "EAI-AUD-08"
+      ],
+      "evidence_paths": [
+        "docs/aims/third-party-register.md",
+        "docs/aims/interested-parties-information.md"
+      ],
+      "operational_proof_required": "Record customer AI obligations, transparency notices and agreed complaint channels"
+    }
+  ]
+}
