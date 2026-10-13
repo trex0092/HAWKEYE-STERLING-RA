@@ -87,6 +87,9 @@ globalThis.fetch = _realFetch;
 const countryReport = spawnSync(process.execPath, ['scripts/country-coverage-report.mjs', '--check'], {
   cwd: process.cwd(), encoding: 'utf8',
 });
+if (countryReport.status !== 0) {
+  console.error('country coverage report check output:\n' + countryReport.stdout + countryReport.stderr);
+}
 check('worldwide country coverage report validates the PEP scope matrix and stays in sync',
   countryReport.status === 0 && countryReport.stdout.includes('Country coverage report is current.'));
 
