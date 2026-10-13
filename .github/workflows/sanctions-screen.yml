@@ -74,7 +74,8 @@ jobs:
     runs-on: ubuntu-latest
     # The 2026-09-30 run reached the 90-minute enrichment budget with five
     # subjects remaining. Allow 100 minutes without increasing provider rates.
-    # Keep 20 minutes of job headroom for list loading, cases, delivery and state.
+    # Keep 15+ minutes of job headroom after the capped 5-minute adverse-media
+    # recovery tail for case review, Asana delivery, and state persistence.
     # Skipped enrichment still fails assurance; a larger budget is not proof
     # that every provider answered or that the full population was covered.
     timeout-minutes: 120
@@ -227,6 +228,11 @@ jobs:
           ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
           SCREEN_ENRICH_BUDGET_MS: '6000000'
+          # The initial 100-minute phase exhausted its deadline on 13 Oct and
+          # permitted only 2 of 20 queued zero-backbone subjects to retry.
+          # Reserve max 5 minutes exclusively for post-sweep failed subjects;
+          # the domain still fails assurance until actual coverage is proven.
+          SCREEN_AM_RECOVERY_RESERVE_MS: '300000'
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           # Personal EU FSF crawler token (optional): the shared public token now
           # redirects to EU Login. Unset = public token, and the EU list fails loudly.
