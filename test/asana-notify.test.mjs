@@ -2,7 +2,8 @@
    shared transient-failure policy (retry classification + backoff) and the
    re-run duplicate guard used by every monitoring delivery stream. */
 import {
-  isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana,
+  isRetryable, retryDelayMs, findRecentDuplicate, findDateScopedDailyDuplicates,
+  esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
   listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize
 } from '../scripts/asana-notify.mjs';
@@ -87,6 +88,87 @@ check('dedupPrefix: outside the window the same-prefix card is not a duplicate',
     '🛡️ Sanctions Screen — 2026-07-02 — y', NOW, 6, '🛡️ Sanctions Screen — 2026-07-02') === null);
 check('without dedupPrefix exact-match semantics are unchanged',
   findRecentDuplicate(digestTasks, '🛡️ Sanctions Screen — 2026-07-02 — 3 new match(es) · 326 screened', NOW) === null);
+
+/* ── whole-day screening digest idempotency (offline Asana mock) ── */
+const dateKey = '🛡️ Sanctions Screen — 2026-07-02';
+const lateTask = { gid: '9001', name: dateKey + ' — 2 new match(es) · 325 screened',
+  created_at: hoursAgo(13), permalink_url: 'https://asana.example/9001' };
+check('same-day digest created thirteen hours earlier is still the authoritative card',
+  findDateScopedDailyDuplicates([lateTask], dateKey).length === 1 &&
+  findRecentDuplicate([lateTask], lateTask.name, NOW) === null);
+check('date-scoped digest never matches the previous UTC screening date',
+  findDateScopedDailyDuplicates([lateTask], '🛡️ Sanctions Screen — 2026-07-03').length === 0);
+check('multiple existing same-day summaries are visible as an ambiguity',
+  findDateScopedDailyDuplicates([lateTask, { ...lateTask, gid: '9002' }], dateKey).length === 2);
+check('invalid date or arbitrary prefix is refused by the daily-only guard',
+  (() => {
+    try { findDateScopedDailyDuplicates([], 'Sanctions Watch'); return false; }
+    catch { return true; }
+  })() && (() => {
+    try { findDateScopedDailyDuplicates([], '🛡️ Sanctions Screen — 2026-02-30'); return false; }
+    catch { return true; }
+  })());
+
+{
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.ASANA_ACCESS_TOKEN;
+  const project = '1216203370612914', section = '1218451960830318';
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-test-credential';
+  let rows = [lateTask];
+  let title = lateTask.name;
+  let puts = 0, posts = 0;
+  const response = data => ({
+    ok: true, status: 200, headers: { get: () => null }, json: async () => ({ data })
+  });
+  globalThis.fetch = async (url, opts = {}) => {
+    const path = String(url).replace('https://app.asana.com/api/1.0', '');
+    if (path.startsWith('/sections/') && !path.endsWith('/addTask'))
+      return response({ gid: section, name: 'Screening Sanctions Update',
+        project: { gid: project } });
+    if (path.startsWith('/projects/' + project + '/tasks?')) {
+      return { ...response(rows), json: async () => ({ data: rows, next_page: null }) };
+    }
+    if (path === '/sections/' + section + '/addTask') return response({});
+    if (path === '/tasks/9001' && opts.method === 'PUT') {
+      puts++;
+      title = JSON.parse(opts.body).data.name;
+      return response({ gid: '9001' });
+    }
+    if (path.startsWith('/tasks/9001?'))
+      return response({ name: title, notes: 'Daily sanctions screening — updated',
+        permalink_url: 'https://asana.example/9001',
+        memberships: [{ project: { gid: project }, section: { gid: section } }] });
+    if (path === '/tasks' && opts.method === 'POST') {
+      posts++;
+      return response({ gid: '9003' });
+    }
+    throw new Error('Unknown synthetic Asana endpoint');
+  };
+  try {
+    await notifyAsana(dateKey + ' — 3 new match(es) · 326 screened', '', {
+      project, section, assignee: null,
+      html: '<body><h1>Daily sanctions screening — synthetic</h1></body>',
+      dateScopedDigest: true, dedupPrefix: dateKey
+    });
+    check('late screening rerun updates + readback-verifies one existing card instead of posting another',
+      puts === 1 && posts === 0 && title.includes('3 new match(es) · 326 screened'));
+    rows = [lateTask, { ...lateTask, gid: '9002' }];
+    let refused = false;
+    try {
+      await notifyAsana(dateKey + ' — changed', '', {
+        project, section, assignee: null,
+        html: '<body><h1>Daily sanctions screening — synthetic</h1></body>',
+        dateScopedDigest: true, dedupPrefix: dateKey
+      });
+    } catch { refused = true; }
+    check('two same-day cards require human reconciliation; no third digest is created',
+      refused && puts === 1 && posts === 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = originalToken;
+  }
+}
 
 /* ── existing helpers still hold ── */
 check('esc escapes all five XML-sensitive characters',
