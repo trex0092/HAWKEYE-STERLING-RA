@@ -64,6 +64,21 @@ export function buildCountryCoverageReport(register = readRegister(), matrix = r
   out.push("- **PEP worldwide scope** means the configured screen applies to subjects across the country universe; it does not prove that Wikidata has complete, current PEP records for every country. The PEP artifact is assessed separately by runtime assurance.");
   out.push("- PEP person counts are not allocated by country here: office context can be missing or refer to a jurisdiction, and must not be presented as a complete country register.");
   out.push("- UN consolidated list screening is independent of these national-list statuses.", "");
+  out.push("## Full 195-country screening applicability matrix", "");
+  out.push("This matrix separates global sanctions baseline and PEP/adverse-media scope from national sanctions source depth and dedicated Google News edition presence. Configured scope does not replace per-run operational evidence.", "");
+  const matrixRows = [...matrix.countries].sort((a,b) => a.country.localeCompare(b.country, "en"));
+  out.push(table(
+    ["Country","Sanctions global baseline","National sanctions status","Loaded national source IDs","Adverse-media global scope","Google News country edition","Worldwide PEP scope"],
+    matrixRows.map((row) => [
+      row.country,
+      row.sanctions?.covered === true ? "yes" : "no",
+      row.sanctions?.nationalStatus || "unknown",
+      (row.sanctions?.nationalSources || []).join(", ") || "—",
+      row.adverseMedia?.covered === true ? "yes" : "no",
+      row.adverseMedia?.dedicatedGoogleNewsEdition === true ? "yes" : "no",
+      row.pep?.covered === true ? "yes" : "no",
+    ])
+  ), "");
   out.push("## Priority: FATF black/grey list countries (" + fatf.length + ")", "");
   out.push(table(["Country","FATF","Sanctions status","AM edition","Partial note"], fatf.map((row) => [row.country,row.fatf,row.status,editions.has(row.country) ? "yes" : "no",partialNote(row)])), "");
   out.push("## Sanctions: " + (statusCounts["not-researched"] || 0) + " not researched (not FATF-flagged first)", "");
