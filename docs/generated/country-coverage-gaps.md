@@ -1,6 +1,6 @@
 # HAWKEYE-STERLING-RA: country coverage gaps (195 countries)
 
-Generated from `data/sanctions-country-coverage.json`, `data/screening-country-coverage.json` and the `LOCALES` matrix in `scripts/adverse-media.mjs`. Register updated: 2026-10-08.
+Generated from `data/sanctions-country-coverage.json`, `data/screening-country-coverage.json` and the `LOCALES` matrix in `scripts/adverse-media.mjs`. Register updated: 2026-10-08
 
 ## How to read this
 
@@ -338,7 +338,6 @@ Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Armenia, Az
 ## Worldwide PEP screening scope: 195/195 countries
 
 The configured worldwide PEP screen applies across the full 195-country subject universe. This is an applicability measure, not proof that the source contains every PEP or that every country has complete identity data.
-
 No countries are outside the configured PEP scope.
 
 Runtime assurance separately checks the harvested artifact, freshness, completeness, source-quality exceptions and whether the daily screen consumed that exact artifact.
