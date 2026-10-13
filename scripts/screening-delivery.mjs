@@ -274,7 +274,11 @@ async function deliverReport(request, report, projectTasks, assignee, upload = n
     }
     await request('/tasks/' + taskId, { method: 'PUT', body: body(pending) });
   } else {
-    const created = await request('/tasks', { method: 'POST', body: body({ ...pending,
+    // A lost Asana response may mean the card was created remotely.
+    // Never replay an ambiguous creation in the same HTTP retry loop: the
+    // next run re-reads daily titles and publisher markers before reusing it.
+    const created = await request('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+      body: body({ ...pending,
       projects: [PROJECT], assignee,
       memberships: [{ project: PROJECT, section: report.section }],
     }) });
@@ -296,7 +300,12 @@ async function deliverReport(request, report, projectTasks, assignee, upload = n
       childId = gid(matches[0].gid);
       await request('/tasks/' + childId, { method: 'PUT', body: body(content) });
     } else {
-      childId = gid((await request('/tasks/' + taskId + '/subtasks', { method: 'POST', body: body(content) }))?.data?.gid);
+      // An evidence-page POST is also non-replayable after a lost response.
+      // Reconciliation on the next run discovers that numbered page by name,
+      // reads back its parent and overwrites only our own marked evidence.
+      childId = gid((await request('/tasks/' + taskId + '/subtasks', {
+        method: 'POST', noRetryOnUnknownOutcome: true, body: body(content)
+      }))?.data?.gid);
     }
     await verifyTask(request, childId, content, null, taskId);
     used.add(childId);
