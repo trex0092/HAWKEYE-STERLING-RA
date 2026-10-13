@@ -35,6 +35,7 @@ flow to the [CAPA log](../aims/corrective-actions.md) and the
 
 | Document | What it is | Framework ref |
 |---|---|---|
+| [ai-platform-framework-decision-2026.md](ai-platform-framework-decision-2026.md) | Applicability decisions for the 12 AI-agent, RAG/vector, model-serving and security frameworks; OWASP LLM / MITRE ATLAS / ATT&CK threat controls and strict operational acceptance | Voluntary architecture/security threat model | 
 | [iso-42001-soa-2026.md](iso-42001-soa-2026.md) | Statement of Applicability (Advisor view) | ISO 42001 Annex A |
 | [Annex A control evidence (provisional)](../../data/iso42001-annex-a-evidence.json) | All 38 individually mapped controls, accountable roles, risks and evidence still required; not an approved SoA or external audit | ISO/IEC 42001:2023 Annex A |
 | [iso-27001-soa-draft-2026.md](iso-27001-soa-draft-2026.md) | **Draft** Statement of Applicability for all 93 controls: applicability proposals, repository evidence and gaps (not approved; no certification claimed) | ISO/IEC 27001:2022 Annex A |
