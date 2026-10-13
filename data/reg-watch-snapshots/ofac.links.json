@@ -128,12 +128,16 @@
   "h": "https://ofac.treasury.gov/contact-ofac"
  },
  {
-  "t": "Settlement Agreement between the U.S. Department of the Treasury's Office of Foreign Assets Control and Pegasus Worldwide Logistics; International Criminal Court Designation and General Licenses; Burma-related Designation Removal",
-  "h": "https://ofac.treasury.gov/recent-actions/20261009"
+  "t": "Counter Narcotics and Counter Terrorism Designations",
+  "h": "https://ofac.treasury.gov/recent-actions/20261013"
  },
  {
   "t": "Sanctions List Updates",
   "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
+ },
+ {
+  "t": "Settlement Agreement between the U.S. Department of the Treasury's Office of Foreign Assets Control and Pegasus Worldwide Logistics; International Criminal Court Designation and General Licenses; Burma-related Designation Removal",
+  "h": "https://ofac.treasury.gov/recent-actions/20261009"
  },
  {
   "t": "Issuance of Russia-related General License",
@@ -176,12 +180,8 @@
   "h": "https://ofac.treasury.gov/recent-actions/regulations-and-guidance"
  },
  {
-  "t": "Issuance of Amended Venezuela General Licenses",
-  "h": "https://ofac.treasury.gov/recent-actions/20260928"
- },
- {
   "t": "Current page 1",
-  "h": "https://ofac.treasury.gov/recent-actions?_ll_epoch=179186068&page=0"
+  "h": "https://ofac.treasury.gov/recent-actions?pulse_nocache=1791900865077-1&page=0"
  },
  {
   "t": "All Recent Actions",
