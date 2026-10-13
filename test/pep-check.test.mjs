@@ -1,6 +1,7 @@
 /* Unit tests for PEP screening pure logic (no network).
    Usage: node test/pep-check.test.mjs */
 import { pepSearchUrl, scorePep, PEP_KEYWORDS, checkPep } from '../scripts/pep-check.mjs';
+import { spawnSync } from 'node:child_process';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -82,6 +83,12 @@ await (async () => {
   check('checkPep does not retry a non-transient status (404)', r3.errored === true && calls3 === 1);
 })();
 globalThis.fetch = _realFetch;
+
+const countryReport = spawnSync(process.execPath, ['scripts/country-coverage-report.mjs', '--check'], {
+  cwd: process.cwd(), encoding: 'utf8',
+});
+check('worldwide country coverage report validates the PEP scope matrix and stays in sync',
+  countryReport.status === 0 && countryReport.stdout.includes('Country coverage report is current.'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
