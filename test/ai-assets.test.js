@@ -107,5 +107,74 @@ for (const f of apiCallers) {
 }
 check('the LLM triage surface (ai.py) is registered', surfaces.has('ai.py'));
 
+/* ── 12-framework adoption and threat-model evidence selection ──────────
+   A comparison infographic is NOT an instruction to install nine new runtime
+   frameworks. Keep the explicit decisions, real code/test references and open
+   operational gaps in CI so the owner can review adoption intentionally. */
+let selection;
+try {
+  selection = JSON.parse(fs.readFileSync(path.join(__dirname, '..',
+    'data', 'ai-framework-selection.json'), 'utf8'));
+} catch (err) {
+  check('AI framework decision register parses', false);
+}
+if (selection) {
+  check('AI framework selection has a versioned schema and human control owner',
+    selection.schema === 'hawkeye.ai-framework-selection/v1' &&
+    /MLRO/.test(selection.owner || '') &&
+    Number.isFinite(Date.parse(selection.as_of || '')));
+  const expected = new Set([
+    'langgraph', 'crewai', 'microsoft-agent-framework', 'haystack',
+    'faiss', 'vllm', 'ollama', 'chroma', 'pinecone-qdrant-weaviate',
+    'mitre-atlas', 'owasp-llm-top10', 'mitre-attack'
+  ]);
+  const frameworks = selection.frameworks || [];
+  const found = new Set(frameworks.map(x => x.id));
+  check('all twelve items assessed with no duplicates, none silently omitted',
+    frameworks.length === 12 && found.size === 12 &&
+    [...expected].every(id => found.has(id)));
+  const docs = fs.readFileSync(path.join(__dirname, '..', 'docs',
+    'governance', 'ai-stack-selection-2026.md'), 'utf8');
+  const checkPath = (value) => typeof value === 'string' &&
+    value.length > 0 && !path.isAbsolute(value) &&
+    !value.split('/').includes('..') &&
+    !/^netlify\b/i.test(value) &&
+    fs.existsSync(path.join(__dirname, '..', value));
+  for (const [i, f] of frameworks.entries()) {
+    check('framework ' + f.id + ' has a justified decision and future adoption gate',
+      typeof f.rationale === 'string' && f.rationale.length >= 65 &&
+      typeof f.adoption_gate === 'string' && f.adoption_gate.length >= 35 &&
+      ['deferred', 'reference-control'].includes(f.decision));
+    check('framework ' + f.id + ' references actual safe repository evidence',
+      Array.isArray(f.evidence) && f.evidence.length > 0 &&
+      f.evidence.every(checkPath));
+    check('framework ' + f.id + ' has a matching numbered decision in the companion document',
+      docs.includes('| ' + (i + 1) + ' | ' + f.name + ' |'));
+  }
+  check('non-security frameworks are deferred pending owner approval, no shadow AI deployment',
+    frameworks.filter(x => x.decision === 'deferred').length === 9);
+  check('only OWASP LLM, MITRE ATLAS and MITRE ATT&CK are adopted as security references',
+    frameworks.filter(x => x.decision === 'reference-control')
+      .map(x => x.id).sort().join(',') ===
+      ['mitre-atlas', 'mitre-attack', 'owasp-llm-top10'].sort().join(','));
+  const scenarios = selection.threat_scenarios || [];
+  const unique = new Set(scenarios.map(x => x.id));
+  check('AI threat model has unique, actionable security and runtime failure scenarios',
+    scenarios.length >= 7 && unique.size === scenarios.length);
+  for (const x of scenarios) {
+    check('scenario ' + x.id + ' has mapped controls and real regression tests',
+      found.has(x.framework) && checkPath(x.control) &&
+      Array.isArray(x.tests) && x.tests.length > 0 &&
+      x.tests.every(checkPath) &&
+      ['repo-regression', 'open-operational-evidence'].includes(x.status) &&
+      typeof x.remaining === 'string' && x.remaining.length >= 50);
+  }
+  check('source-outage failure remains explicitly OPEN instead of mislabeled healthy',
+    scenarios.some(x => x.id === 'screening-operational-source-blackout' &&
+      x.status === 'open-operational-evidence') &&
+    /NOT_CERTIFIED/.test(selection.operational_status || '') &&
+    /one subject had no verifiable adverse-media source response/.test(docs));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
