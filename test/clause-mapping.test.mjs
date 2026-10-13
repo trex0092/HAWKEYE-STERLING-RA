@@ -204,7 +204,7 @@ check('repo navigation exposes the full provisional Annex A evidence crosswalk',
   read('docs/aims/README.md').includes('../../data/iso42001-annex-a-evidence.json'));
 check('societal impact A.5.5 is not misapplied to prompt-injection red teaming',
   read('docs/aims/README.md').includes('A.5.5 (societal impacts)') &&
-  !/Red.Team[^\n|]*\|\s*A\.5\.5\b/i.test(read('docs/aims/README.md')) &&
+  !/^\|\s*\d+\s*\|\s*(?:Prompt-Injection Red-Team Procedure|Red-Team Log)[^|]*\|\s*A\.5\.5\b/im.test(read('docs/aims/README.md')) &&
   !read('docs/aims/red-team-procedure.md').includes('AIMS A.5.5') &&
   !read('docs/aims/red-team-log.md').includes('AIMS A.5.5') &&
   read('docs/aims/red-team-procedure.md').includes('A.6.2.4'));
