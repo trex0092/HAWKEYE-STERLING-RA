@@ -4,7 +4,7 @@
    Usage: node test/sanctions-screen.test.mjs */
 import {
   normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, normalizeResult, normalizeScreenResponse,
-  isMatch, diffState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
+  isMatch, diffState, parseScreeningState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
   whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
@@ -2225,6 +2225,29 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   check('screen runner emits only the safe held-population summary',
     /console\.log\(describeUnscreenedHold\(notScreened\)\)/.test(src) &&
     !/notScreened\.map\(n => n\.(name|key)/.test(src));
+}
+/* State corruption must never silently discard AML / Asana case continuity. */
+{
+  const state = { updated: '2026-10-12', subjects: {
+    'fictional-entity': { name: 'Synthetic Test Entity', lastSeen: '2026-10-12' }
+  } };
+  check('valid historic screening state survives strict parsing without mutation',
+    JSON.stringify(parseScreeningState(JSON.stringify(state))) === JSON.stringify(state));
+  check('first-ever empty screening bootstrap remains supported',
+    parseScreeningState(JSON.stringify({ updated: null, subjects: {} })).updated === null);
+  const bad = [
+    '{ bad json', 'null', '[]', '{}', '{"updated":"2026-10-12"}',
+    '{"updated":"2026-10-12","subjects":[]}',
+    '{"updated":"2026-02-30","subjects":{}}',
+    '{"updated":null,"subjects":{"key":{"name":"Synthetic"}}}',
+  ];
+  check('corrupt/malformed screening histories fail instead of resetting to zero cases',
+    bad.every(raw => { try { parseScreeningState(raw); return false; }
+      catch (e) { return /Screening (state|history)/.test(String(e.message)); } }));
+  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
+  check('runner refuses malformed existing state rather than starting fresh',
+    /return parseScreeningState\\(readFileSync\\(STATE_FILE, 'utf8'\\)\\)/.test(src) &&
+    !src.includes('state unreadable, starting fresh'));
 }
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

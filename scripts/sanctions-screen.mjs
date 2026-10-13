@@ -2189,10 +2189,32 @@ export async function screenLocally(subjects, cfg) {
   return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
+/* A corrupt or malformed persisted AML ledger is NOT the same as a clean
+ * first-run bootstrap. Rebuilding blind would re-flag existing reviews,
+ * invalidate case continuity and potentially duplicate Asana investigations. */
+export function parseScreeningState(raw) {
+  let state;
+  try { state = JSON.parse(raw); }
+  catch { throw new Error('Screening state is unreadable; refusing to restart case history'); }
+  if (!state || typeof state !== 'object' || Array.isArray(state) ||
+      !state.subjects || typeof state.subjects !== 'object' ||
+      Array.isArray(state.subjects) ||
+      !(state.updated === null ||
+        (typeof state.updated === 'string' &&
+         /^\d{4}-\d\d-\d\d$/.test(state.updated) &&
+         Number.isFinite(Date.parse(state.updated + 'T00:00:00Z')) &&
+         new Date(state.updated + 'T00:00:00Z').toISOString().slice(0,10) === state.updated))) {
+    throw new Error('Screening state shape is invalid; refusing to replace persisted AML history');
+  }
+  if (state.updated === null && Object.keys(state.subjects).length) {
+    throw new Error('Screening history has entries without an update date');
+  }
+  return state;
+}
+
 function loadState() {
   if (!existsSync(STATE_FILE)) return { updated: null, subjects: {} };
-  try { return JSON.parse(readFileSync(STATE_FILE, 'utf8')); }
-  catch (e) { console.warn('sanctions-screen: state unreadable, starting fresh (' + e.message + ')'); return { updated: null, subjects: {} }; }
+  return parseScreeningState(readFileSync(STATE_FILE, 'utf8'));
 }
 
 function setOutput(key, val) {
