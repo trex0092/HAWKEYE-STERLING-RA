@@ -2184,7 +2184,7 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   check('second pass: a recovered subject is rebuilt through the same finalize() path',
     /applyAm\(again\);\s*const rebuilt = finalize\(\);/.test(src) && /heartbeat\(\);\s*return finalize\(\);/.test(src));
   check('second pass: runs before input-order restore with a bounded recovery-only deadline',
-    src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order')
+    src.indexOf('runAmSecondPass(amRetryQueue') < src.indexOf('Restore the input order')
     && /deadlineMs: postSweepRecoveryDeadline\(enrichDeadline, cfg\.amRecoveryTailMs\)/.test(src));
   check('recovery tail is bounded under the 120-minute workflow and always leaves a minimum retry allowance',
     scr.resolveAmRecoveryTailMs(undefined) === 300000
@@ -2211,6 +2211,49 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     oldTail.attempted === 0 && oldTail.recovered === 0);
   check('reserved post-sweep window executes a bounded 20-subject retry queue after a full-budget initial sweep',
     reservedTail.attempted === 20 && reservedTail.recovered === 20 && reservedTail.skipped === '');
+
+  // The full-book live run on 13 Oct reduced 16 uncovered subjects to one;
+  // a final small, separately bounded, residual-only probe can try that last
+  // subject once more without touching any previously verified subjects.
+  let callsOk = 0, callsLate = 0, nowResidual = 0;
+  const tracked = scr.trackAmRecovery([
+    { key: 'ok', retry: async () => { callsOk++; nowResidual += 1000; return true; } },
+    { key: 'late', retry: async () => { callsLate++; nowResidual += 1000; return callsLate === 2; } },
+  ]);
+  const mainTail = await run(tracked, {
+    deadlineMs: 150000, delayMs: 60000, concurrency: 2,
+    now: () => nowResidual, sleep: async ms => { nowResidual += ms; },
+  });
+  const outstanding = tracked.filter(item => !item.recovered);
+  const lastTail = await run(outstanding, {
+    deadlineMs: 150000 + scr.AM_FINAL_RECHECK_TAIL_MS,
+    delayMs: scr.AM_FINAL_RECHECK_COOLDOWN_MS, concurrency: 1,
+    max: scr.AM_FINAL_RECHECK_MAX,
+    now: () => nowResidual, sleep: async ms => { nowResidual += ms; },
+  });
+  check('first post-sweep pass leaves one residual when a provider refuses the first recheck',
+    mainTail.attempted === 2 && mainTail.recovered === 1 &&
+    outstanding.length === 1 && outstanding[0].key === 'late');
+  check('final recheck recovers ONLY the initially uncovered straggler',
+    lastTail.attempted === 1 && lastTail.recovered === 1 &&
+    callsOk === 1 && callsLate === 2 && tracked.every(item => item.recovered));
+  await tracked[0].retry();
+  check('already recovered item never replays side effects or decrements errors twice',
+    callsOk === 1);
+  const mass = Array.from({ length: scr.AM_FINAL_RECHECK_MAX + 1 }, (_, i) =>
+    ({ key: 'id-' + i, retry: async () => true }));
+  const refused = await run(mass, {
+    deadlineMs: 10000000, delayMs: 0, max: scr.AM_FINAL_RECHECK_MAX,
+    now: () => nowResidual, sleep: async () => {},
+  });
+  check('final retry never retries a mass source outage or exceeds bounded 8-subject cap',
+    refused.attempted === 0 && /cap/.test(refused.skipped));
+  check('final retries consume at most two extra minutes of the existing job budget',
+    scr.AM_FINAL_RECHECK_TAIL_MS === 120000 &&
+    scr.AM_FINAL_RECHECK_COOLDOWN_MS === 45000 &&
+    /residual\.length <= AM_FINAL_RECHECK_MAX/.test(src) &&
+    /concurrency: 1/.test(src) &&
+    src.indexOf('final gated adverse-media probe') < src.indexOf('Restore the input order'));
 }
 
 /* ── licence-free mode (OPENSANCTIONS_DATA=0) ── */
