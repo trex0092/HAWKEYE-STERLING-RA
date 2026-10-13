@@ -35,6 +35,19 @@ export function retryDelayMs(attempt, retryAfter) {
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 const MAX_ATTEMPTS = 3;
 
+/* All remote Asana reads and writes need bounded execution time. Without an
+   AbortSignal, a stalled HTTP socket can consume the entire daily-screen
+   delivery window, leaving cases unconfirmed. An aborted non-replayable POST
+   has an UNKNOWN outcome and must never be retried automatically. */
+export const ASANA_TIMEOUT_DEFAULT_MS = 30000;
+export function resolveAsanaTimeoutMs(value = ASANA_TIMEOUT_DEFAULT_MS) {
+  const n = Number(value);
+  return Number.isFinite(n)
+    ? Math.max(1000, Math.min(60000, Math.trunc(n)))
+    : ASANA_TIMEOUT_DEFAULT_MS;
+}
+
+
 /* External response bodies and transport exceptions can echo case names,
    subject identifiers, headers or tokens. Only bounded numeric status and a
    fixed, recognised oversize classification may cross into Actions logs.
@@ -56,8 +69,12 @@ export async function asana(path, opts = {}) {
   for (let attempt = 0; ; attempt++) {
     let r;
     try {
+      const deadline = AbortSignal.timeout(resolveAsanaTimeoutMs(process.env.ASANA_HTTP_TIMEOUT_MS));
+      const signal = requestOptions.signal
+        ? AbortSignal.any([requestOptions.signal, deadline]) : deadline;
       r = await fetch('https://app.asana.com/api/1.0' + path, {
         ...requestOptions,
+        signal,
         headers: {
           Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
           'Content-Type': 'application/json',
