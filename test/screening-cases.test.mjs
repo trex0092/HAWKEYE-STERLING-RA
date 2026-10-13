@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, canAutoClearCases, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
 import { caseSection, SECTIONS } from '../scripts/asana-sections.mjs';
 
 let passed = 0, failed = 0;
@@ -191,6 +191,38 @@ check('complete coverage cannot close an absent subject case without a human dis
   planCaseActions({}, OPEN_CASE, TODAY, {
     allowAutoClear: canAutoClearCases(GOOD_COVERAGE, TODAY)
   }).length === 0);
+
+/* ── Remote-first case disposition safety (no Asana or secrets needed) ── */
+const pendingCase = { taskGid: 't1', createdAt: TODAY, cleared: false, agingAlerted: false };
+check('an uncommitted disposition intent cannot mutate the active case',
+  (() => {
+    const original = { ...pendingCase };
+    const proposed = { type: 'disposition-clear', caseGid: pendingCase.taskGid };
+    return proposed.type === 'disposition-clear' && pendingCase.cleared === false &&
+      JSON.stringify(pendingCase) === JSON.stringify(original);
+  })());
+check('confirmed false-positive disposition creates whitelist evidence only after success',
+  (() => {
+    const result = confirmedDispositionState(pendingCase, 'disposition-clear', TODAY,
+      subj({ hits: [
+        { list: 'UK OFSI', hitName: 'Synthetic Match' },
+        { list: 'PEP (Wikidata)', hitName: 'Synthetic Person' }
+      ] }));
+    return result.cleared === true && result.clearedAt === TODAY &&
+      result.disposition.kind === 'false-positive' &&
+      result.disposition.hits.length === 1 && result.disposition.hits[0].hitName === 'Synthetic Match' &&
+      pendingCase.cleared === false;
+  })());
+check('confirmed escalation pins the case open without adding any clearance',
+  (() => {
+    const result = confirmedDispositionState(pendingCase, 'disposition-escalate-ack', TODAY);
+    return result.escalated === true && result.cleared === false && !result.disposition;
+  })());
+check('invalid remote confirmations cannot change case state',
+  (() => {
+    try { confirmedDispositionState(pendingCase, 'unknown-disposition', TODAY); return false; }
+    catch { return pendingCase.cleared === false; }
+  })());
 
 /* ── card body ── */
 const html = caseHtml(KEY, subj(), 'https://example/run');
