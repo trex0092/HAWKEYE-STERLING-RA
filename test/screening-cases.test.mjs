@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, createVerifiedScreeningCase, unverifiedCaseCreationState, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
 import { caseSection, SECTIONS } from '../scripts/asana-sections.mjs';
 
 let passed = 0, failed = 0;
@@ -40,6 +40,71 @@ check('adverse-media cases route to Screening Adverse Media & PEP’s Update',
   caseSection({ hits: [{ list: 'Adverse media (GDELT)' }] }) === SECTIONS.media.gid);
 check('mixed cases retain sanctions priority without creating another section',
   caseSection({ hits: [{ list: 'Adverse media (GDELT)' }, { list: 'UN Consolidated' }] }) === SECTIONS.sanctions.gid);
+
+/* New cases require a remote GID, approved section and read-back receipt.
+   Synthetic IDs and injected request functions, no live Asana writes. */
+{
+  const title = 'Synthetic Screening Case', project = '1216203370612914',
+    section = '1218451960830318', taskId = '1219451000000001';
+  const calls = [];
+  const request = async (path, options = {}) => {
+    calls.push({ path, method: options.method || 'GET',
+      nonReplayable: options.noRetryOnUnknownOutcome === true });
+    if (path === '/tasks' && options.method === 'POST') return { data: { gid: taskId } };
+    if (path === '/sections/' + section + '/addTask') return { data: {} };
+    if (path.startsWith('/tasks/' + taskId + '?')) return { data: {
+      gid: taskId, name: title, memberships: [{ project: { gid: project }, section: { gid: section } }]
+    } };
+    throw new Error('unexpected synthetic Asana request');
+  };
+  const task = await createVerifiedScreeningCase(request, {
+    title, htmlNotes: '<body>Synthetic case evidence</body>', projectGid: project,
+    sectionGid: section, assignee: '1213645083721304', dueOn: TODAY
+  });
+  check('case creation confirms the actual Asana task identity, section and project',
+    task === taskId && calls.length === 3 &&
+    calls[0].path === '/tasks' && calls[0].method === 'POST' && calls[0].nonReplayable &&
+    calls[1].path.endsWith('/addTask') && calls[2].path.includes('?opt_fields='));
+  let missing = false;
+  try {
+    await createVerifiedScreeningCase(async () => ({ data: {} }), {
+      title, htmlNotes: '<body>Synthetic case evidence</body>',
+      projectGid: project, sectionGid: section
+    });
+  } catch { missing = true; }
+  check('missing Asana case GID is never persisted as a successful case', missing);
+  let misplaced = false;
+  try {
+    await createVerifiedScreeningCase(async path => {
+      if (path === '/tasks') return { data: { gid: taskId } };
+      if (path.endsWith('/addTask')) return { data: {} };
+      return { data: { gid: taskId, name: title, memberships: [{
+        project: { gid: project }, section: { gid: '12345' }
+      }] } };
+    }, { title, htmlNotes: '<body>Synthetic</body>', projectGid: project, sectionGid: section });
+  } catch { misplaced = true; }
+  check('misfiled Asana screening case never reports verified delivery', misplaced);
+  let writes = 0, ambiguous = false;
+  try {
+    await createVerifiedScreeningCase(async () => {
+      writes++; throw new Error('synthetic lost receipt');
+    }, { title, htmlNotes: '<body>Synthetic</body>', projectGid: project, sectionGid: section });
+  } catch { ambiguous = true; }
+  check('uncertain case creation is not retried within the case publisher',
+    ambiguous && writes === 1);
+  const pending = unverifiedCaseCreationState(null, TODAY);
+  check('unconfirmed new case preserves a human recovery hold, not a phantom GID',
+    pending.requiresHumanRecovery === true && pending.taskGid === null &&
+    pending.cleared === false && pending.creationUnverifiedAt === TODAY);
+  check('an uncertain case cannot queue another automatic duplicate or invalid aging action',
+    planCaseActions({ k: subj() }, { k: pending }, TODAY).length === 0);
+  const prior = { taskGid: '999999', cleared: true, clearedAt: '2026-07-01' };
+  const uncertainReflag = unverifiedCaseCreationState(prior, TODAY);
+  check('uncertain reflag preserves prior disposition and blocks duplicate creation',
+    uncertainReflag.taskGid === prior.taskGid && uncertainReflag.cleared === true &&
+    uncertainReflag.clearedAt === prior.clearedAt &&
+    planCaseActions({ k: subj() }, { k: uncertainReflag }, TODAY).length === 0);
+}
 
 /* ── planner ── */
 const KEY = 'john doe|ubo|1214107985842154';
