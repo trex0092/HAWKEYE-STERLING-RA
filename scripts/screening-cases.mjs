@@ -23,7 +23,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { asana, asanaEnabled, esc, runUrl, notifyAsana,
-  fitAsanaHtml, fitAsanaName } from './asana-notify.mjs';
+  fitAsanaHtml, fitAsanaName, verifyNewMonitoringAlert } from './asana-notify.mjs';
 import { enrichScreeningResults } from './openai-screening-enrichment.mjs';
 import { appendApiCostUsage } from './api-cost-dashboard.mjs';
 import { SECTIONS, caseSection } from './asana-sections.mjs';
@@ -105,6 +105,10 @@ export function planCaseActions(subjects, casesState, today) {
        the disposition executor — the registry demotes the subject from the
        NEXT screen run onward, so without this guard the re-flag branch below
        would immediately re-open the case the MLRO just closed. */
+    // An uncertain remote create is NOT a missing case. Until an MLRO/IT
+    // operator reconciles its task GID and section, another automatic create
+    // could open duplicate investigations or lose prior clearance history.
+    if (cs?.requiresHumanRecovery) continue;
     if (cs && cs.disposition && cs.clearedAt === today) continue;
     if (active && !cs) {
       /* whitelistedOnly rows are report-only: every remaining hit is an
@@ -188,6 +192,61 @@ export function newCaseStateEntry(gid, today, priorCase) {
   const entry = { taskGid: gid, createdAt: today, agingAlerted: false, cleared: false };
   if (priorCase && priorCase.taskGid) { entry.reopenedFrom = priorCase.taskGid; entry.reopenedAt = today; }
   return entry;
+}
+
+/* Remote Asana task creation is not idempotent across ambiguous failures.
+   Confirm the task's identity, project and actual section before linking it
+   into the persisted AML case ledger. Keep the payload injectable for synthetic
+   offline verification and preserve the shared client retry/429 semantics. */
+export async function createVerifiedScreeningCase(request, {
+  title, htmlNotes, dueOn, assignee, projectGid, sectionGid
+} = {}) {
+  if (typeof request !== 'function' ||
+      !/^[0-9]+$/.test(String(projectGid || '')) ||
+      !/^[0-9]+$/.test(String(sectionGid || '')) ||
+      !String(title || '').trim() || !String(htmlNotes || '').trim()) {
+    throw new Error('Screening case creation context incomplete');
+  }
+  const created = await request('/tasks', {
+    method: 'POST', noRetryOnUnknownOutcome: true,
+    body: JSON.stringify({ data: {
+      name: title, html_notes: htmlNotes, due_on: dueOn, assignee,
+      projects: [projectGid],
+      memberships: [{ project: projectGid, section: sectionGid }]
+    } })
+  });
+  const taskId = String(created?.data?.gid || '');
+  if (!/^[0-9]+$/.test(taskId)) {
+    throw new Error('Asana case create did not return a verified task identifier');
+  }
+  // Explicit membership update is safe to repeat for the *same* task ID.
+  // Creation itself must NEVER be blindly replayed after a lost response.
+  await request('/sections/' + sectionGid + '/addTask', {
+    method: 'POST', body: JSON.stringify({ data: { task: taskId } })
+  });
+  await verifyNewMonitoringAlert(request, taskId, {
+    title, projectGid, sectionGid
+  });
+  return taskId;
+}
+
+/* If a create response or read-back is uncertain, preserve the prior ledger
+   entry, never clear it and require a human to reconcile the possible Asana
+   task before any other automatic creation for this subject. */
+export function unverifiedCaseCreationState(existing, today) {
+  if (!/^\d{4}-\d\d-\d\d$/.test(String(today || ''))) {
+    throw new Error('Unverified case creation date is invalid');
+  }
+  const prior = existing && typeof existing === 'object' && !Array.isArray(existing)
+    ? existing : {};
+  return {
+    ...prior,
+    taskGid: prior.taskGid || null,
+    createdAt: prior.createdAt || today,
+    cleared: prior.cleared === true,
+    requiresHumanRecovery: true,
+    creationUnverifiedAt: today
+  };
 }
 
 export function caseHtml(key, s, runLink, priorCase) {
@@ -503,23 +562,17 @@ async function main() {
   for (const a of actions) {
     try {
       if (a.type === 'create') {
-        const d = await asana('/tasks', {
-          method: 'POST',
-          body: JSON.stringify({ data: {
-            /* Byte-capped, not character-capped: a case title is a designated
-               name verbatim, and Asana measures bytes. The html body is
-               tag-aware capped for the same reason (no-op under the limit). */
-            name: fitAsanaName(caseTitle(a.key, a.subject)),
-            html_notes: fitAsanaHtml(caseHtml(a.key, a.subject, link, a.priorCase)),
-            due_on: a.dueOn || addDays(today, CASE_SLA_DAYS),
-            assignee,
-            projects: [projectGid],
-            memberships: [{ project: projectGid, section: caseSection(a.subject) }]
-          } })
+        // A valid POST response is not proof the compliance task was actually
+        // filed in its approved Asana section. Reuse the central read-back
+        // verifier and avoid replaying a task POST with an unknown outcome.
+        const gid = await createVerifiedScreeningCase(asana, {
+          title: fitAsanaName(caseTitle(a.key, a.subject)),
+          htmlNotes: fitAsanaHtml(caseHtml(a.key, a.subject, link, a.priorCase)),
+          dueOn: a.dueOn || addDays(today, CASE_SLA_DAYS),
+          assignee, projectGid, sectionGid: caseSection(a.subject),
         });
-        const gid = d.data && d.data.gid;
-        /* REPLACES a cleared entry on a re-flag, so the digest's caseGidFor
-           resolves to this new open case and the SLA/aging restart cleanly. */
+        /* REPLACES a cleared entry on a re-flag only after confirmed placement,
+           so a missing Asana response cannot produce a phantom case GID. */
         casesState[a.key] = newCaseStateEntry(gid, today, a.priorCase);
         console.log(a.priorCase
           ? 'screening-cases: re-opened an existing case under human review'
@@ -567,7 +620,10 @@ async function main() {
       // Deleting an Asana task is NOT an MLRO false-positive decision. Never
       // convert 404 into local cleared=true: that would silently whitelist a
       // missing investigation, and future runs would stop retrying.
-      if (a.caseGid && /\b404\b/.test(msg)) {
+      if (a.type === 'create') {
+        casesState[a.key] = unverifiedCaseCreationState(casesState[a.key], today);
+        console.error('screening-cases: new case delivery not verified; automatic retry HELD until human Asana reconciliation');
+      } else if (a.caseGid && /\b404\b/.test(msg)) {
         casesState[a.key] = { ...casesState[a.key],
           missingFromAsanaAt: today, requiresHumanRecovery: true };
         console.error('screening-cases: a tracked Asana case is missing (404); NOT cleared; manual recovery required');
@@ -633,7 +689,12 @@ async function main() {
           (Number.isSafeInteger(ai.usage.total_tokens) ? ai.usage.total_tokens : 0) +
           ' billed tokens; no AI note was published');
       }
-      const html = buildResultsDigestHtml(digestResults, a => (casesState[a.key] || {}).taskGid || null);
+      // An uncertain case cannot be represented as a confirmed open case
+      // link, especially when re-flagging after a previously cleared task.
+      const html = buildResultsDigestHtml(digestResults, a => {
+        const entry = casesState[a.key];
+        return entry && !entry.requiresHumanRecovery ? entry.taskGid || null : null;
+      });
       const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || SECTIONS.sanctions.gid;
       /* Mirror the daily case digest into the queue the MLRO actually works
          (see the MIRROR note in asana-notify). One task, two memberships. */
