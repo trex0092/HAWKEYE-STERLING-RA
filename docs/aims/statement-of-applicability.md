@@ -9,6 +9,14 @@ Advisor. The narrower, control-by-control statement for the LLM Advisor is
 how the two relate, and which risk each Annex A control treats, is in the
 [clause 6.1 mapping index](iso-42001-clause-6-1-mapping.md).
 
+> **Annex A completeness guard (2026-10-13):** The thematic rows below are
+> a summary, not a signed 38-row Statement of Applicability. The
+> [provisional individual-control evidence map](../../data/iso42001-annex-a-evidence.json)
+> references all 38 controls across A.2 to A.10 and identifies the repository
+> proof paths and open operational evidence; the MLRO/Board must review actual
+> applicability and any exclusions before adopting a formal revised SoA.
+> `node scripts/iso-annex-a-evidence.mjs --check` tests traceability only.
+
 > **Reconciled 2026-07-29.** Three defects, all corrected here:
 > (i) a single row asserted *"AI impact assessment (individuals/society) —
 > Implemented"* while the Advisor statement recorded A.5.4 as 🟡 with its first

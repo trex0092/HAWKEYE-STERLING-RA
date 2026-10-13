@@ -18,6 +18,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
+import { ANNEX_A_IDS, validateAnnexAEvidence, buildAnnexAEvidenceReport }
+  from '../scripts/iso-annex-a-evidence.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let passed = 0, failed = 0;
@@ -129,6 +131,64 @@ check('both statements agree that A.5.4 is partial (' + a54Aims + ' / ' + a54Adv
   a54Aims === 'Partial' && a54Adv === '🟡');
 check('both statements cite the ratified stakeholder impact assessment',
   soaAims.includes('stakeholder-impact-assessment-2026.md') && soa2026.includes('stakeholder-impact-assessment-2026.md'));
+
+
+/* Annex A is 38 actual numbered controls, NOT the 39 shown in some charts.
+ * The data crosswalk is PROVISIONAL; this test verifies traceability, not
+ * signed applicability, operational effectiveness, or ISO certification. */
+const annex = JSON.parse(read('data/iso42001-annex-a-evidence.json'));
+const enterprise = JSON.parse(read('data/ai-controls.json'));
+const actualRefs = Object.values(ANNEX_A_IDS).flat();
+const expectedCounts = [3, 2, 5, 4, 9, 5, 4, 3, 3];
+check('Annex A comprises 38 controls and exactly nine groups, with A.5 containing four',
+  actualRefs.length === 38 && Object.values(ANNEX_A_IDS).every(
+    (refs, i) => refs.length === expectedCounts[i]) &&
+  new Set(actualRefs).size === 38);
+check('complete 38-control provisional map has valid paths and closure-action lineage',
+  validateAnnexAEvidence(annex, enterprise, read('docs/governance/open-actions-register.md')).length === 0);
+check('all 38 expected individual control IDs appear once',
+  annex.controls.length === 38 &&
+  actualRefs.every(id => annex.controls.filter(c => c.id === id).length === 1));
+const bad = value => structuredClone(value);
+const actions = read('docs/governance/open-actions-register.md');
+check('a missing or duplicated control fails closed',
+  validateAnnexAEvidence({ ...annex, controls: annex.controls.slice(1) }, enterprise, actions).length > 0 &&
+  validateAnnexAEvidence({ ...annex, controls: [...annex.controls.slice(1), annex.controls[1]] },
+    enterprise, actions).some(x => x.includes('duplicate')));
+check('unsafe or nonexistent evidence paths fail closed before an SoA claim',
+  validateAnnexAEvidence({ ...annex, controls: annex.controls.map((c, i) => i === 0
+    ? { ...c, evidence_paths: ['../../private-key'] } : c) },
+    enterprise, actions).some(x => x.includes('unsafe or absent')));
+check('unrecognized enterprise mappings and phantom open action IDs fail closed',
+  validateAnnexAEvidence({ ...annex, controls: annex.controls.map((c, i) => i === 0
+    ? { ...c, eai_controls: ['EAI-FAKE-1'] } : c) },
+    enterprise, actions).some(x => x.includes('unrecognized enterprise')) &&
+  validateAnnexAEvidence(annex, { ...enterprise,
+    controls: enterprise.controls.map(c => c.id === 'EAI-DMG-05'
+      ? { ...c, closure_actions: [999] } : c) },
+    actions).some(x => x.includes('missing open action #999')));
+check('no synthetic data can promote the provisional map to approved certification',
+  validateAnnexAEvidence({ ...annex, approval_status: 'certified' },
+    enterprise, actions).some(x => x.includes('unapproved SoA posture')));
+const provisionalReport = buildAnnexAEvidenceReport(annex, enterprise);
+check('report flags open independent assurance and pending review, not a green ISO claim',
+  provisionalReport.includes('UNAPPROVED crosswalk') &&
+  provisionalReport.includes('A.8.3') &&
+  provisionalReport.includes('OPEN IN ENTERPRISE REGISTER') &&
+  provisionalReport.includes('#37') &&
+  !provisionalReport.includes('100% compliant'));
+
+check('Advisor SoA maps deployment, operation, events and concerns to correct Annex A refs',
+  /^\| A\.6\.2\.5 AI system deployment \|/m.test(soa2026) &&
+  /^\| A\.6\.2\.6 AI system operation & monitoring \|/m.test(soa2026) &&
+  /^\| A\.6\.2\.8 AI system event logs \|/m.test(soa2026) &&
+  /^\| A\.3\.3 Reporting of concerns \|/m.test(soa2026) &&
+  /^\| A\.8\.3 External reporting \|/m.test(soa2026));
+check('risk-to-control mapping no longer misnames event logging or external reporting',
+  !map.includes('A.6.2.8 (operation & monitoring)') &&
+  !map.includes('A.6.2.6 (deployment)') &&
+  !map.includes('A.8.3 (reporting of concerns)') &&
+  map.includes('A.3.3 (reporting of concerns)'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;

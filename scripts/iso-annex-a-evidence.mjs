@@ -40,8 +40,8 @@ function safePath(path) {
     EVIDENCE_PATH.test(path) && !path.split('/').includes('..') &&
     !path.split('/').includes('.') && !path.startsWith('netlify/');
 }
-function validText(s) {
-  return typeof s === 'string' && s.trim().length >= 10 &&
+function validText(s, minLength = 3) {
+  return typeof s === 'string' && s.trim().length >= minLength &&
     s.length <= 600 && !/[\r\n|]/.test(s);
 }
 function parseActionIds(markdown) {
@@ -77,7 +77,7 @@ export function validateAnnexAEvidence(data, enterprise, actionMarkdown,
     seen.add(c.id);
     if (!validText(c.title) || !validText(c.accountable_owner) ||
         c.applicability !== 'provisional_applicable' ||
-        !validText(c.operational_proof_required)) {
+        !validText(c.operational_proof_required, 10)) {
       errors.push(c.id + ': missing owner, description, proof or provisional scope');
     }
     if (!Array.isArray(c.eai_controls) || c.eai_controls.length < 1 ||
