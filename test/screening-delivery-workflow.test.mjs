@@ -28,3 +28,14 @@ test('delivery executes after assurance and before encrypted state persistence',
   assert.match(step('delivery'), /ASANA_ACCESS_TOKEN: \$\{\{ secrets\.ASANA_ACCESS_TOKEN \}\}/);
   assert.doesNotMatch(step('delivery'), /steps\.assurance\.outcome == 'success'/);
 });
+test('public issue fallback handles assurance failures without exposing screening identities', () => {
+  const issue = steps.find(text => text.includes('Open a GitHub issue when screening or coverage needs human attention'));
+  assert.ok(issue);
+  assert.match(issue, /steps\.screen\.outputs\.screen_error == 'true'/);
+  assert.match(issue, /steps\.assurance\.outcome == 'failure'/);
+  assert.match(issue, /steps\.cases\.outcome != 'success'/);
+  assert.doesNotMatch(issue, /sanctions-screen-report\.md/);
+  assert.doesNotMatch(issue, /body:\s*\(report/);
+  assert.match(issue, /customer, principal, employee, and case identifiers/);
+  assert.match(issue, /human MLRO review/);
+});
