@@ -50,8 +50,9 @@ export function buildCountryCoverageReport(register = readRegister(), matrix = r
   for (const row of register.countries) statusCounts[row.status] = (statusCounts[row.status] || 0) + 1;
   const pepCovered = matrix.countries.filter((row) => row.pep?.covered === true).length;
   const pepUncovered = matrix.countries.filter((row) => row.pep?.covered !== true).map((row) => row.country).sort((a,b) => a.localeCompare(b, "en"));
-  if (matrix.countries.length !== 195 || pepCovered + pepUncovered.length !== matrix.countries.length) {
-    throw new Error("screening-country-coverage.json must define PEP scope for all 195 countries");
+  const countryNames = matrix.countries.map((row) => row?.country).filter((name) => typeof name === "string" && name.trim());
+  if (matrix.countries.length !== 195 || countryNames.length !== 195 || new Set(countryNames).size !== 195) {
+    throw new Error("screening-country-coverage.json must define 195 unique countries");
   }
   const out = [];
   out.push("# HAWKEYE-STERLING-RA: country coverage gaps (195 countries)", "");
