@@ -62,7 +62,7 @@ check('garbage Retry-After falls back to backoff', retryDelayMs(1, 'soon') === 2
       failed = e.message === 'Asana transport failure; remote outcome not confirmed';
     }
     check('every non-replayable Asana POST receives an AbortSignal and cannot retry after an unknown outcome',
-      failed && attempts === 1 && observed instanceof AbortSignal);
+      failed && attempts === 1 && observed instanceof globalThis.AbortSignal);
 
     const external = new AbortController();
     let compositeSignal = null;
@@ -79,7 +79,7 @@ check('garbage Retry-After falls back to backoff', retryDelayMs(1, 'soon') === 2
     try { await pending; }
     catch (e) { aborted = e.message === 'Asana transport failure; remote outcome not confirmed'; }
     check('caller cancellation remains effective alongside the bounded Asana network deadline',
-      aborted && compositeSignal instanceof AbortSignal && compositeSignal.aborted);
+      aborted && compositeSignal instanceof globalThis.AbortSignal && compositeSignal.aborted);
   } finally {
     globalThis.fetch = old;
     if (token === undefined) delete process.env.ASANA_ACCESS_TOKEN;
