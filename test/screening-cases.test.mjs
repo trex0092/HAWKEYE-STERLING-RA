@@ -219,9 +219,25 @@ check('digest: worldwide posture states the matrix size, rotation cycle and glob
     && world.includes('every edition swept within 22 run(s)')
     && world.includes('GDELT global index + Bing News on every subject, every run');
 })());
-check('digest: a clean day is affirmative, never silent', (() => {
-  const clean = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
-  return clean.includes('every subject screened clean') && !clean.includes('DEGRADED');
+check('digest: zero NEW matches never clears nine STANDING AML/PEP findings', (() => {
+  const standing = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0,
+    matchCount: 9, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
+  return standing.includes('9 standing match(es) remain') &&
+    standing.includes('ongoing MLRO review') &&
+    !standing.includes('every subject screened clean') &&
+    !standing.includes('all-clear');
+})());
+check('digest: genuinely zero new/standing matches remains explicit but never promises clearance', (() => {
+  const zero = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0,
+    matchCount: 0, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
+  return zero.includes('No new or changed matches reported') &&
+    zero.includes('not an all-clear') && !zero.includes('every subject screened clean') &&
+    !zero.includes('DEGRADED');
+})());
+check('digest: absent match counts never masquerade as all-clear', (() => {
+  const noCount = { ...RESULTS, alerts: [], newMatches: 0 };
+  delete noCount.matchCount;
+  return buildResultsDigestHtml(noCount).includes('not an all-clear');
 })());
 check('digest title states the outcome and volume',
   resultsDigestTitle(RESULTS) === '🛡️ Sanctions Screen — ' + TODAY + ' — 1 new match(es) · 778 screened'
