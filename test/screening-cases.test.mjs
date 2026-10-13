@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, createVerifiedScreeningCase, unverifiedCaseCreationState, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, createVerifiedScreeningCase, unverifiedCaseCreationState, applyVerifiedCaseDisposition, verifyScreeningCaseAuditStory, CASE_FALSE_POSITIVE_AUDIT, CASE_ESCALATE_AUDIT, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
 import { caseSection, SECTIONS } from '../scripts/asana-sections.mjs';
 
 let passed = 0, failed = 0;
@@ -288,6 +288,109 @@ check('invalid remote confirmations cannot change case state',
     try { confirmedDispositionState(pendingCase, 'unknown-disposition', TODAY); return false; }
     catch { return pendingCase.cleared === false; }
   })());
+
+/* A remote 2xx write is not enough for a consequential MLRO disposition.
+   Simulate real Asana GET/POST/PUT semantics without touching live tasks. */
+{
+  const gid = '1219451000000001';
+  const fpNotes = '[x] false positive\n[ ] escalate\n[ ] under investigation';
+  const escNotes = '[ ] false positive\n[x] escalate\n[ ] under investigation';
+  const mockCase = (initialNotes = fpNotes, options = {}) => {
+    const state = { notes: initialNotes, completed: false, stories: [], calls: [],
+      nextStoryGid: 1219000000, ...options };
+    const request = async (path, opts = {}) => {
+      const method = opts.method || 'GET';
+      state.calls.push({ path, method, nonReplayable: !!opts.noRetryOnUnknownOutcome });
+      if (path.startsWith('/tasks/' + gid + '?')) {
+        const answer = { data: { gid, notes: state.notes, completed: state.completed } };
+        if (options.incompleteTask === true) delete answer.data.completed;
+        return answer;
+      }
+      if (path.startsWith('/tasks/' + gid + '/stories?')) {
+        if (options.invalidStoryHistory) return { data: null };
+        return { data: state.stories.map(s => ({ gid: s.gid, text: s.text })), next_page: null };
+      }
+      if (path === '/tasks/' + gid + '/stories' && method === 'POST') {
+        if (options.failWrite) throw new Error('synthetic uncertain response');
+        const entry = { gid: String(++state.nextStoryGid), text: JSON.parse(opts.body).data.text };
+        if (!options.missingStoryAfterPost) state.stories.push(entry);
+        return { data: { gid: entry.gid } };
+      }
+      if (path === '/tasks/' + gid && method === 'PUT') {
+        if (!options.ignoreCompletion) state.completed = JSON.parse(opts.body).data.completed;
+        if (options.changedApprovalOnCompletion) state.notes = escNotes;
+        return { data: { gid, completed: state.completed } };
+      }
+      throw new Error('Unexpected synthetic Asana call: ' + method + ' ' + path);
+    };
+    return { request, state };
+  };
+  const good = mockCase();
+  const receipt = await applyVerifiedCaseDisposition(good.request, gid, 'disposition-clear');
+  check('human false-positive clearance requires the audit story, completion and final read-back',
+    receipt.confirmed && receipt.completed === true && good.state.completed &&
+    good.state.stories.length === 1 && good.state.stories[0].text === CASE_FALSE_POSITIVE_AUDIT);
+  check('audit story creation and task completion are non-replayable after unknown response',
+    good.state.calls.filter(c => c.method === 'POST' || c.method === 'PUT')
+      .every(c => c.nonReplayable));
+  const repeated = await applyVerifiedCaseDisposition(good.request, gid, 'disposition-clear');
+  check('rerun reconciles a previously completed clearance without duplicate audit comments',
+    repeated.confirmed && good.state.stories.length === 1 &&
+    good.state.calls.filter(c => c.method === 'POST').length === 1);
+
+  const failStory = mockCase(fpNotes, { missingStoryAfterPost: true });
+  let unconfirmedStory = false;
+  try { await applyVerifiedCaseDisposition(failStory.request, gid, 'disposition-clear'); }
+  catch { unconfirmedStory = true; }
+  check('unconfirmed story read-back cannot trigger Asana completion',
+    unconfirmedStory && failStory.state.completed === false &&
+    !failStory.state.calls.some(c => c.method === 'PUT'));
+
+  const failPut = mockCase(fpNotes, { ignoreCompletion: true });
+  let unconfirmedCompletion = false;
+  try { await applyVerifiedCaseDisposition(failPut.request, gid, 'disposition-clear'); }
+  catch { unconfirmedCompletion = true; }
+  check('accepted task completion PUT cannot establish local clearance without a matching GET',
+    unconfirmedCompletion && failPut.state.completed === false);
+
+  const conflicting = mockCase('[x] false positive\n[x] escalate');
+  let conflictBlocked = false;
+  try { await applyVerifiedCaseDisposition(conflicting.request, gid, 'disposition-clear'); }
+  catch { conflictBlocked = true; }
+  check('conflicting MLRO marks fail closed and cannot post a false-positive clearance',
+    conflictBlocked && conflicting.state.calls.every(c => c.method === 'GET'));
+
+  const reversed = mockCase(fpNotes, { changedApprovalOnCompletion: true });
+  let revokedBlocked = false;
+  try { await applyVerifiedCaseDisposition(reversed.request, gid, 'disposition-clear'); }
+  catch { revokedBlocked = true; }
+  check('changing or escalating human decision before final read-back prevents local clearance',
+    revokedBlocked);
+
+  const escalate = mockCase(escNotes);
+  const escReceipt = await applyVerifiedCaseDisposition(escalate.request, gid, 'disposition-escalate-ack');
+  check('confirmed MLRO escalation preserves open task and its audit story',
+    escReceipt.confirmed && escReceipt.completed === false &&
+    escalate.state.stories[0].text === CASE_ESCALATE_AUDIT &&
+    !escalate.state.calls.some(c => c.method === 'PUT'));
+  const malformed = mockCase(fpNotes, { invalidStoryHistory: true });
+  let missingHistory = false;
+  try { await applyVerifiedCaseDisposition(malformed.request, gid, 'disposition-clear'); }
+  catch { missingHistory = true; }
+  check('failed audit-history scan cannot produce an unverified task completion',
+    missingHistory && !malformed.state.calls.some(c => c.method === 'PUT'));
+
+  const ambiguous = mockCase(fpNotes, { failWrite: true });
+  let uncertain = false;
+  try { await applyVerifiedCaseDisposition(ambiguous.request, gid, 'disposition-clear'); }
+  catch { uncertain = true; }
+  check('lost disposition-comment response cannot be replayed or clear case automatically',
+    uncertain && !ambiguous.state.calls.some(c => c.method === 'PUT') &&
+    ambiguous.state.calls.filter(c => c.method === 'POST').length === 1);
+  check('audit read-back helper confirms exact matching evidence only',
+    await verifyScreeningCaseAuditStory(good.request, gid, CASE_FALSE_POSITIVE_AUDIT) &&
+    !(await verifyScreeningCaseAuditStory(good.request, gid, CASE_ESCALATE_AUDIT)));
+}
 
 /* ── card body ── */
 const html = caseHtml(KEY, subj(), 'https://example/run');
