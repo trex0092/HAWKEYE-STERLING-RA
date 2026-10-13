@@ -435,6 +435,10 @@ jobs:
           # is real, so raise them only for supervised off-schedule runs.
           ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
           SCREEN_CONCURRENCY: ${{ vars.SCREEN_CONCURRENCY || '8' }}
+          # The 2026-10-13 live sweep read 65/192 GDELT GKG files with the old 6-worker/900s defaults.
+          # Raise the bounded bulk-scan budget while keeping both values operator-tunable.
+          GKG_WORKERS: ${{ vars.GKG_WORKERS || '12' }}
+          GKG_DEADLINE_SEC: ${{ vars.GKG_DEADLINE_SEC || '2400' }}
           # DAILY DELIVERY TARGET: 09:00 UAE (05:00 UTC). GitHub's 2-4h schedule
           # delay means the run can't control its start, so it controls its
           # finish: news enrichment budgets itself against the target, trimmed
