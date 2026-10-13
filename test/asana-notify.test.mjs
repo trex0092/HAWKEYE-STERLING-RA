@@ -5,7 +5,7 @@ import {
   isRetryable, retryDelayMs, findRecentDuplicate, findDateScopedDailyDuplicates,
   esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
-  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize
+  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize, appendOpenAlertEvidence
 } from '../scripts/asana-notify.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +30,59 @@ check('backoff is capped at 8s', retryDelayMs(10) === 8000);
 check('Retry-After header wins when present', retryDelayMs(0, '5') === 5000);
 check('Retry-After is capped at 30s', retryDelayMs(0, '900') === 30000);
 check('garbage Retry-After falls back to backoff', retryDelayMs(1, 'soon') === 2000);
+
+/* An existing screening-assurance alert must receive each new failed-run link.
+   Synthetic story IDs only; no actual Asana mutations in this test. */
+{
+  const evidence = 'Screening assurance FAILED. Run: https://github.com/example/repo/actions/runs/123';
+  const calls = [];
+  const mock = async (path, opts = {}) => {
+    calls.push({ path, opts });
+    if (opts.method === 'POST') return { data: { gid: '99123568' } };
+    return { data: [], next_page: null };
+  };
+  const added = await appendOpenAlertEvidence(mock, '1218981120144411', evidence);
+  check('existing alert gets remotely confirmed failure evidence without updating or completing the task',
+    added.posted === true && calls.length === 2
+    && calls[0].path.includes('/stories?')
+    && calls[1].path === '/tasks/1218981120144411/stories'
+    && calls[1].opts.method === 'POST'
+    && calls[1].opts.noRetryOnUnknownOutcome === true
+    && JSON.parse(calls[1].opts.body).data.text === evidence);
+  const duplicates = [];
+  const duplicate = await appendOpenAlertEvidence(async (path, opts = {}) => {
+    duplicates.push([path, opts.method]);
+    return { data: [{ gid: '99123568', text: evidence }], next_page: null };
+  }, '1218981120144411', evidence);
+  check('re-running a failed assurance job does not duplicate an existing story or task',
+    duplicate.alreadyRecorded === true && duplicate.posted === false
+    && duplicates.length === 1 && !duplicates[0][1]);
+  let refusedUnconfirmed = false;
+  try {
+    await appendOpenAlertEvidence(async (path, opts = {}) =>
+      opts.method === 'POST' ? { data: {} } : { data: [], next_page: null },
+    '1218981120144411', evidence);
+  } catch { refusedUnconfirmed = true; }
+  check('unconfirmed Asana story response fails loudly, never claims an alert update',
+    refusedUnconfirmed);
+  let refusedBadHistory = false;
+  try {
+    await appendOpenAlertEvidence(async () => ({ data: null }),
+      '1218981120144411', evidence);
+  } catch { refusedBadHistory = true; }
+  check('missing Asana comment history fails closed rather than duplicate-posting',
+    refusedBadHistory);
+  let malformedGidBlocked = false;
+  try { await appendOpenAlertEvidence(mock, 'bogus', evidence); }
+  catch { malformedGidBlocked = true; }
+  check('invalid alert GID cannot reach an Asana write', malformedGidBlocked);
+  const wf = readFileSync(new URL('../.github/workflows/screening-assurance.yml', import.meta.url), 'utf8');
+  const alerts = readFileSync(new URL('../scripts/asana-alert.mjs', import.meta.url), 'utf8');
+  check('only Screening Assurance opts in to updating existing alert evidence',
+    /ASANA_ALERT_REFRESH_OPEN: '1'/.test(wf)
+    && /process\.env\.ASANA_ALERT_REFRESH_OPEN === '1'/.test(alerts)
+    && /appendOpenAlertEvidence\(asana, existing\.gid, notes\)/.test(alerts));
+}
 
 /* ── re-run duplicate guard ── */
 const NOW = Date.parse('2026-07-02T08:00:00Z');
