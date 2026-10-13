@@ -8661,31 +8661,42 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 # ── FOLLOW-UPS CARD ATTESTATION (opt-in via FOLLOWUP_PROJECT_GID) ─────────────
 # An external notifier creates a daily "Daily sanctions/PEP screening" reminder
 # card (dedup-key: SYSTEM|daily-screening|YYYY-MM-DD) in the Follow Ups
-# project. The pipeline closes the loop: after the day's report is DELIVERED it
-# comments on the card with proof, and — only when there are ZERO new findings
-# — completes it. Action days leave the card open: reviewing the findings and
-# recording screening evidence on the affected assessments is a human act.
+# project. A delivered report gets a remotely confirmed reference comment.
+# This reminder is NEVER auto-completed: zero new findings do not prove
+# operational screening completeness, standing-case closure or MLRO review.
 FOLLOWUP_PROJECT_GID = os.environ.get("FOLLOWUP_PROJECT_GID", "")
 
 def followup_disposition(delta):
-    """'complete' on a clean day, 'comment' when findings need a human. Pure."""
-    clean = all(int((delta or {}).get(k, 0) or 0) == 0 for k in ("sanctions", "adverse", "pep"))
-    return "complete" if clean else "comment"
+    """An absence of new findings is not an MLRO attestation or source assurance.
+
+    This optional reminder is evidence of a delivered report, not a screening
+    case. Its closure is a human control, even if all delta counts are zero.
+    """
+    return "comment"
+
 
 def followup_comment_text(today, delta, report_gid):
-    d = delta or {}
-    clean = followup_disposition(delta) == "complete"
-    lines = [f"Daily AML/CFT screening completed and delivered for {today}.",
-             f"Report: https://app.asana.com/0/0/{report_gid}",
-             f"New findings: {d.get('sanctions', 0)} sanctions · {d.get('adverse', 0)} adverse media · {d.get('pep', 0)} PEP."]
-    if clean:
-        lines.append("No new findings — this reminder has been completed automatically "
-                     "with this comment as the attestation record.")
+    d = delta if isinstance(delta, dict) else {}
+    categories = ("sanctions", "adverse", "pep")
+    counts_valid = all(type(d.get(k)) is int and d[k] >= 0 for k in categories)
+    lines = [f"Daily AML/CFT screening report delivered for {today}.",
+             f"Report: https://app.asana.com/0/0/{report_gid}"]
+    if counts_valid:
+        lines.append(f"New findings: {d['sanctions']} sanctions · {d['adverse']} adverse media · {d['pep']} PEP.")
+        if all(d[k] == 0 for k in categories):
+            lines.append("No NEW findings were reported. This is not screening clearance: "
+                         "check standing cases, sanctions/PEP/media source coverage and "
+                         "operational assurance before recording a human attestation.")
+        else:
+            lines.append("New findings require MLRO review; check the screening case board, "
+                         "source coverage and the affected assessments.")
     else:
-        lines.append("Findings require review: see the report and the screening case board. "
-                     "Record screening evidence on the affected customer assessments, then "
-                     "complete this task as the attestation record.")
+        lines.append("New findings: UNKNOWN (missing or invalid screening delta counts). "
+                     "Do not infer clearance or completion from incomplete evidence.")
+    lines.append("Human operator: review the report and source evidence, record the "
+                 "required disposition, then complete this reminder manually.")
     return "\n".join(lines)
+
 
 def attest_followup_card(today, delta, report_gid):
     if not FOLLOWUP_PROJECT_GID:
@@ -8694,24 +8705,23 @@ def attest_followup_card(today, delta, report_gid):
         r = asana_request("GET", f"https://app.asana.com/api/1.0/projects/{FOLLOWUP_PROJECT_GID}/tasks",
                           params={"opt_fields": "name,notes,completed", "limit": 100})
         if r is None or r.status_code not in (200, 201):
-            log(f"  follow-ups: card lookup failed (http {getattr(r, 'status_code', 'none')}) — attestation skipped (non-fatal)")
+            log("  follow-ups: reminder lookup not confirmed; attestation skipped")
             return
         key = f"SYSTEM|daily-screening|{today}"
         card = next((t for t in (r.json().get("data") or [])
                      if key in (t.get("notes") or "") and not t.get("completed")), None)
         if not card:
-            log("  follow-ups: no open reminder card for today — nothing to attest")
+            log("  follow-ups: no matching open reminder in the fetched page; no disposition made")
             return
-        asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
-                      json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
-        if followup_disposition(delta) == "complete":
-            asana_request("PUT", f"https://app.asana.com/api/1.0/tasks/{card['gid']}",
-                          json={"data": {"completed": True}})
-            log("  follow-ups: clean day — reminder card attested and completed")
-        else:
-            log("  follow-ups: findings present — proof comment posted, card left open for the analyst")
+        posted = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
+                               json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
+        if posted is None or posted.status_code not in (200, 201):
+            log("  follow-ups: proof comment not remotely confirmed; reminder remains open")
+            return
+        log("  follow-ups: delivery reference posted; reminder remains open for human review")
     except Exception as e:
-        log(f"  follow-ups: attestation failed ({str(e)[:100]}) — non-fatal, card untouched")
+        log(f"  follow-ups: attestation unavailable ({type(e).__name__}); no task disposition made")
+
 
 def run_unified(run_time):
     if AM_COVERAGE_RETRY:

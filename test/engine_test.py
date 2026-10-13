@@ -5076,20 +5076,74 @@ check("article mentioning the associated entity is identity-corroborated",
 check("name-only article is labelled, NEVER suppressed (still flagged)",
       _ic_arts[1]["identity_corroborated"] is False and _ic_arts[1]["flagged"] is True)
 
-# ── Follow-Ups card attestation (clean day completes, action day stays open) ──
+# ── Follow-Ups cards always require human attestation, even on zero-new days ──
 print("\nscreen.py — Follow-Ups attestation")
 check("gate is OFF by default (no FOLLOWUP_PROJECT_GID)", screen.FOLLOWUP_PROJECT_GID == "")
-check("clean day → complete", screen.followup_disposition({"sanctions": 0, "adverse": 0, "pep": 0}) == "complete")
-check("any finding → comment only, card stays open",
+check("zero new findings never auto-complete the compliance reminder",
+      screen.followup_disposition({"sanctions": 0, "adverse": 0, "pep": 0}) == "comment")
+check("any new finding still leaves the reminder open",
       screen.followup_disposition({"sanctions": 0, "adverse": 2, "pep": 0}) == "comment"
       and screen.followup_disposition({"sanctions": 1}) == "comment")
-check("missing delta counts as clean (zero findings), never as a block",
-      screen.followup_disposition({}) == "complete" and screen.followup_disposition(None) == "complete")
+check("missing or partial deltas never count as assurance",
+      screen.followup_disposition({}) == "comment"
+      and screen.followup_disposition(None) == "comment")
 _fc = screen.followup_comment_text("2026-08-05", {"sanctions": 1, "adverse": 0, "pep": 0}, "999")
-check("action-day comment demands the human acts and cites the report",
-      "require review" in _fc and "https://app.asana.com/0/0/999" in _fc)
-check("clean-day comment states the auto-completion as the attestation record",
-      "completed automatically" in screen.followup_comment_text("2026-08-05", {}, "999"))
+check("new-finding comment calls for MLRO review and references the report",
+      "require MLRO review" in _fc and "https://app.asana.com/0/0/999" in _fc)
+_fc_zero = screen.followup_comment_text(
+    "2026-08-05", {"sanctions": 0, "adverse": 0, "pep": 0}, "999")
+check("zero new findings never asserts clearance or automatic completion",
+      "not screening clearance" in _fc_zero and "manually" in _fc_zero
+      and "completed automatically" not in _fc_zero)
+check("a missing delta is explicitly UNKNOWN, not zero",
+      "UNKNOWN" in screen.followup_comment_text("2026-08-05", {}, "999"))
+
+# Isolated Asana mock: a checked report must never turn into a task completion,
+# even when there are no new findings. Verify remote story success before
+# logging a completed evidence write.
+_followup_project_before = screen.FOLLOWUP_PROJECT_GID
+_followup_request_before = screen.asana_request
+_followup_log_before = screen.log
+_followup_calls, _followup_logs = [], []
+_followup_story_http = [201]
+class _FollowupMockResponse:
+    def __init__(self, status, data=None):
+        self.status_code = status
+        self._data = data
+    def json(self):
+        return self._data
+def _followup_request(method, url, **kwargs):
+    _followup_calls.append((method, url))
+    if method == "GET":
+        return _FollowupMockResponse(200, {"data": [{
+            "gid": "test-reminder", "notes": "SYSTEM|daily-screening|2026-08-05",
+            "completed": False
+        }]})
+    if method == "POST":
+        return _FollowupMockResponse(_followup_story_http[0], {"data": {"gid": "test-story"}})
+    raise AssertionError("unexpected mutation of human-owned reminder")
+try:
+    screen.FOLLOWUP_PROJECT_GID = "test-project"
+    screen.asana_request = _followup_request
+    screen.log = _followup_logs.append
+    screen.attest_followup_card(
+        "2026-08-05", {"sanctions": 0, "adverse": 0, "pep": 0}, "999")
+    check("Asana zero-finding attestation only reads and comments, never PUTs a completion",
+          [c[0] for c in _followup_calls] == ["GET", "POST"])
+    check("successful remote comment reports open pending human review",
+          any("reminder remains open for human review" in s for s in _followup_logs))
+    _followup_calls.clear()
+    _followup_logs.clear()
+    _followup_story_http[0] = 503
+    screen.attest_followup_card("2026-08-05", {}, "999")
+    check("failed Asana story write does not claim confirmed attestation or complete the reminder",
+          [c[0] for c in _followup_calls] == ["GET", "POST"]
+          and any("not remotely confirmed" in s for s in _followup_logs)
+          and not any("reference posted" in s for s in _followup_logs))
+finally:
+    screen.FOLLOWUP_PROJECT_GID = _followup_project_before
+    screen.asana_request = _followup_request_before
+    screen.log = _followup_log_before
 
 # ── TFS FFR/PNMR draft dossiers (draft-only, MLRO acts) ───────────────────────
 print("\ntfs_dossier.py — FFR/PNMR drafts")
