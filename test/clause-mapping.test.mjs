@@ -158,6 +158,15 @@ check('unsafe or nonexistent evidence paths fail closed before an SoA claim',
   validateAnnexAEvidence({ ...annex, controls: annex.controls.map((c, i) => i === 0
     ? { ...c, evidence_paths: ['../../private-key'] } : c) },
     enterprise, actions).some(x => x.includes('unsafe or absent')));
+check('every proposed Annex A control is justified by real AI risk-register IDs',
+  annex.controls.every(c => c.risk_refs.length > 0) &&
+  validateAnnexAEvidence({ ...annex, controls: annex.controls.map((c, i) => i === 0
+    ? { ...c, risk_refs: ['R-999'] } : c) },
+    enterprise, actions).some(x => x.includes('unknown AI risk R-999')));
+check('an unsigned risk crosswalk cannot silently claim controls are not applicable',
+  validateAnnexAEvidence({ ...annex, controls: annex.controls.map((c, i) => i === 0
+    ? { ...c, applicability: 'not_applicable' } : c) },
+    enterprise, actions).some(x => x.includes('provisional scope')));
 check('unrecognized enterprise mappings and phantom open action IDs fail closed',
   validateAnnexAEvidence({ ...annex, controls: annex.controls.map((c, i) => i === 0
     ? { ...c, eai_controls: ['EAI-FAKE-1'] } : c) },

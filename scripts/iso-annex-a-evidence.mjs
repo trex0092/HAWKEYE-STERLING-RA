@@ -50,7 +50,10 @@ function parseActionIds(markdown) {
 }
 
 export function validateAnnexAEvidence(data, enterprise, actionMarkdown,
-  { pathExists = rel => existsSync(join(ROOT, rel)) } = {}) {
+  {
+    pathExists = rel => existsSync(join(ROOT, rel)),
+    riskMarkdown = readFileSync(join(ROOT, 'docs/aims/ai-risk-register.md'), 'utf8')
+  } = {}) {
   const errors = [];
   if (!data || typeof data !== 'object' || Array.isArray(data) ||
       data.schema !== SCHEMA || data.approval_status !== APPROVAL ||
@@ -67,6 +70,9 @@ export function validateAnnexAEvidence(data, enterprise, actionMarkdown,
   }
   const actions = parseActionIds(actionMarkdown);
   if (!actions.size) errors.push('missing authoritative open-actions register');
+  const riskIds = new Set([...String(riskMarkdown || '')
+    .matchAll(/^\|\s*(R-\d+)\s*\|/gm)].map(m => m[1]));
+  if (!riskIds.size) errors.push('missing authoritative AI risk register');
   const seen = new Set();
   for (const c of Array.isArray(items) ? items : []) {
     if (!c || typeof c !== 'object' || Array.isArray(c) ||
@@ -79,6 +85,15 @@ export function validateAnnexAEvidence(data, enterprise, actionMarkdown,
         c.applicability !== 'provisional_applicable' ||
         !validText(c.operational_proof_required, 10)) {
       errors.push(c.id + ': missing owner, description, proof or provisional scope');
+    }
+    if (!Array.isArray(c.risk_refs) || !c.risk_refs.length ||
+        new Set(c.risk_refs).size !== c.risk_refs.length) {
+      errors.push(c.id + ': no distinct risk-treatment justification');
+    }
+    for (const risk of c.risk_refs || []) {
+      if (typeof risk !== 'string' || !riskIds.has(risk)) {
+        errors.push(c.id + ': unknown AI risk ' + String(risk));
+      }
     }
     if (!Array.isArray(c.eai_controls) || c.eai_controls.length < 1 ||
         new Set(c.eai_controls).size !== c.eai_controls.length) {
@@ -132,12 +147,13 @@ export function buildAnnexAEvidenceReport(data, enterprise) {
     '38 Annex A controls in nine groups. A.5 contains FOUR controls, not five.',
     'File existence proves only that a referenced artefact is in the repository.',
     '',
-    '| Control | Enterprise signal | Accountable role | Open actions | Operational proof required |',
-    '|---|---|---|---|---|'
+    '| Control | Risk treatment | Enterprise signal | Owner | Open actions | Operational proof required |',
+    '|---|---|---|---|---|---|'
   ];
   for (const c of rows) {
     out.push('| ' + c.id + ' ' + cell(c.title) +
-      ' | ' + c.signal + ' | ' + cell(c.accountable_owner) +
+      ' | ' + c.risk_refs.join(', ') + ' | ' +
+      c.signal + ' | ' + cell(c.accountable_owner) +
       ' | ' + (c.pending.length ? c.pending.map(n => '#' + n).join(', ') : 'None mapped') +
       ' | ' + cell(c.operational_proof_required) + ' |');
   }
