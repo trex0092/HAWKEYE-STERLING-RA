@@ -198,5 +198,16 @@ check('risk-to-control mapping no longer misnames event logging or external repo
   !map.includes('A.8.3 (reporting of concerns)') &&
   map.includes('A.3.3 (reporting of concerns)'));
 
+check('repo navigation exposes the full provisional Annex A evidence crosswalk',
+  read('README.md').includes('[ISO 42001 Controls (Provisional)](data/iso42001-annex-a-evidence.json)') &&
+  read('docs/governance/README.md').includes('../../data/iso42001-annex-a-evidence.json') &&
+  read('docs/aims/README.md').includes('../../data/iso42001-annex-a-evidence.json'));
+check('societal impact A.5.5 is not misapplied to prompt-injection red teaming',
+  read('docs/aims/README.md').includes('A.5.5 (societal impacts)') &&
+  !/Red.Team[^\n|]*\|\s*A\.5\.5\b/i.test(read('docs/aims/README.md')) &&
+  !read('docs/aims/red-team-procedure.md').includes('AIMS A.5.5') &&
+  !read('docs/aims/red-team-log.md').includes('AIMS A.5.5') &&
+  read('docs/aims/red-team-procedure.md').includes('A.6.2.4'));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;

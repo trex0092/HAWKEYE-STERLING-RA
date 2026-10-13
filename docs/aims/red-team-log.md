@@ -1,4 +1,4 @@
-# Red-Team Log — Campaigns & Corpus Growth (AIMS A.5.5)
+# Red-Team Log — Campaigns & Corpus Growth (AIMS A.6.2.4 / risk R-02)
 
 The [red-team procedure](red-team-procedure.md) runs its injection corpus on
 **every push** — that standing regression is real and green. What a procedure
