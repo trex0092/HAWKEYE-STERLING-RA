@@ -2175,6 +2175,34 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   check('second pass: a mass failure (providers down globally) is not re-queried', r3.attempted === 0 && /cap/.test(r3.skipped));
   const r4 = await run([item('throw'), item(true)], { deadlineMs: 1e12, delayMs: 0, now: clock, sleep });
   check('second pass: a retry that throws stays unrecovered, never aborts the pass', r4.attempted === 2 && r4.recovered === 1);
+  // A transient final refusal must be tried only for the still-uncovered
+  // subject, never a second time for the already-verified provider response.
+  let transientCalls = 0, recoveredCalls = 0;
+  const extra = await run([
+    { retry: async () => { transientCalls++; return transientCalls === 2; } },
+    { retry: async () => { recoveredCalls++; return true; } },
+  ], { deadlineMs: 1e12, delayMs: 0, finalRetryDelayMs: 15000, now: clock, sleep });
+  check('remaining blackout gets one bounded last-chance retry, not an automatic clearance',
+    extra.attempted === 2 && extra.recovered === 2 && extra.unresolved === 0
+    && extra.retryCalls === 3 && extra.rounds === 2
+    && transientCalls === 2 && recoveredCalls === 1);
+  let permanentCalls = 0;
+  const permanent = await run([{ retry: async () => { permanentCalls++; return false; } }],
+    { deadlineMs: 1e12, delayMs: 0, now: clock, sleep });
+  check('repeated provider refusals remain unverified after at most two rounds',
+    permanent.attempted === 1 && permanent.recovered === 0
+    && permanent.unresolved === 1 && permanentCalls === 2);
+  let deadlineCalls = 0;
+  const late = await run([{ retry: async () => { deadlineCalls++; return false; } }],
+    { deadlineMs: t + 120000, delayMs: 0, now: clock, sleep });
+  check('last-chance retry stops if 125 seconds of provider budget remain unavailable',
+    late.attempted === 1 && late.recovered === 0 && late.rounds === 1
+    && deadlineCalls === 1 && /deadline guard/.test(late.skipped));
+  let cappedCalls = 0;
+  const capped = await run([{ retry: async () => { cappedCalls++; return false; } }],
+    { deadlineMs: 1e12, delayMs: 0, now: clock, sleep, maxRounds: 9999 });
+  check('invalidly large retry round count is clamped to at most two attempts',
+    cappedCalls === 2 && capped.rounds === 2 && capped.unresolved === 1);
   const r5 = await run([], { deadlineMs: 0 });
   check('second pass: an empty queue is a no-op', r5.attempted === 0 && r5.recovered === 0 && r5.skipped === '');
   const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
