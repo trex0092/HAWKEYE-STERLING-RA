@@ -1,13 +1,14 @@
 # HAWKEYE-STERLING-RA: country coverage gaps (195 countries)
 
-Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix in `scripts/adverse-media.mjs`. Register updated: 2026-10-08.
+Generated from `data/sanctions-country-coverage.json`, `data/screening-country-coverage.json` and the `LOCALES` matrix in `scripts/adverse-media.mjs`. Register updated: 2026-10-08.
 
 ## How to read this
 
 - **Sanctions status** is the register's own status. `not-researched` = no outcome recorded (27). `identified` = list known, file not verified (37). `pending` = candidate recorded, not loaded (2). `assessed-not-loadable` = researched, cannot be loaded (75). `screened` = national list loaded (54).
 - **AM edition** = whether a dedicated Google News country edition exists in the adverse-media matrix. `no` does not mean zero adverse-media coverage: GDELT and Bing News sweeps are global and name-scoped.
 - **Partial note** = a not-researched country that already has a partial research note in the register.
-- **PEP** is intentionally omitted per country because the current PEP artifact's country field is not reliable enough for a defensible country-by-country statement.
+- **PEP worldwide scope** means the configured screen applies to subjects across the country universe; it does not prove that Wikidata has complete, current PEP records for every country. The PEP artifact is assessed separately by runtime assurance.
+- PEP person counts are not allocated by country here: office context can be missing or refer to a jurisdiction, and must not be presented as a complete country register.
 - UN consolidated list screening is independent of these national-list statuses.
 
 ## Priority: FATF black/grey list countries (24)
@@ -131,6 +132,14 @@ Generated from `data/sanctions-country-coverage.json` and the `LOCALES` matrix i
 ## Adverse media: 128 countries with no dedicated Google News edition
 
 Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Armenia, Azerbaijan, Bahamas, Barbados, Belarus, Belize, Benin, Bhutan, Bolivia, Bosnia and Herzegovina, Botswana, Brunei, Burkina Faso, Burundi, Cabo Verde, Cambodia, Cameroon, Central African Republic, Chad, Comoros, Congo, Costa Rica, Côte d'Ivoire, Croatia, Cuba, Cyprus, Democratic People's Republic of Korea, Democratic Republic of the Congo, Denmark, Djibouti, Dominica, Dominican Republic, Ecuador, El Salvador, Equatorial Guinea, Eritrea, Eswatini, Ethiopia, Fiji, Gabon, Gambia, Georgia, Grenada, Guatemala, Guinea, Guinea-Bissau, Guyana, Haiti, Holy See, Honduras, Iceland, Iran, Jamaica, Kazakhstan, Kiribati, Kyrgyzstan, Laos, Lesotho, Liberia, Libya, Liechtenstein, Luxembourg, Madagascar, Malawi, Maldives, Mali, Malta, Marshall Islands, Mauritania, Mauritius, Micronesia, Moldova, Monaco, Mongolia, Montenegro, Mozambique, Myanmar, Namibia, Nauru, Nepal, Nicaragua, Niger, North Macedonia, Palau, Palestine, Panama, Papua New Guinea, Paraguay, Rwanda, Saint Kitts and Nevis, Saint Lucia, Saint Vincent and the Grenadines, Samoa, San Marino, Sao Tome and Principe, Senegal, Seychelles, Sierra Leone, Solomon Islands, Somalia, South Sudan, Sri Lanka, Sudan, Suriname, Syria, Tajikistan, Tanzania, Timor-Leste, Togo, Tonga, Trinidad and Tobago, Tunisia, Turkmenistan, Tuvalu, Uganda, Uruguay, Uzbekistan, Vanuatu, Venezuela, Yemen, Zambia, Zimbabwe
+
+## Worldwide PEP screening scope: 195/195 countries
+
+The configured worldwide PEP screen applies across the full 195-country subject universe. This is an applicability measure, not proof that the source contains every PEP or that every country has complete identity data.
+
+No countries are outside the configured PEP scope.
+
+Runtime assurance separately checks the harvested artifact, freshness, completeness, source-quality exceptions and whether the daily screen consumed that exact artifact.
 
 ## Regeneration
 
