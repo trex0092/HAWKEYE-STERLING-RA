@@ -362,8 +362,88 @@ export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAU
     const runProblem = runDateIssue(assurance?.run?.date, issuedAtMs);
     if (runProblem) reasons.push(runProblem);
   }
+  // The persisted verdict is NOT the evidence. Refuse a superficially green
+  // boolean when the stored counters, unresolved reasons or consumed source
+  // metadata contradict that verdict. This validates internal consistency;
+  // an independently signed receipt is still needed for provenance.
+  const screened = assurance?.run?.screenedSubjects;
+  const count = n => Number.isSafeInteger(n) && n >= 0;
+  if (!count(screened) || screened === 0) reasons.push('screened subject count missing or invalid');
   for (const key of ['sanctions','adverseMedia','pep']) {
-    if (assurance?.domains?.[key]?.operational !== true) reasons.push(key + ' is not operational');
+    const d = assurance?.domains?.[key];
+    if (d?.operational !== true) reasons.push(key + ' is not operational');
+    if (!Array.isArray(d?.reasons) || d.reasons.length) {
+      reasons.push(key + ' has missing or unresolved failure reasons');
+    }
+    if (!d?.evidence || typeof d.evidence !== 'object' || Array.isArray(d.evidence)) {
+      reasons.push(key + ' evidence missing or invalid');
+    }
+  }
+  const sanc = assurance?.domains?.sanctions?.evidence;
+  if (sanc && typeof sanc === 'object') {
+    if (!count(sanc.screenedSubjects) || sanc.screenedSubjects !== screened) {
+      reasons.push('sanctions evidence does not match screened population');
+    }
+    if (!Array.isArray(sanc.requiredSourceIds) || !sanc.requiredSourceIds.length ||
+        !Array.isArray(sanc.loadedSources) || !Array.isArray(sanc.sourceFloors) ||
+        !Array.isArray(sanc.servedByFallback)) {
+      reasons.push('sanctions required-source evidence incomplete');
+    } else {
+      const ids = sanc.requiredSourceIds;
+      const floor = new Map(sanc.sourceFloors.map(x => [x?.id, x?.minNames]));
+      const loaded = new Map(sanc.loadedSources.map(x => [x?.id, x]));
+      const fallback = new Map(sanc.servedByFallback.map(x => [x?.id, x]));
+      if (new Set(ids).size !== ids.length || new Set(sanc.loadedSources.map(x => x?.id)).size !== sanc.loadedSources.length) {
+        reasons.push('sanctions source evidence contains duplicate IDs');
+      }
+      for (const id of ids) {
+        const p = loaded.get(id), minimum = floor.get(id);
+        const complete = count(minimum) && minimum > 0 && count(p?.count) &&
+          p?.partial === false && p.count >= minimum;
+        const subst = fallback.get(id), fb = loaded.get(subst?.fallback), fbFloor = floor.get(subst?.fallback);
+        const substituted = !!subst && subst.fallback !== id &&
+          count(fbFloor) && fbFloor > 0 && count(fb?.count) &&
+          fb.partial === false && fb.count >= fbFloor &&
+          subst.fallbackCount === fb.count;
+        if (!complete && !substituted) {
+          reasons.push('required sanctions source not proven complete: ' + String(id));
+        }
+      }
+    }
+  }
+  const media = assurance?.domains?.adverseMedia?.evidence;
+  if (media && typeof media === 'object') {
+    if (!count(media.screenedSubjects) || media.screenedSubjects !== screened) {
+      reasons.push('adverse-media evidence does not match screened population');
+    }
+    if (!count(media.errors) || media.errors !== 0 ||
+        !count(media.skippedSubjects) || media.skippedSubjects !== 0) {
+      reasons.push('adverse-media subjects remain without verified coverage');
+    }
+    if (!count(media.matrixTotal) || media.matrixTotal === 0 ||
+        !count(media.googleNewsLocalesPerSubject) || media.googleNewsLocalesPerSubject === 0 ||
+        !Array.isArray(media.globalBackbones) ||
+        !media.backboneFailures || typeof media.backboneFailures !== 'object') {
+      reasons.push('adverse-media source coverage summary is missing');
+    } else {
+      for (const [key, name] of [['googleNews','Google News RSS'], ['gdelt','GDELT global index'], ['bing','Bing News']]) {
+        const failed = media.backboneFailures[key];
+        if (!count(failed) || failed > screened ||
+            (failed === 0) !== media.globalBackbones.includes(name)) {
+          reasons.push('adverse-media source evidence contradicts backbone counts: ' + key);
+        }
+      }
+    }
+  }
+  const pep = assurance?.domains?.pep?.evidence;
+  if (pep && typeof pep === 'object') {
+    if (pep.partial !== false || pep.dailyScreenActive !== true ||
+        !count(pep.persons) || !count(pep.floor) ||
+        pep.floor <= 0 || pep.persons < pep.floor ||
+        !count(pep.dailyScreenCount) || pep.dailyScreenCount !== pep.persons ||
+        !pep.harvestedAt || pep.dailyScreenHarvestedAt !== pep.harvestedAt) {
+      reasons.push('worldwide PEP stored coverage does not prove a complete consumed harvest');
+    }
   }
   return { ok: reasons.length === 0, reasons, ageHours: Number.isFinite(age) ? age : null };
 }
