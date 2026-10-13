@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, createVerifiedScreeningCase, unverifiedCaseCreationState, applyVerifiedCaseDisposition, verifyScreeningCaseAuditStory, CASE_FALSE_POSITIVE_AUDIT, CASE_ESCALATE_AUDIT, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, createVerifiedScreeningCase, unverifiedCaseCreationState, postVerifiedCaseAgingNotice, applyVerifiedCaseDisposition, verifyScreeningCaseAuditStory, CASE_FALSE_POSITIVE_AUDIT, CASE_ESCALATE_AUDIT, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
 import { caseSection, SECTIONS } from '../scripts/asana-sections.mjs';
 
 let passed = 0, failed = 0;
@@ -104,6 +104,69 @@ check('mixed cases retain sanctions priority without creating another section',
     uncertainReflag.taskGid === prior.taskGid && uncertainReflag.cleared === true &&
     uncertainReflag.clearedAt === prior.clearedAt &&
     planCaseActions({ k: subj() }, { k: uncertainReflag }, TODAY).length === 0);
+}
+
+/* SLA aging alerts are audit evidence, not fire-and-forget comments. */
+{
+  const taskGid = '1219451000000001';
+  const storyGid = '1219451000000011';
+  const notice = '⏰ AGING — this screening case has been open 11 days (SLA: 5). Review and disposition required.';
+  const fake = ({ lostPost = false, unconfirmedRead = false, invalidHistory = false } = {}) => {
+    const state = { story: null, calls: [], writes: 0 };
+    const request = async (path, opts = {}) => {
+      const method = opts.method || 'GET';
+      state.calls.push({ path, method, retrySafe: opts.noRetryOnUnknownOutcome === true });
+      if (path.startsWith('/tasks/' + taskGid + '/stories?')) {
+        if (invalidHistory) return { data: null };
+        return { data: state.story ? [state.story] : [], next_page: null };
+      }
+      if (path === '/tasks/' + taskGid + '/stories' && method === 'POST') {
+        state.writes++;
+        state.story = { gid: storyGid, text: JSON.parse(opts.body).data.text };
+        if (lostPost) throw new Error('synthetic lost Asana story acknowledgement');
+        return { data: { gid: storyGid } };
+      }
+      if (path.startsWith('/stories/' + storyGid + '?')) {
+        return { data: unconfirmedRead ? {} : state.story };
+      }
+      throw new Error('unexpected synthetic Asana request');
+    };
+    return { request, state };
+  };
+  const normal = fake();
+  const result = await postVerifiedCaseAgingNotice(normal.request, taskGid, 11);
+  check('SLA aging requires confirmed exact audit comment read-back',
+    result.confirmed && !result.alreadyRecorded && normal.state.story.text === notice &&
+    normal.state.calls.some(x => x.path.includes('/stories/' + storyGid + '?')));
+  check('SLA aging story POST is non-replayable after an unknown remote outcome',
+    normal.state.calls.find(x => x.method === 'POST')?.retrySafe === true);
+  const prior = await postVerifiedCaseAgingNotice(normal.request, taskGid, 11);
+  check('rerun discovers existing SLA comment and cannot duplicate it',
+    prior.confirmed && prior.alreadyRecorded && normal.state.writes === 1);
+  const lost = fake({ lostPost: true });
+  let unknownRejected = false;
+  try { await postVerifiedCaseAgingNotice(lost.request, taskGid, 11); }
+  catch { unknownRejected = true; }
+  const recovery = await postVerifiedCaseAgingNotice(lost.request, taskGid, 11);
+  check('ambiguous story response fails first attempt but reconciles without double posting',
+    unknownRejected && recovery.alreadyRecorded && lost.state.writes === 1);
+  const unconfirmed = fake({ unconfirmedRead: true });
+  let readBlocked = false;
+  try { await postVerifiedCaseAgingNotice(unconfirmed.request, taskGid, 11); }
+  catch { readBlocked = true; }
+  check('a successful Asana POST without read-back never marks SLA evidence as confirmed',
+    readBlocked && unconfirmed.state.writes === 1);
+  const badHistory = fake({ invalidHistory: true });
+  let historyBlocked = false;
+  try { await postVerifiedCaseAgingNotice(badHistory.request, taskGid, 11); }
+  catch { historyBlocked = true; }
+  check('incomplete story history fails closed before creating an unverified SLA alert',
+    historyBlocked && badHistory.state.writes === 0);
+  let invalidBlocked = false;
+  try { await postVerifiedCaseAgingNotice(async () => { throw Error('should not call'); }, taskGid, 3); }
+  catch { invalidBlocked = true; }
+  check('SLA notice may only be sent once the genuine five-day limit is exceeded',
+    invalidBlocked);
 }
 
 /* ── planner ── */
