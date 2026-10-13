@@ -75,6 +75,44 @@ export async function asana(path, opts = {}) {
   }
 }
 
+/* Refresh the evidence on an existing, HUMAN-owned operational alert without
+   creating a second task or changing its name, assignee, notes or disposition.
+   The last failed GitHub run must be discoverable in Asana: on 13 Oct 2026 the
+   ongoing screening assurance task still linked a 29 Sep run because the
+   duplicate guard suppressed every later occurrence without updating proof.
+   Read stories first for re-run idempotency; an incomplete page scan refuses
+   to post an unverified duplicate. No retries on an ambiguous story-write
+   outcome (the caller can re-check the story list on its next run). */
+export async function appendOpenAlertEvidence(call, taskGid, note) {
+  const id = String(taskGid || '');
+  const text = String(note == null ? '' : note).trim();
+  if (!/^\d{8,20}$/.test(id)) throw new Error('existing Asana alert task ID is missing or invalid');
+  if (!text || asanaTextSize(text) > 4000) throw new Error('ongoing alert evidence is absent or oversized');
+  let offset = '', more = false;
+  const seen = new Set();
+  for (let page = 0; page < 10; page++) {
+    const r = await call('/tasks/' + id + '/stories?limit=100&opt_fields=gid,text'
+      + (offset ? '&offset=' + encodeURIComponent(offset) : ''));
+    if (!Array.isArray(r?.data)) throw new Error('existing alert comments could not be verified');
+    if (r.data.some(s => s?.text === text)) return { posted: false, alreadyRecorded: true };
+    offset = r?.next_page?.offset || '';
+    more = !!offset;
+    if (!more) break;
+    if (seen.has(offset)) throw new Error('existing alert comment pagination loop');
+    seen.add(offset);
+  }
+  if (more) throw new Error('existing alert comment history incomplete; refusing unverified duplicate');
+  const receipt = await call('/tasks/' + id + '/stories', {
+    method: 'POST',
+    body: JSON.stringify({ data: { text } }),
+    noRetryOnUnknownOutcome: true,
+  });
+  if (!/^\d+$/.test(String(receipt?.data?.gid || ''))) {
+    throw new Error('Asana did not confirm the new screening assurance evidence comment');
+  }
+  return { posted: true, storyGid: String(receipt.data.gid) };
+}
+
 /* ── Re-run idempotency ──────────────────────────────────────────────────────
    A workflow re-run (or a retry after a failure DOWNSTREAM of a successful
    post) must not file the same alert card twice. A task in the target project
