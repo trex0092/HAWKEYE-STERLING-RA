@@ -136,6 +136,27 @@ export function planCaseActions(subjects, casesState, today) {
   return actions;
 }
 
+/* A human-ticked disposition is NOT committed to local cleared-FP state
+ * until Asana confirms the corresponding audit comment and task completion.
+ * This pure transition runs ONLY after successful network writes. */
+export function confirmedDispositionState(existing, actionType, today, subject = null) {
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing) ||
+      typeof existing.taskGid !== 'string' || !existing.taskGid ||
+      !/^\\d{4}-\\d\\d-\\d\\d$/.test(today)) {
+    throw new Error('Invalid existing case or disposition date');
+  }
+  if (actionType === 'disposition-clear') {
+    return { ...existing, cleared: true, clearedAt: today,
+      clearedBy: 'disposition:false-positive',
+      disposition: { kind: 'false-positive', at: today, caseGid: existing.taskGid,
+        hits: whitelistablePairs(subject?.hits) } };
+  }
+  if (actionType === 'disposition-escalate-ack') {
+    return { ...existing, escalated: true, escalatedAt: today };
+  }
+  throw new Error('Unrecognized case disposition');
+}
+
 /* Parse the MLRO's ticked disposition back out of a case task's notes. Only a
    literal "[x]" tick counts; the untouched "[ ]" template parses as null.
    Fail-safe precedence for a card with more than one tick: escalate (keeps
