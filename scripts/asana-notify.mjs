@@ -75,6 +75,62 @@ export async function asana(path, opts = {}) {
   }
 }
 
+/* Fail-closed lookup for an existing operational alert. A repeated/invalid
+   Asana offset or incomplete page scan must never cause an accidental duplicate
+   compliance alert. Network dependencies are injected for offline tests. */
+export const OPEN_ALERT_PAGE_CAP = 500;
+export async function findOpenMonitoringAlert(call, projectGid, title, { maxPages = OPEN_ALERT_PAGE_CAP } = {}) {
+  const project = String(projectGid || '');
+  if (!/^\d+$/.test(project) || !Number.isSafeInteger(maxPages) || maxPages < 1) {
+    throw new Error('Invalid Asana monitoring project or page budget');
+  }
+  const base = '/tasks?project=' + project + '&completed_since=now'
+    + '&opt_fields=gid,name,permalink_url&limit=100';
+  const offsets = new Set();
+  let offset = '';
+  for (let page = 0; page < maxPages; page++) {
+    const res = await call(base + (offset ? '&offset=' + encodeURIComponent(offset) : ''));
+    if (!Array.isArray(res?.data)) throw new Error('Asana alert lookup returned incomplete task data');
+    const found = res.data.find(item => item && item.name === title);
+    if (found) {
+      if (!/^\d+$/.test(String(found.gid || ''))) {
+        throw new Error('Existing Asana alert has no verifiable task identifier');
+      }
+      return found;
+    }
+    if (!res.next_page) return null;
+    offset = res.next_page.offset;
+    if (typeof offset !== 'string' || !offset || offsets.has(offset)) {
+      throw new Error('Asana alert lookup pagination is incomplete or looping');
+    }
+    offsets.add(offset);
+  }
+  throw new Error('Asana alert lookup reached the page cap; cannot safely create duplicate');
+}
+
+/* A 2xx Asana POST is insufficient as delivery proof when its body lacks a GID
+   or the task was misfiled. Confirm the created task and its actual project /
+   section membership before reporting that compliance received the alert. */
+export async function verifyNewMonitoringAlert(call, taskGid, { title, projectGid, sectionGid = '' } = {}) {
+  const id = String(taskGid || '');
+  const project = String(projectGid || '');
+  const section = String(sectionGid || '');
+  if (!/^\d+$/.test(id) || !/^\d+$/.test(project) || (section && !/^\d+$/.test(section))) {
+    throw new Error('Asana monitoring alert lacks a valid task or section identifier');
+  }
+  const task = (await call('/tasks/' + id
+    + '?opt_fields=gid,name,memberships.project.gid,memberships.section.gid,permalink_url'))?.data;
+  if (!task || String(task.gid) !== id || task.name !== title) {
+    throw new Error('Asana monitoring alert could not be confirmed by read-back');
+  }
+  if (!Array.isArray(task.memberships) ||
+      !task.memberships.some(m => String(m?.project?.gid) === project &&
+        (!section || String(m?.section?.gid) === section))) {
+    throw new Error('Asana monitoring alert was not confirmed in the approved destination');
+  }
+  return task;
+}
+
 /* Refresh the evidence on an existing, HUMAN-owned operational alert without
    creating a second task or changing its name, assignee, notes or disposition.
    The last failed GitHub run must be discoverable in Asana: on 13 Oct 2026 the
