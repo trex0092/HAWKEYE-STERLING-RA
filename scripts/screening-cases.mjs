@@ -94,7 +94,7 @@ export function canAutoClearCases(results, today) {
      age    — case open past the SLA, aging comment not yet posted
      clear  — subject no longer flagged today (or gone from the registry)
    Nothing is planned for under-review/escalated moves — those are human. */
-export function planCaseActions(subjects, casesState, today, { allowAutoClear = false } = {}) {
+export function planCaseActions(subjects, casesState, today) {
   const actions = [];
   const seen = new Set();
   for (const [key, s] of Object.entries(subjects || {})) {
@@ -122,28 +122,16 @@ export function planCaseActions(subjects, casesState, today, { allowAutoClear = 
           priorCase: { taskGid: cs.taskGid || null, clearedAt: cs.clearedAt || null } });
       }
     } else if (active && cs && !cs.cleared) {
-      if (s.whitelistedOnly && !cs.escalated && allowAutoClear === true) {
-        /* The registry now covers every hit on this open case — close it with
-           its own audit note (distinct from the not-flagged auto-clear). */
-        actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid, reason: 'whitelist' });
-      } else {
-        const age = ageInDays(s.firstSeen || cs.createdAt, today);
-        if (!cs.agingAlerted && age > CASE_SLA_DAYS) {
-          actions.push({ type: 'age', key, subject: s, caseGid: cs.taskGid, ageDays: age });
-        }
-      }
-    } else if (!active && cs && !cs.cleared) {
-      /* An escalated case is a human's: never auto-clear it, even when the
-         subject drops off the day's flags. */
-      if (!cs.escalated && allowAutoClear === true) {
-        actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid });
+      // Existing cases remain open until an explicit human disposition is
+      // confirmed remotely. Full screening coverage can inform review but
+      // never grants the system authority to clear a sanctions case.
+      const age = ageInDays(s.firstSeen || cs.createdAt, today);
+      if (!cs.agingAlerted && age > CASE_SLA_DAYS) {
+        actions.push({ type: 'age', key, subject: s, caseGid: cs.taskGid, ageDays: age });
       }
     }
-  }
-  for (const [key, cs] of Object.entries(casesState || {})) {
-    if (!seen.has(key) && !cs.cleared && !cs.escalated && allowAutoClear === true) {
-      actions.push({ type: 'clear', key, subject: null, caseGid: cs.taskGid });
-    }
+    // Missing or inactive subjects do not close existing investigations.
+    // Their cases remain open for human review and preserve their audit trail.
   }
   return actions;
 }
@@ -434,10 +422,9 @@ async function main() {
   if (!casesState || typeof casesState !== 'object' || Array.isArray(casesState)) {
     throw new Error('Existing Asana case state missing or corrupt; refusing duplicate-prone actions');
   }
-  const allowAutoClear = canAutoClearCases(results, today);
-  if (!allowAutoClear) {
-    console.warn('screening-cases: source completeness not proven; all automatic case closures are HELD for human review');
-  }
+  // Screening evidence can inform the MLRO, but cannot itself disposition a
+  // sanctions case. Only a remotely confirmed human disposition closes cases.
+  console.warn('screening-cases: automatic case closure is disabled; confirmed human disposition is required');
 
   /* DISPOSITION READ-BACK — the analyst feedback loop. For every open case,
      read the task notes and parse the ticked disposition block the card
@@ -482,7 +469,7 @@ async function main() {
   }
 
   const actions = [...dispositionActions,
-    ...planCaseActions(screen.subjects, casesState, today, { allowAutoClear })];
+    ...planCaseActions(screen.subjects, casesState, today)];
   console.log('screening-cases: ' + actions.length + ' action(s) — '
     + ['create', 'age', 'clear', 'disposition-clear', 'disposition-escalate-ack']
       .map(t => t + '=' + actions.filter(a => a.type === t).length).join(' '));
