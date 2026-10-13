@@ -192,6 +192,38 @@ check('complete coverage cannot close an absent subject case without a human dis
     allowAutoClear: canAutoClearCases(GOOD_COVERAGE, TODAY)
   }).length === 0);
 
+/* ── Remote-first case disposition safety (no Asana or secrets needed) ── */
+const pendingCase = { taskGid: 't1', createdAt: TODAY, cleared: false, agingAlerted: false };
+check('an uncommitted disposition intent cannot mutate the active case',
+  (() => {
+    const original = { ...pendingCase };
+    const proposed = { type: 'disposition-clear', caseGid: pendingCase.taskGid };
+    return proposed.type === 'disposition-clear' && pendingCase.cleared === false &&
+      JSON.stringify(pendingCase) === JSON.stringify(original);
+  })());
+check('confirmed false-positive disposition creates whitelist evidence only after success',
+  (() => {
+    const result = confirmedDispositionState(pendingCase, 'disposition-clear', TODAY,
+      subj({ hits: [
+        { list: 'UK OFSI', hitName: 'Synthetic Match' },
+        { list: 'PEP (Wikidata)', hitName: 'Synthetic Person' }
+      ] }));
+    return result.cleared === true && result.clearedAt === TODAY &&
+      result.disposition.kind === 'false-positive' &&
+      result.disposition.hits.length === 1 && result.disposition.hits[0].hitName === 'Synthetic Match' &&
+      pendingCase.cleared === false;
+  })());
+check('confirmed escalation pins the case open without adding any clearance',
+  (() => {
+    const result = confirmedDispositionState(pendingCase, 'disposition-escalate-ack', TODAY);
+    return result.escalated === true && result.cleared === false && !result.disposition;
+  })());
+check('invalid remote confirmations cannot change case state',
+  (() => {
+    try { confirmedDispositionState(pendingCase, 'unknown-disposition', TODAY); return false; }
+    catch { return pendingCase.cleared === false; }
+  })());
+
 /* ── card body ── */
 const html = caseHtml(KEY, subj(), 'https://example/run');
 check('case body: single <body> root, escalation banner for sanctions-match, SLA and lifecycle present',
@@ -287,39 +319,7 @@ check('digest: absent match counts never masquerade as all-clear', (() => {
 })());
 check('digest title states the outcome and volume',
   resultsDigestTitle(RESULTS) === '🛡️ Sanctions Screen — ' + TODAY + ' — 1 new match(es) · 778 screened'
-  && resultsDigestTitle({ ...RESULTS, newMatches: 0 }).inc/* ── Remote-first case disposition safety (no Asana or secrets needed) ── */
-const pendingCase = { taskGid: 't1', createdAt: TODAY, cleared: false, agingAlerted: false };
-check('an uncommitted disposition intent cannot mutate the active case',
-  (() => {
-    const original = { ...pendingCase };
-    const proposed = { type: 'disposition-clear', caseGid: pendingCase.taskGid };
-    return proposed.type === 'disposition-clear' && pendingCase.cleared === false &&
-      JSON.stringify(pendingCase) === JSON.stringify(original);
-  })());
-check('confirmed false-positive disposition creates whitelist evidence only after success',
-  (() => {
-    const result = confirmedDispositionState(pendingCase, 'disposition-clear', TODAY,
-      subj({ hits: [
-        { list: 'UK OFSI', hitName: 'Synthetic Match' },
-        { list: 'PEP (Wikidata)', hitName: 'Synthetic Person' }
-      ] }));
-    return result.cleared === true && result.clearedAt === TODAY &&
-      result.disposition.kind === 'false-positive' &&
-      result.disposition.hits.length === 1 && result.disposition.hits[0].hitName === 'Synthetic Match' &&
-      pendingCase.cleared === false;
-  })());
-check('confirmed escalation pins the case open without adding any clearance',
-  (() => {
-    const result = confirmedDispositionState(pendingCase, 'disposition-escalate-ack', TODAY);
-    return result.escalated === true && result.cleared === false && !result.disposition;
-  })());
-check('invalid remote confirmations cannot change case state',
-  (() => {
-    try { confirmedDispositionState(pendingCase, 'unknown-disposition', TODAY); return false; }
-    catch { return pendingCase.cleared === false; }
-  })());
-
-ludes('no new matches'));
+  && resultsDigestTitle({ ...RESULTS, newMatches: 0 }).includes('no new matches'));
 
 /* ── Disposition read-back (analyst feedback loop) ── */
 check('parseDisposition: untouched template parses as null (no false trigger)',
