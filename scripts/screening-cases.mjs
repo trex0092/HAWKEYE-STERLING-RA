@@ -47,6 +47,34 @@ export function ageInDays(fromDay, today) {
   return Math.round((b - a) / 86400000);
 }
 
+/* An aging comment is an AML review-escalation artifact. Unknown POST
+   outcomes must never be replayed blindly, and a 2xx reply without a
+   verifiable comment must not suppress future SLA escalation. Reuse the
+   existing bounded story-history dedupe and require remote read-back. */
+export async function postVerifiedCaseAgingNotice(request, caseGid, ageDays,
+  { slaDays = CASE_SLA_DAYS } = {}) {
+  const id = String(caseGid || '');
+  if (typeof request !== 'function' || !/^\d{8,20}$/.test(id) ||
+      !Number.isSafeInteger(ageDays) || ageDays <= slaDays ||
+      !Number.isSafeInteger(slaDays) || slaDays < 1) {
+    throw new Error('Invalid AML case SLA alert request');
+  }
+  const message = '⏰ AGING — this screening case has been open ' + ageDays +
+    ' days (SLA: ' + slaDays + '). Review and disposition required.';
+  const result = await appendOpenAlertEvidence(request, id, message);
+  if (result.posted) {
+    const gid = String(result.storyGid || '');
+    if (!/^\d+$/.test(gid)) throw new Error('Asana case SLA audit comment identifier invalid');
+    const receipt = (await request('/stories/' + gid + '?opt_fields=gid,text'))?.data;
+    if (String(receipt?.gid || '') !== gid || receipt?.text !== message) {
+      throw new Error('Asana case SLA audit comment not independently verified');
+    }
+  } else if (!result.alreadyRecorded) {
+    throw new Error('Asana case SLA comment result not confirmed');
+  }
+  return { confirmed: true, alreadyRecorded: result.alreadyRecorded === true };
+}
+
 export function caseTitle(key, s) {
   /* UBO keys carry the customer gid as their third segment; LEGAL-ENTITY keys
      have no '|' at all, so every company case used to be titled CASE-XXXXXX.
@@ -663,12 +691,9 @@ async function main() {
           ? 'screening-cases: re-opened an existing case under human review'
           : 'screening-cases: created a new case requiring human review');
       } else if (a.type === 'age') {
-        await asana('/tasks/' + a.caseGid + '/stories', {
-          method: 'POST',
-          body: JSON.stringify({ data: { text: '⏰ AGING — this screening case has been open ' + a.ageDays + ' days (SLA: ' + CASE_SLA_DAYS + '). Review and disposition required.' } })
-        });
+        await postVerifiedCaseAgingNotice(asana, a.caseGid, a.ageDays);
         casesState[a.key] = { ...casesState[a.key], agingAlerted: true };
-        console.log('screening-cases: SLA aging alert posted (' + a.ageDays + 'd)');
+        console.log('screening-cases: SLA aging alert remotely verified (' + a.ageDays + 'd)');
       } else if (a.type === 'clear') {
         const clearText = a.reason === 'whitelist'
           ? '✅ AUTO-CLEARED (cleared-FP registry) — every hit on this case is a designated-name pair an analyst already dispositioned as a false positive. The ' + today + ' screen keeps the subject on the report, annotated and demoted; a NEW or CHANGED designated name re-opens a fresh case.'
