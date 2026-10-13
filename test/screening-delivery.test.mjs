@@ -9,8 +9,9 @@ function fixture() {
   const status = operational => ({ operational, reasons: [], warnings: [], evidence: {} });
   return {
     runId: '100', nowMs: NOW,
-    results: { date: '2026-09-30', screened: 2, alerts: [], lists: [{ id: 'synthetic', count: 1 }],
-      failures: [], enrichment: {}, cleared: [] },
+    results: { date: '2026-09-30', screened: 2, alerts: [], lists: [{ id: 'synthetic', name: 'Synthetic Test List', count: 1, partial: false }],
+      failures: [], enrichment: {}, cleared: [], degraded: false },
+
     assurance: { version: 1, generatedAt: new Date(NOW).toISOString(), operational: true,
       run: { githubRunId: '100', date: '2026-09-30', screenedSubjects: 2 },
       domains: { sanctions: status(true), adverseMedia: status(true), pep: status(true) } },
@@ -86,6 +87,12 @@ for (const [name, change] of [
   ['missing results', x => { x.results = null; }],
   ['zero screened subjects', x => { x.results.screened = 0; }],
   ['invalid calendar date', x => { x.results.date = '2026-02-30'; }],
+  ['non-numeric workflow run ID', x => { x.runId = 'malformed/run'; x.assurance.run.githubRunId = x.runId; }],
+  ['a zero-source green report', x => { x.results.lists = []; }],
+  ['a zero-entry source with green assurance', x => { x.results.lists[0].count = 0; }],
+  ['partial designation source with green assurance', x => { x.results.lists[0].partial = true; }],
+  ['degraded engine with green assurance', x => { x.results.degraded = true; }],
+  ['unnamed source with green assurance', x => { x.results.lists[0].name = ''; }],
   ['missing alerts', x => { delete x.results.alerts; }],
   ['missing assurance', x => { x.assurance = null; }],
   ['stale assurance', x => { x.assurance.generatedAt = '2026-09-29T00:00:00Z'; }],
@@ -139,6 +146,21 @@ test('degraded PEP/adverse media is delivered honestly, never converted to opera
   assert.match(media.notes, /Adverse media: DEGRADED/);
   assert.match(media.notes, /8 labels remain unresolved/);
   assert.match(media.notes, /5 subjects skipped enrichment/);
+});
+
+test('degraded screening can be delivered but never claims to clear prior findings', async () => {
+  const input = fixture();
+  input.assurance.operational = false;
+  input.assurance.domains.sanctions.operational = false;
+  input.assurance.domains.sanctions.reasons = ['Synthetic current source unavailable'];
+  input.results.degraded = true;
+  input.results.cleared = ['Former Synthetic Match'];
+  const fake = api();
+  const out = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  assert.equal(out.operational, false);
+  const sanctions = [...fake.attachments.values()].find(a => a.name.includes('-sanctions-')).text;
+  assert.match(sanctions, /NOT MATCHED - DEGRADED COVERAGE - REVIEW REQUIRED,Former Synthetic Match/);
+  assert.doesNotMatch(sanctions, /CLEARED THIS RUN/);
 });
 
 test('rerun refreshes the same cards and evidence rather than keeping stale results', async () => {
@@ -322,7 +344,7 @@ test('each results card carries a read-back-verified findings table, one row per
   assert.match(sanctions, /NEW\/CHANGED,Jane Roe,individual,Acme Gold,Shareholder/);
   assert.match(sanctions, /OFAC SDN,'=ROE\, Jane|OFAC SDN,"'=ROE, Jane"/, 'formula injection neutralised');
   assert.doesNotMatch(sanctions, /PEP \(Worldwide/, 'PEP hits belong to the media table');
-  assert.match(sanctions, /CLEARED THIS RUN,Old Match/);
+  assert.match(sanctions, /NO MATCH ON THIS RUN - NOT MLRO CLEARANCE,Old Match/);
   assert.match(media, /PEP \(Worldwide — Wikidata\),Jane Roe,90/);
 });
 
@@ -354,6 +376,10 @@ test('csvCell quotes separators and neutralises formulas', () => {
   assert.equal(csvCell('a,b'), '"a,b"');
   assert.equal(csvCell('say "hi"'), '"say ""hi"""');
   assert.equal(csvCell('+1'), "'+1");
+  assert.equal(csvCell('  =HYPERLINK("https://example.invalid","run")'),
+    '\'  =HYPERLINK("https://example.invalid","run")'.replaceAll('"', '""').replace(/^/, '"').concat('"'));
+  assert.equal(csvCell('\t@SUM(1,2)'), '"\'\t@SUM(1,2)"');
+  assert.equal(csvCell('\u200b=1+1'), "'\u200b=1+1");
   assert.equal(csvCell(['x', 'y']), 'x; y');
   assert.ok(buildFindingsCsv('sanctions', [], [], []).startsWith('\ufeffstatus,'));
 });
