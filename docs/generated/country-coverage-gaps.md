@@ -1,6 +1,6 @@
 # HAWKEYE-STERLING-RA: country coverage gaps (195 countries)
 
-Generated from `data/sanctions-country-coverage.json`, `data/screening-country-coverage.json` and the `LOCALES` matrix in `scripts/adverse-media.mjs`. Register updated: 2026-10-08
+Generated from `data/sanctions-country-coverage.json`, `data/screening-country-coverage.json` and the `LOCALES` matrix in `scripts/adverse-media.mjs`. Register updated: 2026-10-08.
 
 ## How to read this
 
