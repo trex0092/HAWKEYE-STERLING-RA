@@ -6,7 +6,9 @@ import { publishDailyScreening, buildReports, splitEvidence, textSize, validateE
 
 const NOW = Date.parse('2026-09-30T10:00:00Z');
 function fixture() {
-  const status = operational => ({ operational, reasons: [], warnings: [], evidence: {} });
+  // Synthetic but internally consistent evidence, so that failures prove the
+  // mismatch under test rather than passing because the fixture lacks sources.
+  const status = (operational, evidence) => ({ operational, reasons: [], warnings: [], evidence });
   return {
     runId: '100', nowMs: NOW,
     results: { date: '2026-09-30', screened: 2, alerts: [], lists: [{ id: 'synthetic', name: 'Synthetic Test List', count: 1, partial: false }],
@@ -14,7 +16,26 @@ function fixture() {
 
     assurance: { version: 1, generatedAt: new Date(NOW).toISOString(), operational: true,
       run: { githubRunId: '100', date: '2026-09-30', screenedSubjects: 2 },
-      domains: { sanctions: status(true), adverseMedia: status(true), pep: status(true) } },
+      domains: {
+        sanctions: status(true, {
+          screenedSubjects: 2, requiredSourceIds: ['synthetic'],
+          loadedSources: [{ id: 'synthetic', count: 10, partial: false }],
+          sourceFloors: [{ id: 'synthetic', minNames: 1 }],
+          servedByFallback: [],
+        }),
+        adverseMedia: status(true, {
+          screenedSubjects: 2, errors: 0, skippedSubjects: 0,
+          matrixTotal: 79, googleNewsLocalesPerSubject: 8,
+          globalBackbones: ['Google News RSS', 'GDELT global index', 'Bing News'],
+          backboneFailures: { googleNews: 0, gdelt: 0, bing: 0 },
+        }),
+        pep: status(true, {
+          persons: 50000, floor: 30000, partial: false,
+          dailyScreenActive: true, dailyScreenCount: 50000,
+          harvestedAt: '2026-09-30T00:00:00.000Z',
+          dailyScreenHarvestedAt: '2026-09-30T00:00:00.000Z',
+        }),
+      } },
     state: { updated: '2026-09-30', subjects: {} },
   };
 }
@@ -106,6 +127,15 @@ for (const [name, change] of [
   ['missing PEP status', x => { delete x.assurance.domains.pep; }],
   ['green with reasons', x => { x.assurance.domains.pep.reasons.push('partial'); }],
   ['contradictory overall status', x => { x.assurance.operational = false; }],
+  ['green flag despite uncovered adverse-media subjects', x => { x.assurance.domains.adverseMedia.evidence.errors = 18; }],
+  ['green flag despite skipped adverse-media subjects', x => { x.assurance.domains.adverseMedia.evidence.skippedSubjects = 1; }],
+  ['green flag despite missing global backbone evidence', x => { delete x.assurance.domains.adverseMedia.evidence.backboneFailures; }],
+  ['green flag despite contradictory news provider counts', x => { x.assurance.domains.adverseMedia.evidence.backboneFailures.googleNews = 1; }],
+  ['green flag despite truncated required sanctions source', x => { x.assurance.domains.sanctions.evidence.loadedSources[0].count = 0; }],
+  ['green flag despite wrong sanctions source subject count', x => { x.assurance.domains.sanctions.evidence.screenedSubjects = 1; }],
+  ['green flag despite partial worldwide PEP harvest', x => { x.assurance.domains.pep.evidence.partial = true; }],
+  ['green flag despite unconsumed worldwide PEP harvest', x => { x.assurance.domains.pep.evidence.dailyScreenActive = false; }],
+  ['green flag without detailed operational source evidence', x => { x.assurance.domains.adverseMedia.evidence = {}; }],
 ]) {
   test('rejects ' + name + ' before any write', async () => {
     const input = fixture(); change(input);
@@ -146,6 +176,20 @@ test('degraded PEP/adverse media is delivered honestly, never converted to opera
   assert.match(media.notes, /Adverse media: DEGRADED/);
   assert.match(media.notes, /8 labels remain unresolved/);
   assert.match(media.notes, /5 subjects skipped enrichment/);
+});
+
+test('an honestly degraded coverage report still reaches Asana with provisional findings', async () => {
+  const input = fixture();
+  input.assurance.domains.adverseMedia.operational = false;
+  input.assurance.domains.adverseMedia.reasons = ['18 subjects had zero adverse-media backbone coverage'];
+  input.assurance.domains.adverseMedia.evidence.errors = 18;
+  input.assurance.operational = false;
+  const fake = api();
+  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  assert.equal(receipt.operational, false);
+  const task = fake.tasks.get(receipt.reports.find(x => x.domain === 'media').taskGid);
+  assert.match(task.notes, /Adverse media: DEGRADED/);
+  assert.match(task.notes, /18 subjects had zero adverse-media backbone coverage/);
 });
 
 test('degraded screening can be delivered but never claims to clear prior findings', async () => {
