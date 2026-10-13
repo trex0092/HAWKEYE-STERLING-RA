@@ -149,7 +149,6 @@ check('complete 38-control provisional map has valid paths and closure-action li
 check('all 38 expected individual control IDs appear once',
   annex.controls.length === 38 &&
   actualRefs.every(id => annex.controls.filter(c => c.id === id).length === 1));
-const bad = value => structuredClone(value);
 const actions = read('docs/governance/open-actions-register.md');
 check('a missing or duplicated control fails closed',
   validateAnnexAEvidence({ ...annex, controls: annex.controls.slice(1) }, enterprise, actions).length > 0 &&
