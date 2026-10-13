@@ -712,8 +712,11 @@ check('a sectionless mirror still joins the project',
     /name:\s*fitAsanaName\(name\)/.test(notify) && /data\.notes = fitAsanaText\(notes\)/.test(notify));
   check('wiring: the Adverse Media & PEP audit card caps by bytes',
     /name:\s*fitAsanaName\(name\),\s*notes:\s*fitAsanaText\(notes\)/.test(screen));
-  check('wiring: the screening-case card caps title and body by bytes',
-    /name:\s*fitAsanaName\(caseTitle\(/.test(cases) && /html_notes:\s*fitAsanaHtml\(caseHtml\(/.test(cases));
+  check('wiring: the screening-case card caps title and body by bytes before verified creation',
+    /createVerifiedScreeningCase\(asana,\s*\{/.test(cases) &&
+    /title:\s*fitAsanaName\(caseTitle\(/.test(cases) &&
+    /htmlNotes:\s*fitAsanaHtml\(caseHtml\(/.test(cases) &&
+    /name:\s*title,\s*html_notes:\s*htmlNotes/.test(cases));
   /* The regression that started all this: a character slice on an Asana field.
      Any new one is a bug waiting for the next multilingual card. */
   for (const [file, text] of [['scripts/asana-notify.mjs', notify],
