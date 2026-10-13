@@ -92,9 +92,28 @@ def _sanitize_untrusted(text: str, cap: int = 500) -> str:
     t = re.sub(r"\s+", " ", t).strip()
     return t[:cap]
 
+# OWASP LLM01 / MITRE ATLAS prompt-injection evasion: attackers can replace
+# ordinary Latin letters with compatibility glyphs, insert zero-width format
+# controls within words, or substitute non-ASCII dashes for word separators.
+# Normalize only for DETECTION; reports preserve the original sourced headline.
+# Do not broad-strip every non-Latin code point: Arabic and Cyrillic headlines
+# must remain reviewable without defaulting them to suspected injections.
+_INJECTION_FORMAT_CONTROLS = re.compile(
+    r"[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]"
+)
+
 def detect_injection(text: str):
-    tl = _sanitize_untrusted(text).lower()
-    return [m for m in _INJECTION_MARKERS if m in tl]
+    # Keep the existing 500-character work cap. NFKC normalizes compatibility
+    # characters; casefold recognizes Unicode case variants. The secondary
+    # word-boundary spelling catches "ignore—previous" while the primary
+    # spelling still catches literal model-role delimiters ("<|", "</system").
+    normalized = unicodedata.normalize(
+        "NFKC", _sanitize_untrusted(text)
+    ).casefold()
+    normalized = _INJECTION_FORMAT_CONTROLS.sub("", normalized)
+    words = re.sub(r"[\W_]+", " ", normalized, flags=re.UNICODE).strip()
+    return [marker for marker in _INJECTION_MARKERS
+            if marker in normalized or marker in words]
 
 def _wrap_untrusted(text: str) -> str:
     return f"<<UNTRUSTED>>{_sanitize_untrusted(text)}<<END>>"
