@@ -1910,6 +1910,32 @@ async function mapLimit(items, limit, fn) {
 export const AM_SECOND_PASS_MAX = 100;
 export const AM_RECOVERY_TAIL_MAX_MS = 5 * 60 * 1000;
 export const AM_RECOVERY_TAIL_MIN_MS = 60 * 1000;
+// The final probe spends at most TWO EXTRA MINUTES of the 120-minute workflow
+// budget and is available only when <=8 ZERO-COVERAGE subjects remain. The
+// 100-minute initial sweep + five-minute recovery + two-minute final probe
+// preserve at least 13 minutes nominal headroom for AML case and Asana delivery.
+export const AM_FINAL_RECHECK_MAX = 8;
+export const AM_FINAL_RECHECK_TAIL_MS = 2 * 60 * 1000;
+export const AM_FINAL_RECHECK_COOLDOWN_MS = 45000;
+
+/* Track successful retries so a later residual-only round cannot rerun a
+   recovered subject, decrement its failure count twice, or duplicate evidence.
+   Errors leave the subject outstanding. No personal data enters the log. */
+export function trackAmRecovery(items) {
+  return (Array.isArray(items) ? items : []).map(item => {
+    let recovered = false;
+    return {
+      key: item.key,
+      get recovered() { return recovered; },
+      retry: async () => {
+        if (recovered) return true;
+        const ok = (await item.retry()) === true;
+        if (ok) recovered = true;
+        return ok;
+      },
+    };
+  });
+}
 export function resolveAmRecoveryTailMs(value = AM_RECOVERY_TAIL_MAX_MS) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return AM_RECOVERY_TAIL_MAX_MS;
@@ -2178,16 +2204,37 @@ export async function screenLocally(subjects, cfg) {
     heartbeat();
     return finalize();
   });
-  const amSecondPass = await runAmSecondPass(amSecondPassQueue, {
+  const amRetryQueue = trackAmRecovery(amSecondPassQueue);
+  const amSecondPass = await runAmSecondPass(amRetryQueue, {
     // An initial sweep consuming its full wall-clock budget must still leave
     // a bounded opportunity for zero-coverage subjects to recover. Provider
     // failure remains a counted assurance error if this tail cannot recover it.
     deadlineMs: postSweepRecoveryDeadline(enrichDeadline, cfg.amRecoveryTailMs),
     delayMs: Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0),
   });
-  if (amSecondPassQueue.length) {
-    console.log('sanctions-screen: adverse-media second pass — ' + amSecondPassQueue.length + ' zero-coverage subject(s) after the sweep; re-checked '
+  if (amRetryQueue.length) {
+    console.log('sanctions-screen: adverse-media second pass — ' + amRetryQueue.length + ' zero-coverage subject(s) after the sweep; re-checked '
       + amSecondPass.attempted + ', recovered ' + amSecondPass.recovered + (amSecondPass.skipped ? ' (' + amSecondPass.skipped + ')' : ''));
+  }
+  /* 13 Oct live run #38409639052: bounded post-sweep retries recovered 15
+     of 16 blacked-out subjects, leaving ONE unverified. The shared provider
+     cooldown can clear during the remaining workflow headroom. Make one
+     final LOW-CONCURRENCY, residual-only probe rather than re-querying all
+     991 subjects or extending the five-minute first recovery window.
+     Never bypass source gates/breakers or erase unrecovered error counts. */
+  const residual = amRetryQueue.filter(item => !item.recovered);
+  if (amSecondPass.attempted && residual.length > 0 &&
+      residual.length <= AM_FINAL_RECHECK_MAX) {
+    const last = await runAmSecondPass(residual, {
+      deadlineMs: postSweepRecoveryDeadline(enrichDeadline, cfg.amRecoveryTailMs) +
+        AM_FINAL_RECHECK_TAIL_MS,
+      delayMs: AM_FINAL_RECHECK_COOLDOWN_MS,
+      max: AM_FINAL_RECHECK_MAX,
+      concurrency: 1,
+    });
+    console.log('sanctions-screen: final gated adverse-media probe — ' +
+      residual.length + ' outstanding; attempted ' + last.attempted +
+      ', recovered ' + last.recovered + (last.skipped ? ' (' + last.skipped + ')' : ''));
   }
   /* Restore the input order — the rotation exists only for enrichment fairness,
      and every downstream consumer (reports, state diff) sees a stable order. */
