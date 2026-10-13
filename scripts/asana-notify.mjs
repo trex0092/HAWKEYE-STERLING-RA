@@ -35,6 +35,22 @@ export function retryDelayMs(attempt, retryAfter) {
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 const MAX_ATTEMPTS = 3;
 
+/* External response bodies and transport exceptions can echo case names,
+   subject identifiers, headers or tokens. Only bounded numeric status and a
+   fixed, recognised oversize classification may cross into Actions logs.
+   The HTML-size fallback needs that classification, not any raw provider text. */
+export function publicAsanaRejection(status, payload) {
+  const valid = Number.isInteger(status) && status >= 100 && status <= 599;
+  const code = valid ? String(status) : 'invalid-status';
+  const oversized = status === 400 && Array.isArray(payload?.errors) &&
+    payload.errors.some(row => typeof row?.message === 'string' &&
+      /(?:rich text value is too large|html_notes.{0,80}too large)/i.test(row.message.slice(0,500)));
+  return 'Asana ' + code + (oversized
+    ? ': Rich text value is too large'
+    : ': request rejected (provider details redacted)');
+}
+
+
 export async function asana(path, opts = {}) {
   const { noRetryOnUnknownOutcome = false, ...requestOptions } = opts;
   for (let attempt = 0; ; attempt++) {
@@ -54,11 +70,12 @@ export async function asana(path, opts = {}) {
          with the same bounded backoff instead of dying on the first blip. */
       if (!noRetryOnUnknownOutcome && attempt < MAX_ATTEMPTS - 1) {
         const delay = retryDelayMs(attempt);
-        console.warn('asana-notify: network error (' + (e && e.message || e) + ') — retry ' + (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
+        console.warn('asana-notify: transport failure (details redacted) — retry ' +
+          (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
         await sleep(delay);
         continue;
       }
-      throw e;
+      throw new Error('Asana transport failure; remote outcome not confirmed');
     }
     const d = await r.json().catch(() => ({}));
     if (r.ok) return d;
@@ -76,7 +93,7 @@ export async function asana(path, opts = {}) {
       await sleep(delay);
       continue;
     }
-    throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
+    throw new Error(publicAsanaRejection(r.status, d));
   }
 }
 

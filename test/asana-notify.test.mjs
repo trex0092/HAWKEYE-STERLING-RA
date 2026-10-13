@@ -2,7 +2,7 @@
    shared transient-failure policy (retry classification + backoff) and the
    re-run duplicate guard used by every monitoring delivery stream. */
 import {
-  asana, isRetryable, retryDelayMs, findRecentDuplicate, findDateScopedDailyDuplicates,
+  asana, isRetryable, retryDelayMs, publicAsanaRejection, findRecentDuplicate, findDateScopedDailyDuplicates,
   esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
   listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize, appendOpenAlertEvidence,
@@ -150,6 +150,59 @@ check('garbage Retry-After falls back to backoff', retryDelayMs(1, 'soon') === 2
     /if \(!\/\^\\d\+\$\/\.test\(String\(gid \|\| ''\)\)\)/.test(source)
     && /verifyNewMonitoringAlert\(asana, gid/.test(source)
     && /findOpenMonitoringAlert\(asana, PROJECT_GID, title\)/.test(source));
+}
+
+/* Asana responses are untrusted, potentially containing confidential case
+   names, document IDs or tokens. Only fixed error categories reach CI logs. */
+{
+  const privateText = 'SYNTHETIC_PERSON_DO_NOT_LOG__PASSPORT_ABC123';
+  const fakeResponse = (code, message) => ({
+    ok: false, status: code, headers: { get: () => null },
+    json: async () => ({ errors: [{ message }] })
+  });
+  check('provider 4xx details never pass into a returned/logged screening error',
+    publicAsanaRejection(400, { errors: [{ message: 'invalid subject ' + privateText }] })
+      === 'Asana 400: request rejected (provider details redacted)');
+  check('recognised html_notes oversize is safely classified without reflecting provider details',
+    publicAsanaRejection(400, { errors: [{
+      message: '.html_notes : Rich text value is too large. ' + privateText
+    }] }) === 'Asana 400: Rich text value is too large');
+  const oldFetch = globalThis.fetch, oldToken = process.env.ASANA_ACCESS_TOKEN;
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-not-live';
+  try {
+    globalThis.fetch = async () => fakeResponse(403, 'Private client ' + privateText);
+    let reject = '';
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'Synthetic' } }) });
+    } catch (e) { reject = e.message; }
+    check('Asana 403 preserves status but never logs a private response body',
+      reject.startsWith('Asana 403:') && !reject.includes(privateText));
+
+    globalThis.fetch = async () => { throw new Error('network: ' + privateText); };
+    let transport = '';
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'Synthetic' } }) });
+    } catch (e) { transport = e.message; }
+    check('a lost Asana response never propagates a raw network exception or private identifiers',
+      transport === 'Asana transport failure; remote outcome not confirmed'
+      && !transport.includes(privateText));
+
+    globalThis.fetch = async () => fakeResponse(400,
+      '.html_notes : Rich text value is too large. ' + privateText);
+    let sizeError = '';
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'Synthetic' } }) });
+    } catch (e) { sizeError = e.message; }
+    check('Asana rich-text size fallback can still detect the safe fixed refusal',
+      /too large/i.test(sizeError) && !sizeError.includes(privateText));
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldToken === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = oldToken;
+  }
 }
 
 /* An existing screening-assurance alert must receive each new failed-run link.
