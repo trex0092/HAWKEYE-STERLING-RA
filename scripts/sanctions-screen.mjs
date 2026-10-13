@@ -1897,17 +1897,31 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
-/* Adverse-media SECOND PASS. The per-subject last-resort retry runs while the
-   whole book is still being swept, so the providers are under peak pressure:
-   on 2 Oct 2026 it recovered 275 of 286 subjects and left 11 with ZERO
-   backbone coverage. After the sweep, once pressure has eased, re-check only
-   those zero-coverage subjects once — bounded by the enrichment deadline, a
-   cool-down, a cap (a mass failure means the providers are down globally and
-   re-querying the whole book only adds load) and low concurrency. Each queue
-   item's retry() resolves true when its subject recovered. A subject that
-   still fails stays a counted error: degrade loudly, never a false clear.
+/* Adverse-media SECOND PASS. The first-pass recovery runs under full-book
+   provider pressure. Re-check only ZERO-coverage subjects after the sweep,
+   with the existing cool-down, cap, low concurrency and fail-closed errors.
+   The initial enrichment deadline cannot also be the second-pass deadline:
+   on 13 Oct 2026 all 991 subjects completed the sweep, but only 2 of the 20
+   queued last-resort rechecks ran before that deadline. Both recovered,
+   leaving 18 without coverage. Reserve a separately capped five-minute tail
+   from the 120-minute workflow budget. Never spend this tail on unfailed
+   subjects or relax source validation, screening evidence or MLRO oversight.
    Pure orchestration (clock / sleep injectable) — unit-tested. */
 export const AM_SECOND_PASS_MAX = 100;
+export const AM_RECOVERY_TAIL_MAX_MS = 5 * 60 * 1000;
+export const AM_RECOVERY_TAIL_MIN_MS = 60 * 1000;
+export function resolveAmRecoveryTailMs(value = AM_RECOVERY_TAIL_MAX_MS) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return AM_RECOVERY_TAIL_MAX_MS;
+  return Math.max(AM_RECOVERY_TAIL_MIN_MS,
+    Math.min(AM_RECOVERY_TAIL_MAX_MS, Math.trunc(numeric)));
+}
+export function postSweepRecoveryDeadline(enrichDeadline, reserveMs = AM_RECOVERY_TAIL_MAX_MS) {
+  if (!Number.isFinite(enrichDeadline) || enrichDeadline < 0) {
+    throw new RangeError('invalid enrichment deadline; refusing unbounded adverse-media retries');
+  }
+  return enrichDeadline + resolveAmRecoveryTailMs(reserveMs);
+}
 export async function runAmSecondPass(queue, {
   deadlineMs, delayMs = 60000, max = AM_SECOND_PASS_MAX, concurrency = 2,
   now = Date.now, sleep = ms => new Promise(res => setTimeout(res, ms)),
@@ -2165,7 +2179,10 @@ export async function screenLocally(subjects, cfg) {
     return finalize();
   });
   const amSecondPass = await runAmSecondPass(amSecondPassQueue, {
-    deadlineMs: enrichDeadline,
+    // An initial sweep consuming its full wall-clock budget must still leave
+    // a bounded opportunity for zero-coverage subjects to recover. Provider
+    // failure remains a counted assurance error if this tail cannot recover it.
+    deadlineMs: postSweepRecoveryDeadline(enrichDeadline, cfg.amRecoveryTailMs),
     delayMs: Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0),
   });
   if (amSecondPassQueue.length) {
@@ -2276,6 +2293,9 @@ async function main() {
        per-subject request rate is unchanged (same concurrency, same budgeted
        locale rotation), only the phase runs longer. */
     enrichBudgetMs: Number(process.env.SCREEN_ENRICH_BUDGET_MS) || 5400000,
+    // Capped recovery-only tail after the full-book sweep. Not a replacement
+    // for screening any subject and never sufficient evidence of source health.
+    amRecoveryTailMs: resolveAmRecoveryTailMs(process.env.SCREEN_AM_RECOVERY_RESERVE_MS),
     /* Cleared-FP registry (whitelist): default ON — an empty registry is a
        no-op, and the kill switch exists for incident response. */
     whitelist: process.env.SCREEN_WHITELIST !== '0',

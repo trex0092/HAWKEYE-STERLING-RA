@@ -2183,8 +2183,34 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     && /if \(again\.errored\) return false;\s*amErrors--; amIncomplete = false;/.test(src));
   check('second pass: a recovered subject is rebuilt through the same finalize() path',
     /applyAm\(again\);\s*const rebuilt = finalize\(\);/.test(src) && /heartbeat\(\);\s*return finalize\(\);/.test(src));
-  check('second pass: runs before the input-order restore, bounded by the enrichment deadline',
-    src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order') && /deadlineMs: enrichDeadline/.test(src));
+  check('second pass: runs before input-order restore with a bounded recovery-only deadline',
+    src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order')
+    && /deadlineMs: postSweepRecoveryDeadline\(enrichDeadline, cfg\.amRecoveryTailMs\)/.test(src));
+  check('recovery tail is bounded under the 120-minute workflow and always leaves a minimum retry allowance',
+    scr.resolveAmRecoveryTailMs(undefined) === 300000
+    && scr.resolveAmRecoveryTailMs(900000) === 300000
+    && scr.resolveAmRecoveryTailMs(-1) === 60000
+    && scr.resolveAmRecoveryTailMs(NaN) === 300000);
+  check('recovery deadline extends the spent enrichment budget, not the original subject-sweep window',
+    scr.postSweepRecoveryDeadline(6000000, 300000) === 6300000);
+  let tailClock = 1000000;
+  const expiredMainDeadline = tailClock - 1;
+  const pendingBlackouts = Array.from({ length: 20 }, () => ({
+    retry: async () => { tailClock += 1000; return true; },
+  }));
+  const oldTail = await run(pendingBlackouts, {
+    deadlineMs: expiredMainDeadline, delayMs: 60000,
+    now: () => tailClock, sleep: async d => { tailClock += d; },
+  });
+  const reservedTail = await run(pendingBlackouts, {
+    deadlineMs: scr.postSweepRecoveryDeadline(expiredMainDeadline),
+    delayMs: 60000, now: () => tailClock,
+    sleep: async d => { tailClock += d; },
+  });
+  check('expired enrichment budget previously skipped all queued second-pass subjects',
+    oldTail.attempted === 0 && oldTail.recovered === 0);
+  check('reserved post-sweep window executes a bounded 20-subject retry queue after a full-budget initial sweep',
+    reservedTail.attempted === 20 && reservedTail.recovered === 20 && reservedTail.skipped === '');
 }
 
 /* ── licence-free mode (OPENSANCTIONS_DATA=0) ── */
