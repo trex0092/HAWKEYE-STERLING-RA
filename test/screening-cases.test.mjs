@@ -62,15 +62,15 @@ check('case open past the SLA → exactly one aging action, never repeated', (()
   return first.length === 1 && first[0].type === 'age' && first[0].ageDays === 11 && again.length === 0;
 })());
 
-check('subject no longer flagged today → auto-clear', (() => {
+check('subject no longer flagged today remains open for human disposition', (() => {
   const gone = subj({ lastSeen: '2026-07-05' });
   const a = planCaseActions({ [KEY]: gone }, { [KEY]: { taskGid: 't1', createdAt: '2026-06-27', agingAlerted: true, cleared: false } }, TODAY, { allowAutoClear: true });
-  return a.length === 1 && a[0].type === 'clear' && a[0].caseGid === 't1';
+  return a.length === 0;
 })());
 
-check('subject vanished from the registry entirely → auto-clear its case', (() => {
+check('subject missing from the registry does not close its case', (() => {
   const a = planCaseActions({}, { [KEY]: { taskGid: 't1', createdAt: '2026-06-27', cleared: false } }, TODAY, { allowAutoClear: true });
-  return a.length === 1 && a[0].type === 'clear';
+  return a.length === 0;
 })());
 
 check('a cleared case never re-acts', (() => {
@@ -108,9 +108,9 @@ check('second clearance then THIRD re-flag runs the same reopen path against the
   /* re-flag #1 → fresh case t2 replaces t1's cleared entry */
   const a1 = planCaseActions({ [KEY]: subj() }, cases, TODAY)[0];
   cases[a1.key] = newCaseStateEntry('t2', TODAY, a1.priorCase);
-  /* subject drops off again → auto-clear t2 (simulated as the executor does) */
+  /* subject drops off again → preserve t2 open until an MLRO disposition */
   const a2 = planCaseActions({ [KEY]: subj({ lastSeen: TODAY }) }, cases, '2026-07-10', { allowAutoClear: true });
-  if (!(a2.length === 1 && a2[0].type === 'clear' && a2[0].caseGid === 't2')) return false;
+  if (a2.length !== 0) return false;
   cases[KEY] = { ...cases[KEY], cleared: true, clearedAt: '2026-07-10' };
   /* re-flag #2 → a third fresh case referencing t2, not t1 */
   const a3 = planCaseActions({ [KEY]: subj({ lastSeen: '2026-07-15' }) }, cases, '2026-07-15');
@@ -143,10 +143,10 @@ check('mixed registry plans each subject independently', (() => {
     { [k2]: { taskGid: 't2', createdAt: '2026-06-27', cleared: false } },
     TODAY, { allowAutoClear: true });
   const types = a.map(x => x.type).sort().join();
-  return types === 'clear,create';
+  return types === 'create';
 })());
 
-/* ── Coverage-conditioned auto-clearance: protect Asana cases on outages ── */
+/* ── Complete coverage informs review but never grants clearance authority ── */
 const GOOD_COVERAGE = {
   date: TODAY, screened: 2, degraded: false, failures: [],
   lists: [{ id: 'sdn', count: 123, partial: false }],
@@ -154,7 +154,7 @@ const GOOD_COVERAGE = {
     pepWorldwide: { active: true, partial: false, count: 200,
       harvested: '2026-07-08T05:00:00Z' } }
 };
-check('only fresh, full three-domain coverage authorizes any automated case closure',
+check('full screening coverage still does not authorize automated case closure',
   canAutoClearCases(GOOD_COVERAGE, TODAY) === true &&
   canAutoClearCases({ ...GOOD_COVERAGE, degraded: true }, TODAY) === false &&
   canAutoClearCases({ ...GOOD_COVERAGE, failures: ['source unreachable'] }, TODAY) === false);
@@ -186,11 +186,11 @@ check('incomplete coverage still creates genuinely new cases while withholding c
   }, { inactive: { taskGid: 'case2', cleared: false } }, TODAY);
   return actions.length === 1 && actions[0].type === 'create' && actions[0].key === KEY;
 })());
-check('a fresh, complete run can explicitly authorize closures after verification',
+check('complete coverage cannot close an absent subject case without a human disposition',
   canAutoClearCases(GOOD_COVERAGE, TODAY) &&
   planCaseActions({}, OPEN_CASE, TODAY, {
     allowAutoClear: canAutoClearCases(GOOD_COVERAGE, TODAY)
-  })[0]?.type === 'clear');
+  }).length === 0);
 
 /* ── card body ── */
 const html = caseHtml(KEY, subj(), 'https://example/run');
@@ -316,9 +316,9 @@ check('planner: whitelistedOnly subject opens NO case',
   planCaseActions({ k1: _s({ whitelistedOnly: true }) }, {}, TODAY).length === 0);
 check('planner: whitelistedOnly does not re-open a cleared case',
   planCaseActions({ k1: _s({ whitelistedOnly: true }) }, { k1: { taskGid: 't', cleared: true, clearedAt: '2026-07-01' } }, TODAY).length === 0);
-check('planner: whitelistedOnly closes an OPEN case with the registry reason',
+check('planner: whitelistedOnly keeps an OPEN case until human disposition',
   (() => { const a = planCaseActions({ k1: _s({ whitelistedOnly: true }) }, { k1: { taskGid: 't', cleared: false } }, TODAY, { allowAutoClear: true });
-    return a.length === 1 && a[0].type === 'clear' && a[0].reason === 'whitelist'; })());
+    return a.length === 0; })());
 check('planner: an escalated case is never auto-cleared — not by absence…',
   planCaseActions({}, { k1: { taskGid: 't', cleared: false, escalated: true } }, TODAY).length === 0);
 check('planner: …and not by the whitelist either',
