@@ -65,7 +65,12 @@ export async function asana(path, opts = {}) {
     if (r.status === 401) {
       throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked. Rotate it in GitHub Settings → Secrets → ASANA_ACCESS_TOKEN.');
     }
-    if (!noRetryOnUnknownOutcome && attempt < MAX_ATTEMPTS - 1 && isRetryable(r.status)) {
+    // A confirmed HTTP 429 is a definite refusal, so even a non-replayable
+    // task/story mutation can retry after the requested cooldown. In contrast,
+    // a network exception or 5xx may have committed remotely: do NOT repeat
+    // that mutation without first reading the task/story history.
+    if ((!noRetryOnUnknownOutcome || r.status === 429) &&
+        attempt < MAX_ATTEMPTS - 1 && isRetryable(r.status)) {
       const delay = retryDelayMs(attempt, r.headers && r.headers.get && r.headers.get('retry-after'));
       console.warn('asana-notify: Asana ' + r.status + ' — retry ' + (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
       await sleep(delay);
