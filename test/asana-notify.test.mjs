@@ -5,7 +5,8 @@ import {
   isRetryable, retryDelayMs, findRecentDuplicate, findDateScopedDailyDuplicates,
   esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
-  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize, appendOpenAlertEvidence
+  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize, appendOpenAlertEvidence,
+  findOpenMonitoringAlert, verifyNewMonitoringAlert, OPEN_ALERT_PAGE_CAP
 } from '../scripts/asana-notify.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +31,73 @@ check('backoff is capped at 8s', retryDelayMs(10) === 8000);
 check('Retry-After header wins when present', retryDelayMs(0, '5') === 5000);
 check('Retry-After is capped at 30s', retryDelayMs(0, '900') === 30000);
 check('garbage Retry-After falls back to backoff', retryDelayMs(1, 'soon') === 2000);
+
+/* Every newly issued compliance alert requires read-back proof that the
+   actual task exists in its approved destination. Offline mocks only. */
+{
+  const project = '1216203370612914', section = '1218451960830318';
+  const name = 'SCREENING ASSURANCE DEGRADED: synthetic test';
+  const seenPaths = [];
+  const found = await findOpenMonitoringAlert(async path => {
+    seenPaths.push(path);
+    return seenPaths.length === 1
+      ? { data: [{ gid: '100', name: 'Unrelated alert' }], next_page: { offset: 'token+/=' } }
+      : { data: [{ gid: '1218981120144411', name }], next_page: null };
+  }, project, name);
+  check('open monitoring alert lookup scans later pages and escapes cursor data',
+    found?.gid === '1218981120144411' && seenPaths.length === 2
+    && seenPaths[1].includes('offset=token%2B%2F%3D'));
+  const missing = await findOpenMonitoringAlert(async () => ({ data: [], next_page: null }), project, name);
+  check('complete empty task search safely identifies a genuinely new alert', missing === null);
+  let loopRefused = false;
+  try {
+    await findOpenMonitoringAlert(async () => ({ data: [], next_page: { offset: 'repeat' } }), project, name);
+  } catch { loopRefused = true; }
+  check('repeated Asana task page cursor fails closed rather than creating another alert', loopRefused);
+  let incompleteRefused = false;
+  try { await findOpenMonitoringAlert(async () => ({ data: null }), project, name); }
+  catch { incompleteRefused = true; }
+  check('malformed task list fails closed, not mistaken for no duplicate', incompleteRefused);
+  let capRefused = false;
+  try {
+    await findOpenMonitoringAlert(async () => ({ data: [], next_page: { offset: 'later' } }),
+      project, name, { maxPages: 1 });
+  } catch { capRefused = true; }
+  check('bounded task scan refuses to declare no existing alert when pagination is incomplete',
+    capRefused && OPEN_ALERT_PAGE_CAP >= 100);
+
+  const id = '1219451234567890';
+  const correct = { data: { gid: id, name,
+    permalink_url: 'https://app.asana.com/0/0/' + id,
+    memberships: [{ project: { gid: project }, section: { gid: section } }] } };
+  const verified = await verifyNewMonitoringAlert(async () => correct, id,
+    { title: name, projectGid: project, sectionGid: section });
+  check('new monitoring alert is verified against its destination section and exact task identity',
+    verified.gid === id && verified.permalink_url.endsWith(id));
+  let missingGidRefused = false;
+  try { await verifyNewMonitoringAlert(async () => correct, '',
+    { title: name, projectGid: project, sectionGid: section }); }
+  catch { missingGidRefused = true; }
+  check('missing task receipt fails closed before false delivery success', missingGidRefused);
+  let wrongSectionRefused = false;
+  try { await verifyNewMonitoringAlert(async () => ({
+    data: { ...correct.data, memberships: [{ project: { gid: project }, section: { gid: '123456' } }] }
+  }), id, { title: name, projectGid: project, sectionGid: section }); }
+  catch { wrongSectionRefused = true; }
+  check('task delivered outside the MLRO section cannot be reported as successful',
+    wrongSectionRefused);
+  let staleTitleRefused = false;
+  try { await verifyNewMonitoringAlert(async () => ({ data: { ...correct.data, name: 'Other' } }),
+    id, { title: name, projectGid: project, sectionGid: section }); }
+  catch { staleTitleRefused = true; }
+  check('task with an unconfirmed or changed title is not a valid delivery receipt',
+    staleTitleRefused);
+  const source = readFileSync(new URL('../scripts/asana-alert.mjs', import.meta.url), 'utf8');
+  check('operational alert publisher refuses missing created GIDs and verifies remote placement',
+    /if \(!\/\^\\d\+\$\/\.test\(String\(gid \|\| ''\)\)\)/.test(source)
+    && /verifyNewMonitoringAlert\(asana, gid/.test(source)
+    && /findOpenMonitoringAlert\(asana, PROJECT_GID, title\)/.test(source));
+}
 
 /* An existing screening-assurance alert must receive each new failed-run link.
    Synthetic story IDs only; no actual Asana mutations in this test. */
