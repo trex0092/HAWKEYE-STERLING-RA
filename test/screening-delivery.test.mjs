@@ -59,7 +59,7 @@ function api() {
   const request = async (path, options = {}) => {
     const method = options.method || 'GET';
     const data = options.body ? JSON.parse(options.body).data : null;
-    calls.push({ path, method, data });
+    calls.push({ path, method, data, nonReplayable: options.noRetryOnUnknownOutcome === true });
     if (intercept) { const response = await intercept(path, method, data); if (response !== undefined) return response; }
     let match;
     if ((match = path.match(/^\/attachments\?parent=(\d+)/))) {
@@ -218,6 +218,58 @@ test('rerun refreshes the same cards and evidence rather than keeping stale resu
   assert.match(media.notes, /New or changed findings in this report: 1/);
   const child = [...fake.tasks.values()].find(t => t.parent?.gid === media.gid);
   assert.match(child.notes, /Synthetic Example/);
+});
+
+test('lost acknowledgement after Asana daily report creation does not replay the write', async () => {
+  const input = fixture(), fake = api();
+  const title = buildReports(input.results, input.assurance, input)[0].title;
+  let lost = false;
+  fake.setIntercept((path, method, data) => {
+    if (!lost && path === '/tasks' && method === 'POST' && data.name === title) {
+      lost = true;
+      fake.add(data);  // Remote create succeeded, only the acknowledgement was lost.
+      throw new Error('synthetic lost Asana report creation acknowledgement');
+    }
+  });
+  await assert.rejects(
+    publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
+    /sanctions delivery failed/
+  );
+  assert.equal([...fake.tasks.values()].filter(x => x.name === title).length, 1);
+  assert.ok(fake.calls.filter(x => x.path === '/tasks' && x.method === 'POST')
+    .every(x => x.nonReplayable), 'report creation must opt out of ambiguous retry');
+  fake.setIntercept(null);
+  const recovered = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  assert.equal(recovered.reports.length, 2);
+  assert.equal([...fake.tasks.values()].filter(x => x.name === title).length, 1,
+    'rerun must reuse the remote-created report, not create a duplicate');
+});
+
+test('lost acknowledgement after evidence page creation is reconciled by page marker', async () => {
+  const input = fixture(), fake = api();
+  let lost = false;
+  fake.setIntercept((path, method, data) => {
+    const parent = /^\/tasks\/(\d+)\/subtasks$/.exec(path);
+    if (!lost && parent && method === 'POST' && data.name === '[screening-evidence] 0001') {
+      lost = true;
+      fake.add(data, parent[1]);  // Page exists on Asana, but the response is lost.
+      throw new Error('synthetic lost Asana evidence-page acknowledgement');
+    }
+  });
+  await assert.rejects(
+    publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
+    /sanctions delivery failed/
+  );
+  assert.ok(fake.calls.filter(x => /\/tasks\/\d+\/subtasks$/.test(x.path) && x.method === 'POST')
+    .every(x => x.nonReplayable), 'evidence page creation must opt out of ambiguous retry');
+  fake.setIntercept(null);
+  const recovered = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  assert.equal(recovered.reports.length, 2);
+  const taskId = recovered.reports.find(x => x.domain === 'sanctions').taskGid;
+  const pages = [...fake.tasks.values()].filter(x =>
+    x.parent?.gid === taskId && x.name === '[screening-evidence] 0001');
+  assert.equal(pages.length, 1, 'lost acknowledgement must not create two evidence pages');
+  assert.match(pages[0].notes, /^BEGIN SCREENING EVIDENCE/);
 });
 
 test('next date creates fresh daily reports rather than suppressing the day', async () => {
