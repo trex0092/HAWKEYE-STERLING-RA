@@ -28,6 +28,26 @@ test('delivery executes after assurance and before encrypted state persistence',
   assert.match(step('delivery'), /ASANA_ACCESS_TOKEN: \$\{\{ secrets\.ASANA_ACCESS_TOKEN \}\}/);
   assert.doesNotMatch(step('delivery'), /steps\.assurance\.outcome == 'success'/);
 });
+test('failed screening and unconfirmed case/report synchronization escalate directly to Asana', () => {
+  const alert = step('asana-failure-alert');
+  assert.ok(alert);
+  assert.match(alert, /if: always\(\)/);
+  for (const source of [
+    "steps.screen.outcome == 'failure'", "steps.screen.outputs.screen_error == 'true'",
+    "steps.cases.outcome == 'failure'", "steps.delivery.outcome == 'failure'"
+  ]) assert.ok(alert.includes(source), 'missing escalation condition: ' + source);
+  assert.match(alert, /run: \|[\s\S]*node scripts\/asana-alert\.mjs/);
+  assert.match(alert, /ASANA_ALERT_REFRESH_OPEN: '1'/);
+  assert.match(alert, /ASANA_ACCESS_TOKEN: \$\{\{ secrets\.ASANA_ACCESS_TOKEN \}\}/);
+  assert.match(alert, /ASANA_SECTION_GID: '1218451960830318'/);
+  assert.match(alert, /timeout-minutes: 3/);
+  assert.match(alert, /Do NOT infer clearance/);
+  assert.match(alert, /NOT been remotely verified/);
+  assert.ok(source.indexOf('id: delivery') < source.indexOf('id: asana-failure-alert'));
+  assert.doesNotMatch(alert, /steps\.screen\.outputs\.title|sanctions-screen-report\.md|\.subjects\[/);
+  assert.doesNotMatch(alert, /continue-on-error/);
+});
+
 test('public issue fallback handles assurance failures without exposing screening identities', () => {
   const issue = steps.find(text => text.includes('Open a GitHub issue when screening or coverage needs human attention'));
   assert.ok(issue);
