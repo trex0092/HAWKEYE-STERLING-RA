@@ -1922,24 +1922,65 @@ export function postSweepRecoveryDeadline(enrichDeadline, reserveMs = AM_RECOVER
   }
   return enrichDeadline + resolveAmRecoveryTailMs(reserveMs);
 }
+export const AM_SECOND_PASS_MAX_ROUNDS = 2;
+export const AM_SECOND_PASS_FINAL_RETRY_DELAY_MS = 15000;
+export const AM_SECOND_PASS_FINAL_MIN_BUDGET_MS = 125000;
+
+/* The last full-book run recovered 15/16 remaining zero-coverage subjects
+   after the initial sweep. A single provider refusal in that second pass must
+   get ONE last bounded, cooled-down chance while the same approved retry
+   window still has enough time; never re-query subjects already recovered.
+   Crucially, successful coverage still requires a real parsed provider reply.
+   This cannot convert a network error into clean evidence. */
 export async function runAmSecondPass(queue, {
   deadlineMs, delayMs = 60000, max = AM_SECOND_PASS_MAX, concurrency = 2,
+  finalRetryDelayMs = AM_SECOND_PASS_FINAL_RETRY_DELAY_MS,
+  maxRounds = AM_SECOND_PASS_MAX_ROUNDS,
   now = Date.now, sleep = ms => new Promise(res => setTimeout(res, ms)),
 } = {}) {
   const items = Array.isArray(queue) ? queue : [];
-  if (!items.length) return { attempted: 0, recovered: 0, skipped: '' };
-  if (items.length > max) return { attempted: 0, recovered: 0, skipped: items.length + ' zero-coverage subjects exceed the second-pass cap of ' + max + ' (providers down globally)' };
-  if (!Number.isFinite(deadlineMs) || now() + delayMs >= deadlineMs) return { attempted: 0, recovered: 0, skipped: 'enrichment time budget exhausted' };
-  if (delayMs > 0) await sleep(delayMs);
-  let recovered = 0, attempted = 0;
-  await mapLimit(items, Math.max(1, concurrency), async item => {
-    if (now() >= deadlineMs) return;
-    attempted++;
-    let ok = false;
-    try { ok = (await item.retry()) === true; } catch { ok = false; }
-    if (ok) recovered++;
+  const empty = (skipped = '') => ({
+    attempted: 0, recovered: 0, skipped, retryCalls: 0, rounds: 0, unresolved: items.length,
   });
-  return { attempted, recovered, skipped: attempted < items.length ? 'enrichment deadline reached mid-pass' : '' };
+  if (!items.length) return empty();
+  if (items.length > max) return empty(items.length +
+    ' zero-coverage subjects exceed the second-pass cap of ' + max + ' (providers down globally)');
+  if (!Number.isFinite(deadlineMs) || now() + delayMs >= deadlineMs) {
+    return empty('enrichment time budget exhausted');
+  }
+  if (delayMs > 0) await sleep(delayMs);
+  let attempted = 0, recovered = 0, retryCalls = 0, rounds = 0;
+  let pending = items;
+  const allowedRounds = Number.isSafeInteger(maxRounds)
+    ? Math.max(1, Math.min(AM_SECOND_PASS_MAX_ROUNDS, maxRounds)) : AM_SECOND_PASS_MAX_ROUNDS;
+  const cooldown = Math.max(0, Math.min(30000, Number(finalRetryDelayMs) ||
+    AM_SECOND_PASS_FINAL_RETRY_DELAY_MS));
+  let finalRetryBlocked = false;
+  for (let round = 0; round < allowedRounds && pending.length; round++) {
+    if (round > 0) {
+      // The last chance must not start close enough to the deadline that a
+      // legitimate provider timeout could overrun the 120-minute workflow.
+      if (now() + cooldown + AM_SECOND_PASS_FINAL_MIN_BUDGET_MS >= deadlineMs) {
+        finalRetryBlocked = true;
+        break;
+      }
+      if (cooldown > 0) await sleep(cooldown);
+    }
+    const decisions = await mapLimit(pending, Math.max(1, concurrency), async item => {
+      if (now() >= deadlineMs) return { attempted: false, ok: false };
+      retryCalls++;
+      let ok = false;
+      try { ok = (await item.retry()) === true; } catch { /* remain unavailable */ }
+      return { attempted: true, ok };
+    });
+    if (round === 0) attempted += decisions.filter(x => x.attempted).length;
+    recovered += decisions.filter(x => x.ok).length;
+    pending = pending.filter((_, idx) => !decisions[idx].ok);
+    rounds++;
+  }
+  const skipped = attempted < items.length ? 'enrichment deadline reached mid-pass'
+    : finalRetryBlocked ? 'last-chance retry blocked by recovery deadline guard' : '';
+  return { attempted, recovered, skipped, retryCalls, rounds, unresolved: pending.length };
 }
 
 const BAND_RANK = { critical: 4, high: 3, medium: 2, low: 1, '': 0 };
@@ -2187,7 +2228,10 @@ export async function screenLocally(subjects, cfg) {
   });
   if (amSecondPassQueue.length) {
     console.log('sanctions-screen: adverse-media second pass — ' + amSecondPassQueue.length + ' zero-coverage subject(s) after the sweep; re-checked '
-      + amSecondPass.attempted + ', recovered ' + amSecondPass.recovered + (amSecondPass.skipped ? ' (' + amSecondPass.skipped + ')' : ''));
+      + amSecondPass.attempted + ', recovered ' + amSecondPass.recovered
+      + ' (provider attempts ' + amSecondPass.retryCalls + ', bounded rounds ' + amSecondPass.rounds
+      + ', still uncovered ' + amSecondPass.unresolved + ')'
+      + (amSecondPass.skipped ? ' (' + amSecondPass.skipped + ')' : ''));
   }
   /* Restore the input order — the rotation exists only for enrichment fairness,
      and every downstream consumer (reports, state diff) sees a stable order. */
