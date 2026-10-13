@@ -376,6 +376,35 @@ console.log('\n— runtime worldwide screening assurance —\n');
     !futurePep.domains.pep.operational && futurePep.domains.pep.reasons.some(r => r.includes('future')));
   check('stored runtime assurance enforces the top-level operational verdict',
     !checkStored({ ...ok, operational: false }, { nowMs }).ok);
+  check('stored runtime assurance accepts internally consistent verified evidence',
+    checkStored(ok, { nowMs }).ok);
+  const forgedMediaGreen = structuredClone(uc);
+  forgedMediaGreen.operational = true;
+  forgedMediaGreen.domains.adverseMedia.operational = true;
+  check('persisted zero-coverage subjects cannot be marked operational by changing booleans',
+    !checkStored(forgedMediaGreen, { nowMs }).ok
+    && checkStored(forgedMediaGreen, { nowMs }).reasons.some(x => x.includes('without verified coverage')));
+  const hiddenFailure = structuredClone(ok);
+  hiddenFailure.domains.adverseMedia.reasons.push('previous source outage');
+  check('unresolved failure reasons invalidate a green persisted domain',
+    !checkStored(hiddenFailure, { nowMs }).ok);
+  const missingEvidence = structuredClone(ok);
+  delete missingEvidence.domains.adverseMedia.evidence;
+  check('removing stored adverse-media coverage proof fails closed',
+    !checkStored(missingEvidence, { nowMs }).ok);
+  const mismatchedSubjects = structuredClone(ok);
+  mismatchedSubjects.domains.sanctions.evidence.screenedSubjects--;
+  check('domain subject counts must reconcile with the screening-run population',
+    !checkStored(mismatchedSubjects, { nowMs }).ok);
+  const truncatedSanctions = structuredClone(ok);
+  truncatedSanctions.domains.sanctions.evidence.loadedSources[0].count = 0;
+  check('a truncated sanctions source cannot retain a stored all-clear verdict',
+    !checkStored(truncatedSanctions, { nowMs }).ok);
+  const missingPep = structuredClone(ok);
+  missingPep.domains.pep.evidence.partial = true;
+  check('a partial PEP harvest cannot be marked operational by changing booleans',
+    !checkStored(missingPep, { nowMs }).ok);
+
   const noRequiredContract = structuredClone(contract);
   noRequiredContract.domains.sanctions.sources = [];
   const emptyContractVerdict = assessRuntime({ results, pepDataset: pep, contract: noRequiredContract,
