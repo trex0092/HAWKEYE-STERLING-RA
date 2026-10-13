@@ -69,9 +69,9 @@ export async function asana(path, opts = {}) {
   for (let attempt = 0; ; attempt++) {
     let r;
     try {
-      const deadline = AbortSignal.timeout(resolveAsanaTimeoutMs(process.env.ASANA_HTTP_TIMEOUT_MS));
+      const deadline = globalThis.AbortSignal.timeout(resolveAsanaTimeoutMs(process.env.ASANA_HTTP_TIMEOUT_MS));
       const signal = requestOptions.signal
-        ? AbortSignal.any([requestOptions.signal, deadline]) : deadline;
+        ? globalThis.AbortSignal.any([requestOptions.signal, deadline]) : deadline;
       r = await fetch('https://app.asana.com/api/1.0' + path, {
         ...requestOptions,
         signal,
