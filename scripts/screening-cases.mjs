@@ -27,6 +27,8 @@ import { asana, asanaEnabled, esc, runUrl, notifyAsana,
 import { enrichScreeningResults } from './openai-screening-enrichment.mjs';
 import { appendApiCostUsage } from './api-cost-dashboard.mjs';
 import { SECTIONS, caseSection } from './asana-sections.mjs';
+import { assessRuntime } from './screening-assurance.mjs';
+import { readJsonMaybeGz } from './pep-worldwide.mjs';
 
 export const SCREEN_STATE_FILE = 'data/sanctions-screen-state.json';
 export const CASES_FILE = 'data/screening-cases-state.json';
@@ -80,6 +82,26 @@ export function canAutoClearCases(results, today) {
     pep.active === true && pep.partial === false &&
     Number.isSafeInteger(pep.count) && pep.count > 0 &&
     typeof pep.harvested === 'string' && Number.isFinite(Date.parse(pep.harvested));
+}
+
+/* The case planner's cheap flags cannot certify the whole coverage universe:
+ * even one healthy sanctions list can pass them when OTHER required lists
+ * were removed from configuration. Only the same independently evaluated
+ * contract used by operational screening assurance can authorize automatic
+ * dispositions. This predicate is deliberately independent of case creation,
+ * aging, human escalation, and the daily review digest. */
+export function authorizeAutoClear(results, today, assurance) {
+  const dayStart = typeof today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(today)
+    ? Date.parse(today + 'T00:00:00Z') : NaN;
+  const issued = Date.parse(String(assurance?.generatedAt || ''));
+  return canAutoClearCases(results, today) &&
+    Number.isFinite(dayStart) && Number.isFinite(issued) &&
+    issued >= dayStart && issued < dayStart + 86400000 &&
+    assurance?.operational === true &&
+    assurance?.run?.date === today &&
+    assurance?.run?.screenedSubjects === results.screened &&
+    ['sanctions', 'adverseMedia', 'pep']
+      .every(domain => assurance?.domains?.[domain]?.operational === true);
 }
 
 /* Pure planner: decide every case action from plain data.
@@ -455,9 +477,26 @@ async function main() {
   if (!casesState || typeof casesState !== 'object' || Array.isArray(casesState)) {
     throw new Error('Existing Asana case state missing or corrupt; refusing duplicate-prone actions');
   }
-  const allowAutoClear = canAutoClearCases(results, today);
+  // Re-evaluate the current run against the independent, pinned screening
+  // contract and the actual PEP harvest BEFORE considering ANY auto-closure.
+  // A cached green badge or self-reported "degraded:false" is not adequate.
+  // If required evidence is unreadable, HOLD existing cases; still deliver
+  // new matches, SLA aging and MLRO escalation rather than hiding alerts.
+  let runAssurance = null;
+  try {
+    const contract = readJson('data/worldwide-screening-sources.json');
+    let pepDataset = null;
+    try {
+      pepDataset = readJsonMaybeGz(
+        process.env.PEP_WORLDWIDE_FILE || 'data/pep-worldwide.json');
+    } catch { /* Missing/unreadable PEP evidence is a coverage failure. */ }
+    runAssurance = assessRuntime({ results, pepDataset, contract });
+  } catch {
+    console.warn('screening-cases: independent coverage verification unavailable; automatic closure held');
+  }
+  const allowAutoClear = authorizeAutoClear(results, today, runAssurance);
   if (!allowAutoClear) {
-    console.warn('screening-cases: source completeness not proven; all automatic case closures are HELD for human review');
+    console.warn('screening-cases: independent sanctions/media/PEP proof incomplete; all automatic case closures are HELD for human review');
   }
 
   /* DISPOSITION READ-BACK — the analyst feedback loop. For every open case,

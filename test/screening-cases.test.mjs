@@ -1,8 +1,9 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { planCaseActions, canAutoClearCases, authorizeAutoClear, confirmedDispositionState, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
 import { caseSection, SECTIONS } from '../scripts/asana-sections.mjs';
+import { assessRuntime } from '../scripts/screening-assurance.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -154,6 +155,49 @@ const GOOD_COVERAGE = {
     pepWorldwide: { active: true, partial: false, count: 200,
       harvested: '2026-07-08T05:00:00Z' } }
 };
+const GREEN_PROOF = {
+  operational: true, generatedAt: TODAY + 'T12:00:00.000Z',
+  run: { date: TODAY, screenedSubjects: GOOD_COVERAGE.screened },
+  domains: {
+    sanctions: { operational: true },
+    adverseMedia: { operational: true },
+    pep: { operational: true },
+  },
+};
+check('automatic case closure requires current independent three-domain proof',
+  authorizeAutoClear(GOOD_COVERAGE, TODAY, GREEN_PROOF) === true &&
+  authorizeAutoClear(GOOD_COVERAGE, TODAY, null) === false &&
+  authorizeAutoClear(GOOD_COVERAGE, TODAY, { ...GREEN_PROOF,
+    operational: false }) === false);
+check('yesterday proof or mismatched screened population never authorizes a clearance',
+  authorizeAutoClear(GOOD_COVERAGE, TODAY, { ...GREEN_PROOF,
+    generatedAt: '2026-07-07T23:59:00Z' }) === false &&
+  authorizeAutoClear(GOOD_COVERAGE, TODAY, { ...GREEN_PROOF,
+    run: { ...GREEN_PROOF.run, screenedSubjects: GOOD_COVERAGE.screened + 1 } }) === false);
+check('any nonoperational sanctions, news or PEP domain holds automatic closure',
+  ['sanctions', 'adverseMedia', 'pep'].every(domain =>
+    !authorizeAutoClear(GOOD_COVERAGE, TODAY, { ...GREEN_PROOF,
+      domains: { ...GREEN_PROOF.domains, [domain]: { operational: false } } })));
+const incompleteContractProof = assessRuntime({
+  results: { ...GOOD_COVERAGE, lists: [{
+    id: 'ofac-sdn', count: 12000, partial: false
+  }] },
+  contract: { domains: { sanctions: { sources: [
+    { id: 'ofac-sdn', required: true, minNames: 9000 },
+    { id: 'un-consolidated', required: true, minNames: 500 },
+  ] } } },
+  pepDataset: null,
+  nowMs: Date.parse(TODAY + 'T12:00:00Z'),
+});
+check('one successfully fetched sanctions source cannot certify a missing required source',
+  canAutoClearCases(GOOD_COVERAGE, TODAY) === true &&
+  incompleteContractProof.domains.sanctions.operational === false &&
+  authorizeAutoClear(GOOD_COVERAGE, TODAY, incompleteContractProof) === false);
+check('case creation and human-review aging remain active when assurance is absent',
+  planCaseActions({ [KEY]: subj() }, {}, TODAY, {
+    allowAutoClear: authorizeAutoClear(GOOD_COVERAGE, TODAY, null)
+  })[0]?.type === 'create');
+
 check('only fresh, full three-domain coverage authorizes any automated case closure',
   canAutoClearCases(GOOD_COVERAGE, TODAY) === true &&
   canAutoClearCases({ ...GOOD_COVERAGE, degraded: true }, TODAY) === false &&
