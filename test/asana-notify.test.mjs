@@ -2,7 +2,7 @@
    shared transient-failure policy (retry classification + backoff) and the
    re-run duplicate guard used by every monitoring delivery stream. */
 import {
-  asana, isRetryable, retryDelayMs, publicAsanaRejection, findRecentDuplicate, findDateScopedDailyDuplicates,
+  asana, isRetryable, retryDelayMs, resolveAsanaTimeoutMs, ASANA_TIMEOUT_DEFAULT_MS, publicAsanaRejection, findRecentDuplicate, findDateScopedDailyDuplicates,
   esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
   listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize, appendOpenAlertEvidence,
@@ -31,6 +31,63 @@ check('backoff is capped at 8s', retryDelayMs(10) === 8000);
 check('Retry-After header wins when present', retryDelayMs(0, '5') === 5000);
 check('Retry-After is capped at 30s', retryDelayMs(0, '900') === 30000);
 check('garbage Retry-After falls back to backoff', retryDelayMs(1, 'soon') === 2000);
+
+/* Abort-signal deadline is enforced by the shared Asana fetch boundary,
+   including non-replayable writes; synthetic transport only. */
+{
+  check('Asana fetch timeout has a bounded default and no unlimited zero timeout',
+    ASANA_TIMEOUT_DEFAULT_MS === 30000 &&
+    resolveAsanaTimeoutMs(undefined) === 30000 &&
+    resolveAsanaTimeoutMs('0') === 1000 &&
+    resolveAsanaTimeoutMs('500') === 1000 &&
+    resolveAsanaTimeoutMs('120000') === 60000 &&
+    resolveAsanaTimeoutMs('invalid') === 30000);
+  const old = globalThis.fetch;
+  const token = process.env.ASANA_ACCESS_TOKEN;
+  const env = process.env.ASANA_HTTP_TIMEOUT_MS;
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-not-live';
+  process.env.ASANA_HTTP_TIMEOUT_MS = '2500';
+  try {
+    let observed = null, attempts = 0;
+    globalThis.fetch = async (_url, options = {}) => {
+      observed = options.signal;
+      attempts++;
+      throw new Error('synthetic ambiguous Asana network termination');
+    };
+    let failed = false;
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'synthetic case' } }) });
+    } catch (e) {
+      failed = e.message === 'Asana transport failure; remote outcome not confirmed';
+    }
+    check('every non-replayable Asana POST receives an AbortSignal and cannot retry after an unknown outcome',
+      failed && attempts === 1 && observed instanceof globalThis.AbortSignal);
+
+    const external = new AbortController();
+    let compositeSignal = null;
+    globalThis.fetch = (_url, options = {}) => new Promise((_resolve, reject) => {
+      compositeSignal = options.signal;
+      if (!compositeSignal) return reject(Error('missing deadline signal'));
+      if (compositeSignal.aborted) return reject(Error('synthetic aborted'));
+      compositeSignal.addEventListener('abort', () => reject(Error('synthetic aborted')), { once: true });
+    });
+    const pending = asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+      signal: external.signal, body: JSON.stringify({ data: { name: 'synthetic case' } }) });
+    external.abort();
+    let aborted = false;
+    try { await pending; }
+    catch (e) { aborted = e.message === 'Asana transport failure; remote outcome not confirmed'; }
+    check('caller cancellation remains effective alongside the bounded Asana network deadline',
+      aborted && compositeSignal instanceof globalThis.AbortSignal && compositeSignal.aborted);
+  } finally {
+    globalThis.fetch = old;
+    if (token === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = token;
+    if (env === undefined) delete process.env.ASANA_HTTP_TIMEOUT_MS;
+    else process.env.ASANA_HTTP_TIMEOUT_MS = env;
+  }
+}
 
 /* Asana task creation is non-replayable after an ambiguous response.
    On 429 the service explicitly did NOT accept the mutation, and bounded
