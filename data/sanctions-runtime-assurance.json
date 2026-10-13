@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-13T07:59:38.337Z",
-  "githubRunId": "38366099227",
-  "commit": "835d5da677255a5eabf0abd07d88860ed8e801f2",
+  "generatedAt": "2026-10-13T12:50:16.649Z",
+  "githubRunId": "38400142322",
+  "commit": "5a39ebbb04687f49cb65d24eaf6a9f4c969a645c",
   "screenedSubjects": 991,
   "requiredSourceIds": [
     "un-consolidated",
@@ -13,9 +13,7 @@
   ],
   "operational": true,
   "reasons": [],
-  "warnings": [
-    "one or more supplementary sanctions sources were unavailable or partial"
-  ],
+  "warnings": [],
   "evidence": {
     "screenedSubjects": 991,
     "loadedSources": [
@@ -47,6 +45,12 @@
         "id": "eu-fsf",
         "name": "EU — Consolidated financial sanctions list (CSV)",
         "count": 31037,
+        "partial": false
+      },
+      {
+        "id": "fr-dgt",
+        "name": "France — Registre national des gels (DGT)",
+        "count": 19827,
         "partial": false
       }
     ],
@@ -84,8 +88,6 @@
       }
     ],
     "servedByFallback": [],
-    "notes": [
-      "France — Registre national des gels (DGT) could not be loaded (fetch failed <- UND_ERR_CONNECT_TIMEOUT: Connect Timeout Error (attempted address: gels-avoirs.dgtresor.gouv.fr:443, timeout: 10000ms)) - coverage degraded"
-    ]
+    "notes": []
   }
 }
