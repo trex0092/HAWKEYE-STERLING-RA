@@ -349,7 +349,7 @@ export function writeAssurance(assurance) {
   writeFileSync(BADGE_FILES.pep, badgeSvg('PEP runtime', assurance.domains.pep));
 }
 
-export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAULT_ASSURANCE_MAX_AGE_HOURS } = {}) {
+export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAULT_ASSURANCE_MAX_AGE_HOURS, expectedCommit = null } = {}) {
   const reasons = [];
   if (!assurance || assurance.version !== 1) reasons.push('assurance artifact missing or invalid');
   if (assurance?.operational !== true) reasons.push('overall screening assurance is not operational');
@@ -361,6 +361,21 @@ export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAU
   if (Number.isFinite(issuedAtMs)) {
     const runProblem = runDateIssue(assurance?.run?.date, issuedAtMs);
     if (runProblem) reasons.push(runProblem);
+  }
+  // Operational proof is tied to the EXACT screening-code revision being
+  // checked. A fresh report from yesterday's code is not validation of a
+  // newly merged engine, source-project policy, or Asana delivery contract.
+  // This is a commit-consistency check, not a claim of signed provenance.
+  if (expectedCommit !== null && expectedCommit !== undefined) {
+    const expected = String(expectedCommit).trim();
+    const actual = String(assurance?.run?.commit || '').trim();
+    if (!/^[a-f0-9]{40}$/i.test(expected)) {
+      reasons.push('expected integrated screening commit is missing or invalid');
+    } else if (!/^[a-f0-9]{40}$/i.test(actual)) {
+      reasons.push('stored screening evidence has no verified producing commit');
+    } else if (actual.toLowerCase() !== expected.toLowerCase()) {
+      reasons.push('stored screening evidence was produced by a different code commit');
+    }
   }
   // The persisted verdict is NOT the evidence. Refuse a superficially green
   // boolean when the stored counters, unresolved reasons or consumed source
@@ -457,7 +472,12 @@ function main() {
   if (mode === '--check') {
     let stored = null;
     try { stored = loadJson(ASSURANCE_FILE); } catch {}
-    const checked = checkStored(stored);
+    // GitHub Actions provides the workflow triggering commit. The workflow
+    // passes it explicitly, so no assurance job can silently reuse an older
+    // screening run after code or the approved Asana-source mapping changed.
+    const expectedCommit = process.env.SCREENING_ASSURANCE_EXPECTED_COMMIT ??
+      (process.env.GITHUB_ACTIONS === 'true' ? (process.env.GITHUB_SHA ?? '') : null);
+    const checked = checkStored(stored, { expectedCommit });
     if (!checked.ok) {
       console.error('screening-assurance: FAILED');
       for (const r of checked.reasons) console.error('- ' + r);
