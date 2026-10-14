@@ -1,0 +1,3 @@
+interface:
+  display_name: "Github Workflow Security"
+  short_description: "Harden GitHub Actions and validate starter workflow adoption."
