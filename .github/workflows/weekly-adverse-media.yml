@@ -383,11 +383,10 @@ jobs:
           EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
-          # HR - Employees screening population (MLRO-directed 2026-07-29,
-          # see screen.py). Never forwarded here before, so screen.py always
-          # fell back to its own hardcoded default (1216139945846994), which
-          # does not exist in Asana, and that FATAL guard aborted the run.
-          ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID || '1216239131596624' }}
+          # Both approved Asana projects are mandatory screening populations.
+          # Pin HR here: a non-empty stale repository variable would otherwise
+          # redirect the Python engine to an unapproved or missing project.
+          ASANA_EMPLOYEE_DB_GID: '1216239131596624'
           ASANA_DELIVERY_SECTION_GID: '1218979441933783'
           ASANA_SANCTIONS_SECTION_GID: '1218451960830318'
           ASANA_MEDIA_SECTION_GID: '1218979441933783'
