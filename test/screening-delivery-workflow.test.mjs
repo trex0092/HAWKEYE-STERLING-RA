@@ -67,6 +67,24 @@ test('failed encrypted-state persistence and missing watchdog dispatch cannot si
   assert.doesNotMatch(alert, /continue-on-error|subjects\[|sanctions-screen-report\.md/);
 });
 
+test('screening API cost dashboard uses complete verified inputs or reports INCOMPLETE', () => {
+  const budget = steps.find(text => text.includes('name: API cost summary (metadata only)'));
+  assert.ok(budget, 'screening cost step exists');
+  assert.match(budget, /API_USD_RATES_JSON:\s*\$\{\{\s*vars\.API_USD_RATES_JSON\s*\}\}/);
+  assert.match(budget, /if \[ ! -s api-cost-ledger\.jsonl \] \|\| \[ -z/);
+  assert.match(budget, /INCOMPLETE: No verified pricing table and sanitized paid-usage receipts/);
+  assert.match(budget, /Missing evidence is not zero spending/);
+  assert.match(budget, /umask 077/);
+  assert.match(budget, /PRICE_FILE="\$\{RUNNER_TEMP\}\/hawkeye-screen-verified-prices\.json"/);
+  assert.match(budget, /trap 'rm -f "\$PRICE_FILE"' EXIT/);
+  assert.match(budget, /node scripts\/api-cost-dashboard\.mjs --ledger api-cost-ledger\.jsonl --prices "\$PRICE_FILE"/);
+  assert.doesNotMatch(budget, /run: node scripts\/api-cost-dashboard\.mjs\s*(?:\n|$)/,
+    'dashboard without its required arguments always fails with exit code 2');
+  assert.doesNotMatch(budget, /\$0\.00|estimated_usd: 0|status: priced_estimate/);
+  assert.match(budget, /continue-on-error: true/,
+    'cost observability cannot block the sanctions/PEP report delivery');
+});
+
 test('public issue fallback handles assurance failures without exposing screening identities', () => {
   const issue = steps.find(text => text.includes('Open a GitHub issue when screening or coverage needs human attention'));
   assert.ok(issue);
