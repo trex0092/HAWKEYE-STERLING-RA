@@ -1,0 +1,150 @@
+{
+  "schema": "hawkeye/starter-workflows-adoption/v1",
+  "reviewed_at": "2026-10-14",
+  "upstream": "https://github.com/actions/starter-workflows",
+  "purpose": "Only adopt missing, supported controls for the repo's actual Python, Node and container assets. A template is not a requirement or security certification.",
+  "decisions": [
+    {
+      "starter": "code-scanning/hadolint.yml",
+      "decision": "adopt",
+      "reason": "Dockerfile best-practice lint, pinned action and no image publishing",
+      "target": ".github/workflows/dockerfile-security-lint.yml"
+    },
+    {
+      "starter": "code-scanning/anchore-syft.yml",
+      "decision": "adopt",
+      "reason": "Source SPDX SBOM artifact without write token or dependency submission",
+      "target": ".github/workflows/source-sbom.yml"
+    },
+    {
+      "starter": "code-scanning/codeql.yml",
+      "decision": "already-present",
+      "reason": "CodeQL is already wired with existing blocking CI and scheduled scans",
+      "target": ".github/workflows/codeql.yml"
+    },
+    {
+      "starter": "code-scanning/bandit.yml",
+      "decision": "already-present",
+      "reason": "Existing Python SAST covers unsafe high-risk code paths",
+      "target": ".github/workflows/bandit.yml"
+    },
+    {
+      "starter": "code-scanning/semgrep.yml",
+      "decision": "already-present",
+      "reason": "Semgrep already enforces application-specific security invariants",
+      "target": ".github/workflows/semgrep.yml"
+    },
+    {
+      "starter": "code-scanning/dependency-review.yml",
+      "decision": "already-present",
+      "reason": "Existing PR dependency review includes security baseline gating",
+      "target": ".github/workflows/dependency-review.yml"
+    },
+    {
+      "starter": "code-scanning/osv-scanner.yml",
+      "decision": "already-present",
+      "reason": "Existing OSV workflow checks vulnerability advisories",
+      "target": ".github/workflows/osv-scanner.yml"
+    },
+    {
+      "starter": "code-scanning/scorecard.yml",
+      "decision": "already-present",
+      "reason": "Existing OSSF Scorecard workflow tests repository hygiene",
+      "target": ".github/workflows/scorecard.yml"
+    },
+    {
+      "starter": "code-scanning/trivy.yml",
+      "decision": "already-present",
+      "reason": "Existing container CVE scan of published self-hosting image",
+      "target": ".github/workflows/container-scan.yml"
+    },
+    {
+      "starter": "ci/python-app.yml",
+      "decision": "already-present",
+      "reason": "Python screening test suite and Bandit are already covered by CI",
+      "target": ".github/workflows/ci.yml"
+    },
+    {
+      "starter": "ci/node.js.yml",
+      "decision": "already-present",
+      "reason": "Existing Node and browser regression test jobs cover JS runtime",
+      "target": ".github/workflows/ci.yml"
+    },
+    {
+      "starter": "automation/stale.yml",
+      "decision": "already-present",
+      "reason": "Stale issue triage already exists with project-specific policies",
+      "target": ".github/workflows/stale.yml"
+    },
+    {
+      "starter": "automation/label.yml",
+      "decision": "already-present",
+      "reason": "Existing labeler and label-sync jobs reconcile declarative taxonomy",
+      "target": ".github/workflows/label-sync.yml"
+    },
+    {
+      "starter": "automation/manual.yml",
+      "decision": "defer",
+      "reason": "Generic Hello World manual template adds no operational control; use specific workflow_dispatch checks"
+    },
+    {
+      "starter": "ci/npm-publish.yml",
+      "decision": "reject",
+      "reason": "package.json is private; do not introduce an unapproved public package release path"
+    },
+    {
+      "starter": "ci/npm-publish-github-packages.yml",
+      "decision": "reject",
+      "reason": "package.json is private; GitHub Package publishing is not authorized"
+    },
+    {
+      "starter": "ci/android.yml",
+      "decision": "not-applicable",
+      "reason": "No Android application or Gradle build target exists in this repository"
+    },
+    {
+      "starter": "ci/dotnet.yml",
+      "decision": "not-applicable",
+      "reason": "No .NET solution or C# package exists"
+    },
+    {
+      "starter": "ci/go.yml",
+      "decision": "not-applicable",
+      "reason": "No Go application code requiring a separate compiler job"
+    },
+    {
+      "starter": "code-scanning/sonarcloud.yml",
+      "decision": "defer",
+      "reason": "Third-party account integration, scanning overlap and external token need independent approval"
+    }
+  ],
+  "policy": {
+    "read_only_automation": true,
+    "third_party_actions_pinned": true,
+    "no_netlify_changes": true,
+    "package_publication_authorized": false,
+    "human_mlro_dispositions_required": true,
+    "live_branch_protection_requires_independent_verification": true,
+    "priority_labels_manual": true,
+    "source_screening_assurance_requires_real_run": true
+  },
+  "agent_skills": [
+    ".agents/skills/screening-evidence-review/SKILL.md",
+    ".agents/skills/asana-case-delivery/SKILL.md",
+    ".agents/skills/github-workflow-security/SKILL.md"
+  ],
+  "manual_labels": [
+    "priority/P0",
+    "priority/P1",
+    "priority/P2",
+    "status/evidence-needed",
+    "status/mlro-review"
+  ],
+  "auto_area_labels": [
+    "area/asana-delivery",
+    "area/ai-security",
+    "area/supply-chain",
+    "area/agent-skills",
+    "area/repo-protection"
+  ]
+}
