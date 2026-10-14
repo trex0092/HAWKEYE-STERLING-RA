@@ -2501,12 +2501,12 @@ async function main() {
   try { subjects = await fetchAsanaSubjects(CUSTOMER_PROJECT_GID, asanaToken); }
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
-  // Preserve the population totals BEFORE concatenating employee records.
-  // These counts, not subject names, are published with the run's assurance.
-  const customerScreenedSubjects = subjects.length;
-  let employeeScreenedSubjects = 0;
   const onRunner = process.env.GITHUB_ACTIONS === 'true';
   let maskedCount = onRunner ? maskSubjectNames(subjects) : 0;
+  // Counts follow immediate public-run identity masking, before appending HR.
+  // This is aggregate-only evidence and contains no subject identifiers.
+  const customerScreenedSubjects = subjects.length;
+  let employeeScreenedSubjects = 0;
 
   if (EMPLOYEE_PROJECT_GID) {
     let employees;
