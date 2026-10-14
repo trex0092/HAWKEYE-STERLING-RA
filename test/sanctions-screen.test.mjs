@@ -841,7 +841,7 @@ check('control-retry heals on missing SUCCESS (a red bail is now re-dispatched)'
 check('operational sanctions screen revalidates only approved main code changes, retaining manual/schedule controls',
   /^  push:\s*$/m.test(screenYml)
   && /branches:\s*\[main\]/.test(screenYml)
-  && /paths:\s*$/.test(screenYml)
+  && /^\s*paths:\s*$/m.test(screenYml)
   && screenYml.includes("      - '.github/workflows/sanctions-screen.yml'")
   && screenYml.includes("      - 'scripts/screening-assurance.mjs'")
   && !/^  pull_request:/m.test(screenYml)
