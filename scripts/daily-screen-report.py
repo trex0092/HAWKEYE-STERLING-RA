@@ -30,6 +30,12 @@ script_ver  = os.environ["SCRIPT_VERSION"]
 total       = results["total"]
 entity_count     = results.get("entity_count", total)
 individual_count = results.get("individual_count", 0)
+employee_count = results.get("employee_count")
+if not isinstance(employee_count, int) or isinstance(employee_count, bool) or not (0 < employee_count <= individual_count):
+    raise SystemExit("FATAL: mandatory HR screening population evidence is missing or invalid")
+principal_count = individual_count - employee_count
+if entity_count + individual_count != total:
+    raise SystemExit("FATAL: screening population totals are inconsistent")
 confirmed   = results["confirmed"]
 potential   = results["potential"]
 clear_count = results["clear_count"]
@@ -81,6 +87,13 @@ if os.environ.get("UAE_LIST_STALE", "false") == "true":
     _rev_max = os.environ.get("UAE_LIST_REVIEW_MAX", "7")
     eocn_last_reviewed = f"{eocn_last_reviewed}  ⚠️ REVIEW OVERDUE (age {_rev_age}, max {_rev_max}d): re-verify against the official EOCN publication"
 
+def _subject_label(row):
+    if row.get("kind") != "individual":
+        return row["customer"] + "  [LEGAL ENTITY]"
+    role = row.get("role") or "Principal"
+    parent = row.get("parent") or ""
+    return row["customer"] + "  [INDIVIDUAL — " + role + ((" of " + parent) if parent else "") + "]"
+
 # ---- confirmed hits section ----
 if refused:
     # Never render all-clear wording on a refused run: no results
@@ -92,7 +105,7 @@ elif not confirmed:
 else:
     lines = []
     for i, h in enumerate(confirmed, 1):
-        subj = h['customer'] + ("  [INDIVIDUAL — " + (h.get('role') or 'Principal') + " of " + h.get('parent','') + "]" if h.get('kind') == 'individual' else "  [LEGAL ENTITY]")
+        subj = _subject_label(h)
         lines.append(
             f"⛔ HIT {i}\n"
             f"   Subject:         {subj}\n"
@@ -116,7 +129,7 @@ elif not potential:
 else:
     lines = []
     for i, p in enumerate(potential, 1):
-        subj = p['customer'] + ("  [INDIVIDUAL — " + (p.get('role') or 'Principal') + " of " + p.get('parent','') + "]" if p.get('kind') == 'individual' else "  [LEGAL ENTITY]")
+        subj = _subject_label(p)
         lines.append(
             f"⚠️  POTENTIAL MATCH {i}\n"
             f"   Subject:         {subj}\n"
@@ -243,21 +256,23 @@ LISTS SCREENED
 SCOPE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Subjects Screened:     {total} — FULL Customer Database
-                       ({entity_count} legal entities + {individual_count} principals/UBOs)
+Subjects Screened:     {total} — FULL Customer Database + HR Employees
+                       ({entity_count} entities + {principal_count} principals/UBOs + {employee_count} employees)
 Screening Type:        Fuzzy name matching + alias matching
 Match Threshold:       85% minimum similarity score
 Transliteration:       Arabic / Turkish / Latin variants included
 Entity Types:          Legal entities AND their associated individuals
                        (every shareholder, director and UBO recorded
                        in SECTION 4 of the customer assessment is
-                       screened in their own right, not just the company)
+                       screened in their own right, not just the company;
+                       completed HR training tasks represent employees
+                       still subject to natural-person screening)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RESULTS SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Total Subjects Screened:               {total}  ({entity_count} entities + {individual_count} principals/UBOs)
+Total Subjects Screened:               {total}  ({entity_count} entities + {principal_count} principals/UBOs + {employee_count} employees)
 Confirmed Hits:                        {len(confirmed)}
 Potential Matches — Pending Review:    {len(potential)}
 Clear — No Match:                      {clear_count}
@@ -305,9 +320,11 @@ EU FSF File Hash:         {eu_hash}
 UK OFSI File Hash:        {uk_hash}
 UAE EOCN List Hash:       {uae_b_hash}
 
-Customer List Source:     Asana — Customer Database
+Screening Source 1:       Asana — Customer Database
                           Project GID: 1214107620220121
-Subjects at Time of Run:  {total} ({entity_count} entities + {individual_count} principals/UBOs)
+Screening Source 2:       Asana — HR - Employees Training/Workshops
+                          Project GID: 1216239131596624
+Subjects at Time of Run:  {total} ({entity_count} entities + {principal_count} principals/UBOs + {employee_count} employees)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MLRO SIGN-OFF
