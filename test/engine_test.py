@@ -103,6 +103,39 @@ _pm_e, _clr_e = screen.screen_customers(
 check("a designated corporate owner flags the customer by control linkage",
       len(_pm_e) == 1 and any(h["subject_type"].startswith("ENTITY (owner)") and h["control_linkage"] for h in _pm_e[0]["hits"]))
 
+# HR screening: source tasks are natural persons, never an extra company,
+# nor a corporate ownership/control link to their employer.
+_staff = {"name": "Maria Santos", "kind": "employee", "individuals": ["Maria Santos"],
+          "entity_owners": [], "permalink": "hr"}
+_firm = {"name": "Acme Trading LLC", "individuals": ["John Owner"],
+         "entity_owners": ["Parent Holding Ltd"], "permalink": "customer"}
+_hr_slots = screen.build_screening_subjects([_staff, _firm])
+check("HR staff produces one individual slot and no company slot",
+      sum(t == "INDIVIDUAL" and n == "Maria Santos" for t, n, _, _ in _hr_slots) == 1
+      and not any(t == "COMPANY" and n == "Maria Santos" for t, n, _, _ in _hr_slots))
+check("customer entity, director and corporate owner remain screenable",
+      {t for t, n, _, row in _hr_slots if row is _firm}
+      == {"COMPANY", "INDIVIDUAL", "ENTITY (owner)"})
+check("HR task name remains screenable when parsed names are absent",
+      screen.screening_individuals({**_staff, "individuals": []}) == ["Maria Santos"])
+try:
+    screen.screening_individuals({**_staff, "name": "", "individuals": []})
+    _missing_hr_rejected = False
+except ValueError:
+    _missing_hr_rejected = True
+check("blank HR name fails closed rather than disappearing", _missing_hr_rejected)
+_staff_lists = {"OFAC SDN": [(screen.normalize("MARIA SANTOS"), "MARIA SANTOS")]}
+_staff_hits, _staff_clear = screen.screen_customers([_staff], _staff_lists)
+check("designated employee flags an individual without corporate-control linkage",
+      len(_staff_hits) == 1 and len(_staff_hits[0]["hits"]) > 0
+      and all(h["subject_type"] == "INDIVIDUAL" and not h["control_linkage"]
+              for h in _staff_hits[0]["hits"]))
+_company_hits, _company_clear = screen.screen_customers(
+    [_firm], {"OFAC SDN": [(screen.normalize("PARENT HOLDING LTD"), "PARENT HOLDING LTD")]})
+check("customer corporate-owner sanctions match retains control linkage",
+      len(_company_hits) == 1 and any(h["subject_type"] == "ENTITY (owner)"
+      and h["control_linkage"] for h in _company_hits[0]["hits"]))
+
 # ── full-screening audit regressions: extraction & the unscreenable net ───────
 print("screen.py — extraction & unscreenable-net regressions")
 # Mixed-script subject: normalize() strips the Arabic letters, leaving only the

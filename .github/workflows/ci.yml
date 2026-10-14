@@ -267,6 +267,8 @@ jobs:
         run: python test/manual-screen-source-test.py
       - name: Run Python engine unit tests (screen + ai + agents + kyc + txn + monitoring)
         run: python test/engine_test.py
+      - name: Guard HR natural-person classification in the screening engine
+        run: python test/hr-employee-classification-regression.py
       - name: Run MCP server + tool-layer unit tests (protocol + engine wrappers)
         run: python test/mcp_tools_test.py
       - name: Run formal bias / fairness evaluation (R-05 — cross-script recall parity)
