@@ -1360,8 +1360,80 @@ export async function asanaPaged(projectGid, path, optFields, token, what,
   }
 }
 
+/* Every actual Asana source TASK must have its OWN top-level screening row.
+   The legacy name-based parser deduplicates legal entities: when two different
+   task GIDs have the same normalized name, the second task can vanish while
+   the aggregate "screened" count still appears internally consistent. Stop
+   rather than misrepresent this population as complete. Nothing is logged
+   beyond aggregate counts and a generic failure classification. */
+export function requireCompleteAsanaPopulation(tasks, subjects, { employee = false } = {}) {
+  if (!Array.isArray(tasks) || !tasks.length ||
+      !Array.isArray(subjects) || !subjects.length) {
+    throw new Error('Approved Asana source coverage incomplete: no verifiable source/task rows');
+  }
+  const taskIds = new Set();
+  for (const task of tasks) {
+    const id = String(task?.gid || '');
+    if (!/^\d+$/.test(id) || taskIds.has(id) ||
+        typeof task?.name !== 'string' || !task.name.trim()) {
+      throw new Error('Approved Asana source coverage incomplete: missing or duplicate task identity');
+    }
+    taskIds.add(id);
+  }
+  const keys = new Set(), directIds = new Set();
+  for (const subject of subjects) {
+    if (!subject?.key || keys.has(subject.key)) {
+      throw new Error('Approved Asana source coverage incomplete: duplicate screening identity');
+    }
+    keys.add(subject.key);
+    if (!subject.parent) {
+      const id = String(subject.gid || '');
+      if (!taskIds.has(id) || directIds.has(id)) {
+        throw new Error('Approved Asana source coverage incomplete: top-level record identity mismatch');
+      }
+      directIds.add(id);
+      if (employee && (subject.entityType !== 'individual' || subject.role !== 'Employee')) {
+        throw new Error('Approved Asana employee source did not produce individual screening records');
+      }
+    } else if (employee) {
+      // HR training notes are not customer ownership schedules; no unexpected
+      // person rows may be synthesized from them and counted as staff.
+      throw new Error('Approved Asana employee source produced unrelated principal rows');
+    }
+  }
+  if (directIds.size !== tasks.length ||
+      (employee && subjects.length !== tasks.length)) {
+    throw new Error('Approved Asana source coverage incomplete: one or more tasks were not screened');
+  }
+  return { taskRecords: tasks.length, screenedSubjects: subjects.length };
+}
+
+/* Customer legal entities and UBOs, and HR personnel, share one sanctions,
+   adverse-media, PEP and case-state namespace. Even when both source projects
+   individually read successfully, an identical key across projects would
+   cause distinct people/entities to share state and compromise case evidence.
+   Never silently merge records or silently clear standing cases. */
+export function requireDistinctSourceKeys(customers, employees) {
+  if (!Array.isArray(customers) || !customers.length ||
+      !Array.isArray(employees) || !employees.length) {
+    throw new Error('Approved customer and employee screening populations must both be present');
+  }
+  const keys = new Set();
+  for (const person of customers.concat(employees)) {
+    const key = String(person?.key || '');
+    if (!key || keys.has(key)) {
+      throw new Error('Customer/employee screening key collision; manual identity reconciliation required');
+    }
+    keys.add(key);
+  }
+  return true;
+}
+
 export async function fetchAsanaSubjects(projectGid, token) {
-  return parseSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
+  const tasks = await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid);
+  const subjects = parseSubjects(tasks);
+  requireCompleteAsanaPopulation(tasks, subjects);
+  return subjects;
 }
 
 /* HR – Employees: every task IS a natural person (the task name is the
@@ -1390,7 +1462,10 @@ export function parseEmployeeSubjects(tasks) {
 }
 
 export async function fetchAsanaEmployeeSubjects(projectGid, token) {
-  return parseEmployeeSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
+  const tasks = await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid);
+  const subjects = parseEmployeeSubjects(tasks);
+  requireCompleteAsanaPopulation(tasks, subjects, { employee: true });
+  return subjects;
 }
 
 /* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
@@ -2516,6 +2591,8 @@ async function main() {
     employeeScreenedSubjects = employees.length;
     console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
     if (onRunner) maskedCount += maskSubjectNames(employees);
+    try { requireDistinctSourceKeys(subjects, employees); }
+    catch { return bailUnscreened('Customer Database and HR Employees screening subjects have conflicting identities; MLRO review required', today); }
     subjects = subjects.concat(employees);
   }
   if (onRunner) console.log('sanctions-screen: ' + maskedCount + ' subject identifier(s) masked in this public run log — names are disclosed in Asana only');
