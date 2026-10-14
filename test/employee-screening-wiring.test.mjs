@@ -34,16 +34,19 @@ const FORWARD_RE = (name) => new RegExp(name + ':\\s*\\$\\{\\{\\s*vars\\.' + nam
 
 for (const wf of WORKFLOWS) {
   const text = readFileSync(wf.file, 'utf8');
-  check(`${wf.file}: forwards ${wf.varName} into the ${wf.engine} job env (regression: 2026-09-19 employee-GID FATAL, PRs #549/#550/#552)`,
-    FORWARD_RE(wf.varName).test(text));
+  const isPython = wf.engine.startsWith('Python');
+  const correct = isPython
+    ? /ASANA_EMPLOYEE_DB_GID:\s*'1216239131596624'/.test(text) &&
+      !/ASANA_EMPLOYEE_DB_GID:\s*\$\{\{/.test(text)
+    : FORWARD_RE(wf.varName).test(text);
+  check(`${wf.file}: binds the approved HR screening source for the ${wf.engine} job`,
+    correct);
 }
 
-/* An unset repo variable expands to an EMPTY string, which both engines read as
-   "employee screening disabled". Every screening workflow must therefore fall
-   back to the live HR - Employees project (1216239131596624) so a missing
-   variable can never silently drop the employee population. The onboarding
-   screen and independent sanctions runtime assurance once forwarded bare
-   variables, so both need a strict fallback for the approved HR project. */
+/* JS workflows retain strict fallback and source-route validation. Python
+   workflows PIN the approved project GID, ignoring stale repository variables
+   because the Python engine historically allowed an empty HR setting. A
+   missing or redirected employee source must never create an all-clear. */
 const EMPLOYEE_PROJECT_GID = '1216239131596624';
 const source = readFileSync('scripts/sanctions-screen.mjs', 'utf8');
 check('JS engine defaults to the same approved HR Employees GID used by all workflows',
@@ -56,8 +59,11 @@ check('JS engine aborts when customer, employee or results project changes',
 
 for (const wf of WORKFLOWS) {
   const text = readFileSync(wf.file, 'utf8');
-  check(`${wf.file}: ${wf.varName} falls back to the HR - Employees project when the repo variable is unset`,
-    new RegExp(wf.varName + ":\\s*\\$\\{\\{\\s*vars\\." + wf.varName + "\\s*\\|\\|\\s*'" + EMPLOYEE_PROJECT_GID + "'\\s*\\}\\}").test(text));
+  const correctSource = wf.engine.startsWith('Python')
+    ? new RegExp(wf.varName + ":\\s*'" + EMPLOYEE_PROJECT_GID + "'").test(text)
+    : new RegExp(wf.varName + ":\\s*\\$\\{\\{\\s*vars\\." + wf.varName + "\\s*\\|\\|\\s*'" + EMPLOYEE_PROJECT_GID + "'\\s*\\}\\}").test(text);
+  check(`${wf.file}: ${wf.varName} cannot silently omit the approved HR project`,
+    correctSource);
 }
 
 /* A customer-only sanctions probe can look green despite never screening
