@@ -366,5 +366,45 @@ const ambiguous = await dispatchOnce(async (_path,opt) => {
 }, '/actions/workflows/sanctions-screen.yml', {nowMs:dedupeNow});
 check('ambiguous POST outcomes never cause an automatic replay',
   ambiguous.action === 'unknown' && posts === 1);
+/* Starter-workflows adaptation: prove these additional jobs can only lint and
+   collect dependency evidence, never publish artifacts to a package registry,
+   deploy services, or acquire write-capable repository credentials. */
+const dockerLint = readFileSync(join(dir, 'dockerfile-security-lint.yml'), 'utf8');
+const sbom = readFileSync(join(dir, 'source-sbom.yml'), 'utf8');
+const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+check('Dockerfile lint action pinned to exact upstream starter SHA',
+  /hadolint\/hadolint-action@[a-f0-9]{40}/.test(dockerLint));
+check('Dockerfile lint is blocking, not a no-fail badge',
+  /failure-threshold:\s*warning/.test(dockerLint) &&
+  /no-fail:\s*false/.test(dockerLint));
+check('source SBOM uses the pinned upstream starter Syft action',
+  /anchore\/sbom-action@[a-f0-9]{40}/.test(sbom));
+check('source SBOM is downloadable SPDX with bounded artifact retention',
+  /format:\s*spdx-json/.test(sbom) &&
+  /upload-artifact:\s*true/.test(sbom) &&
+  /upload-artifact-retention:\s*14/.test(sbom));
+for (const [name, body] of [['Dockerfile lint', dockerLint], ['SBOM', sbom]]) {
+  check(name + ' uses read-only token and has no pull_request_target trigger',
+    /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(body) &&
+    !/^  pull_request_target:/m.test(body) &&
+    !/packages:\s*write|contents:\s*write|id-token:\s*write/.test(body));
+  check(name + ' has no deploy, publish or credentialed checkout',
+    !/^\s+(?:docker push|npm publish|npx semantic-release|gh release create)\b/m.test(body) &&
+    /persist-credentials:\s*false/.test(body));
+}
+check('SBOM cannot silently submit dependencies with a write-capable token',
+  /dependency-snapshot:\s*false/.test(sbom) &&
+  /upload-release-assets:\s*false/.test(sbom));
+if (pkg.private === true) {
+  const directPublish = files.filter(file => {
+    const lines = readFileSync(join(dir, file), 'utf8')
+      .split(/\r?\n/).filter(line => !/^\s*#/.test(line));
+    return lines.some(line =>
+      /^\s*(?:-\s*)?(?:run:\s*)?(?:npm|pnpm|yarn)\s+publish(?:\s|$)/.test(line));
+  });
+  check('a private NPM package is never published by GitHub Actions',
+    directPublish.length === 0);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
