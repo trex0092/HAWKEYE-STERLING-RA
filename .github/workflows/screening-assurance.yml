@@ -49,6 +49,10 @@ jobs:
           git checkout FETCH_HEAD -- data/badges/pep-operational.svg
 
       - name: Require fresh operational evidence
+        env:
+          # A previous successful 991-subject screen is not proof the newly
+          # merged Asana customer+employee source mapping was exercised.
+          SCREENING_ASSURANCE_EXPECTED_COMMIT: ${{ github.sha }}
         run: node scripts/screening-assurance.mjs --check
 
       - name: Alert in Asana when worldwide screening assurance fails
