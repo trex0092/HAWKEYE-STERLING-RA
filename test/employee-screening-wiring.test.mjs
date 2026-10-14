@@ -65,9 +65,9 @@ for (const wf of WORKFLOWS) {
    merely whether employee env keys exist in the workflow text. */
 const runtimeWorkflow = readFileSync('.github/workflows/sanctions-runtime-assurance.yml', 'utf8');
 check('runtime assurance explicitly defaults to the approved Customer Database',
-  /ASANA_CUSTOMER_PROJECT_GID:\\s*\\$\\{\\{\\s*vars\\.ASANA_CUSTOMER_PROJECT_GID\\s*\\|\\|\\s*'1214107620220121'\\s*\\}\\}/.test(runtimeWorkflow));
+  /ASANA_CUSTOMER_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_CUSTOMER_PROJECT_GID\s*\|\|\s*'1214107620220121'\s*\}\}/.test(runtimeWorkflow));
 check('runtime assurance explicitly defaults to completed HR Employees population',
-  /ASANA_EMPLOYEE_PROJECT_GID:\\s*\\$\\{\\{\\s*vars\\.ASANA_EMPLOYEE_PROJECT_GID\\s*\\|\\|\\s*'1216239131596624'\\s*\\}\\}/.test(runtimeWorkflow));
+  /ASANA_EMPLOYEE_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_EMPLOYEE_PROJECT_GID\s*\|\|\s*'1216239131596624'\s*\}\}/.test(runtimeWorkflow));
 
 /* If screen.py's own env-var name for this population ever changes, every one
    of the above should change together -- catch a partial rename early rather
