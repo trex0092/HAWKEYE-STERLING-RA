@@ -366,5 +366,24 @@ const ambiguous = await dispatchOnce(async (_path,opt) => {
 }, '/actions/workflows/sanctions-screen.yml', {nowMs:dedupeNow});
 check('ambiguous POST outcomes never cause an automatic replay',
   ambiguous.action === 'unknown' && posts === 1);
+/* GitHub Packages starter templates must not silently publish a private
+   compliance repository, create release-triggered jobs, or grant write token. */
+const readiness = readFileSync(join(dir, 'npm-package-readiness.yml'), 'utf8');
+check('package readiness is manual-only and cannot publish on tag or release',
+  /workflow_dispatch:/.test(readiness) &&
+  !/^\s{2}(?:push|release|schedule|pull_request_target):/m.test(readiness) &&
+  !/\bnpm\s+publish\b|\bpackages:\s*write|\bid-token:\s*write/.test(readiness));
+check('private package readiness has exact action pins, no shared cache and no credentials',
+  /step-security\/harden-runner@[a-f0-9]{40}/.test(readiness) &&
+  /actions\/checkout@[a-f0-9]{40}/.test(readiness) &&
+  /actions\/setup-node@[a-f0-9]{40}/.test(readiness) &&
+  /persist-credentials:\s*false/.test(readiness) &&
+  /package-manager-cache:\s*false/.test(readiness) &&
+  /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(readiness));
+check('manual package audit only makes local dry-run and preserves private invariant',
+  /p\.private !== true/.test(readiness) &&
+  /npm pack --dry-run --ignore-scripts/.test(readiness) &&
+  /egress-policy:\s*block/.test(readiness));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
