@@ -378,31 +378,87 @@ export async function publishDailyScreening({ results, assurance, state, request
 
 /* Multipart upload (Node's built-in FormData/Blob — no dependency). The JSON
    client cannot send files, so this is the one direct call to Asana here. */
-async function uploadAttachment(parent, name, text, type) {
+export async function uploadAttachment(parent, name, text, type) {
   const form = new globalThis.FormData();
   form.append('parent', parent);
   form.append('file', new globalThis.Blob([text], { type }), name);
-  const response = await fetch('https://app.asana.com/api/1.0/attachments', {
-    method: 'POST', body: form, signal: globalThis.AbortSignal.timeout(60000),
-    headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' },
-  });
+  let response;
+  try {
+    response = await fetch('https://app.asana.com/api/1.0/attachments', {
+      method: 'POST', body: form, signal: globalThis.AbortSignal.timeout(60000),
+      headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' },
+    });
+  } catch {
+    // An upload can have committed even when the TCP response disappeared.
+    // Never log the provider exception or replay that POST directly.
+    throw new Error('Asana attachment upload transport failure; outcome unverified');
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error('Asana attachment upload ' + response.status);
-  return data?.data?.gid;
+  if (!/^\d+$/.test(String(data?.data?.gid || ''))) {
+    throw new Error('Asana attachment upload transport failure; outcome unverified');
+  }
+  return data.data.gid;
+}
+
+/* Reconcile a transient Asana delivery failure once while TODAY'S complete
+   screening result is still available in the job. Without this bounded retry,
+   the morning delivery guard restarts the entire ~100-minute 991-subject
+   screen just to retry a report publication. New cards/pages are already
+   marked, remotely read back and re-used by publishDailyScreening; no AML
+   decision or screening result is recalculated on a delivery retry.
+   Refuse to retry contradictory coverage, missing MLRO approval, bad project
+   mapping, incomplete evidence or any other deterministic failure. */
+export const EVIDENCE_DELIVERY_RETRY_DELAY_MS = 15000;
+export function isTransientEvidenceDeliveryFailure(error) {
+  const failures = error instanceof AggregateError && Array.isArray(error.errors)
+    ? error.errors : [error];
+  if (!failures.length) return false;
+  return failures.every(failure => {
+    const message = String(failure?.message || '').replace(/^(?:sanctions|media) delivery failed:\s*/i, '');
+    return /^(?:Asana transport failure; remote outcome not confirmed|Asana attachment upload transport failure; outcome unverified|Asana (?:408|429|500|502|503|504):|Asana attachment upload (?:408|429|500|502|503|504)\b)/.test(message);
+  });
+}
+
+export async function deliverWithOneRecoveryRetry(deliver, {
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  delayMs = EVIDENCE_DELIVERY_RETRY_DELAY_MS,
+  onRetry = () => {}
+} = {}) {
+  if (typeof deliver !== 'function' || typeof sleep !== 'function' ||
+      typeof onRetry !== 'function' || !Number.isSafeInteger(delayMs) ||
+      delayMs < 0 || delayMs > EVIDENCE_DELIVERY_RETRY_DELAY_MS) {
+    throw new Error('Invalid bounded screening evidence recovery settings');
+  }
+  try {
+    return await deliver();
+  } catch (error) {
+    if (!isTransientEvidenceDeliveryFailure(error)) throw error;
+    onRetry();
+    await sleep(delayMs);
+    // Exactly one more pass with the SAME immutable screening inputs. Remote
+    // card/page ownership and attachment read-back checks still apply.
+    return await deliver();
+  }
 }
 
 async function main() {
   if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN is required for daily results delivery');
   const read = file => JSON.parse(readFileSync(file, 'utf8'));
   const { asana } = await import('./asana-notify.mjs');
-  const receipt = await publishDailyScreening({
-    results: read('sanctions-screen-results.json'),
-    assurance: read('data/screening-assurance.json'),
-    state: read('data/sanctions-screen-state.json'),
+  // Retain ONE screened input snapshot; a transport-only retry reconciles
+  // Asana evidence without recomputing subjects or changing risk decisions.
+  const results = read('sanctions-screen-results.json');
+  const assurance = read('data/screening-assurance.json');
+  const state = read('data/sanctions-screen-state.json');
+  const receipt = await deliverWithOneRecoveryRetry(() => publishDailyScreening({
+    results, assurance, state,
     runId: process.env.GITHUB_RUN_ID,
     assignee: process.env.ASANA_CASE_ASSIGNEE_GID || '1213645083721304',
     request: (path, options = {}) => asana(path, { ...options, signal: globalThis.AbortSignal.timeout(30000) }),
     upload: uploadAttachment,
+  }), {
+    onRetry: () => console.warn('screening-delivery: transient Asana delivery failure; reconciling existing evidence once before escalating'),
   });
   writeFileSync('screening-delivery-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
   for (const report of receipt.reports) console.log('screening-delivery: verified ' + report.domain + ' task ' + report.taskGid);
