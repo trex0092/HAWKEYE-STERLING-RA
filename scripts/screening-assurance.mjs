@@ -20,6 +20,28 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { readJsonMaybeGz, PEP_FLOOR } from './pep-worldwide.mjs';
 import { LOCALES } from './adverse-media.mjs';
+import { CUSTOMER_PROJECT, EMPLOYEE_PROJECT } from './asana-sections.mjs';
+
+/* The approved TWO-source screening population is an assurance control, not
+   merely workflow configuration. A missing employee project, a blank/redirected
+   GID, bad subject count or population-count mismatch must fail closed.
+   These counters contain no customer/employee names or private task IDs. */
+export function approvedSourcePopulationIssue(population, screened) {
+  const customer = population?.customer, employee = population?.employee;
+  const positive = value => Number.isSafeInteger(value) && value > 0;
+  if (!positive(screened) ||
+      !customer || !employee ||
+      customer.projectGid !== CUSTOMER_PROJECT ||
+      employee.projectGid !== EMPLOYEE_PROJECT ||
+      !positive(customer.screenedSubjects) ||
+      !positive(employee.screenedSubjects)) {
+    return 'approved Customer Database and HR Employees screening-source proof missing or invalid';
+  }
+  if (customer.screenedSubjects + employee.screenedSubjects !== screened) {
+    return 'approved Asana source-population totals disagree with screened subject count';
+  }
+  return '';
+}
 
 export const ASSURANCE_FILE = 'data/screening-assurance.json';
 export const RESULTS_FILE = 'sanctions-screen-results.json';
@@ -71,6 +93,17 @@ export function assessRuntime({
   expectedAdverseMatrix = LOCALES.length,
 } = {}) {
   const screenedCountValid = Number.isSafeInteger(results?.screened) && results.screened > 0;
+  const population = {
+    customer: {
+      projectGid: String(results?.sourcePopulation?.customer?.projectGid || ''),
+      screenedSubjects: results?.sourcePopulation?.customer?.screenedSubjects,
+    },
+    employee: {
+      projectGid: String(results?.sourcePopulation?.employee?.projectGid || ''),
+      screenedSubjects: results?.sourcePopulation?.employee?.screenedSubjects,
+    },
+  };
+  const sourceIssue = approvedSourcePopulationIssue(population, results?.screened);
   const requiredEntries = arr(contract?.domains?.sanctions?.sources)
     .filter(s => s && s.required !== false && String(s.id || ''));
   const requiredSanctions = requiredEntries.map(s => String(s.id));
@@ -121,6 +154,7 @@ export function assessRuntime({
   const sanctionsReasons = [];
   if (currentRunIssue) sanctionsReasons.push(currentRunIssue);
   if (!screenedCountValid) sanctionsReasons.push('screened subject count is missing or invalid');
+  if (sourceIssue) sanctionsReasons.push(sourceIssue);
   if (malformedLoaded.length) sanctionsReasons.push('sanctions source evidence has malformed counts or partial flags');
   if (!requiredSanctions.length) sanctionsReasons.push('sanctions contract defines no required sources');
   if (invalidFloors.length) sanctionsReasons.push('required sanctions coverage floors absent or invalid: '
@@ -161,6 +195,7 @@ export function assessRuntime({
   const adverseReasons = [];
   if (currentRunIssue) adverseReasons.push(currentRunIssue);
   if (!screenedCountValid) adverseReasons.push('screened subject count is missing or invalid');
+  if (sourceIssue) adverseReasons.push(sourceIssue);
   const adverseWarnings = [];
   // Absent error counters previously became zero via num(undefined), allowing a
   // broken report to claim no unscreened subjects. Require explicit bounded
@@ -243,6 +278,7 @@ export function assessRuntime({
   const pepReasons = [];
   if (currentRunIssue) pepReasons.push(currentRunIssue);
   if (!screenedCountValid) pepReasons.push('screened subject count is missing or invalid');
+  if (sourceIssue) pepReasons.push(sourceIssue);
   const pepWarnings = [];
   const pepRun = e.pepWorldwide || {};
   const pepCount = num(pepDataset?.count);
@@ -315,6 +351,7 @@ export function assessRuntime({
       githubRunId: process.env.GITHUB_RUN_ID || '',
       commit: process.env.GITHUB_SHA || '',
       screenedSubjects: num(results?.screened),
+      sourcePopulation: population,
     },
     countryUniverse: Number(contract?.countryUniverse) || 195,
     operational: sanctions.operational && adverseMedia.operational && pep.operational,
@@ -384,6 +421,8 @@ export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAU
   const screened = assurance?.run?.screenedSubjects;
   const count = n => Number.isSafeInteger(n) && n >= 0;
   if (!count(screened) || screened === 0) reasons.push('screened subject count missing or invalid');
+  const sourceIssue = approvedSourcePopulationIssue(assurance?.run?.sourcePopulation, screened);
+  if (sourceIssue) reasons.push(sourceIssue);
   for (const key of ['sanctions','adverseMedia','pep']) {
     const d = assurance?.domains?.[key];
     if (d?.operational !== true) reasons.push(key + ' is not operational');
