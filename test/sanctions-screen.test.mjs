@@ -3,7 +3,7 @@
      { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
    Usage: node test/sanctions-screen.test.mjs */
 import {
-  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, normalizeResult, normalizeScreenResponse,
+  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, requireCompleteAsanaPopulation, requireDistinctSourceKeys, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, parseScreeningState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
@@ -273,6 +273,70 @@ const dupSubs = parseSubjects([dupA, dupB]);
 check('duplicate-named customers: entity deduped but BOTH customers’ principals are screened',
   dupSubs.filter(x => x.entityType === 'organisation').length === 1 &&
   dupSubs.some(x => x.name === 'Alpha Person') && dupSubs.some(x => x.name === 'Bravo Person'));
+
+/* Source-level proof must include EVERY Asana task, not merely sum whatever
+   the name-deduped parser happened to return. Use only synthetic task IDs. */
+{
+  const customers = [
+    { gid: '8001', name: 'Synthetic Metals A LLC', completed: false, notes: 'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — Director\nName: Synthetic Person One' },
+    { gid: '8002', name: 'Synthetic Metals B LLC', completed: false, notes: '' },
+  ];
+  const parsed = parseSubjects(customers);
+  const receipt = requireCompleteAsanaPopulation(customers, parsed);
+  check('approved customer project proof reconciles raw tasks to entity + UBO screening rows',
+    receipt.taskRecords === 2 && receipt.screenedSubjects === 3);
+  const namesakes = [
+    { gid: '8011', name: 'SAME REGISTERED COMPANY LLC', completed: false, notes: '' },
+    { gid: '8012', name: 'Same Registered Company LLC', completed: false, notes: '' },
+  ];
+  let rejectedDuplicateCustomer = false;
+  try { requireCompleteAsanaPopulation(namesakes, parseSubjects(namesakes)); }
+  catch (e) { rejectedDuplicateCustomer = /tasks were not screened/.test(String(e.message)); }
+  check('two same-named company records cannot be collapsed into a green all-clear',
+    rejectedDuplicateCustomer);
+  const employees = [
+    { gid: '9001', name: 'Synthetic Employee A', completed: true, notes: 'Nationality: UAE' },
+    { gid: '9002', name: 'Synthetic Employee B', completed: true, notes: 'Nationality: India' },
+  ];
+  const staff = parseEmployeeSubjects(employees);
+  const staffReceipt = requireCompleteAsanaPopulation(employees, staff, { employee: true });
+  check('both completed HR employee tasks retain one natural-person screening row each',
+    staffReceipt.taskRecords === 2 && staffReceipt.screenedSubjects === 2 &&
+    staff.every(x => x.entityType === 'individual'));
+  let duplicateStaffRejected = false;
+  const namesakeStaff = [
+    { gid: '9011', name: 'Synthetic Shared Name', completed: true, notes: '' },
+    { gid: '9012', name: 'synthetic shared name', completed: true, notes: '' },
+  ];
+  try { requireCompleteAsanaPopulation(namesakeStaff, parseEmployeeSubjects(namesakeStaff), { employee: true }); }
+  catch (e) { duplicateStaffRejected = /tasks were not screened/.test(String(e.message)); }
+  check('same-named completed HR employees cannot silently disappear from screening', duplicateStaffRejected);
+  let acrossProjectsRejected = false;
+  try { requireDistinctSourceKeys(parsed, [{...staff[0], key: parsed[0].key}]); }
+  catch (e) { acrossProjectsRejected = /collision/.test(String(e.message)); }
+  check('staff/customer normalized-name collision refuses shared case history and a false clear',
+    acrossProjectsRejected && requireDistinctSourceKeys(parsed, staff));
+  let missingGidRejected = false;
+  try { requireCompleteAsanaPopulation([{ name: 'Synthetic Miss', gid: '' }], [{ key: 'synthetic miss', gid: '' }]); }
+  catch { missingGidRejected = true; }
+  check('Asana source tasks must provide verifiable IDs before population acceptance',
+    missingGidRejected);
+  let unrelatedPrincipalRejected = false;
+  try { requireCompleteAsanaPopulation(employees, [
+    ...staff, { key: 'synthetic other|ubo|9001', gid: '9001', name: 'Synthetic Other', parent: 'Synthetic Employee A' }
+  ], { employee: true }); }
+  catch { unrelatedPrincipalRejected = true; }
+  check('HR training notes cannot manufacture UBO rows that falsely expand staff coverage',
+    unrelatedPrincipalRejected);
+  const source = readFileSync(new URL('../scripts/sanctions-screen.mjs', import.meta.url), 'utf8');
+  const runtime = readFileSync(new URL('../scripts/sanctions-runtime-assurance.mjs', import.meta.url), 'utf8');
+  check('both Asana fetchers enforce per-task screening receipt before returning',
+    /requireCompleteAsanaPopulation\(tasks, subjects\)/.test(source) &&
+    /requireCompleteAsanaPopulation\(tasks, subjects, \{ employee: true \}\)/.test(source));
+  check('full daily screening and independent runtime proof check cross-project key collisions',
+    /requireDistinctSourceKeys\(subjects, employees\)/.test(source) &&
+    /requireDistinctSourceKeys\(customers, employees\)/.test(runtime));
+}
 
 /* Empty-normalization customers (symbols-only / unscreenable records) used to
    COLLIDE on the shared key '': the second was deduped away before screening
