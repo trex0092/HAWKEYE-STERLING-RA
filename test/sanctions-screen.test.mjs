@@ -3,11 +3,11 @@
      { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
    Usage: node test/sanctions-screen.test.mjs */
 import {
-  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, normalizeResult, normalizeScreenResponse,
+  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, requireCompleteAsanaPopulation, requireDistinctSourceKeys, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, parseScreeningState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
-  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
+  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse, createOmTask, shouldRetryLegacyAsanaWrite,
   getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay, loadSanctionsLists
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName, parseIdbCsv } from '../scripts/sanctions-match.mjs';
@@ -19,11 +19,18 @@ import { dirname, join, resolve } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+
+
 let passed = 0, failed = 0;
 function check(name, cond) {
   if (cond) { passed++; console.log('  ok  ' + name); }
   else { failed++; console.log('FAIL  ' + name); }
 }
+
+check('screen result builder persists both Asana source population counts without subject identifiers',
+  /sourcePopulation:\s*\{[\s\S]*?customer:\s*\{\s*projectGid: CUSTOMER_PROJECT_GID, screenedSubjects: customerScreenedSubjects\s*\},[\s\S]*?employee:\s*\{\s*projectGid: EMPLOYEE_PROJECT_GID, screenedSubjects: employeeScreenedSubjects\s*\}/.test(
+    readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8')
+  ));
 
 /* Approved source-of-truth + destination contract for mandatory AML screening.
    These tests are pure; no live Asana credentials or customer names. */
@@ -93,6 +100,38 @@ for (const [reason, route] of [
     data.sources.customer.screenedSubjects === 1 &&
     data.sources.employee.projectGid === employeeProject &&
     !JSON.stringify(data.sources).includes('Synthetic'));
+  const isolated = runtime.buildSanctionsRuntimeResults({
+    results: data.subjects.map(() => ({ band: 'low', recommendation: 'clear', lists: [] })),
+    degraded: false,
+    notes: [],
+    coverage: { lists: [{ id: 'ofac-sdn', name: 'OFAC SDN', partial: false, names: ['SANCTIONED ENTITY'] }] },
+  }, data.sources, '2026-10-14');
+  check('sanctions-only runtime proof preserves both Asana sources in the shared screening validator',
+    isolated.screened === 21 &&
+    isolated.sourcePopulation.customer.screenedSubjects === 1 &&
+    isolated.sourcePopulation.employee.screenedSubjects === 20 &&
+    isolated.sourcePopulation.customer.projectGid === customerProject &&
+    isolated.sourcePopulation.employee.projectGid === employeeProject &&
+    !JSON.stringify(isolated.sourcePopulation).includes('Synthetic'));
+  let missingPopulationFailed = false;
+  try {
+    runtime.buildSanctionsRuntimeResults({
+      results: [{}], coverage: { lists: [] }, notes: [],
+    }, { customer: { projectGid: customerProject, screenedSubjects: 1 } }, '2026-10-14');
+  } catch (e) {
+    missingPopulationFailed = /HR Employees/.test(String(e.message));
+  }
+  check('sanctions-only runtime refuses absent HR project evidence before accepting a green result',
+    missingPopulationFailed);
+  let wrongTotalsFailed = false;
+  try {
+    runtime.buildSanctionsRuntimeResults({ results: Array(22).fill({}), coverage: { lists: [] } },
+      data.sources, '2026-10-14');
+  } catch (e) {
+    wrongTotalsFailed = /source-population totals/.test(String(e.message));
+  }
+  check('sanctions-only runtime refuses source counts that do not reconcile with actual subjects',
+    wrongTotalsFailed);
 
   for (const [label, params] of [
     ['redirected customer', { customerProject: '111111111' }],
@@ -234,6 +273,70 @@ const dupSubs = parseSubjects([dupA, dupB]);
 check('duplicate-named customers: entity deduped but BOTH customers’ principals are screened',
   dupSubs.filter(x => x.entityType === 'organisation').length === 1 &&
   dupSubs.some(x => x.name === 'Alpha Person') && dupSubs.some(x => x.name === 'Bravo Person'));
+
+/* Source-level proof must include EVERY Asana task, not merely sum whatever
+   the name-deduped parser happened to return. Use only synthetic task IDs. */
+{
+  const customers = [
+    { gid: '8001', name: 'Synthetic Metals A LLC', completed: false, notes: 'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — Director\nName: Synthetic Person One' },
+    { gid: '8002', name: 'Synthetic Metals B LLC', completed: false, notes: '' },
+  ];
+  const parsed = parseSubjects(customers);
+  const receipt = requireCompleteAsanaPopulation(customers, parsed);
+  check('approved customer project proof reconciles raw tasks to entity + UBO screening rows',
+    receipt.taskRecords === 2 && receipt.screenedSubjects === 3);
+  const namesakes = [
+    { gid: '8011', name: 'SAME REGISTERED COMPANY LLC', completed: false, notes: '' },
+    { gid: '8012', name: 'Same Registered Company LLC', completed: false, notes: '' },
+  ];
+  let rejectedDuplicateCustomer = false;
+  try { requireCompleteAsanaPopulation(namesakes, parseSubjects(namesakes)); }
+  catch (e) { rejectedDuplicateCustomer = /tasks were not screened/.test(String(e.message)); }
+  check('two same-named company records cannot be collapsed into a green all-clear',
+    rejectedDuplicateCustomer);
+  const employees = [
+    { gid: '9001', name: 'Synthetic Employee A', completed: true, notes: 'Nationality: UAE' },
+    { gid: '9002', name: 'Synthetic Employee B', completed: true, notes: 'Nationality: India' },
+  ];
+  const staff = parseEmployeeSubjects(employees);
+  const staffReceipt = requireCompleteAsanaPopulation(employees, staff, { employee: true });
+  check('both completed HR employee tasks retain one natural-person screening row each',
+    staffReceipt.taskRecords === 2 && staffReceipt.screenedSubjects === 2 &&
+    staff.every(x => x.entityType === 'individual'));
+  let duplicateStaffRejected = false;
+  const namesakeStaff = [
+    { gid: '9011', name: 'Synthetic Shared Name', completed: true, notes: '' },
+    { gid: '9012', name: 'synthetic shared name', completed: true, notes: '' },
+  ];
+  try { requireCompleteAsanaPopulation(namesakeStaff, parseEmployeeSubjects(namesakeStaff), { employee: true }); }
+  catch (e) { duplicateStaffRejected = /tasks were not screened/.test(String(e.message)); }
+  check('same-named completed HR employees cannot silently disappear from screening', duplicateStaffRejected);
+  let acrossProjectsRejected = false;
+  try { requireDistinctSourceKeys(parsed, [{...staff[0], key: parsed[0].key}]); }
+  catch (e) { acrossProjectsRejected = /collision/.test(String(e.message)); }
+  check('staff/customer normalized-name collision refuses shared case history and a false clear',
+    acrossProjectsRejected && requireDistinctSourceKeys(parsed, staff));
+  let missingGidRejected = false;
+  try { requireCompleteAsanaPopulation([{ name: 'Synthetic Miss', gid: '' }], [{ key: 'synthetic miss', gid: '' }]); }
+  catch { missingGidRejected = true; }
+  check('Asana source tasks must provide verifiable IDs before population acceptance',
+    missingGidRejected);
+  let unrelatedPrincipalRejected = false;
+  try { requireCompleteAsanaPopulation(employees, [
+    ...staff, { key: 'synthetic other|ubo|9001', gid: '9001', name: 'Synthetic Other', parent: 'Synthetic Employee A' }
+  ], { employee: true }); }
+  catch { unrelatedPrincipalRejected = true; }
+  check('HR training notes cannot manufacture UBO rows that falsely expand staff coverage',
+    unrelatedPrincipalRejected);
+  const source = readFileSync(new URL('../scripts/sanctions-screen.mjs', import.meta.url), 'utf8');
+  const runtime = readFileSync(new URL('../scripts/sanctions-runtime-assurance.mjs', import.meta.url), 'utf8');
+  check('both Asana fetchers enforce per-task screening receipt before returning',
+    /requireCompleteAsanaPopulation\(tasks, subjects\)/.test(source) &&
+    /requireCompleteAsanaPopulation\(tasks, subjects, \{ employee: true \}\)/.test(source));
+  check('full daily screening and independent runtime proof check cross-project key collisions',
+    /requireDistinctSourceKeys\(subjects, employees\)/.test(source) &&
+    /requireDistinctSourceKeys\(customers, employees\)/.test(runtime));
+}
 
 /* Empty-normalization customers (symbols-only / unscreenable records) used to
    COLLIDE on the shared key '': the second was deduped away before screening
@@ -824,6 +927,88 @@ check('a COMPLETE alias fold leaves the primary fully re-verified',
 const _screened = [_fl[0]].filter(L => !L.partial).map(L => L.name);
 check('a partial primary is excluded from screenedLists (matches carried, not cleared)',
   _screened.length === 0);
+
+/* Legacy AM/PEP cards remain important when the full daily digest is in
+   case-engine mode. Simulate real create, section membership and read-back. */
+{
+  const gid = '1219452000000001', project = '1216203370612914',
+    section = '1218451960830318', name = 'Synthetic AM PEP Review';
+  const payload = { name, notes: 'Synthetic, no customer data', projectGid: project, sectionGid: section };
+  const previousFetch = globalThis.fetch;
+  let requests = [];
+  const mock = ({ noGid = false, wrongSection = false, noRemote = false,
+    serverError = false, lost = false } = {}) => {
+    requests = [];
+    globalThis.fetch = async (url, options = {}) => {
+      const method = options.method || 'GET';
+      requests.push({ path: String(url), method });
+      if (lost) throw Error('SYNTHETIC_CONFIDENTIAL_SHOULD_NOT_APPEAR');
+      if (method === 'POST' && String(url).endsWith('/tasks')) {
+        return { ok: !serverError, status: serverError ? 503 : 201,
+          headers: { get: () => null },
+          json: async () => serverError ? { errors: [{ message: 'PRIVATE_CASE_REFERENCE' }] }
+            : { data: noGid ? {} : { gid } } };
+      }
+      if (method === 'POST' && String(url).endsWith('/addTask')) {
+        return { ok: true, status: 200, headers: { get: () => null },
+          json: async () => ({ data: {} }) };
+      }
+      if (method === 'GET' && String(url).includes('/tasks/' + gid)) {
+        return { ok: true, status: 200, headers: { get: () => null },
+          json: async () => noRemote ? { data: null } : { data: {
+            gid, name, permalink_url: 'https://app.asana.com/0/0/' + gid,
+            memberships: [{ project: { gid: project },
+              section: { gid: wrongSection ? '1200000000000000' : section } }]
+          } } };
+      }
+      throw Error('Unexpected synthetic Asana path');
+    };
+  };
+  try {
+    mock();
+    const link = await createOmTask(payload, 'synthetic-token');
+    check('monitoring card success requires actual task and approved Asana section read-back',
+      link.endsWith(gid) && requests.length === 3 &&
+      requests.filter(r => r.method === 'POST').length === 2 &&
+      requests.some(r => r.method === 'GET'));
+    mock({ noGid: true });
+    let rejected = false;
+    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
+    check('a 2xx response with no task identity cannot be claimed as Asana delivery',
+      rejected && requests.length === 1);
+    mock({ wrongSection: true });
+    rejected = false;
+    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
+    check('a monitoring task filed in the wrong section is not accepted as delivered',
+      rejected && requests.length === 3);
+    mock({ noRemote: true });
+    rejected = false;
+    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
+    check('an unconfirmed remote task remains an unresolved delivery error',
+      rejected && requests.length === 3);
+    mock({ serverError: true });
+    let providerError = '';
+    try { await createOmTask(payload, 'synthetic-token'); } catch (e) { providerError = e.message; }
+    check('ambiguous 503 task create is never replayed and does not leak Asana response data',
+      requests.length === 1 && /^Asana 503/.test(providerError) &&
+      !providerError.includes('PRIVATE_CASE_REFERENCE'));
+    mock({ lost: true });
+    let transportError = '';
+    try { await createOmTask(payload, 'synthetic-token'); } catch (e) { transportError = e.message; }
+    check('Asana transport exceptions containing identity data are redacted',
+      requests.length === 1 &&
+      transportError === 'Asana transport failure; remote write outcome unconfirmed' &&
+      !transportError.includes('SYNTHETIC_CONFIDENTIAL'));
+    check('only definite 429 refusal can replay task or new-section creation',
+      shouldRetryLegacyAsanaWrite(429, '/tasks') &&
+      !shouldRetryLegacyAsanaWrite(503, '/tasks') &&
+      !shouldRetryLegacyAsanaWrite(500, '/projects/1216203370612914/sections') &&
+      shouldRetryLegacyAsanaWrite(503, '/sections/1218451960830318/addTask') &&
+      !shouldRetryLegacyAsanaWrite(403, '/tasks'));
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+}
 
 /* ── same-day Ongoing-Monitoring dedup is DIRECTION-AWARE ──
    Both card names carry the words "Adverse Media", so the old flat

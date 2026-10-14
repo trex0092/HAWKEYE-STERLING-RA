@@ -33,7 +33,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
-  fitAsanaText, fitAsanaName } from './asana-notify.mjs';
+  fitAsanaText, fitAsanaName, publicAsanaRejection } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName } from './sanctions-match.mjs';
 import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
@@ -1261,11 +1261,17 @@ const asanaSleep = ms => new Promise(res => setTimeout(res, ms));
 
 async function asanaGet(url, token, timeoutMs = 30000) {
   for (let attempt = 0; ; attempt++) {
-    const { ok, status, retryAfter, data } = await withTimeout(async (signal) => {
-      const r = await fetch(url, { signal, headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
-      const d = await r.json().catch(() => ({}));
-      return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
-    }, timeoutMs);
+    let response;
+    try {
+      response = await withTimeout(async (signal) => {
+        const r = await fetch(url, { signal, headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+        const d = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
+      }, timeoutMs);
+    } catch {
+      throw new Error('Asana transport failure; remote outcome unconfirmed');
+    }
+    const { ok, status, retryAfter, data } = response;
     if (ok) return data;
     if (attempt < 2 && isRetryable(status)) {
       const delay = retryDelayMs(attempt, retryAfter);
@@ -1273,7 +1279,7 @@ async function asanaGet(url, token, timeoutMs = 30000) {
       await asanaSleep(delay);
       continue;
     }
-    throw new Error('Asana ' + status + ': ' + JSON.stringify(data.errors || data).slice(0, 200));
+    throw new Error(publicAsanaRejection(status, data));
   }
 }
 
@@ -1360,8 +1366,80 @@ export async function asanaPaged(projectGid, path, optFields, token, what,
   }
 }
 
+/* Every actual Asana source TASK must have its OWN top-level screening row.
+   The legacy name-based parser deduplicates legal entities: when two different
+   task GIDs have the same normalized name, the second task can vanish while
+   the aggregate "screened" count still appears internally consistent. Stop
+   rather than misrepresent this population as complete. Nothing is logged
+   beyond aggregate counts and a generic failure classification. */
+export function requireCompleteAsanaPopulation(tasks, subjects, { employee = false } = {}) {
+  if (!Array.isArray(tasks) || !tasks.length ||
+      !Array.isArray(subjects) || !subjects.length) {
+    throw new Error('Approved Asana source coverage incomplete: no verifiable source/task rows');
+  }
+  const taskIds = new Set();
+  for (const task of tasks) {
+    const id = String(task?.gid || '');
+    if (!/^\d+$/.test(id) || taskIds.has(id) ||
+        typeof task?.name !== 'string' || !task.name.trim()) {
+      throw new Error('Approved Asana source coverage incomplete: missing or duplicate task identity');
+    }
+    taskIds.add(id);
+  }
+  const keys = new Set(), directIds = new Set();
+  for (const subject of subjects) {
+    if (!subject?.key || keys.has(subject.key)) {
+      throw new Error('Approved Asana source coverage incomplete: duplicate screening identity');
+    }
+    keys.add(subject.key);
+    if (!subject.parent) {
+      const id = String(subject.gid || '');
+      if (!taskIds.has(id) || directIds.has(id)) {
+        throw new Error('Approved Asana source coverage incomplete: top-level record identity mismatch');
+      }
+      directIds.add(id);
+      if (employee && (subject.entityType !== 'individual' || subject.role !== 'Employee')) {
+        throw new Error('Approved Asana employee source did not produce individual screening records');
+      }
+    } else if (employee) {
+      // HR training notes are not customer ownership schedules; no unexpected
+      // person rows may be synthesized from them and counted as staff.
+      throw new Error('Approved Asana employee source produced unrelated principal rows');
+    }
+  }
+  if (directIds.size !== tasks.length ||
+      (employee && subjects.length !== tasks.length)) {
+    throw new Error('Approved Asana source coverage incomplete: one or more tasks were not screened');
+  }
+  return { taskRecords: tasks.length, screenedSubjects: subjects.length };
+}
+
+/* Customer legal entities and UBOs, and HR personnel, share one sanctions,
+   adverse-media, PEP and case-state namespace. Even when both source projects
+   individually read successfully, an identical key across projects would
+   cause distinct people/entities to share state and compromise case evidence.
+   Never silently merge records or silently clear standing cases. */
+export function requireDistinctSourceKeys(customers, employees) {
+  if (!Array.isArray(customers) || !customers.length ||
+      !Array.isArray(employees) || !employees.length) {
+    throw new Error('Approved customer and employee screening populations must both be present');
+  }
+  const keys = new Set();
+  for (const person of customers.concat(employees)) {
+    const key = String(person?.key || '');
+    if (!key || keys.has(key)) {
+      throw new Error('Customer/employee screening key collision; manual identity reconciliation required');
+    }
+    keys.add(key);
+  }
+  return true;
+}
+
 export async function fetchAsanaSubjects(projectGid, token) {
-  return parseSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
+  const tasks = await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid);
+  const subjects = parseSubjects(tasks);
+  requireCompleteAsanaPopulation(tasks, subjects);
+  return subjects;
 }
 
 /* HR – Employees: every task IS a natural person (the task name is the
@@ -1390,30 +1468,48 @@ export function parseEmployeeSubjects(tasks) {
 }
 
 export async function fetchAsanaEmployeeSubjects(projectGid, token) {
-  return parseEmployeeSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
+  const tasks = await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid);
+  const subjects = parseEmployeeSubjects(tasks);
+  requireCompleteAsanaPopulation(tasks, subjects, { employee: true });
+  return subjects;
 }
 
 /* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
 
-async function asanaPost(path, body, token, timeoutMs = 30000) {
+/* New cards and sections are non-idempotent: after an ambiguous HTTP 5xx
+   the remote create may already have succeeded, so never auto-replay it.
+   Asana 429 is a definite rate-limit rejection and remains retryable. */
+export function shouldRetryLegacyAsanaWrite(status, path) {
+  if (!isRetryable(status)) return false;
+  const creating = path === '/tasks' || /^\/projects\/\d+\/sections$/.test(path);
+  return !creating || status === 429;
+}
+
+export async function asanaPost(path, body, token, timeoutMs = 30000) {
   for (let attempt = 0; ; attempt++) {
-    const { ok, status, retryAfter, data } = await withTimeout(async (signal) => {
-      const r = await fetch('https://app.asana.com/api/1.0' + path, {
-        signal, method: 'POST',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ data: body })
-      });
-      const d = await r.json().catch(() => ({}));
-      return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
-    }, timeoutMs);
+    let response;
+    try {
+      response = await withTimeout(async (signal) => {
+        const r = await fetch('https://app.asana.com/api/1.0' + path, {
+          signal, method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ data: body })
+        });
+        const d = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
+      }, timeoutMs);
+    } catch {
+      throw new Error('Asana transport failure; remote write outcome unconfirmed');
+    }
+    const { ok, status, retryAfter, data } = response;
     if (ok) return data;
-    if (attempt < 2 && isRetryable(status)) {
+    if (attempt < 2 && shouldRetryLegacyAsanaWrite(status, path)) {
       const delay = retryDelayMs(attempt, retryAfter);
       console.warn('sanctions-screen: Asana ' + status + ' — retry in ' + delay + 'ms');
       await asanaSleep(delay);
       continue;
     }
-    throw new Error('Asana ' + status + ': ' + JSON.stringify(data.errors || data).slice(0, 200));
+    throw new Error(publicAsanaRejection(status, data));
   }
 }
 
@@ -1430,7 +1526,9 @@ async function ensureSection(projectGid, name, token) {
   const found = sections.find(s => String(s.name || '').trim().toLowerCase() === want);
   if (found) return found.gid;
   const created = await asanaPost('/projects/' + projectGid + '/sections', { name }, token);
-  return created.data && created.data.gid;
+  const id = String(created?.data?.gid || '');
+  if (!/^\d+$/.test(id)) throw new Error('Asana section creation receipt was not verified');
+  return id;
 }
 
 /* All task names in a project (paginated) — used for same-day dedup. */
@@ -1467,20 +1565,28 @@ export function omCardToSkip(names, dateStr, hasHits) {
 
 /* Create a task in the Ongoing Monitoring project and file it under its section.
    Returns the task permalink (or null). Filing under the section is non-fatal. */
-async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
-  /* Byte-capped, not character-capped. Asana measures BYTES; the 60,000-CHAR
-     cut here was the same bug that lost the screening digest — this card now
-     carries multilingual PEP names too, and those cost 2-3 bytes each. */
+export async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
+  /* HTTP 2xx is not Asana delivery proof. A task with no GID, wrong project
+     membership or absent compliance section must remain an incident, not a
+     logged successful screening card. Keep original byte budgets and owner. */
   const data = { name: fitAsanaName(name), notes: fitAsanaText(notes), projects: [projectGid] };
   if (due) data.due_on = due;
   if (OM_ASSIGNEE) data.assignee = OM_ASSIGNEE;
   const d = await asanaPost('/tasks', data, token);
-  const gid = d.data && d.data.gid;
-  if (gid && sectionGid) {
-    try { await asanaPost('/sections/' + sectionGid + '/addTask', { task: gid }, token); }
-    catch (e) { console.warn('sanctions-screen: could not file task under section ' + sectionGid + ' (' + (e && e.message || e) + ')'); }
+  const gid = String(d?.data?.gid || '');
+  if (!/^\d+$/.test(gid)) throw new Error('Asana monitoring task creation returned no verifiable GID');
+  if (sectionGid) await asanaPost('/sections/' + sectionGid + '/addTask', { task: gid }, token);
+  const remote = (await asanaGet(
+    'https://app.asana.com/api/1.0/tasks/' + gid +
+    '?opt_fields=gid,name,memberships.project.gid,memberships.section.gid,permalink_url', token
+  ))?.data;
+  if (String(remote?.gid || '') !== gid || remote?.name !== data.name ||
+      !Array.isArray(remote?.memberships) ||
+      !remote.memberships.some(m => String(m?.project?.gid || '') === String(projectGid) &&
+        (!sectionGid || String(m?.section?.gid || '') === String(sectionGid)))) {
+    throw new Error('Asana monitoring card identity or approved destination was not independently verified');
   }
-  return d.data && d.data.permalink_url;
+  return remote.permalink_url || d?.data?.permalink_url || null;
 }
 
 /* PART B — post the daily Adverse Media & PEP task (CLEAR or HIT). Never throws;
@@ -2503,14 +2609,21 @@ async function main() {
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
   const onRunner = process.env.GITHUB_ACTIONS === 'true';
   let maskedCount = onRunner ? maskSubjectNames(subjects) : 0;
+  // Counts follow immediate public-run identity masking, before appending HR.
+  // This is aggregate-only evidence and contains no subject identifiers.
+  const customerScreenedSubjects = subjects.length;
+  let employeeScreenedSubjects = 0;
 
   if (EMPLOYEE_PROJECT_GID) {
     let employees;
     try { employees = await fetchAsanaEmployeeSubjects(EMPLOYEE_PROJECT_GID, asanaToken); }
     catch (e) { return bailUnscreened('could not read the HR – Employees project (' + (e && e.message || e) + ') — employee screening is configured, so the run must not proceed without it', today); }
     if (!employees.length) return bailUnscreened('the HR – Employees project returned 0 subjects while employee screening is configured — set ASANA_EMPLOYEE_PROJECT_GID empty to disable it explicitly', today);
+    employeeScreenedSubjects = employees.length;
     console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
     if (onRunner) maskedCount += maskSubjectNames(employees);
+    try { requireDistinctSourceKeys(subjects, employees); }
+    catch { return bailUnscreened('Customer Database and HR Employees screening subjects have conflicting identities; MLRO review required', today); }
     subjects = subjects.concat(employees);
   }
   if (onRunner) console.log('sanctions-screen: ' + maskedCount + ' subject identifier(s) masked in this public run log — names are disclosed in Asana only');
@@ -2602,6 +2715,12 @@ async function main() {
   writeFileSync(RESULTS_FILE, JSON.stringify({
     date: today,
     screened: subjects.length, entities, individuals,
+    // This is an aggregate-only source receipt: no task IDs, names, employee
+    // identity attributes, notes or personal identifiers are exposed.
+    sourcePopulation: {
+      customer: { projectGid: CUSTOMER_PROJECT_GID, screenedSubjects: customerScreenedSubjects },
+      employee: { projectGid: EMPLOYEE_PROJECT_GID, screenedSubjects: employeeScreenedSubjects },
+    },
     newMatches: alerts.length, matchCount, clearedCount: cleared.length,
     degraded: screen.degraded,
     lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({
