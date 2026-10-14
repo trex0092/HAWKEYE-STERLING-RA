@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import {
   fetchAsanaSubjects,
   fetchAsanaEmployeeSubjects,
+  requireDistinctSourceKeys,
   requireApprovedScreeningRoute,
   screenLocally,
   resolveThreshold,
@@ -38,6 +39,9 @@ export async function loadApprovedRuntimePopulation(token, {
   if (!Array.isArray(employees) || !employees.length) {
     throw new Error('HR Employees project returned 0 verified screening subjects');
   }
+  // Verify that both distinct project populations remain separately keyed;
+  // a namesake across HR and the Customer Database cannot share AML state.
+  requireDistinctSourceKeys(customers, employees);
   // Aggregates contain NO task names, dates of birth or national ID fields.
   const sources = {
     customer: { projectGid: customerProject, screenedSubjects: customers.length },
