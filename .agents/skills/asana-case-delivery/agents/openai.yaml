@@ -1,0 +1,3 @@
+interface:
+  display_name: "Asana Case Delivery"
+  short_description: "Check Asana case, report and audit receipt integrity."
