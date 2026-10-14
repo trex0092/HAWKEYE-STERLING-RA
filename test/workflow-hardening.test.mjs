@@ -385,5 +385,24 @@ check('manual package audit only makes local dry-run and preserves private invar
   /npm pack --dry-run --ignore-scripts/.test(readiness) &&
   /egress-policy:\s*block/.test(readiness));
 
+/* A manual user-supplied label is not executable shell code.
+   Keep diagnostics read-only, manually triggered and without log spoofing. */
+const manual = readFileSync(join(dir, 'manual.yml'), 'utf8');
+check('manual diagnostic cannot run on push, release, PR or schedule',
+  /workflow_dispatch:/.test(manual) &&
+  !/^\s{2}(?:push|pull_request|pull_request_target|release|schedule):/m.test(manual));
+check('manual diagnostic owns only read permission and restricted egress',
+  /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(manual) &&
+  /step-security\/harden-runner@[a-f0-9]{40}/.test(manual) &&
+  /egress-policy:\s*block/.test(manual) &&
+  /disable-sudo:\s*true/.test(manual));
+check('manual diagnostic passes user input through env, never shell expression interpolation',
+  /GREETING_NAME:\s*\$\{\{ inputs\.name \}\}/.test(manual) &&
+  /printf 'Hello %s\\n' "\$GREETING_NAME"/.test(manual) &&
+  !/run:[^\n]*\$\{\{\s*inputs\./.test(manual));
+check('manual diagnostic rejects log-control or shell-metacharacter inputs before printf',
+  /\^\[a-zA-Z0-9_-\]\{1,64\}\$/.test(manual) &&
+  /exit 1/.test(manual));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
