@@ -19,6 +19,11 @@ import { dirname, join, resolve } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+check('screen result builder persists both Asana source population counts without subject identifiers',
+  /sourcePopulation:\s*\{[\s\S]*?customer:\s*\{\s*projectGid: CUSTOMER_PROJECT_GID, screenedSubjects: customerScreenedSubjects\s*\},[\s\S]*?employee:\s*\{\s*projectGid: EMPLOYEE_PROJECT_GID, screenedSubjects: employeeScreenedSubjects\s*\}/.test(
+    readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8')
+  ));
+
 let passed = 0, failed = 0;
 function check(name, cond) {
   if (cond) { passed++; console.log('  ok  ' + name); }
@@ -34,10 +39,6 @@ check('screening requires Customer Database and HR Employees as distinct mandato
     results: '1216203370612914',
     monitoring: '1216203370612914',
   }) === true);
-check('screen result builder persists both Asana source population counts without subject identifiers',
-  /sourcePopulation:\s*\{[\s\S]*?customer:\s*\{\s*projectGid: CUSTOMER_PROJECT_GID, screenedSubjects: customerScreenedSubjects\s*\},[\s\S]*?employee:\s*\{\s*projectGid: EMPLOYEE_PROJECT_GID, screenedSubjects: employeeScreenedSubjects\s*\}/.test(
-    readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8')
-  ));
 for (const [reason, route] of [
   ['stale customer project', { customer: '1216139945846994' }],
   ['stale employee project', { employee: '1216139945846994' }],
