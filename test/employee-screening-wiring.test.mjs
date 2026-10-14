@@ -43,6 +43,15 @@ for (const wf of WORKFLOWS) {
    variable can never silently drop the employee population. The onboarding
    screen forwarded the bare variable with no fallback. */
 const EMPLOYEE_PROJECT_GID = '1216239131596624';
+const source = readFileSync('scripts/sanctions-screen.mjs', 'utf8');
+check('JS engine defaults to the same approved HR Employees GID used by all workflows',
+  /: EMPLOYEE_PROJECT;/.test(source) &&
+  /import \{ CUSTOMER_PROJECT, EMPLOYEE_PROJECT, MONITORING_PROJECT \}/.test(source));
+check('JS engine aborts when customer, employee or results project changes',
+  /requireApprovedScreeningRoute\(\);/.test(source) &&
+  /return bailUnscreened\(/.test(source) &&
+  /String\(employee \|\| ''\) !== EMPLOYEE_PROJECT/.test(source));
+
 for (const wf of WORKFLOWS) {
   const text = readFileSync(wf.file, 'utf8');
   check(`${wf.file}: ${wf.varName} falls back to the HR - Employees project when the repo variable is unset`,
