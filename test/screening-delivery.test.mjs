@@ -16,7 +16,12 @@ function fixture() {
       failures: [], enrichment: {}, cleared: [], degraded: false },
 
     assurance: { version: 1, generatedAt: new Date(NOW).toISOString(), operational: true,
-      run: { githubRunId: '100', date: '2026-09-30', screenedSubjects: 2 },
+      run: { githubRunId: '100', date: '2026-09-30', screenedSubjects: 2,
+        sourcePopulation: {
+          customer: { projectGid: '1214107620220121', screenedSubjects: 1 },
+          employee: { projectGid: '1216239131596624', screenedSubjects: 1 },
+        },
+      },
       domains: {
         sanctions: status(true, {
           screenedSubjects: 2, requiredSourceIds: ['synthetic'],
