@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { publishDailyScreening, buildReports, splitEvidence, textSize, validateEvidence,
-  PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName } from '../scripts/screening-delivery.mjs';
+  PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName,
+  isTransientEvidenceDeliveryFailure, deliverWithOneRecoveryRetry, EVIDENCE_DELIVERY_RETRY_DELAY_MS } from '../scripts/screening-delivery.mjs';
 
 const NOW = Date.parse('2026-09-30T10:00:00Z');
 function fixture() {
@@ -335,6 +336,73 @@ test('lost acknowledgement after evidence page creation is reconciled by page ma
     x.parent?.gid === taskId && x.name === '[screening-evidence] 0001');
   assert.equal(pages.length, 1, 'lost acknowledgement must not create two evidence pages');
   assert.match(pages[0].notes, /^BEGIN SCREENING EVIDENCE/);
+});
+
+test('only recognized transient Asana errors can trigger one whole-publisher reconciliation', () => {
+  const is = message => isTransientEvidenceDeliveryFailure(new Error(message));
+  assert.equal(is('Asana transport failure; remote outcome not confirmed'), true);
+  assert.equal(is('sanctions delivery failed: Asana 503: request rejected (provider details redacted)'), true);
+  assert.equal(is('media delivery failed: Asana attachment upload 502'), true);
+  assert.equal(is('Asana 429: request rejected (provider details redacted)'), true);
+  assert.equal(is('Asana 403: request rejected (provider details redacted)'), false);
+  assert.equal(is('Screening sources cannot support an OPERATIONAL Asana delivery'), false);
+  assert.equal(is('media delivery failed: Asana task ownership marker invalid'), false);
+  assert.equal(isTransientEvidenceDeliveryFailure(new AggregateError([
+    new Error('sanctions delivery failed: Asana transport failure; remote outcome not confirmed'),
+    new Error('media delivery failed: Screening evidence is incomplete')
+  ], 'mixed failures')), false, 'any deterministic failure must block replay');
+});
+
+test('transient Asana parent-card acknowledgement is reconciled in-place with no duplicate screening reports', async () => {
+  const input = fixture(), fake = api();
+  const reportName = buildReports(input.results, input.assurance, input.state, input)[0].title;
+  const baseline = JSON.stringify(input);
+  let fault = false, retries = 0;
+  const slept = [];
+  fake.setIntercept((path, method, data) => {
+    if (!fault && path === '/tasks' && method === 'POST' && data.name === reportName) {
+      fault = true;
+      fake.add(data); // Asana committed the task; the transport lost the acknowledgement.
+      throw new Error('Asana transport failure; remote outcome not confirmed');
+    }
+  });
+  const receipt = await deliverWithOneRecoveryRetry(
+    () => publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
+    { sleep: async ms => { slept.push(ms); }, onRetry: () => retries++ }
+  );
+  assert.equal(receipt.reports.length, 2);
+  assert.equal(retries, 1);
+  assert.deepEqual(slept, [EVIDENCE_DELIVERY_RETRY_DELAY_MS]);
+  assert.equal([...fake.tasks.values()].filter(t => t.name === reportName).length, 1,
+    'lost receipt must not create duplicate human-facing Asana result cards');
+  assert.equal(fake.attachments.size, 2, 'each final domain has precisely one verified CSV');
+  assert.equal(JSON.stringify(input), baseline,
+    'retry cannot mutate the screening source set, risk findings or disposition state');
+});
+
+test('deterministic evidence/source integrity errors never restart the daily publication', async () => {
+  let count = 0;
+  const deterministic = new Error('Screening sources cannot support an OPERATIONAL Asana delivery');
+  await assert.rejects(deliverWithOneRecoveryRetry(async () => {
+    count++;
+    throw deterministic;
+  }, { sleep: async () => { throw new Error('must not sleep'); } }), /Screening sources/);
+  assert.equal(count, 1);
+});
+
+test('two transport failures still fail the screening delivery gate and never run a third time', async () => {
+  let count = 0;
+  const sleeps = [];
+  await assert.rejects(deliverWithOneRecoveryRetry(async () => {
+    count++;
+    throw new AggregateError([
+      new Error('media delivery failed: Asana transport failure; remote outcome not confirmed')
+    ], 'media publication failed');
+  }, { sleep: async ms => { sleeps.push(ms); } }), /media publication failed/);
+  assert.equal(count, 2);
+  assert.deepEqual(sleeps, [EVIDENCE_DELIVERY_RETRY_DELAY_MS]);
+  await assert.rejects(deliverWithOneRecoveryRetry(async () => {}, { delayMs: 30000 }),
+    /Invalid bounded screening evidence recovery settings/);
 });
 
 test('next date creates fresh daily reports rather than suppressing the day', async () => {
