@@ -206,6 +206,7 @@ branches:
           - gitleaks
           - size
           - Dependency Review
+          - policy-guard     # Always-on code/workflow + source mapping protection
       enforce_admins: false             # OFF by design: the admin bypass is the
                                         # single maintainer's merge path now that
                                         # approvals are required (see the
