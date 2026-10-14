@@ -69,6 +69,22 @@ check('runtime assurance explicitly defaults to the approved Customer Database',
 check('runtime assurance explicitly defaults to completed HR Employees population',
   /ASANA_EMPLOYEE_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_EMPLOYEE_PROJECT_GID\s*\|\|\s*'1216239131596624'\s*\}\}/.test(runtimeWorkflow));
 
+/* The daily production screen must expose BOTH approved source IDs at
+   the workflow boundary. Earlier runs printed an empty Customer DB env field
+   even though the JS module silently supplied a fallback internally. Avoid
+   source ambiguity in audit logs while preserving the in-engine strict route
+   check against a stale or redirected repository variable. */
+const primaryScreenWorkflow = readFileSync('.github/workflows/sanctions-screen.yml', 'utf8');
+check('daily sanctions workflow explicitly binds approved Customer Database fallback',
+  /ASANA_CUSTOMER_PROJECT_GID:\\s*\\$\\{\\{\\s*vars\\.ASANA_CUSTOMER_PROJECT_GID\\s*\\|\\|\\s*'1214107620220121'\\s*\\}\\}/.test(primaryScreenWorkflow));
+check('daily sanctions workflow binds the exact approved HR Employees population',
+  /ASANA_EMPLOYEE_PROJECT_GID:\\s*\\$\\{\\{\\s*vars\\.ASANA_EMPLOYEE_PROJECT_GID\\s*\\|\\|\\s*'1216239131596624'\\s*\\}\\}/.test(primaryScreenWorkflow));
+check('JS source route refuses a redirected customer, employee, delivery or monitoring project',
+  /String\\(customer \\|\\| ''\\) !== CUSTOMER_PROJECT/.test(source) &&
+  /String\\(employee \\|\\| ''\\) !== EMPLOYEE_PROJECT/.test(source) &&
+  /String\\(results \\|\\| ''\\) !== MONITORING_PROJECT/.test(source) &&
+  /String\\(monitoring \\|\\| ''\\) !== MONITORING_PROJECT/.test(source));
+
 /* The retired manual workflow still supports dispatch and must never
    screen only customers while claiming complete sanctions coverage. */
 const manual = readFileSync('.github/workflows/daily-sanctions-screen.yml', 'utf8');
