@@ -49,6 +49,8 @@ jobs:
         run: node test/brand-guard.test.mjs
       - name: Run workflow-hardening ratchet (SHA pins, harden-runner, timeouts, egress rationale)
         run: node test/workflow-hardening.test.mjs
+      - name: Guard bounded Chrome smoke commands and mandatory DOM assertions
+        run: node test/browser-smoke-bounds.test.mjs
       - name: Run scoring model-validation golden set
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
@@ -285,7 +287,7 @@ jobs:
           # Reduced motion skips the gauge draw-in animation, whose mid-flight
           # rewind raced the DOM dump under virtual time (flaky runs 38/39).
           # Chrome's own exit code is tolerated; the greps are the assertions.
-          google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
+          timeout --signal=TERM --kill-after=5s 75s google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/index.html" > /tmp/dom.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom.html
@@ -297,7 +299,7 @@ jobs:
         run: |
           # Second run without prefers-reduced-motion exercises the gauge draw-in
           # and count-up animation code paths that the stable run skips.
-          google-chrome --headless=new --no-sandbox --disable-gpu \
+          timeout --signal=TERM --kill-after=5s 75s google-chrome --headless=new --no-sandbox --disable-gpu \
             --virtual-time-budget=8000 \
             --dump-dom "file://$PWD/index.html" > /tmp/dom-motion.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-motion.html
@@ -307,7 +309,7 @@ jobs:
           echo "motion smoke ok — animation code paths exercised"
       - name: Browser smoke test (AI Operations Console)
         run: |
-          google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
+          timeout --signal=TERM --kill-after=5s 75s google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/console.html" > /tmp/dom-console.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-console.html
@@ -323,7 +325,7 @@ jobs:
           echo "console smoke ok — HUD + panels render, zero mock data on a fresh app"
       - name: Browser smoke test (Hawkeye Sterling Advisor)
         run: |
-          google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
+          timeout --signal=TERM --kill-after=5s 75s google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/advisor.html" > /tmp/dom-advisor.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-advisor.html
