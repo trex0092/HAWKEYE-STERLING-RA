@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { publishDailyScreening, buildReports, splitEvidence, textSize, validateEvidence,
   PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName,
-  isTransientEvidenceDeliveryFailure, deliverWithOneRecoveryRetry, EVIDENCE_DELIVERY_RETRY_DELAY_MS } from '../scripts/screening-delivery.mjs';
+  isTransientEvidenceDeliveryFailure, deliverWithOneRecoveryRetry, EVIDENCE_DELIVERY_RETRY_DELAY_MS, uploadAttachment } from '../scripts/screening-delivery.mjs';
 
 const NOW = Date.parse('2026-09-30T10:00:00Z');
 function fixture() {
@@ -378,6 +378,37 @@ test('transient Asana parent-card acknowledgement is reconciled in-place with no
   assert.equal(fake.attachments.size, 2, 'each final domain has precisely one verified CSV');
   assert.equal(JSON.stringify(input), baseline,
     'retry cannot mutate the screening source set, risk findings or disposition state');
+});
+
+test('ambiguous upload transport failures and missing receipts trigger safe reconciliation without leaking exceptions', async () => {
+  const prevFetch = globalThis.fetch, prevToken = process.env.ASANA_ACCESS_TOKEN;
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-test-token';
+  try {
+    globalThis.fetch = async () => { throw new Error('synthetic-private-identifier-not-for-logs'); };
+    let lost = '';
+    try { await uploadAttachment('12345678', 'synthetic.csv', 'x,y', 'text/csv'); }
+    catch (e) { lost = e.message; }
+    assert.equal(lost, 'Asana attachment upload transport failure; outcome unverified');
+    assert.equal(isTransientEvidenceDeliveryFailure(new Error(lost)), true);
+    assert.doesNotMatch(lost, /synthetic-private-identifier/);
+
+    globalThis.fetch = async () => ({
+      ok: true, status: 200, json: async () => ({ data: {} })
+    });
+    await assert.rejects(uploadAttachment('12345678', 'synthetic.csv', 'x,y', 'text/csv'),
+      /Asana attachment upload transport failure; outcome unverified/);
+    globalThis.fetch = async () => ({
+      ok: false, status: 403, json: async () => ({})
+    });
+    await assert.rejects(uploadAttachment('12345678', 'synthetic.csv', 'x,y', 'text/csv'),
+      /Asana attachment upload 403/);
+    assert.equal(isTransientEvidenceDeliveryFailure(new Error('Asana attachment upload 403')), false,
+      'access-denied upload must not cause an automatic retry');
+  } finally {
+    globalThis.fetch = prevFetch;
+    if (prevToken === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = prevToken;
+  }
 });
 
 test('deterministic evidence/source integrity errors never restart the daily publication', async () => {
