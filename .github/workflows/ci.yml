@@ -49,6 +49,8 @@ jobs:
         run: node test/brand-guard.test.mjs
       - name: Run workflow-hardening ratchet (SHA pins, harden-runner, timeouts, egress rationale)
         run: node test/workflow-hardening.test.mjs
+      - name: Guard bounded Chrome smoke commands and mandatory DOM assertions
+        run: node test/browser-smoke-bounds.test.mjs
       - name: Run scoring model-validation golden set
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
