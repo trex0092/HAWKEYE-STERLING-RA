@@ -1,0 +1,51 @@
+name: Package readiness audit (never publishes)
+
+# Explicit manual check only. Private package must not reach GitHub Packages.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            *.githubapp.com:443
+
+      - name: Checkout read-only without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node without shared caches
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Validate private package metadata
+        run: |
+          node -e "const p=require('./package.json'); if (p.private !== true || !p.name || !p.version) process.exit(1)"
+          echo 'Private package metadata verified'
+
+      - name: Inspect packaging without lifecycle scripts or publication
+        run: |
+          npm pack --dry-run --ignore-scripts --silent --json > /dev/null
+          echo 'Local packaging dry run passed; nothing published or uploaded'
