@@ -51,15 +51,31 @@ on:
   # so a missed dispatch still lands ~08:00-10:00 UAE, not mid-afternoon.
   schedule:
     - cron: '17 0 * * *'   # 00:17 UTC = 04:17 UAE daily (odd minute) — backstop to the on-time dispatch
+  # A merged change to the screening engine or its assurance/delivery contract
+  # invalidates prior exact-commit runtime evidence. Revalidate automatically
+  # on integrated main, not on unreviewed PRs or unrelated documentation.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sanctions-screen.yml'
+      - '.github/workflows/screening-assurance.yml'
+      - '.github/workflows/sanctions-runtime-assurance.yml'
+      - 'scripts/sanctions-screen.mjs'
+      - 'scripts/screening-assurance.mjs'
+      - 'scripts/screening-delivery.mjs'
+      - 'scripts/screening-cases.mjs'
+      - 'data/worldwide-screening-sources.json'
+      - 'screen.py'
+      - 'kyc.py'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# This workflow is an OPERATIONAL control, not a code-validation workflow.
-# Source changes are exercised by CI. Keeping the runtime workflow schedule/
-# manual-only prevents ordinary merges from creating hour-long full-base
-# screens or being mistaken by freshness checks for today's mandatory control.
+# Operational control: CI tests proposals; relevant accepted changes on main
+# receive a fresh full-population run and exact-commit assurance. Ordinary
+# application/doc merges do not trigger costly screening. Non-cancelling
+# concurrency prevents a new push from discarding an active run's evidence.
 concurrency:
   group: sanctions-screen-runtime
   cancel-in-progress: false
