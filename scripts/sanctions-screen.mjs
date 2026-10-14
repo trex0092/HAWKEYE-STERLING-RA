@@ -1285,18 +1285,68 @@ async function asanaGet(url, token, timeoutMs = 30000) {
    visible; a quietly truncated customer list is neither. */
 export const ASANA_PAGE_CAP = Number(process.env.ASANA_PAGE_CAP) || 500;
 
-export async function asanaPaged(projectGid, path, optFields, token, what, { soft = false } = {}) {
-  const out = [];
+/* Asana returns pagination shape independently of HTTP status. A successful
+   HTTP 200 with data:null or a missing/looped offset after page one must not
+   silently truncate the Customer Database or HR Employees population. This
+   parser validates BOTH authoritative source projects and destination scans.
+   No subject names or raw remote error bodies enter the public failure. */
+export function validateAsanaProjectPage(page, label = 'Asana project') {
+  if (!page || typeof page !== 'object' || !Array.isArray(page.data)) {
+    throw new Error(label + ': malformed task/section page; project coverage INCOMPLETE');
+  }
+  const seen = new Set();
+  for (const row of page.data) {
+    if (!row || typeof row !== 'object' ||
+        !/^\d+$/.test(String(row.gid || '')) ||
+        typeof row.name !== 'string' || !row.name.trim()) {
+      throw new Error(label + ': missing record identity on a page; project coverage INCOMPLETE');
+    }
+    const gid = String(row.gid);
+    if (seen.has(gid)) {
+      throw new Error(label + ': duplicate Asana record in one page; project coverage INCOMPLETE');
+    }
+    seen.add(gid);
+  }
+  let nextOffset = null;
+  if (page.next_page !== null && page.next_page !== undefined) {
+    if (typeof page.next_page !== 'object' || Array.isArray(page.next_page) ||
+        typeof page.next_page.offset !== 'string' || !page.next_page.offset) {
+      throw new Error(label + ': malformed next-page cursor; project coverage INCOMPLETE');
+    }
+    nextOffset = page.next_page.offset;
+  }
+  return { rows: page.data, nextOffset };
+}
+
+export async function asanaPaged(projectGid, path, optFields, token, what,
+  { soft = false, loadPage = asanaGet } = {}) {
+  const out = [], seenIds = new Set(), seenOffsets = new Set();
   let offset = null, pages = 0;
   for (;;) {
     const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + path);
     u.searchParams.set('opt_fields', optFields);
     u.searchParams.set('limit', '100');
     if (offset) u.searchParams.set('offset', offset);
-    const json = await asanaGet(u, token);
-    for (const t of (json.data || [])) out.push(t);
-    offset = json.next_page && json.next_page.offset;
-    if (!offset) return out;
+    const { rows, nextOffset } = validateAsanaProjectPage(
+      await loadPage(u, token), what
+    );
+    if (offset && !rows.length) {
+      throw new Error(what + ': empty continuation page; project coverage INCOMPLETE');
+    }
+    for (const row of rows) {
+      const id = String(row.gid);
+      if (seenIds.has(id)) {
+        throw new Error(what + ': duplicate Asana record across pages; project coverage INCOMPLETE');
+      }
+      seenIds.add(id);
+      out.push(row);
+    }
+    if (!nextOffset) return out;
+    if (seenOffsets.has(nextOffset)) {
+      throw new Error(what + ': repeated pagination cursor; project coverage INCOMPLETE');
+    }
+    seenOffsets.add(nextOffset);
+    offset = nextOffset;
     if (++pages >= ASANA_PAGE_CAP) {
       const msg = what + ': read ' + out.length + ' record(s) over ' + pages
         + ' pages and Asana still reports more — the page cap (' + ASANA_PAGE_CAP
