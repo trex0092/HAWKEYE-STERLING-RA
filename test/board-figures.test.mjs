@@ -118,6 +118,10 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const results = {
     date: '2026-09-28',
     screened: 12,
+    sourcePopulation: {
+      customer: { projectGid: '1214107620220121', screenedSubjects: 10 },
+      employee: { projectGid: '1216239131596624', screenedSubjects: 2 },
+    },
     degraded: false,
     failures: [],
     lists: [
@@ -149,6 +153,38 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const ok = assessRuntime({ results, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
   check('runtime assurance passes only when all three domains have complete current evidence',
     ok.operational && ok.domains.sanctions.operational && ok.domains.adverseMedia.operational && ok.domains.pep.operational);
+  check('green source evidence independently identifies both approved Asana projects with reconciled counts',
+    ok.run.sourcePopulation.customer.projectGid === '1214107620220121'
+    && ok.run.sourcePopulation.employee.projectGid === '1216239131596624'
+    && ok.run.sourcePopulation.customer.screenedSubjects === 10
+    && ok.run.sourcePopulation.employee.screenedSubjects === 2
+    && ok.run.sourcePopulation.customer.screenedSubjects + ok.run.sourcePopulation.employee.screenedSubjects === 12
+    && !JSON.stringify(ok.run.sourcePopulation).includes('Synthetic'));
+  const noEmployeeProof = structuredClone(results);
+  delete noEmployeeProof.sourcePopulation.employee;
+  const missingEmployee = assessRuntime({ results: noEmployeeProof, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('missing HR Employees evidence invalidates all three operational screening domains',
+    Object.values(missingEmployee.domains).every(x => !x.operational && x.reasons.some(s => s.includes('HR Employees'))));
+  const omittedEmployees = structuredClone(results);
+  omittedEmployees.sourcePopulation.employee.screenedSubjects = 0;
+  check('no screened employees fails closed, even when every other source returned complete',
+    !assessRuntime({ results: omittedEmployees, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 }).operational);
+  const swappedSource = structuredClone(results);
+  swappedSource.sourcePopulation.customer.projectGid = '9999999999999999';
+  check('redirected Customer Database project cannot satisfy worldwide screening assurance',
+    !assessRuntime({ results: swappedSource, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 }).operational);
+  const mismatchedSource = structuredClone(results);
+  mismatchedSource.sourcePopulation.customer.screenedSubjects = 9;
+  check('screened source counts must sum to the actual screened population',
+    !assessRuntime({ results: mismatchedSource, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 }).operational);
+  const forgedSources = structuredClone(ok);
+  forgedSources.run.sourcePopulation.employee.screenedSubjects = 0;
+  check('stored operational booleans cannot conceal a missing employee screening population',
+    !checkStored(forgedSources, { nowMs }).ok);
+  const forgedTotals = structuredClone(ok);
+  forgedTotals.run.sourcePopulation.customer.screenedSubjects = 11;
+  check('stored operational artifact rejects manipulated customer/employee totals',
+    !checkStored(forgedTotals, { nowMs }).ok);
 
   const missingAdverseErrorCount = structuredClone(results);
   delete missingAdverseErrorCount.enrichment.amErrors;
