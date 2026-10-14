@@ -1967,12 +1967,16 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
    Driven through a stubbed fetch, so the real loop is what is under test. */
 {
   const realFetch = globalThis.fetch;
+  let nextMockGid = 0, nextMockOffset = 0;
   const page = (n, more) => ({
     ok: true, status: 200,
     headers: { get: () => null },
     json: async () => ({
-      data: Array.from({ length: n }, (_, i) => ({ gid: String(i), name: 'Customer ' + i, completed: false })),
-      next_page: more ? { offset: 'o' + Math.random() } : null
+      data: Array.from({ length: n }, () => {
+        const gid = String(++nextMockGid);
+        return { gid, name: 'Synthetic Customer ' + gid, completed: false };
+      }),
+      next_page: more ? { offset: 'offset-' + (++nextMockOffset) } : null
     })
   });
   const stub = (pages) => { let i = 0; globalThis.fetch = async () => page(2, ++i < pages); };
@@ -2000,6 +2004,68 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   finally { console.error = realErr; globalThis.fetch = realFetch; }
   check('asana paging: the dedup scan degrades LOUDLY instead of throwing (a duplicate card beats no card)',
     Array.isArray(soft) && soft.length === scr.ASANA_PAGE_CAP * 2 && /page cap/.test(warned) && /PARTIAL|partial/.test(warned));
+
+  /* Live Customer Database had 339 tasks on 14 Oct 2026 (four pages);
+     all 20 HR Employees tasks were completed. A malformed later page could
+     previously be treated as a clean end of a partially read project. */
+  const goodPage = { data: [{ gid: '1219000000000001',
+    name: 'Synthetic Completed Employee', completed: true }], next_page: null };
+  const valid = scr.validateAsanaProjectPage(goodPage, 'HR Employees');
+  check('completed HR records remain eligible for screening and have valid page identity',
+    valid.rows.length === 1 && valid.rows[0].completed === true && valid.nextOffset === null);
+  let malformedLater = false, reads = 0;
+  try {
+    await scr.asanaPaged('1214107620220121', '/tasks', 'name,completed',
+      'synthetic', 'Customer Database', { loadPage: async () =>
+        (++reads === 1
+          ? { data: [{ gid: '100', name: 'Synthetic Customer' }], next_page: { offset: 'p2' } }
+          : { data: null, next_page: null }) });
+  } catch (e) { malformedLater = /INCOMPLETE/.test(String(e.message)); }
+  check('HTTP-200 with null data on a later Asana source page fails closed',
+    malformedLater && reads === 2);
+  let invalidCursor = false;
+  try {
+    scr.validateAsanaProjectPage(
+      { data: [{ gid: '1', name: 'A' }], next_page: { offset: '' } }, 'Customer Database'
+    );
+  } catch { invalidCursor = true; }
+  check('invalid next-page cursor cannot silently truncate screening population',
+    invalidCursor);
+  let loopingCursor = false, loopReads = 0;
+  try {
+    await scr.asanaPaged('1216239131596624', '/tasks', 'name',
+      'synthetic', 'HR Employees', { loadPage: async () => ({
+        data: [{ gid: String(++loopReads), name: 'Synthetic Worker ' + loopReads }],
+        next_page: { offset: 'loop' }
+      }) });
+  } catch (e) { loopingCursor = /repeated pagination cursor/.test(String(e.message)); }
+  check('repeat page cursor is rejected at second page rather than looping to timeout',
+    loopingCursor && loopReads === 2);
+  let repeatedGid = false;
+  try {
+    await scr.asanaPaged('1214107620220121', '/tasks', 'name',
+      'synthetic', 'Customer Database', { loadPage: async (url) => ({
+        data: [{ gid: '123', name: 'A' }],
+        next_page: url.searchParams.get('offset') ? null : { offset: 'p2' }
+      }) });
+  } catch (e) { repeatedGid = /duplicate Asana record across pages/.test(String(e.message)); }
+  check('overlapping Asana pages cannot count the same customer twice', repeatedGid);
+  let emptyContinuation = false;
+  try {
+    await scr.asanaPaged('1214107620220121', '/tasks', 'name',
+      'synthetic', 'Customer Database', { loadPage: async (url) =>
+        url.searchParams.get('offset')
+          ? { data: [], next_page: null }
+          : { data: [{ gid: '123', name: 'A' }], next_page: { offset: 'p2' } } });
+  } catch (e) { emptyContinuation = /empty continuation page/.test(String(e.message)); }
+  check('empty continuation cannot be counted as a complete customer book', emptyContinuation);
+  const completedHR = Array.from({ length: 20 }, (_, i) => ({
+    gid: String(1216239131596600 + i),
+    name: 'Synthetic Staff ' + String(i + 1), completed: true, notes: ''
+  }));
+  const allHR = scr.parseEmployeeSubjects(completedHR);
+  check('all 20 completed HR Training/Workshops tasks are independently screened',
+    allHR.length === 20 && allHR.every(row => row.entityType === 'individual'));
 
   const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
   check('asana paging: the section lookup paginates — an unpaged read creates a DUPLICATE column nobody watches',
