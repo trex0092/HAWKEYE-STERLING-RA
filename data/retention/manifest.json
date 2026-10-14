@@ -448,6 +448,13 @@
     "recordedAt": "2026-10-13T12:37:24.305Z"
   },
   {
+    "file": "sanctions-state-2026-10-14-3b1aa3380ad4170e.json",
+    "sha256": "3b1aa3380ad4170ea939bc581097d98a629677095962abddb64bb7f2996d99c8",
+    "bytes": 2839,
+    "updated": "2026-10-14",
+    "recordedAt": "2026-10-14T10:04:35.868Z"
+  },
+  {
     "file": "sanctions-state-2026-10-14-f753902705560c22.json",
     "sha256": "f753902705560c226f58ebc126dbabd05c3fa0512f44b5096db2cc2920071510",
     "bytes": 2839,
