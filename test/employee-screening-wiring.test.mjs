@@ -81,6 +81,17 @@ check('runtime assurance explicitly defaults to completed HR Employees populatio
    source ambiguity in audit logs while preserving the in-engine strict route
    check against a stale or redirected repository variable. */
 const primaryScreenWorkflow = readFileSync('.github/workflows/sanctions-screen.yml', 'utf8');
+const exactScreenRevalidation = [
+  '  push:',
+  '    branches: [main]',
+  '    paths:',
+  "      - '.github/workflows/sanctions-screen.yml'",
+].join('\n');
+check('approved screening workflow changes start a current-main full Asana source revalidation',
+  primaryScreenWorkflow.includes(exactScreenRevalidation) &&
+  /group:\s*sanctions-screen-runtime/.test(primaryScreenWorkflow) &&
+  /cancel-in-progress:\s*false/.test(primaryScreenWorkflow));
+
 check('daily sanctions workflow explicitly binds approved Customer Database fallback',
   /ASANA_CUSTOMER_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_CUSTOMER_PROJECT_GID\s*\|\|\s*'1214107620220121'\s*\}\}/.test(primaryScreenWorkflow));
 check('daily sanctions workflow binds the exact approved HR Employees population',
