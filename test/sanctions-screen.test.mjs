@@ -56,6 +56,76 @@ for (const [reason, route] of [
   check('unapproved Asana routing fails closed: ' + reason, refused);
 }
 
+
+/* The independent sanctions-runtime job must not silently screen HR employee
+   records as companies or accept a redirected/blank Asana source project.
+   The 20 synthetic staff tasks mirror the completed state of the actual
+   approved HR project; NO live Asana or public customer PII in these tests. */
+{
+  const runtime = await import('../scripts/sanctions-runtime-assurance.mjs');
+  const customerProject = '1214107620220121', employeeProject = '1216239131596624';
+  const customer = scr.parseSubjects([
+    { gid: '9001', name: 'SYNTHETIC CUSTOMER CO LLC', notes: 'Jurisdiction: UAE', completed: false },
+  ]);
+  const staff = scr.parseEmployeeSubjects(Array.from({ length: 20 }, (_, i) => ({
+    gid: String(9100 + i), name: 'Synthetic Worker ' + (i + 1),
+    completed: true, notes: 'Nationality: United Arab Emirates\\nDOB: 01 January 1980',
+  })));
+  const requests = [];
+  const fetchCustomers = async (id, token) => {
+    requests.push('customer:' + id);
+    return customer;
+  };
+  const fetchEmployees = async (id, token) => {
+    requests.push('employee:' + id);
+    return staff;
+  };
+  const data = await runtime.loadApprovedRuntimePopulation('synthetic-test-token', {
+    customerProject, employeeProject, fetchCustomers, fetchEmployees
+  });
+  check('runtime assurance screens both approved projects, not output-only project',
+    requests.join('|') === 'customer:' + customerProject + '|employee:' + employeeProject);
+  check('all 20 completed HR records are retained as individual employee screening subjects',
+    data.sources.employee.screenedSubjects === 20 && data.subjects.length === 21 &&
+    data.subjects.filter(s => s.role === 'Employee' && s.entityType === 'individual').length === 20);
+  check('runtime subject-source provenance exposes project GIDs and counts but no names or PII',
+    data.sources.customer.projectGid === customerProject &&
+    data.sources.customer.screenedSubjects === 1 &&
+    data.sources.employee.projectGid === employeeProject &&
+    !JSON.stringify(data.sources).includes('Synthetic'));
+
+  for (const [label, params] of [
+    ['redirected customer', { customerProject: '111111111' }],
+    ['redirected employee', { employeeProject: '111111111' }],
+    ['disabled employee source', { employeeProject: '' }],
+  ]) {
+    requests.length = 0;
+    let refused = false;
+    try {
+      await runtime.loadApprovedRuntimePopulation('synthetic-test-token', {
+        customerProject, employeeProject, fetchCustomers, fetchEmployees, ...params
+      });
+    } catch (e) { refused = /Authoritative Asana/.test(String(e.message)); }
+    check('runtime probe rejects ' + label + ' before an Asana API call',
+      refused && requests.length === 0);
+  }
+  let absentEmployeeFailed = false;
+  try {
+    await runtime.loadApprovedRuntimePopulation('synthetic-test-token', {
+      customerProject, employeeProject, fetchCustomers,
+      fetchEmployees: async () => []
+    });
+  } catch (e) { absentEmployeeFailed = /HR Employees project/.test(String(e.message)); }
+  check('runtime probe fails closed on empty staff coverage', absentEmployeeFailed);
+  let incompleteCustomerFailed = false;
+  try {
+    await runtime.loadApprovedRuntimePopulation('synthetic-test-token', {
+      customerProject, employeeProject, fetchCustomers: async () => null, fetchEmployees
+    });
+  } catch (e) { incompleteCustomerFailed = /Customer Database/.test(String(e.message)); }
+  check('runtime probe fails closed on invalid customer coverage', incompleteCustomerFailed);
+}
+
 /* ── name folding ── */
 check('normalizeName folds case, punctuation and diacritics',
   normalizeName('YÜKSEL KIYMETLİ MADENLER TİCARET A.Ş.') === normalizeName('yuksel kiymetli madenler ticaret a s'));
