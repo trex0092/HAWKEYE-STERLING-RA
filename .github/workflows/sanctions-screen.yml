@@ -277,7 +277,9 @@ jobs:
         if: steps.screen.outputs.screen_error != 'true'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_CASES_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
+          # Case and daily-results evidence MUST reach this approved MLRO
+          # project, even if an unrelated repository variable is repointed.
+          ASANA_CASES_PROJECT_GID: '1216203370612914'
           ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
           # "Sanctions updates" section — the run's RESULTS surface (Asana, not
           # GitHub). Repointed 2026-09-16: this literal fallback pointed at

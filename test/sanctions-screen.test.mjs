@@ -25,6 +25,37 @@ function check(name, cond) {
   else { failed++; console.log('FAIL  ' + name); }
 }
 
+/* Approved source-of-truth + destination contract for mandatory AML screening.
+   These tests are pure; no live Asana credentials or customer names. */
+check('screening requires Customer Database and HR Employees as distinct mandatory Asana sources',
+  scr.requireApprovedScreeningRoute({
+    customer: '1214107620220121',
+    employee: '1216239131596624',
+    results: '1216203370612914',
+    monitoring: '1216203370612914',
+  }) === true);
+for (const [reason, route] of [
+  ['stale customer project', { customer: '1216139945846994' }],
+  ['stale employee project', { employee: '1216139945846994' }],
+  ['disabled employee population', { employee: '' }],
+  ['redirected screening alert project', { results: '1216139945846994' }],
+  ['redirected monitoring results', { monitoring: '1216139945846994' }],
+]) {
+  let refused = false;
+  try {
+    scr.requireApprovedScreeningRoute({
+      customer: '1214107620220121',
+      employee: '1216239131596624',
+      results: '1216203370612914',
+      monitoring: '1216203370612914',
+      ...route,
+    });
+  } catch (e) {
+    refused = /Authoritative Asana/.test(String(e.message));
+  }
+  check('unapproved Asana routing fails closed: ' + reason, refused);
+}
+
 /* ── name folding ── */
 check('normalizeName folds case, punctuation and diacritics',
   normalizeName('YÜKSEL KIYMETLİ MADENLER TİCARET A.Ş.') === normalizeName('yuksel kiymetli madenler ticaret a s'));
