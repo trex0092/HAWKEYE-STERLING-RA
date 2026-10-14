@@ -378,17 +378,27 @@ export async function publishDailyScreening({ results, assurance, state, request
 
 /* Multipart upload (Node's built-in FormData/Blob — no dependency). The JSON
    client cannot send files, so this is the one direct call to Asana here. */
-async function uploadAttachment(parent, name, text, type) {
+export async function uploadAttachment(parent, name, text, type) {
   const form = new globalThis.FormData();
   form.append('parent', parent);
   form.append('file', new globalThis.Blob([text], { type }), name);
-  const response = await fetch('https://app.asana.com/api/1.0/attachments', {
-    method: 'POST', body: form, signal: globalThis.AbortSignal.timeout(60000),
-    headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' },
-  });
+  let response;
+  try {
+    response = await fetch('https://app.asana.com/api/1.0/attachments', {
+      method: 'POST', body: form, signal: globalThis.AbortSignal.timeout(60000),
+      headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' },
+    });
+  } catch {
+    // An upload can have committed even when the TCP response disappeared.
+    // Never log the provider exception or replay that POST directly.
+    throw new Error('Asana attachment upload transport failure; outcome unverified');
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error('Asana attachment upload ' + response.status);
-  return data?.data?.gid;
+  if (!/^\d+$/.test(String(data?.data?.gid || ''))) {
+    throw new Error('Asana attachment upload transport failure; outcome unverified');
+  }
+  return data.data.gid;
 }
 
 /* Reconcile a transient Asana delivery failure once while TODAY'S complete
