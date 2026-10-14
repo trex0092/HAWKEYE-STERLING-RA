@@ -78,30 +78,44 @@ export function validateEvidence(results, assurance, state, { runId, nowMs = Dat
   }
   const operational = DOMAINS.every(domain => assurance.domains[domain].operational);
   if (assurance.operational !== operational) throw new Error('Contradictory overall assurance status');
-  // A green Asana report must never rest on an empty source inventory,
-  // zero-name/partial lists, or a separate degraded engine result. We still
-  // DELIVER honestly degraded reports so incident responders see the outage.
-  if (operational && (results.degraded !== false || results.lists.length === 0 ||
-      !results.lists.every(list => record(list) && typeof list.name === 'string' &&
-        !!list.name.trim() && Number.isSafeInteger(list.count) &&
-        list.count > 0 && list.partial === false))) {
-    throw new Error('Screening sources cannot support an OPERATIONAL Asana delivery');
+  // Source rows must be complete enough to support a reproducible audit
+  // trail. A supplemental source may be partial, but a zero-name, anonymous or
+  // malformed list must never be accepted as a successful source fetch.
+  if (!results.lists.length || !results.lists.every(list =>
+    record(list) && typeof list.id === 'string' && !!list.id.trim() &&
+    typeof list.name === 'string' && !!list.name.trim() &&
+    Number.isSafeInteger(list.count) && list.count > 0 &&
+    typeof list.partial === 'boolean')) {
+    throw new Error('Screening source inventory is incomplete or malformed');
   }
   if (operational) {
-    // Reuse the verified persisted-evidence gate, not a parallel, weaker
-    // interpretation of the same source counters. Otherwise a flipped green
-    // flag over real zero-coverage subjects can be delivered to an MLRO as
-    // OPERATIONAL despite the assurance watchdog correctly rejecting it.
+    // The independent assurance distinguishes REQUIRED source coverage (and
+    // formally declared, complete fallbacks) from supplementary national-list
+    // outages. The latter must be disclosed in Asana but must not block the
+    // delivery of valid primary screening evidence and human-owned cases.
     const checked = checkStored(assurance, { nowMs, maxAgeHours: 6 });
     if (!checked.ok) {
-      // Keep the error generic: input source metadata may contain identifiers
-      // and must not be copied to the public Actions log.
       throw new Error('Screening evidence contradicts the OPERATIONAL Asana delivery claim');
     }
+    // Do not accept stale or forged green source receipts that refer to a
+    // different inventory than the just-finished screening engine.
+    const loaded = assurance.domains.sanctions.evidence.loadedSources;
+    const receiptById = new Map(loaded.map(row => [row.id, row]));
+    if (loaded.length !== results.lists.length ||
+        new Set(results.lists.map(row => row.id)).size !== results.lists.length ||
+        results.lists.some(row => {
+          const proof = receiptById.get(row.id);
+          return !proof || proof.count !== row.count || proof.partial !== row.partial;
+        })) {
+      throw new Error('Screening source inventory contradicts the independent assurance receipt');
+    }
   }
-  // A DEGRADED report is still delivered promptly with explicit failures and
-  // provisional negative results, not blocked by the operational-only gate.
-  return operational;
+  // An OPTIONAL source being partial is not equivalent to missing required
+  // screening: deliver the warnings and findings instead of failing Asana.
+  // Nonetheless do not return an overall all-clear while any source is
+  // degraded. Mark negative and clearance evidence provisional for MLRO review.
+  return operational && results.degraded === false &&
+    results.lists.every(list => list.partial === false);
 }
 
 /* Human-readable findings table, attached to each daily results card. The JSON
@@ -167,7 +181,7 @@ function rowDomains(row) {
 }
 
 export function buildReports(results, assurance, state, context) {
-  validateEvidence(results, assurance, state, context);
+  const deliveryOperational = validateEvidence(results, assurance, state, context);
   return Object.entries(DESTINATIONS).map(([domain, section]) => {
     const domains = domain === 'sanctions' ? ['sanctions'] : ['adverseMedia', 'pep'];
     const title = 'Daily ' + (domain === 'sanctions' ? 'Sanctions' : 'Adverse Media and PEP')
@@ -176,7 +190,18 @@ export function buildReports(results, assurance, state, context) {
       'Evidence generated: ' + assurance.generatedAt,
       'Workflow run: ' + assurance.run.githubRunId,
       'Subjects processed by the sanctions engine: ' + results.screened,
-      'Processing count is not proof of complete adverse-media or PEP coverage.'];
+      'Processing count is not proof of complete adverse-media or PEP coverage.',
+      'Required screening assurance: ' + (assurance.operational ? 'OPERATIONAL' : 'DEGRADED') +
+        ' (independent sanctions, adverse-media and PEP verification).',
+      'Overall screening evidence: ' + (deliveryOperational ? 'OPERATIONAL' : 'DEGRADED / PROVISIONAL') +
+        '. This report is never a substitute for human MLRO disposition.'];
+    if (results.degraded !== false || results.lists.some(list => list.partial)) {
+      summary.push('WARNING: One or more supplementary sanctions sources were unavailable or partial.' +
+        ' Required-source and fallback coverage are separately verified by the assurance receipt.' +
+        ' Screening findings and negative/clearance evidence require MLRO review.',
+        'Partial loaded list(s): ' + (results.lists.filter(list => list.partial)
+          .map(list => list.name).join('; ') || 'see full failures and assurance warnings below'));
+    }
     for (const key of domains) {
       const item = assurance.domains[key];
       summary.push('\n' + LABELS[key] + ': ' + (item.operational ? 'OPERATIONAL' : 'DEGRADED'));
@@ -210,7 +235,7 @@ export function buildReports(results, assurance, state, context) {
       summary: summary.join('\n'), pages,
       attachment: { name: attachment,
         csv: buildFindingsCsv(domain, standing, alerts, domain === 'sanctions' ? results.cleared : [],
-          { provisional: !assurance.operational }) } };
+          { provisional: !deliveryOperational }) } };
   });
 }
 
@@ -346,7 +371,9 @@ export async function publishDailyScreening({ results, assurance, state, request
   }
   if (errors.length) throw new AggregateError(errors, errors.map(error => error.message).join('; '));
   return { version: 1, runId: String(runId), screeningDate: results.date, projectGid: PROJECT,
-    verifiedAt: new Date(nowMs).toISOString(), operational: assurance.operational, reports: delivered };
+    verifiedAt: new Date(nowMs).toISOString(),
+    operational: validateEvidence(results, assurance, state, { runId, nowMs }),
+    requiredDomainsOperational: assurance.operational, reports: delivered };
 }
 
 /* Multipart upload (Node's built-in FormData/Blob — no dependency). The JSON

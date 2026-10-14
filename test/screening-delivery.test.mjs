@@ -19,7 +19,7 @@ function fixture() {
       domains: {
         sanctions: status(true, {
           screenedSubjects: 2, requiredSourceIds: ['synthetic'],
-          loadedSources: [{ id: 'synthetic', count: 10, partial: false }],
+          loadedSources: [{ id: 'synthetic', count: 1, partial: false }],
           sourceFloors: [{ id: 'synthetic', minNames: 1 }],
           servedByFallback: [],
         }),
@@ -112,7 +112,6 @@ for (const [name, change] of [
   ['a zero-source green report', x => { x.results.lists = []; }],
   ['a zero-entry source with green assurance', x => { x.results.lists[0].count = 0; }],
   ['partial designation source with green assurance', x => { x.results.lists[0].partial = true; }],
-  ['degraded engine with green assurance', x => { x.results.degraded = true; }],
   ['unnamed source with green assurance', x => { x.results.lists[0].name = ''; }],
   ['missing alerts', x => { delete x.results.alerts; }],
   ['missing assurance', x => { x.assurance = null; }],
@@ -144,6 +143,72 @@ for (const [name, change] of [
     assert.equal(fake.calls.length, 0);
   });
 }
+
+test('supplementary sanctions-source outage delivers verified reports into the approved Asana project', async () => {
+  const input = fixture();
+  input.results.degraded = true; // real 14 Oct 2026 source limitation
+  input.results.lists.push({
+    id: 'supplemental', name: 'Synthetic supplementary national list', count: 7, partial: true
+  });
+  input.assurance.domains.sanctions.evidence.loadedSources.push({
+    id: 'supplemental', count: 7, partial: true
+  });
+  input.assurance.domains.sanctions.warnings.push(
+    'A supplementary national list was partial; all required lists are complete');
+  const fake = api();
+  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  assert.equal(receipt.projectGid, '1216203370612914');
+  assert.equal(receipt.requiredDomainsOperational, true);
+  assert.equal(receipt.operational, false, 'supplementary loss must not become an all-clear');
+  assert.deepEqual(receipt.reports.map(r => r.sectionGid), [
+    '1218451960830318', '1218979441933783'
+  ]);
+  for (const report of receipt.reports) {
+    const card = fake.tasks.get(report.taskGid);
+    assert.match(card.notes, /^DELIVERY VERIFIED:/);
+    assert.match(card.notes, /Overall screening evidence: DEGRADED \/ PROVISIONAL/);
+    assert.match(card.notes, /WARNING: One or more supplementary sanctions sources/);
+    assert.equal(card.memberships[0].project.gid, '1216203370612914');
+    assert.equal(card.memberships[0].section.gid, report.sectionGid);
+  }
+  assert.equal(fake.attachments.size, 2, 'both domains must receive real findings attachments');
+});
+
+test('source-failure flag alone must not prevent evidence delivery or imply all-clear', async () => {
+  const input = fixture();
+  input.results.degraded = true;
+  input.results.failures = ['Synthetic optional national source temporarily unavailable'];
+  input.assurance.domains.sanctions.warnings.push('Supplementary source failed');
+  const fake = api();
+  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
+  assert.equal(receipt.operational, false);
+  assert.equal(receipt.reports.length, 2);
+  assert.match(fake.tasks.get(receipt.reports[0].taskGid).notes, /DEGRADED \/ PROVISIONAL/);
+});
+
+test('source receipts cannot be altered independently of assurance, even with a partial source', async () => {
+  const input = fixture();
+  input.results.degraded = true;
+  input.results.lists[0].partial = true;
+  const fake = api();
+  await assert.rejects(
+    publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
+    /inventory contradicts/
+  );
+  assert.equal(fake.calls.length, 0);
+});
+test('a missing required source still fails closed rather than using a supplementary warning', async () => {
+  const input = fixture();
+  input.results.degraded = true;
+  input.results.lists[0].partial = true;
+  input.assurance.domains.sanctions.evidence.loadedSources[0].partial = true;
+  const fake = api();
+  await assert.rejects(
+    publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
+    /contradicts the OPERATIONAL Asana delivery claim/
+  );
+  assert.equal(fake.calls.length, 0);
+});
 
 test('both sections receive read-back-verified daily reports, including a no-new-match day', async () => {
   const fake = api();
