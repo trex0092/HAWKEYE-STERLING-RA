@@ -8024,6 +8024,23 @@ def enrichment_rotation(n, today_ordinal, retry_pass=False):
     offset = 67 if n % 67 else 71      # same guard for the make-up pass
     return (today_ordinal * stride + (offset if retry_pass else 0)) % n
 
+def build_screening_subjects(customers):
+    """Enumerate screening slots without misclassifying HR employees as firms.
+
+    Preserve corporate-owner screening and record attribution; the same
+    identities are screened separately by the sanctions and enrichment paths.
+    """
+    subjects = []
+    for record in customers:
+        if record.get("kind") != "employee":
+            subjects.append(("COMPANY", record["name"], None, record))
+        for person in screening_individuals(record):
+            subjects.append(("INDIVIDUAL", person, record["name"], record))
+        for owner in record.get("entity_owners", []):
+            subjects.append(("ENTITY (owner)", owner, record["name"], record))
+    return subjects
+
+
 def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     """Shared core: sanctions + adverse media + PEP over a set of customers, with
     delta classification, one Asana report and MLRO case subtasks. mode controls
@@ -8036,17 +8053,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 
     # Subject set first — the watchlist pass below screens it before the
     # network-bound enrichment starts.
-    subjects_all = []
-    for c in customers:
-        if c.get("kind") != "employee":
-            subjects_all.append(("COMPANY", c["name"], None, c))
-        for ind in screening_individuals(c):
-            subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
-        # Corporate owners/parents are sanctions-screened (50%/control rule) —
-        # sweep their adverse media too, or a designated parent's coverage is
-        # never seen. No PEP check: PEP status is a natural-person concept.
-        for ent in c.get("entity_owners", []):
-            subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
+    subjects_all = build_screening_subjects(customers)
 
     # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual — the
     # network-bound sweep runs in PARALLEL (bounded pool), and it STARTS HERE,
