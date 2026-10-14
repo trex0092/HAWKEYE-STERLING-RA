@@ -45,6 +45,35 @@ function fixture() {
     state: { updated: '2026-09-30', subjects: {} },
   };
 }
+test('daily Asana reports independently disclose BOTH approved screening source populations', () => {
+  const input = fixture();
+  const reports = buildReports(input.results, input.assurance, input.state, input);
+  assert.equal(reports.length, 2);
+  for (const report of reports) {
+    assert.match(report.summary, /Asana source-population proof: VERIFIED for this workflow run/);
+    assert.match(report.summary, /Customer Database \(project 1214107620220121\): 1 customer\/legal-entity and principal subjects/);
+    assert.match(report.summary, /HR Employees \(project 1216239131596624\): 1 individual employees/);
+    assert.match(report.summary, /Source population reconciled: 2 of 2 screened subjects/);
+    assert.match(report.summary, /Processing count is not proof of complete adverse-media or PEP coverage/);
+    assert.doesNotMatch(report.summary, /passport|DOB|Emirates ID/i);
+  }
+});
+
+test('degraded evidence never invents two-project proof when source receipt is absent', () => {
+  const input = fixture();
+  input.assurance.operational = false;
+  input.assurance.domains.adverseMedia.operational = false;
+  input.assurance.domains.adverseMedia.reasons = ['synthetic news coverage unavailable'];
+  delete input.assurance.run.sourcePopulation;
+  const reports = buildReports(input.results, input.assurance, input.state, input);
+  assert.equal(reports.length, 2);
+  for (const report of reports) {
+    assert.match(report.summary, /Asana source-population proof: UNVERIFIED/);
+    assert.match(report.summary, /DEGRADED \/ PROVISIONAL/);
+    assert.doesNotMatch(report.summary, /Source population reconciled:/);
+  }
+});
+
 function api() {
   const tasks = new Map();
   const calls = [];

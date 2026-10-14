@@ -4,7 +4,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { checkStored } from './screening-assurance.mjs';
+import { checkStored, approvedSourcePopulationIssue } from './screening-assurance.mjs';
 
 export const PROJECT = '1216203370612914';
 export const DESTINATIONS = Object.freeze({
@@ -182,6 +182,22 @@ function rowDomains(row) {
 
 export function buildReports(results, assurance, state, context) {
   const deliveryOperational = validateEvidence(results, assurance, state, context);
+  // Human review should not require opening 500 numbered evidence pages merely
+  // to verify WHICH Asana projects were screened. Only approved project GIDs
+  // and aggregate counts appear in this readable summary, never identities.
+  const sourcePopulation = assurance?.run?.sourcePopulation;
+  const sourceIssue = approvedSourcePopulationIssue(sourcePopulation, results.screened);
+  const sourceSummary = sourceIssue
+    ? ['Asana source-population proof: UNVERIFIED — review required.',
+      'A processed-subject count alone is NOT evidence that both source projects were read.']
+    : ['Asana source-population proof: VERIFIED for this workflow run.',
+      'Customer Database (project ' + sourcePopulation.customer.projectGid + '): ' +
+        sourcePopulation.customer.screenedSubjects + ' customer/legal-entity and principal subjects.',
+      'HR Employees (project ' + sourcePopulation.employee.projectGid + '): ' +
+        sourcePopulation.employee.screenedSubjects + ' individual employees, including completed training records.',
+      'Source population reconciled: ' +
+        (sourcePopulation.customer.screenedSubjects + sourcePopulation.employee.screenedSubjects) +
+        ' of ' + results.screened + ' screened subjects.'];
   return Object.entries(DESTINATIONS).map(([domain, section]) => {
     const domains = domain === 'sanctions' ? ['sanctions'] : ['adverseMedia', 'pep'];
     const title = 'Daily ' + (domain === 'sanctions' ? 'Sanctions' : 'Adverse Media and PEP')
@@ -190,6 +206,7 @@ export function buildReports(results, assurance, state, context) {
       'Evidence generated: ' + assurance.generatedAt,
       'Workflow run: ' + assurance.run.githubRunId,
       'Subjects processed by the sanctions engine: ' + results.screened,
+      ...sourceSummary,
       'Processing count is not proof of complete adverse-media or PEP coverage.',
       'Required screening assurance: ' + (assurance.operational ? 'OPERATIONAL' : 'DEGRADED') +
         ' (independent sanctions, adverse-media and PEP verification).',
