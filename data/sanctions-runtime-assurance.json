@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-14T05:26:54.233Z",
-  "githubRunId": "38516585390",
-  "commit": "2dc9c8e5bfb37aaecc49b3f82685d49661003e4d",
+  "generatedAt": "2026-10-14T09:03:26.879Z",
+  "githubRunId": "38539413730",
+  "commit": "e74f26fc0fae2754db735b0da1a7f55e83102cd4",
   "screenedSubjects": 991,
   "sourceProjects": {
     "customer": {
@@ -28,15 +28,15 @@
     "screenedSubjects": 991,
     "loadedSources": [
       {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3773,
-        "partial": false
-      },
-      {
         "id": "uk-ofsi",
         "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
         "count": 58417,
+        "partial": false
+      },
+      {
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3773,
         "partial": false
       },
       {
