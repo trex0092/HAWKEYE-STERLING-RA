@@ -378,6 +378,22 @@ console.log('\n— runtime worldwide screening assurance —\n');
     !checkStored({ ...ok, operational: false }, { nowMs }).ok);
   check('stored runtime assurance accepts internally consistent verified evidence',
     checkStored(ok, { nowMs }).ok);
+  const expectedSha = 'a'.repeat(40);
+  const screenedAtCommit = { ...ok, run: { ...ok.run, commit: expectedSha } };
+  check('green assurance is accepted only when evidence comes from this exact main commit',
+    checkStored(screenedAtCommit, { nowMs, expectedCommit: expectedSha }).ok);
+  check('same-day fresh green evidence from a different code revision fails closed',
+    !checkStored(screenedAtCommit, { nowMs, expectedCommit: 'b'.repeat(40) }).ok &&
+    checkStored(screenedAtCommit, { nowMs, expectedCommit: 'b'.repeat(40) })
+      .reasons.some(reason => reason.includes('different code commit')));
+  check('missing producing commit can never prove latest-main screening health',
+    !checkStored(ok, { nowMs, expectedCommit: expectedSha }).ok);
+  check('malformed expected main commit cannot silently disable the provenance gate',
+    !checkStored(screenedAtCommit, { nowMs, expectedCommit: '' }).ok);
+  const assuranceWorkflow = readFileSync(join(ROOT, '.github/workflows/screening-assurance.yml'), 'utf8');
+  check('runtime assurance workflow explicitly pins the required producing SHA',
+    /SCREENING_ASSURANCE_EXPECTED_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}/.test(assuranceWorkflow) &&
+    /node scripts\/screening-assurance\.mjs --check/.test(assuranceWorkflow));
   const forgedMediaGreen = structuredClone(uc);
   forgedMediaGreen.operational = true;
   forgedMediaGreen.domains.adverseMedia.operational = true;
