@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 12
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -46,7 +46,7 @@ jobs:
           persist-credentials: false
 
       - name: Check Dockerfile best practices (blocking)
-        uses: hadolint/hadolint-action@f988afea3da57ee48710a9795b6bb677cc901183 # v3.2.0 from GitHub starter workflows
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.2.0 from GitHub starter workflows
         with:
           dockerfile: Dockerfile
           failure-threshold: warning
