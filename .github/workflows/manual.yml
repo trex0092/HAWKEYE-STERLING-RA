@@ -1,32 +1,41 @@
-# This is a basic workflow that is manually triggered
+name: Safe manual diagnostic
 
-name: Manual workflow
-
-# Controls when the action will run. Workflow runs when manually triggered using the UI
-# or API.
+# Manual-only, read-only diagnostic. No releases, publishing or deployment.
 on:
   workflow_dispatch:
-    # Inputs the workflow accepts.
     inputs:
       name:
-        # Friendly description to be shown in the UI instead of 'name'
-        description: 'Person to greet'
-        # Default value if no value is explicitly provided
-        default: 'World'
-        # Input has to be provided for the workflow to run
-        required: true
-        # The data type of the input
+        description: 'Optional ASCII diagnostic label'
+        required: false
+        default: World
         type: string
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
-jobs:
-  # This workflow contains a single job called "greet"
-  greet:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+permissions:
+  contents: read
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
+concurrency:
+  group: manual-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-    # Runs a single command using the runners shell
-    - name: Send greeting
-      run: echo "Hello ${{ inputs.name }}"
+      - name: Restrict network and sudo
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: block
+          disable-sudo: true
+
+      - name: Validate and display diagnostic label
+        env:
+          GREETING_NAME: ${{ inputs.name }}
+        shell: bash
+        run: |
+          # Untrusted workflow input is data, NEVER interpolated into shell code.
+          if [[ ! "$GREETING_NAME" =~ ^[a-zA-Z0-9_-]{1,64}$ ]]; then
+            echo 'Invalid diagnostic label (ASCII letters, digits, underscores or hyphens only)' >&2
+            exit 1
+          fi
+          printf 'Hello %s\n' "$GREETING_NAME"
