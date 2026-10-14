@@ -118,13 +118,10 @@ ASANA_MEDIA_SECTION_GID = os.environ.get("ASANA_MEDIA_SECTION_GID", "12189794419
 # sanctions-only digest has its own delivery in scripts/screening-cases.mjs.
 ASANA_SECTION_GID     = os.environ.get("ASANA_DELIVERY_SECTION_GID", ASANA_MEDIA_SECTION_GID)
 # ── Second screening population + second delivery queue (MLRO, 2026-07-29) ──
-# Screening reads BOTH populations: the Customer Database (customers + their
-# UBOs/owners) and the HR – Employees project (staff screening — FATF R.18 /
-# CR 134/2025 employee due diligence). Set ASANA_EMPLOYEE_DB_GID empty to
-# disable employee screening explicitly; an unreachable or empty project while
-# configured is FATAL, exactly like the customer database — a screening
-# population that silently drops out is a silent clear.
-ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", "1216239131596624")
+# Screening reads BOTH approved Asana populations. Staff due diligence is
+# mandatory: a blank or redirected HR project must FAIL, never disable screening.
+APPROVED_EMPLOYEE_DB_GID = "1216239131596624"
+ASANA_EMPLOYEE_DB_GID = os.environ.get("ASANA_EMPLOYEE_DB_GID", APPROVED_EMPLOYEE_DB_GID)
 # RETIRED 2026-09-15: the daily deliverable used to be multi-homed into a
 # second MLRO queue, the separate "Follow Ups" project (old value
 # 1215884707932023). That project was merged into HAWKEYE STERLING APP (it
@@ -4467,6 +4464,12 @@ def get_payment_register():
 
 
 def get_all_customers():
+    # This Python route must enforce the same approved HR population as the JS
+    # production engine, including when executed manually outside Actions.
+    if ASANA_EMPLOYEE_DB_GID != APPROVED_EMPLOYEE_DB_GID:
+        raise RuntimeError(
+            "FATAL: approved HR Employees screening source missing or redirected; "
+            "the staff population cannot be disabled or silently substituted.")
     customers = []
     CUSTOMER_ROWS_SKIPPED.clear()
     params = {
@@ -4553,7 +4556,7 @@ def get_all_customers():
                     f"FATAL: Asana employee fetch failed "
                     f"({getattr(r,'status_code','network')}) — refusing to screen a "
                     f"population that silently dropped out. Check ASANA_EMPLOYEE_DB_GID "
-                    f"or set it empty to disable employee screening explicitly.")
+                    f"the approved HR source is mandatory.")
             data = r.json() if isinstance(r.json(), dict) else {}
             for t in (data.get("data") or []):
                 if not t.get("gid") or not t.get("name"):
@@ -4587,7 +4590,7 @@ def get_all_customers():
             raise RuntimeError(
                 "FATAL: 0 employees read from the HR – Employees project while employee "
                 "screening is configured — refusing to screen a population that silently "
-                "dropped out. Check ASANA_EMPLOYEE_DB_GID or set it empty to disable.")
+                "dropped out. Check ASANA_EMPLOYEE_DB_GID (the approved HR source is mandatory).")
         masked += mask_population(employees)
         log(f"Loaded {len(employees)} employees (screened with the same pipeline as customers)")
         customers.extend(employees)
