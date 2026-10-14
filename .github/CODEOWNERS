@@ -25,3 +25,14 @@
 /index.html                 @trex0092
 /advisor.html               @trex0092
 /console.html               @trex0092
+
+# Explicit owners for sensitive code and the protection mechanism itself.
+# Keep these below broad patterns so they are the final matching owner.
+/.github/CODEOWNERS          @trex0092
+/.github/settings.yml        @trex0092
+/.github/workflows/          @trex0092
+/screen.py                   @trex0092
+/ai.py                       @trex0092
+/agent_orchestrator.py       @trex0092
+/agents.py                   @trex0092
+/test/                       @trex0092

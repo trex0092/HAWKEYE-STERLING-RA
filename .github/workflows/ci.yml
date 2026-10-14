@@ -332,6 +332,41 @@ jobs:
           done
           echo "advisor smoke ok — composer, persona picker and hero render"
 
+  # Independent, always-reporting policy/approval/source-integrity check.
+  # This is a REQUIRED context in .github/settings.yml. Never paths-gate the
+  # containing CI workflow on pull_request or the policy-guard will deadlock PRs.
+  policy-guard:
+    name: policy-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden policy runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Protect CODEOWNERS, required checks and fail-closed Asana screening
+        run: node test/code-workflow-protection.test.mjs
+      - name: Verify required checks cannot be skipped by path or renamed
+        run: node test/protection-contexts.test.mjs
+      - name: Check both approved Asana screening populations
+        run: node test/employee-screening-wiring.test.mjs
+      - name: Verify failed screening still escalates and delivers evidence
+        run: node --test test/screening-delivery-workflow.test.mjs
+
   # Property-based fuzzing runs in its own job: unlike the stub-based suites in
   # the blocked-egress `test` job above, it imports the real engine, so it
   # needs the hash-locked dependencies (incl. hypothesis) from PyPI — and it
