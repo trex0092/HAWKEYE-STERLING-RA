@@ -11,7 +11,7 @@ import {
   CUSTOMER_PROJECT_GID,
   EMPLOYEE_PROJECT_GID,
 } from './sanctions-screen.mjs';
-import { assessRuntime, badgeSvg, BADGE_FILES } from './screening-assurance.mjs';
+import { assessRuntime, approvedSourcePopulationIssue, badgeSvg, BADGE_FILES } from './screening-assurance.mjs';
 
 export const OUT_FILE = 'data/sanctions-runtime-assurance.json';
 /* The auxiliary sanctions-only proof must use exactly the same authoritative
@@ -46,6 +46,45 @@ export async function loadApprovedRuntimePopulation(token, {
   return { subjects: customers.concat(employees), sources };
 }
 
+
+/* Both approved Asana projects have ALREADY been read and independently
+   counted. The auxiliary sanctions-only runner must pass their source receipt
+   to assessRuntime exactly as the full-screening runner does, otherwise a
+   valid 991-subject read fails the shared fail-closed population proof.
+   Only project GIDs and aggregate counts survive into the artifact. */
+export function buildSanctionsRuntimeResults(probe, sources,
+  date = new Date().toISOString().slice(0, 10)) {
+  const rows = probe?.results;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('sanctions runtime has no verified subject screening rows');
+  }
+  const sourcePopulation = {
+    customer: {
+      projectGid: sources?.customer?.projectGid,
+      screenedSubjects: sources?.customer?.screenedSubjects,
+    },
+    employee: {
+      projectGid: sources?.employee?.projectGid,
+      screenedSubjects: sources?.employee?.screenedSubjects,
+    },
+  };
+  const issue = approvedSourcePopulationIssue(sourcePopulation, rows.length);
+  if (issue) throw new Error(issue);
+  return {
+    date,
+    screened: rows.length,
+    sourcePopulation,
+    degraded: probe.degraded,
+    failures: probe.notes || [],
+    lists: (probe.coverage?.lists || []).map(x => ({
+      id: x.id || '',
+      name: x.name || '',
+      count: Array.isArray(x.names) ? x.names.length : 0,
+      partial: !!x.partial,
+    })),
+    enrichment: {},
+  };
+}
 
 async function main() {
   const token = process.env.ASANA_ACCESS_TOKEN || '';
@@ -87,19 +126,7 @@ async function main() {
     throw new Error('sanctions probe did not screen the complete subject population');
   }
 
-  const results = {
-    date: new Date().toISOString().slice(0, 10),
-    screened: probe.results.length,
-    degraded: probe.degraded,
-    failures: probe.notes || [],
-    lists: (probe.coverage?.lists || []).map(x => ({
-      id: x.id || '',
-      name: x.name || '',
-      count: Array.isArray(x.names) ? x.names.length : 0,
-      partial: !!x.partial,
-    })),
-    enrichment: {},
-  };
+  const results = buildSanctionsRuntimeResults(probe, sources);
   const assessed = assessRuntime({ results, pepDataset: null, contract });
   const domain = assessed.domains.sanctions;
   const artifact = {
