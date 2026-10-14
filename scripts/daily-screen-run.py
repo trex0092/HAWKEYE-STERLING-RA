@@ -40,7 +40,7 @@ import screen as engine
 # ---- load customers ----
 with open("/tmp/customers.json") as f:
     customers = json.load(f)
-print(f"Screening {len(customers)} customers")
+print(f"Screening {len(customers)} customer, principal and employee subjects")
 
 # ---- build sanctions name list ----
 sanctioned = []   # list of dicts: {name, list, programme}
@@ -340,6 +340,7 @@ if _refusal:
         "total": len(customers),
         "entity_count": sum(1 for c in customers if c.get("kind") != "individual"),
         "individual_count": sum(1 for c in customers if c.get("kind") == "individual"),
+        "employee_count": sum(1 for c in customers if c.get("role") == "Employee"),
         "confirmed": [], "potential": [], "clear_count": 0,
         "uae_pdf_failed": os.environ.get("UAE_PDF_FAILED", "false"),
         "refused": _refusal,
@@ -419,6 +420,7 @@ results_data = {
     "total": len(customers),
     "entity_count": sum(1 for c in customers if c.get("kind") != "individual"),
     "individual_count": sum(1 for c in customers if c.get("kind") == "individual"),
+        "employee_count": sum(1 for c in customers if c.get("role") == "Employee"),
     "confirmed": confirmed_hits,
     "potential": potential_matches,
     "clear_count": len(clear),
