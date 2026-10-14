@@ -100,6 +100,38 @@ for (const [reason, route] of [
     data.sources.customer.screenedSubjects === 1 &&
     data.sources.employee.projectGid === employeeProject &&
     !JSON.stringify(data.sources).includes('Synthetic'));
+  const isolated = runtime.buildSanctionsRuntimeResults({
+    results: data.subjects.map(() => ({ band: 'low', recommendation: 'clear', lists: [] })),
+    degraded: false,
+    notes: [],
+    coverage: { lists: [{ id: 'ofac-sdn', name: 'OFAC SDN', partial: false, names: ['SANCTIONED ENTITY'] }] },
+  }, data.sources, '2026-10-14');
+  check('sanctions-only runtime proof preserves both Asana sources in the shared screening validator',
+    isolated.screened === 21 &&
+    isolated.sourcePopulation.customer.screenedSubjects === 1 &&
+    isolated.sourcePopulation.employee.screenedSubjects === 20 &&
+    isolated.sourcePopulation.customer.projectGid === customerProject &&
+    isolated.sourcePopulation.employee.projectGid === employeeProject &&
+    !JSON.stringify(isolated.sourcePopulation).includes('Synthetic'));
+  let missingPopulationFailed = false;
+  try {
+    runtime.buildSanctionsRuntimeResults({
+      results: [{}], coverage: { lists: [] }, notes: [],
+    }, { customer: { projectGid: customerProject, screenedSubjects: 1 } }, '2026-10-14');
+  } catch (e) {
+    missingPopulationFailed = /HR Employees/.test(String(e.message));
+  }
+  check('sanctions-only runtime refuses absent HR project evidence before accepting a green result',
+    missingPopulationFailed);
+  let wrongTotalsFailed = false;
+  try {
+    runtime.buildSanctionsRuntimeResults({ results: Array(22).fill({}), coverage: { lists: [] } },
+      data.sources, '2026-10-14');
+  } catch (e) {
+    wrongTotalsFailed = /source-population totals/.test(String(e.message));
+  }
+  check('sanctions-only runtime refuses source counts that do not reconcile with actual subjects',
+    wrongTotalsFailed);
 
   for (const [label, params] of [
     ['redirected customer', { customerProject: '111111111' }],
