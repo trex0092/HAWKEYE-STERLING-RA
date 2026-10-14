@@ -19,11 +19,18 @@ import { dirname, join, resolve } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+
+
 let passed = 0, failed = 0;
 function check(name, cond) {
   if (cond) { passed++; console.log('  ok  ' + name); }
   else { failed++; console.log('FAIL  ' + name); }
 }
+
+check('screen result builder persists both Asana source population counts without subject identifiers',
+  /sourcePopulation:\s*\{[\s\S]*?customer:\s*\{\s*projectGid: CUSTOMER_PROJECT_GID, screenedSubjects: customerScreenedSubjects\s*\},[\s\S]*?employee:\s*\{\s*projectGid: EMPLOYEE_PROJECT_GID, screenedSubjects: employeeScreenedSubjects\s*\}/.test(
+    readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8')
+  ));
 
 /* Approved source-of-truth + destination contract for mandatory AML screening.
    These tests are pure; no live Asana credentials or customer names. */
