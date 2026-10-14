@@ -6,6 +6,8 @@ must never omit all twenty completed HR tasks or claim customer-only coverage.
 """
 import importlib.util
 import os
+import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,7 +15,12 @@ ROOT = Path(__file__).resolve().parent.parent
 MODULE = ROOT / "scripts" / "daily-screen-fetch.py"
 spec = importlib.util.spec_from_file_location("manual_screen_source", MODULE)
 screen = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(screen)
+# This CI stage intentionally has no third-party Python dependencies. Never
+# install packages or make a real network request just to unit-test the source
+# parser. Its HTTP adapter is injected in each test below.
+with patch.dict(sys.modules, {"requests": types.SimpleNamespace(get=lambda *a, **k:
+                      (_ for _ in ()).throw(AssertionError("unexpected Asana network request")))}):
+    spec.loader.exec_module(screen)
 
 count = [0]
 failed = [0]
