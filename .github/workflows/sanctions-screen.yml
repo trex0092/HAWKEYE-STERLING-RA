@@ -209,7 +209,7 @@ jobs:
           # commercial licence). Unset = on. See docs/aims/third-party-register.md.
           OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
+          ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121' }}
           ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID || '1216239131596624' }}
           # "Sanctions updates" section, gid 1218451960830318. Repointed
           # 2026-09-16: same fix as sanctions-watch.yml -- this was reading
