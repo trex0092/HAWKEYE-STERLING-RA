@@ -7,7 +7,7 @@ import {
   isMatch, diffState, parseScreeningState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
-  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
+  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse, createOmTask, shouldRetryLegacyAsanaWrite,
   getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay, loadSanctionsLists
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName, parseIdbCsv } from '../scripts/sanctions-match.mjs';
@@ -927,6 +927,88 @@ check('a COMPLETE alias fold leaves the primary fully re-verified',
 const _screened = [_fl[0]].filter(L => !L.partial).map(L => L.name);
 check('a partial primary is excluded from screenedLists (matches carried, not cleared)',
   _screened.length === 0);
+
+/* Legacy AM/PEP cards remain important when the full daily digest is in
+   case-engine mode. Simulate real create, section membership and read-back. */
+{
+  const gid = '1219452000000001', project = '1216203370612914',
+    section = '1218451960830318', name = 'Synthetic AM PEP Review';
+  const payload = { name, notes: 'Synthetic, no customer data', projectGid: project, sectionGid: section };
+  const previousFetch = globalThis.fetch;
+  let requests = [];
+  const mock = ({ noGid = false, wrongSection = false, noRemote = false,
+    serverError = false, lost = false } = {}) => {
+    requests = [];
+    globalThis.fetch = async (url, options = {}) => {
+      const method = options.method || 'GET';
+      requests.push({ path: String(url), method });
+      if (lost) throw Error('SYNTHETIC_CONFIDENTIAL_SHOULD_NOT_APPEAR');
+      if (method === 'POST' && String(url).endsWith('/tasks')) {
+        return { ok: !serverError, status: serverError ? 503 : 201,
+          headers: { get: () => null },
+          json: async () => serverError ? { errors: [{ message: 'PRIVATE_CASE_REFERENCE' }] }
+            : { data: noGid ? {} : { gid } } };
+      }
+      if (method === 'POST' && String(url).endsWith('/addTask')) {
+        return { ok: true, status: 200, headers: { get: () => null },
+          json: async () => ({ data: {} }) };
+      }
+      if (method === 'GET' && String(url).includes('/tasks/' + gid)) {
+        return { ok: true, status: 200, headers: { get: () => null },
+          json: async () => noRemote ? { data: null } : { data: {
+            gid, name, permalink_url: 'https://app.asana.com/0/0/' + gid,
+            memberships: [{ project: { gid: project },
+              section: { gid: wrongSection ? '1200000000000000' : section } }]
+          } } };
+      }
+      throw Error('Unexpected synthetic Asana path');
+    };
+  };
+  try {
+    mock();
+    const link = await createOmTask(payload, 'synthetic-token');
+    check('monitoring card success requires actual task and approved Asana section read-back',
+      link.endsWith(gid) && requests.length === 3 &&
+      requests.filter(r => r.method === 'POST').length === 2 &&
+      requests.some(r => r.method === 'GET'));
+    mock({ noGid: true });
+    let rejected = false;
+    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
+    check('a 2xx response with no task identity cannot be claimed as Asana delivery',
+      rejected && requests.length === 1);
+    mock({ wrongSection: true });
+    rejected = false;
+    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
+    check('a monitoring task filed in the wrong section is not accepted as delivered',
+      rejected && requests.length === 3);
+    mock({ noRemote: true });
+    rejected = false;
+    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
+    check('an unconfirmed remote task remains an unresolved delivery error',
+      rejected && requests.length === 3);
+    mock({ serverError: true });
+    let providerError = '';
+    try { await createOmTask(payload, 'synthetic-token'); } catch (e) { providerError = e.message; }
+    check('ambiguous 503 task create is never replayed and does not leak Asana response data',
+      requests.length === 1 && /^Asana 503/.test(providerError) &&
+      !providerError.includes('PRIVATE_CASE_REFERENCE'));
+    mock({ lost: true });
+    let transportError = '';
+    try { await createOmTask(payload, 'synthetic-token'); } catch (e) { transportError = e.message; }
+    check('Asana transport exceptions containing identity data are redacted',
+      requests.length === 1 &&
+      transportError === 'Asana transport failure; remote write outcome unconfirmed' &&
+      !transportError.includes('SYNTHETIC_CONFIDENTIAL'));
+    check('only definite 429 refusal can replay task or new-section creation',
+      shouldRetryLegacyAsanaWrite(429, '/tasks') &&
+      !shouldRetryLegacyAsanaWrite(503, '/tasks') &&
+      !shouldRetryLegacyAsanaWrite(500, '/projects/1216203370612914/sections') &&
+      shouldRetryLegacyAsanaWrite(503, '/sections/1218451960830318/addTask') &&
+      !shouldRetryLegacyAsanaWrite(403, '/tasks'));
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+}
 
 /* ── same-day Ongoing-Monitoring dedup is DIRECTION-AWARE ──
    Both card names carry the words "Adverse Media", so the old flat

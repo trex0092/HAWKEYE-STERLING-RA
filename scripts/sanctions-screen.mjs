@@ -33,7 +33,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
-  fitAsanaText, fitAsanaName } from './asana-notify.mjs';
+  fitAsanaText, fitAsanaName, publicAsanaRejection } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName } from './sanctions-match.mjs';
 import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
@@ -1261,11 +1261,17 @@ const asanaSleep = ms => new Promise(res => setTimeout(res, ms));
 
 async function asanaGet(url, token, timeoutMs = 30000) {
   for (let attempt = 0; ; attempt++) {
-    const { ok, status, retryAfter, data } = await withTimeout(async (signal) => {
-      const r = await fetch(url, { signal, headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
-      const d = await r.json().catch(() => ({}));
-      return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
-    }, timeoutMs);
+    let response;
+    try {
+      response = await withTimeout(async (signal) => {
+        const r = await fetch(url, { signal, headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+        const d = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
+      }, timeoutMs);
+    } catch {
+      throw new Error('Asana transport failure; remote outcome unconfirmed');
+    }
+    const { ok, status, retryAfter, data } = response;
     if (ok) return data;
     if (attempt < 2 && isRetryable(status)) {
       const delay = retryDelayMs(attempt, retryAfter);
@@ -1273,7 +1279,7 @@ async function asanaGet(url, token, timeoutMs = 30000) {
       await asanaSleep(delay);
       continue;
     }
-    throw new Error('Asana ' + status + ': ' + JSON.stringify(data.errors || data).slice(0, 200));
+    throw new Error(publicAsanaRejection(status, data));
   }
 }
 
@@ -1470,25 +1476,40 @@ export async function fetchAsanaEmployeeSubjects(projectGid, token) {
 
 /* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
 
-async function asanaPost(path, body, token, timeoutMs = 30000) {
+/* New cards and sections are non-idempotent: after an ambiguous HTTP 5xx
+   the remote create may already have succeeded, so never auto-replay it.
+   Asana 429 is a definite rate-limit rejection and remains retryable. */
+export function shouldRetryLegacyAsanaWrite(status, path) {
+  if (!isRetryable(status)) return false;
+  const creating = path === '/tasks' || /^\/projects\/\d+\/sections$/.test(path);
+  return !creating || status === 429;
+}
+
+export async function asanaPost(path, body, token, timeoutMs = 30000) {
   for (let attempt = 0; ; attempt++) {
-    const { ok, status, retryAfter, data } = await withTimeout(async (signal) => {
-      const r = await fetch('https://app.asana.com/api/1.0' + path, {
-        signal, method: 'POST',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ data: body })
-      });
-      const d = await r.json().catch(() => ({}));
-      return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
-    }, timeoutMs);
+    let response;
+    try {
+      response = await withTimeout(async (signal) => {
+        const r = await fetch('https://app.asana.com/api/1.0' + path, {
+          signal, method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ data: body })
+        });
+        const d = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, retryAfter: r.headers.get('retry-after'), data: d };
+      }, timeoutMs);
+    } catch {
+      throw new Error('Asana transport failure; remote write outcome unconfirmed');
+    }
+    const { ok, status, retryAfter, data } = response;
     if (ok) return data;
-    if (attempt < 2 && isRetryable(status)) {
+    if (attempt < 2 && shouldRetryLegacyAsanaWrite(status, path)) {
       const delay = retryDelayMs(attempt, retryAfter);
       console.warn('sanctions-screen: Asana ' + status + ' — retry in ' + delay + 'ms');
       await asanaSleep(delay);
       continue;
     }
-    throw new Error('Asana ' + status + ': ' + JSON.stringify(data.errors || data).slice(0, 200));
+    throw new Error(publicAsanaRejection(status, data));
   }
 }
 
@@ -1505,7 +1526,9 @@ async function ensureSection(projectGid, name, token) {
   const found = sections.find(s => String(s.name || '').trim().toLowerCase() === want);
   if (found) return found.gid;
   const created = await asanaPost('/projects/' + projectGid + '/sections', { name }, token);
-  return created.data && created.data.gid;
+  const id = String(created?.data?.gid || '');
+  if (!/^\d+$/.test(id)) throw new Error('Asana section creation receipt was not verified');
+  return id;
 }
 
 /* All task names in a project (paginated) — used for same-day dedup. */
@@ -1542,20 +1565,28 @@ export function omCardToSkip(names, dateStr, hasHits) {
 
 /* Create a task in the Ongoing Monitoring project and file it under its section.
    Returns the task permalink (or null). Filing under the section is non-fatal. */
-async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
-  /* Byte-capped, not character-capped. Asana measures BYTES; the 60,000-CHAR
-     cut here was the same bug that lost the screening digest — this card now
-     carries multilingual PEP names too, and those cost 2-3 bytes each. */
+export async function createOmTask({ name, notes, projectGid, sectionGid, due }, token) {
+  /* HTTP 2xx is not Asana delivery proof. A task with no GID, wrong project
+     membership or absent compliance section must remain an incident, not a
+     logged successful screening card. Keep original byte budgets and owner. */
   const data = { name: fitAsanaName(name), notes: fitAsanaText(notes), projects: [projectGid] };
   if (due) data.due_on = due;
   if (OM_ASSIGNEE) data.assignee = OM_ASSIGNEE;
   const d = await asanaPost('/tasks', data, token);
-  const gid = d.data && d.data.gid;
-  if (gid && sectionGid) {
-    try { await asanaPost('/sections/' + sectionGid + '/addTask', { task: gid }, token); }
-    catch (e) { console.warn('sanctions-screen: could not file task under section ' + sectionGid + ' (' + (e && e.message || e) + ')'); }
+  const gid = String(d?.data?.gid || '');
+  if (!/^\d+$/.test(gid)) throw new Error('Asana monitoring task creation returned no verifiable GID');
+  if (sectionGid) await asanaPost('/sections/' + sectionGid + '/addTask', { task: gid }, token);
+  const remote = (await asanaGet(
+    'https://app.asana.com/api/1.0/tasks/' + gid +
+    '?opt_fields=gid,name,memberships.project.gid,memberships.section.gid,permalink_url', token
+  ))?.data;
+  if (String(remote?.gid || '') !== gid || remote?.name !== data.name ||
+      !Array.isArray(remote?.memberships) ||
+      !remote.memberships.some(m => String(m?.project?.gid || '') === String(projectGid) &&
+        (!sectionGid || String(m?.section?.gid || '') === String(sectionGid)))) {
+    throw new Error('Asana monitoring card identity or approved destination was not independently verified');
   }
-  return d.data && d.data.permalink_url;
+  return remote.permalink_url || d?.data?.permalink_url || null;
 }
 
 /* PART B — post the daily Adverse Media & PEP task (CLEAR or HIT). Never throws;
