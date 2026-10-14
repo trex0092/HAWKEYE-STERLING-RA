@@ -3,9 +3,10 @@ name: Source supply-chain SBOM (Syft)
 # Adapted from actions/starter-workflows/code-scanning/anchore-syft.yml.
 # Generates a downloadable SPDX inventory; does not publish a package/image,
 # push to any repository, submit dependency snapshots or use credentials.
-# The pinned Syft action itself uploads the artifact using artifact-name.
-# Unsupported upstream inputs must not be included: the old job failed
-# artifact creation using a filename-shaped artifact name on 14 October.
+# Pin upstream Anchore SBOM Action v0.24.0, released with Node.js 24 and a
+# modern artifact uploader. The legacy v0.12 action failed the current GitHub
+# artifact container API despite valid names. The action uploads its own SBOM,
+# with release uploads and dependency snapshots explicitly disabled.
 on:
   pull_request:
     paths:
@@ -60,7 +61,7 @@ jobs:
           persist-credentials: false
 
       - name: Produce SPDX JSON for source dependencies
-        uses: anchore/sbom-action@bb716408e75840bbb01e839347cd213767269d4a # from official starter workflows
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0 verified release; Node.js 24
         with:
           path: .
           format: spdx-json
@@ -68,3 +69,6 @@ jobs:
           # SPDX contents are JSON; use a portable slash/dot-free artifact ID.
           artifact-name: hawkeye-source-sbom
           dependency-snapshot: false
+          upload-artifact: true
+          upload-artifact-retention: 14
+          upload-release-assets: false
