@@ -69,6 +69,17 @@ check('runtime assurance explicitly defaults to the approved Customer Database',
 check('runtime assurance explicitly defaults to completed HR Employees population',
   /ASANA_EMPLOYEE_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_EMPLOYEE_PROJECT_GID\s*\|\|\s*'1216239131596624'\s*\}\}/.test(runtimeWorkflow));
 
+/* The retired manual workflow still supports dispatch and must never
+   screen only customers while claiming complete sanctions coverage. */
+const manual = readFileSync('.github/workflows/daily-sanctions-screen.yml', 'utf8');
+const legacySource = readFileSync('scripts/daily-screen-fetch.py', 'utf8');
+check('manual sanctions workflow binds the Customer Database to its approved source',
+  /CUSTOMER_DB_GID:.*1214107620220121/.test(manual));
+check('manual sanctions workflow screens completed employees from the approved HR source',
+  /EMPLOYEE_DB_GID:.*1216239131596624/.test(manual) &&
+  /fetch_source_tasks\(token, employee, "HR Employees"\)/.test(legacySource) &&
+  /APPROVED_EMPLOYEE_PROJECT = "1216239131596624"/.test(legacySource));
+
 /* If screen.py's own env-var name for this population ever changes, every one
    of the above should change together -- catch a partial rename early rather
    than as a live 404 in production. */
