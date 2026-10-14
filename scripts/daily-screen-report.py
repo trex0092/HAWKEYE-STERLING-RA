@@ -101,7 +101,9 @@ if refused:
     hits_text = ("SCREENING REFUSED - no match results were computed this run.\n"
                  + refused)
 elif not confirmed:
-    hits_text = "No confirmed sanctions matches identified in this run.\nAll customers returned clear across all lists screened."
+    hits_text = ("No confirmed sanctions matches identified in this run.\n"
+                 "Any potential matches, manual-review records, incomplete lists and\n"
+                 "unverified subjects remain pending human MLRO review.")
 else:
     lines = []
     for i, h in enumerate(confirmed, 1):
@@ -109,7 +111,7 @@ else:
         lines.append(
             f"⛔ HIT {i}\n"
             f"   Subject:         {subj}\n"
-            f"   Customer Record: {h['customer_url']}\n"
+            f"   Source Asana Task: {h['customer_url']}\n"
             f"   Matched List:    {h['matched_list']}\n"
             f"   Matched Entity:  {h['matched_name']}\n"
             f"   Match Score:     {h['score']}%\n"
@@ -133,7 +135,7 @@ else:
         lines.append(
             f"⚠️  POTENTIAL MATCH {i}\n"
             f"   Subject:         {subj}\n"
-            f"   Customer Record: {p['customer_url']}\n"
+            f"   Source Asana Task: {p['customer_url']}\n"
             f"   Matched List:    {p['matched_list']}\n"
             f"   Matched Entity:  {p['matched_name']}\n"
             f"   Match Score:     {p['score']}%\n"
