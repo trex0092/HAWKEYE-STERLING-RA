@@ -136,6 +136,14 @@
   "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
  },
  {
+  "t": "Settlement Agreement between the U.S. Department of the Treasury's Office of Foreign Assets Control and Bank of America, N.A.",
+  "h": "https://ofac.treasury.gov/recent-actions/20261013_33"
+ },
+ {
+  "t": "Enforcement Actions",
+  "h": "https://ofac.treasury.gov/recent-actions/enforcement-actions"
+ },
+ {
   "t": "Settlement Agreement between the U.S. Department of the Treasury's Office of Foreign Assets Control and Pegasus Worldwide Logistics; International Criminal Court Designation and General Licenses; Burma-related Designation Removal",
   "h": "https://ofac.treasury.gov/recent-actions/20261009"
  },
@@ -172,28 +180,20 @@
   "h": "https://ofac.treasury.gov/recent-actions/20260929"
  },
  {
-  "t": "Publication of Regulatory Amendments; Publication of Cuba Sanctions Regulations; Issuance of New and Amended Cuba-related Frequently Asked Questions; Publication of Cuba-related OFAC Alert",
-  "h": "https://ofac.treasury.gov/recent-actions/20260929_33"
- },
- {
-  "t": "Regulations and Guidance",
-  "h": "https://ofac.treasury.gov/recent-actions/regulations-and-guidance"
- },
- {
   "t": "Current page 1",
-  "h": "https://ofac.treasury.gov/recent-actions?pulse_nocache=1791900865077-1&page=0"
+  "h": "https://ofac.treasury.gov/recent-actions?_ll_epoch=179195449&page=0"
  },
  {
   "t": "All Recent Actions",
   "h": "https://ofac.treasury.gov/recent-actions"
  },
  {
-  "t": "Enforcement Actions",
-  "h": "https://ofac.treasury.gov/recent-actions/enforcement-actions"
- },
- {
   "t": "Miscellaneous",
   "h": "https://ofac.treasury.gov/recent-actions/miscellaneous"
+ },
+ {
+  "t": "Regulations and Guidance",
+  "h": "https://ofac.treasury.gov/recent-actions/regulations-and-guidance"
  },
  {
   "t": "Sign up for OFAC Recent Actions e-mail updates",
