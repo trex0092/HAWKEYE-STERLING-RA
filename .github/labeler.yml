@@ -83,3 +83,24 @@ visual-regression:
 config:
   - changed-files:
       - any-glob-to-any-file: ['.editorconfig', '.gitattributes', '.nvmrc', 'eslint.config.mjs', '.htmlhintrc', 'playwright*.config.mjs', 'lighthouserc.json', '.github/labeler.yml', '.github/settings.yml', '.claude/**']
+
+# These area labels add filtering without guessing priority or human approval.
+"area/asana-delivery":
+  - changed-files:
+      - any-glob-to-any-file: ['scripts/asana-*.mjs', 'scripts/screening-cases.mjs', 'scripts/screening-delivery.mjs', 'test/asana-notify.test.mjs', 'test/screening-delivery.test.mjs', '.github/workflows/asana-*.yml']
+
+"area/ai-security":
+  - changed-files:
+      - any-glob-to-any-file: ['ai.py', 'agent_orchestrator.py', 'agents.py', 'mcp_tools.py', 'test/redteam_injection.py', '.semgrep/**', 'data/ai-controls.json', 'docs/governance/ai-*']
+
+"area/supply-chain":
+  - changed-files:
+      - any-glob-to-any-file: ['Dockerfile', 'package.json', 'package-lock.json', 'pyproject.toml', 'ci/**', '.github/dependabot.yml', '.github/workflows/source-sbom.yml', '.github/workflows/dockerfile-security-lint.yml']
+
+"area/agent-skills":
+  - changed-files:
+      - any-glob-to-any-file: ['.agents/skills/**', '.claude/skills/**', '.claude/agents/**', 'skills-lock.json']
+
+"area/repo-protection":
+  - changed-files:
+      - any-glob-to-any-file: ['.github/settings.yml', '.github/CODEOWNERS', '.github/labeler.yml', '.github/ISSUE_TEMPLATE/**', '.github/PULL_REQUEST_TEMPLATE.md', '.github/workflows/workflow-lint.yml', '.github/workflows/label-sync.yml', '.github/REPOSITORY_AUTOMATION_CATALOG.md']
