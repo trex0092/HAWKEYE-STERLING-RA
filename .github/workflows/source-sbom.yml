@@ -1,0 +1,74 @@
+name: Source supply-chain SBOM (Syft)
+
+# Adapted from actions/starter-workflows/code-scanning/anchore-syft.yml.
+# Generates a downloadable SPDX inventory; does not publish a package/image,
+# push to any repository, submit dependency snapshots or use credentials.
+# Pin upstream Anchore SBOM Action v0.24.0, released with Node.js 24 and a
+# modern artifact uploader. The legacy v0.12 action failed the current GitHub
+# artifact container API despite valid names. The action uploads its own SBOM,
+# with release uploads and dependency snapshots explicitly disabled.
+on:
+  pull_request:
+    paths:
+      - package.json
+      - package-lock.json
+      - pyproject.toml
+      - ci/**
+      - .github/workflows/source-sbom.yml
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - pyproject.toml
+      - ci/**
+      - .github/workflows/source-sbom.yml
+  schedule:
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-sbom-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-sbom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner (egress block)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            raw.githubusercontent.com:443
+            *.actions.githubusercontent.com:443
+            *.blob.core.windows.net:443
+            *.githubapp.com:443
+
+      - name: Checkout, without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Produce SPDX JSON for source dependencies
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0 verified release; Node.js 24
+        with:
+          path: .
+          format: spdx-json
+          # GitHub Actions artifact container NAME, not a filename.
+          # SPDX contents are JSON; use a portable slash/dot-free artifact ID.
+          artifact-name: hawkeye-source-sbom
+          dependency-snapshot: false
+          upload-artifact: true
+          upload-artifact-retention: 14
+          upload-release-assets: false

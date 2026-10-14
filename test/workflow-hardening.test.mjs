@@ -404,5 +404,53 @@ check('manual diagnostic rejects log-control or shell-metacharacter inputs befor
   /\^\[a-zA-Z0-9_-\]\{1,64\}\$/.test(manual) &&
   /exit 1/.test(manual));
 
+/* Starter-workflows adaptation: prove these additional jobs can only lint and
+   collect dependency evidence, never publish artifacts to a package registry,
+   deploy services, or acquire write-capable repository credentials. */
+const dockerLint = readFileSync(join(dir, 'dockerfile-security-lint.yml'), 'utf8');
+const sbom = readFileSync(join(dir, 'source-sbom.yml'), 'utf8');
+const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+check('Dockerfile lint action pinned to exact upstream starter SHA',
+  /hadolint\/hadolint-action@[a-f0-9]{40}/.test(dockerLint));
+check('Dockerfile lint is blocking, not a no-fail badge',
+  /failure-threshold:\s*warning/.test(dockerLint) &&
+  /no-fail:\s*false/.test(dockerLint));
+check('source SBOM uses reviewed pinned Node24-compatible Anchore action',
+  /anchore\/sbom-action@e22c389904149dbc22b58101806040fa8d37a610/.test(sbom));
+check('source SBOM uses supported modern artifact upload and 14-day retention',
+  /format:\s*spdx-json/.test(sbom) &&
+  /artifact-name:\s*hawkeye-source-sbom\s*$/m.test(sbom) &&
+  /dependency-snapshot:\s*false/.test(sbom) &&
+  /upload-artifact:\s*true/.test(sbom) &&
+  /upload-artifact-retention:\s*14/.test(sbom) &&
+  /upload-release-assets:\s*false/.test(sbom));
+for (const [name, body] of [['Dockerfile lint', dockerLint], ['SBOM', sbom]]) {
+  check(name + ' uses read-only token and has no pull_request_target trigger',
+    /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(body) &&
+    !/^  pull_request_target:/m.test(body) &&
+    !/packages:\s*write|contents:\s*write|id-token:\s*write/.test(body));
+  check(name + ' has no deploy, publish or credentialed checkout',
+    !/^\s+(?:docker push|npm publish|npx semantic-release|gh release create)\b/m.test(body) &&
+    /persist-credentials:\s*false/.test(body));
+}
+check('SBOM cannot silently submit dependencies or publish assets with a write-capable token',
+  /dependency-snapshot:\s*false/.test(sbom) &&
+  /upload-release-assets:\s*false/.test(sbom) &&
+  !/^\s*github-token:/m.test(sbom) &&
+  !/\brelease:\s*\n|\bpackages:\s*write/.test(sbom));
+check('scheduled source SBOM is correctly classified for independent control freshness',
+  /'source-sbom.yml':\s*'read-only weekly source dependency inventory/.test(
+    readFileSync(join(dir, '..', '..', 'scripts', 'freshness-check.mjs'), 'utf8')));
+if (pkg.private === true) {
+  const directPublish = files.filter(file => {
+    const lines = readFileSync(join(dir, file), 'utf8')
+      .split(/\r?\n/).filter(line => !/^\s*#/.test(line));
+    return lines.some(line =>
+      /^\s*(?:-\s*)?(?:run:\s*)?(?:npm|pnpm|yarn)\s+publish(?:\s|$)/.test(line));
+  });
+  check('a private NPM package is never published by GitHub Actions',
+    directPublish.length === 0);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
