@@ -379,10 +379,11 @@ check('Dockerfile lint is blocking, not a no-fail badge',
   /no-fail:\s*false/.test(dockerLint));
 check('source SBOM uses the pinned upstream starter Syft action',
   /anchore\/sbom-action@[a-f0-9]{40}/.test(sbom));
-check('source SBOM is downloadable SPDX with bounded artifact retention',
+check('source SBOM has a portable confirmed artifact name and valid Syft inputs',
   /format:\s*spdx-json/.test(sbom) &&
-  /upload-artifact:\s*true/.test(sbom) &&
-  /upload-artifact-retention:\s*14/.test(sbom));
+  /artifact-name:\s*hawkeye-source-sbom\s*$/m.test(sbom) &&
+  /dependency-snapshot:\s*false/.test(sbom) &&
+  !/^\s*(upload-artifact|upload-release-assets|upload-artifact-retention):/m.test(sbom));
 for (const [name, body] of [['Dockerfile lint', dockerLint], ['SBOM', sbom]]) {
   check(name + ' uses read-only token and has no pull_request_target trigger',
     /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(body) &&
@@ -392,9 +393,13 @@ for (const [name, body] of [['Dockerfile lint', dockerLint], ['SBOM', sbom]]) {
     !/^\s+(?:docker push|npm publish|npx semantic-release|gh release create)\b/m.test(body) &&
     /persist-credentials:\s*false/.test(body));
 }
-check('SBOM cannot silently submit dependencies with a write-capable token',
+check('SBOM cannot silently submit dependencies or release assets with a write-capable token',
   /dependency-snapshot:\s*false/.test(sbom) &&
-  /upload-release-assets:\s*false/.test(sbom));
+  !/^\s*(upload-release-assets|github-token):/m.test(sbom) &&
+  !/\brelease:\s*\n|\bpackages:\s*write/.test(sbom));
+check('scheduled source SBOM is correctly classified for independent control freshness',
+  /'source-sbom.yml':\s*'read-only weekly source dependency inventory/.test(
+    readFileSync(join(dir, '..', '..', 'scripts', 'freshness-check.mjs'), 'utf8')));
 if (pkg.private === true) {
   const directPublish = files.filter(file => {
     const lines = readFileSync(join(dir, file), 'utf8')
