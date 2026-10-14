@@ -263,6 +263,8 @@ jobs:
         # floors compare each engine to ITSELF and are blind to drift between the
         # two — this is the only check that compares them to EACH OTHER.
         run: node test/matcher-parity.test.mjs
+      - name: Verify both mandatory Asana source projects in the manual sanctions workflow
+        run: python test/manual-screen-source-test.py
       - name: Run Python engine unit tests (screen + ai + agents + kyc + txn + monitoring)
         run: python test/engine_test.py
       - name: Run MCP server + tool-layer unit tests (protocol + engine wrappers)
