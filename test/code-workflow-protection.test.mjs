@@ -31,14 +31,30 @@ function ownerEntries(body) {
 }
 
 function requiredContexts(body) {
-  // Resolve only the required_status_checks context list, not arbitrary
-  // YAML arrays of labels or workflows.
-  const group = body.match(/^\s+required_status_checks:\s*\n([\s\S]*?)(?=^\s{6}\w|^\s{4}\w|^branches:|$(?![\s\S]))/m);
-  const block = group?.[1] ?? '';
-  const section = block.match(/^\s+contexts:\s*\n((?:^\s+-[^\n]*\n?)+)/m);
-  return (section?.[1] ?? '').split('\n')
-    .map(line => line.replace(/^\s*-\s*/, '').split(/\s+#/)[0].trim())
-    .filter(Boolean);
+  // Mirror the repository's existing branch-protection parser: when the
+  // contexts list starts, consume only list entries at the SAME indentation.
+  // Structural scan avoids accidentally stopping at sibling YAML keys.
+  const lines = body.split(/\r?\n/);
+  const contexts = [];
+  let inside = false, indent = -1;
+  for (const raw of lines) {
+    const line = raw.replace(/\s+#.*$/, '');
+    if (!inside) {
+      if (/^\s*contexts:\s*$/.test(line)) inside = true;
+      continue;
+    }
+    if (!line.trim()) continue;
+    const match = line.match(/^(\s*)-\s+(.+)$/);
+    if (match) {
+      if (indent < 0) indent = match[1].length;
+      if (match[1].length === indent) {
+        contexts.push(match[2].trim());
+        continue;
+      }
+    }
+    break;
+  }
+  return contexts;
 }
 
 function requiredPullRequestIsUnfiltered(body) {
