@@ -3053,14 +3053,15 @@ finally:
 # complete coverage over what was left.
 print("screen.py — un-screenable customer rows are attested, not dropped")
 _gac_orig = screen.asana_request
-# Employee screening pulls a SECOND project inside get_all_customers and has its
-# own (correct) fail-closed guard on an empty result; disable it so this block
-# exercises the customer path only.
+# HR screening is mandatory. Mock a valid staff row so customer denominator
+# checks isolate customer rows without disabling the employee source.
 _gac_emp = screen.ASANA_EMPLOYEE_DB_GID
 
 
 def _gac_stub(rows):
-    pages = [{"data": rows}, {"data": []}]
+    pages = [{"data": rows}, {"data": [
+        {"gid": "staff1", "name": "Test Staff", "notes": "",
+         "permalink_url": "https://app.asana.com/0/0/staff1"}]}]
 
     def _req(method, url, **kw):
         body = pages.pop(0) if pages else {"data": []}
@@ -3076,10 +3077,19 @@ _gac_rows = [
 ]
 try:
     screen.ASANA_EMPLOYEE_DB_GID = ""
+    try:
+        screen.get_all_customers()
+        _hr_disabled_rejected = False
+    except RuntimeError as exc:
+        _hr_disabled_rejected = "approved HR Employees" in str(exc)
+    check("Python screening rejects empty HR project instead of skipping staff",
+          _hr_disabled_rejected)
+    screen.ASANA_EMPLOYEE_DB_GID = _gac_emp
     screen.asana_request = _gac_stub(_gac_rows)
     _gac = screen.get_all_customers()
     check("screenable customer rows are still screened",
-          [c["name"] for c in _gac] == ["Alpha Trading LLC", "Beta Metals FZE"])
+          [c["name"] for c in _gac if c.get("kind") != "employee"]
+          == ["Alpha Trading LLC", "Beta Metals FZE"])
     check("a row missing its name is RECORDED, not silently dropped",
           any(r["gid"] == "2" and r["missing"] == "name" for r in screen.CUSTOMER_ROWS_SKIPPED))
     check("a row missing its gid is RECORDED too",
@@ -3087,9 +3097,10 @@ try:
     check("every skipped row carries a permalink so the MLRO can fix the record",
           all(r["permalink"] for r in screen.CUSTOMER_ROWS_SKIPPED))
     # The attestation's denominator must be the WHOLE book, not the survivors.
-    _true_total = len(_gac) + len(screen.CUSTOMER_ROWS_SKIPPED)
-    check("the true denominator exceeds the screened count when rows are skipped",
-          _true_total == 4 and len(_gac) == 2)
+    _screened_customers = sum(c.get("kind") != "employee" for c in _gac)
+    _true_total = _screened_customers + len(screen.CUSTOMER_ROWS_SKIPPED)
+    check("the true denominator exceeds the screened customer count when rows are skipped",
+          _true_total == 4 and _screened_customers == 2)
     _note = screen._skipped_rows_note()
     check("the attestation note names the un-screenable records",
           "https://app.asana.com/0/0/2" in _note and "NOT" in _note)
@@ -3121,9 +3132,7 @@ finally:
 # it claimed "same guards". A staff member whose Asana row lost its name simply
 # vanished: not screened, not counted, not reported.
 #
-# The block above could not have caught it: it sets ASANA_EMPLOYEE_DB_GID = ""
-# to keep the customer path isolated, so the untested path was the broken one.
-# This block drives BOTH projects in one call.
+# Exercise missing employee identities with both approved populations in one call.
 print("screen.py — un-screenable EMPLOYEE rows are attested too, not dropped")
 import re as _re_emp
 _emp_orig = screen.asana_request
@@ -3143,6 +3152,14 @@ def _two_project_stub(customer_rows, employee_rows):
 
 try:
     screen.ASANA_EMPLOYEE_DB_GID = "EMP123"
+    try:
+        screen.get_all_customers()
+        _redirected_hr_rejected = False
+    except RuntimeError as exc:
+        _redirected_hr_rejected = "approved HR Employees" in str(exc)
+    check("Python screening rejects redirected HR project before any Asana fetch",
+          _redirected_hr_rejected)
+    screen.ASANA_EMPLOYEE_DB_GID = _emp_gid
     screen.asana_request = _two_project_stub(
         [{"gid": "1", "name": "Alpha Trading LLC", "notes": "", "permalink_url": "https://app.asana.com/0/0/1"}],
         [
