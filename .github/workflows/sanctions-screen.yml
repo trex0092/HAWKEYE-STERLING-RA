@@ -301,7 +301,27 @@ jobs:
       - name: API cost summary (metadata only)
         if: always() && !cancelled()
         continue-on-error: true
-        run: node scripts/api-cost-dashboard.mjs
+        env:
+          # Independently dated publisher prices only; never assume a missing
+          # price or absent usage receipt means zero spend.
+          API_USD_RATES_JSON: ${{ vars.API_USD_RATES_JSON }}
+        run: |
+          # The dashboard CLI REQUIRES a ledger and a verified price table.
+          # Invoking it with no args always exits 2 and loses the monitoring
+          # signal. A no-cost/unused-model run is UNKNOWN, not "$0.00".
+          if [ ! -s api-cost-ledger.jsonl ] || [ -z "${API_USD_RATES_JSON:-}" ]; then
+            echo 'API cost dashboard: INCOMPLETE (no verified prices or usage receipts)'
+            {
+              echo '## API Cost Dashboard'
+              echo 'INCOMPLETE: No verified pricing table and sanitized paid-usage receipts were both available. Missing evidence is not zero spending.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            umask 077
+            PRICE_FILE="${RUNNER_TEMP}/hawkeye-screen-verified-prices.json"
+            trap 'rm -f "$PRICE_FILE"' EXIT
+            printf '%s' "$API_USD_RATES_JSON" > "$PRICE_FILE"
+            node scripts/api-cost-dashboard.mjs --ledger api-cost-ledger.jsonl --prices "$PRICE_FILE"
+          fi
 
       - name: API credit/quota alerts (sanitized categories only)
         if: always() && !cancelled()
