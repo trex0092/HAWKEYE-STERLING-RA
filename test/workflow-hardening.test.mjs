@@ -366,6 +366,44 @@ const ambiguous = await dispatchOnce(async (_path,opt) => {
 }, '/actions/workflows/sanctions-screen.yml', {nowMs:dedupeNow});
 check('ambiguous POST outcomes never cause an automatic replay',
   ambiguous.action === 'unknown' && posts === 1);
+/* GitHub Packages starter templates must not silently publish a private
+   compliance repository, create release-triggered jobs, or grant write token. */
+const readiness = readFileSync(join(dir, 'npm-package-readiness.yml'), 'utf8');
+check('package readiness is manual-only and cannot publish on tag or release',
+  /workflow_dispatch:/.test(readiness) &&
+  !/^\s{2}(?:push|release|schedule|pull_request_target):/m.test(readiness) &&
+  !/\bnpm\s+publish\b|\bpackages:\s*write|\bid-token:\s*write/.test(readiness));
+check('private package readiness has exact action pins, no shared cache and no credentials',
+  /step-security\/harden-runner@[a-f0-9]{40}/.test(readiness) &&
+  /actions\/checkout@[a-f0-9]{40}/.test(readiness) &&
+  /actions\/setup-node@[a-f0-9]{40}/.test(readiness) &&
+  /persist-credentials:\s*false/.test(readiness) &&
+  /package-manager-cache:\s*false/.test(readiness) &&
+  /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(readiness));
+check('manual package audit only makes local dry-run and preserves private invariant',
+  /p\.private !== true/.test(readiness) &&
+  /npm pack --dry-run --ignore-scripts/.test(readiness) &&
+  /egress-policy:\s*block/.test(readiness));
+
+/* A manual user-supplied label is not executable shell code.
+   Keep diagnostics read-only, manually triggered and without log spoofing. */
+const manual = readFileSync(join(dir, 'manual.yml'), 'utf8');
+check('manual diagnostic cannot run on push, release, PR or schedule',
+  /workflow_dispatch:/.test(manual) &&
+  !/^\s{2}(?:push|pull_request|pull_request_target|release|schedule):/m.test(manual));
+check('manual diagnostic owns only read permission and restricted egress',
+  /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(manual) &&
+  /step-security\/harden-runner@[a-f0-9]{40}/.test(manual) &&
+  /egress-policy:\s*block/.test(manual) &&
+  /disable-sudo:\s*true/.test(manual));
+check('manual diagnostic passes user input through env, never shell expression interpolation',
+  /GREETING_NAME:\s*\$\{\{ inputs\.name \}\}/.test(manual) &&
+  /printf 'Hello %s\\n' "\$GREETING_NAME"/.test(manual) &&
+  !/run:[^\n]*\$\{\{\s*inputs\./.test(manual));
+check('manual diagnostic rejects log-control or shell-metacharacter inputs before printf',
+  /\^\[a-zA-Z0-9_-\]\{1,64\}\$/.test(manual) &&
+  /exit 1/.test(manual));
+
 /* Starter-workflows adaptation: prove these additional jobs can only lint and
    collect dependency evidence, never publish artifacts to a package registry,
    deploy services, or acquire write-capable repository credentials. */
