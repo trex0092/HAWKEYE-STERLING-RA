@@ -51,15 +51,26 @@ on:
   # so a missed dispatch still lands ~08:00-10:00 UAE, not mid-afternoon.
   schedule:
     - cron: '17 0 * * *'   # 00:17 UTC = 04:17 UAE daily (odd minute) — backstop to the on-time dispatch
+  # An approved update to THIS operational workflow must be exercised against
+  # both live Asana source projects at its merged main commit, not merely pass
+  # static CI while an older daily run remains the only assurance receipt.
+  # Exact-path push gate: ordinary application/document merges do NOT trigger
+  # the 100-minute, provider-budgeted full screen. Existing job concurrency
+  # queues behind an in-progress run without cancelling its audit evidence.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sanctions-screen.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 # This workflow is an OPERATIONAL control, not a code-validation workflow.
-# Source changes are exercised by CI. Keeping the runtime workflow schedule/
-# manual-only prevents ordinary merges from creating hour-long full-base
-# screens or being mistaken by freshness checks for today's mandatory control.
+# Source changes are exercised by CI; only a vetted change to THIS screening
+# workflow triggers an additional full operational revalidation on main.
+# Other merges never create hour-long screens. The same strict fail-closed
+# source-population and Asana evidence gates apply to scheduled/push/manual runs.
 concurrency:
   group: sanctions-screen-runtime
   cancel-in-progress: false
