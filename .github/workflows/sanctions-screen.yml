@@ -308,7 +308,7 @@ jobs:
         run: |
           # The dashboard CLI REQUIRES a ledger and a verified price table.
           # Invoking it with no args always exits 2 and loses the monitoring
-          # signal. A no-cost/unused-model run is UNKNOWN, not "$0.00".
+          # signal. Missing pricing or token usage is UNKNOWN, never priced.
           if [ ! -s api-cost-ledger.jsonl ] || [ -z "${API_USD_RATES_JSON:-}" ]; then
             echo 'API cost dashboard: INCOMPLETE (no verified prices or usage receipts)'
             {
