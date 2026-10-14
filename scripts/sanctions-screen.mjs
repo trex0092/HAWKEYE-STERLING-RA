@@ -43,6 +43,7 @@ import { checkFbi } from './fbi-check.mjs';
 import { pepListFromDataset, readJsonMaybeGz, PEP_LIST_NAME } from './pep-worldwide.mjs';
 import { corroborateIdentity, corroborateArticleIdentity, identityLabel } from './entity-resolution.mjs';
 import { buildDecisionSupport } from './screening-intelligence.mjs';
+import { CUSTOMER_PROJECT, EMPLOYEE_PROJECT, MONITORING_PROJECT } from './asana-sections.mjs';
 
 /* normalizeName lives in sanctions-match.mjs (the single source of truth) and is
    re-exported here so existing importers (tests, runner) are unchanged. */
@@ -60,7 +61,7 @@ export const RESULTS_FILE = 'sanctions-screen-results.json';
 /* "Customer Database" project (workspace: Compliance Tasks) — the screening
    subject of record. Override with ASANA_CUSTOMER_PROJECT_GID. */
 export const CUSTOMER_PROJECT_GID =
-  process.env.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121';
+  process.env.ASANA_CUSTOMER_PROJECT_GID || CUSTOMER_PROJECT;
 
 /* "HR – Employees" project — the SECOND screening population (staff screening,
    MLRO-directed 2026-07-29). Same pipeline, same matcher, same case lifecycle
@@ -72,7 +73,7 @@ export const CUSTOMER_PROJECT_GID =
 export const EMPLOYEE_PROJECT_GID =
   process.env.ASANA_EMPLOYEE_PROJECT_GID !== undefined
     ? process.env.ASANA_EMPLOYEE_PROJECT_GID
-    : '1216139945846994';
+    : EMPLOYEE_PROJECT;
 
 /* Consolidated designation lists screened against (data/sanctions-sources.json).
    Override the file with SANCTIONS_SOURCES_FILE. */
@@ -86,7 +87,27 @@ export const COVERAGE = 'OFAC SDN/non-SDN · UN · EU · UK OFSI · UAE EOCN Loc
    Adverse Media & PEP record here so there is always evidence monitoring actually
    executed. The section is resolved by name at runtime (created if missing), so no
    manual Asana setup is required; ASANA_OM_AM_PEP_SECTION_GID is an optional override. */
-export const OM_PROJECT_GID = process.env.ASANA_OM_PROJECT_GID || '1216203370612914';
+export const OM_PROJECT_GID = process.env.ASANA_OM_PROJECT_GID || MONITORING_PROJECT;
+/* The two SOURCE projects and single OUTPUT project are compliance policy,
+   not a configurable alternative screening universe. On the production runner,
+   a stale repository variable, an explicitly blank HR GID or a redirected
+   results project MUST abort before producing a false all-clear. This pure
+   function is also exercised directly in offline regression tests. */
+export function requireApprovedScreeningRoute({
+  customer = CUSTOMER_PROJECT_GID,
+  employee = EMPLOYEE_PROJECT_GID,
+  results = REG_PROJECT_GID,
+  monitoring = OM_PROJECT_GID,
+} = {}) {
+  if (String(customer || '') !== CUSTOMER_PROJECT ||
+      String(employee || '') !== EMPLOYEE_PROJECT ||
+      String(results || '') !== MONITORING_PROJECT ||
+      String(monitoring || '') !== MONITORING_PROJECT) {
+    throw new Error('Authoritative Asana customer/employee screening sources or results destination do not match approved project policy');
+  }
+  return true;
+}
+
 export const OM_SECTION_AM_PEP = 'Adverse Media & PEP Monitoring';
 /* Audit tasks are assigned to the token bearer by default; override with a user GID. */
 const OM_ASSIGNEE = process.env.ASANA_OM_ASSIGNEE_GID || 'me';
@@ -2320,6 +2341,10 @@ function bailUnscreened(reason, today) {
 
 async function main() {
   const today = new Date().toISOString().slice(0, 10);
+  try { requireApprovedScreeningRoute(); }
+  catch { return bailUnscreened(
+    'approved Customer Database, HR Employees, or HAWKEYE STERLING APP project routing is misconfigured', today
+  ); }
   const cfg = {
     sourcesFile: SANCTIONS_SOURCES_FILE,
     extraFile: process.env.SANCTIONS_EXTRA_FILE || 'data/sanctions-extra.json',
@@ -2442,7 +2467,7 @@ async function main() {
 
   const individuals = subjects.filter(s => s.entityType === 'individual').length;
   const entities = subjects.length - individuals;
-  console.log('sanctions-screen: screening ' + subjects.length + ' subjects (' + entities + ' entities + ' + individuals + ' principals/UBOs) from the FULL Customer Database against the free consolidated lists'
+  console.log('sanctions-screen: screening ' + subjects.length + ' subjects (' + entities + ' entities + ' + individuals + ' principals/UBOs) from the FULL Customer Database + HR Employees source projects against the free consolidated lists'
     + (cfg.adverseMedia ? ' + adverse media' : '') + (cfg.pep ? ' + PEP' : ''));
   const screen = await screenLocally(subjects, cfg);
   if (!screen.anyOk) return bailUnscreened('no sanctions list could be loaded — ' + ((screen.notes || []).join('; ') || 'all sources failed'), today);
