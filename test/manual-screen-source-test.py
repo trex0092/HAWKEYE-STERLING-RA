@@ -112,8 +112,6 @@ expect_error("unapproved Asana project refuses any fetch",
     lambda: screen.fetch_source_tasks("synthetic", "123456789", "Customer", forbidden),
     "not approved")
 check("redirected source attempts did not contact Asana", not calls)
-expect_error("customer-only manual run fails before any network activity",
-    lambda: screen.main(), "both approved") if False else None
 with patch.dict(os.environ, {
     "ASANA_PAT": "synthetic", "CUSTOMER_DB_GID": screen.APPROVED_CUSTOMER_PROJECT,
     "EMPLOYEE_DB_GID": ""
