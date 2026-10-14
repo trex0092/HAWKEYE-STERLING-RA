@@ -61,8 +61,10 @@ jobs:
       - name: Prove required sanctions runtime
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
-          ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID }}
+          # Both approved Asana projects are mandatory. A missing repository
+          # variable must never silently disable completed HR employee records.
+          ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121' }}
+          ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID || '1216239131596624' }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           # Personal EU FSF crawler token (optional): the shared public token now
           # redirects to EU Login. Unset = public token, and the EU list fails loudly.

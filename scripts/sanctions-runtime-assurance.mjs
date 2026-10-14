@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   fetchAsanaSubjects,
+  fetchAsanaEmployeeSubjects,
+  requireApprovedScreeningRoute,
   screenLocally,
   resolveThreshold,
   SANCTIONS_SOURCES_FILE,
@@ -12,6 +14,38 @@ import {
 import { assessRuntime, badgeSvg, BADGE_FILES } from './screening-assurance.mjs';
 
 export const OUT_FILE = 'data/sanctions-runtime-assurance.json';
+/* The auxiliary sanctions-only proof must use exactly the same authoritative
+   Asana customer and completed-employee populations as the daily full screen.
+   Generic fetchAsanaSubjects() classifies top-level tasks as organisations:
+   it must NOT be used on employees, who require individual/PEP identity data.
+   Dependencies are injectable for credential-free regression tests. */
+export async function loadApprovedRuntimePopulation(token, {
+  customerProject = process.env.ASANA_CUSTOMER_PROJECT_GID || CUSTOMER_PROJECT_GID,
+  employeeProject = process.env.ASANA_EMPLOYEE_PROJECT_GID !== undefined
+    ? process.env.ASANA_EMPLOYEE_PROJECT_GID : EMPLOYEE_PROJECT_GID,
+  fetchCustomers = fetchAsanaSubjects,
+  fetchEmployees = fetchAsanaEmployeeSubjects,
+} = {}) {
+  // A blank/redirected HR source may NOT turn a 2-project screen into a
+  // seemingly successful customer-only probe. Validate BEFORE any network.
+  requireApprovedScreeningRoute({ customer: customerProject, employee: employeeProject });
+  if (!token) throw new Error('ASANA_ACCESS_TOKEN is required');
+  const customers = await fetchCustomers(customerProject, token);
+  if (!Array.isArray(customers) || !customers.length) {
+    throw new Error('Customer Database returned 0 verified screening subjects');
+  }
+  const employees = await fetchEmployees(employeeProject, token);
+  if (!Array.isArray(employees) || !employees.length) {
+    throw new Error('HR Employees project returned 0 verified screening subjects');
+  }
+  // Aggregates contain NO task names, dates of birth or national ID fields.
+  const sources = {
+    customer: { projectGid: customerProject, screenedSubjects: customers.length },
+    employee: { projectGid: employeeProject, screenedSubjects: employees.length },
+  };
+  return { subjects: customers.concat(employees), sources };
+}
+
 
 async function main() {
   const token = process.env.ASANA_ACCESS_TOKEN || '';
@@ -30,21 +64,7 @@ async function main() {
     .map(s => String(s.fallbackSourceId));
   const loadIds = [...new Set(required.concat(fallbacks))];
 
-  const customers = await fetchAsanaSubjects(
-    process.env.ASANA_CUSTOMER_PROJECT_GID || CUSTOMER_PROJECT_GID,
-    token
-  );
-  if (!customers.length) throw new Error('Customer Database returned 0 screening subjects');
-
-  let subjects = customers;
-  const employeeProject = process.env.ASANA_EMPLOYEE_PROJECT_GID !== undefined
-    ? process.env.ASANA_EMPLOYEE_PROJECT_GID
-    : EMPLOYEE_PROJECT_GID;
-  if (employeeProject) {
-    const employees = await fetchAsanaSubjects(employeeProject, token);
-    if (!employees.length) throw new Error('HR Employees project returned 0 screening subjects');
-    subjects = subjects.concat(employees);
-  }
+  const { subjects, sources } = await loadApprovedRuntimePopulation(token);
 
   const probe = await screenLocally(subjects, {
     sourcesFile: SANCTIONS_SOURCES_FILE,
@@ -62,7 +82,8 @@ async function main() {
     whitelist: false,
     secondOpinion: false,
   });
-  if (!probe.anyOk || probe.results.length !== subjects.length) {
+  if (!probe.anyOk || probe.results.length !== subjects.length ||
+      sources.customer.screenedSubjects + sources.employee.screenedSubjects !== subjects.length) {
     throw new Error('sanctions probe did not screen the complete subject population');
   }
 
@@ -87,6 +108,7 @@ async function main() {
     githubRunId: process.env.GITHUB_RUN_ID || '',
     commit: process.env.GITHUB_SHA || '',
     screenedSubjects: results.screened,
+    sourceProjects: sources,
     requiredSourceIds: required,
     operational: domain.operational,
     reasons: domain.reasons,

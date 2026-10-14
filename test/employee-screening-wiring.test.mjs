@@ -25,6 +25,7 @@ function check(name, cond) {
 
 const WORKFLOWS = [
   { file: '.github/workflows/sanctions-screen.yml', engine: 'JS (sanctions-screen.mjs)', varName: 'ASANA_EMPLOYEE_PROJECT_GID' },
+  { file: '.github/workflows/sanctions-runtime-assurance.yml', engine: 'JS (sanctions-runtime-assurance.mjs)', varName: 'ASANA_EMPLOYEE_PROJECT_GID' },
   { file: '.github/workflows/weekly-adverse-media.yml', engine: 'Python (screen.py)', varName: 'ASANA_EMPLOYEE_DB_GID' },
   { file: '.github/workflows/onboarding-screen.yml', engine: 'Python (screen.py, onboarding mode)', varName: 'ASANA_EMPLOYEE_DB_GID' },
 ];
@@ -41,7 +42,8 @@ for (const wf of WORKFLOWS) {
    "employee screening disabled". Every screening workflow must therefore fall
    back to the live HR - Employees project (1216239131596624) so a missing
    variable can never silently drop the employee population. The onboarding
-   screen forwarded the bare variable with no fallback. */
+   screen and independent sanctions runtime assurance once forwarded bare
+   variables, so both need a strict fallback for the approved HR project. */
 const EMPLOYEE_PROJECT_GID = '1216239131596624';
 const source = readFileSync('scripts/sanctions-screen.mjs', 'utf8');
 check('JS engine defaults to the same approved HR Employees GID used by all workflows',
@@ -57,6 +59,15 @@ for (const wf of WORKFLOWS) {
   check(`${wf.file}: ${wf.varName} falls back to the HR - Employees project when the repo variable is unset`,
     new RegExp(wf.varName + ":\\s*\\$\\{\\{\\s*vars\\." + wf.varName + "\\s*\\|\\|\\s*'" + EMPLOYEE_PROJECT_GID + "'\\s*\\}\\}").test(text));
 }
+
+/* A customer-only sanctions probe can look green despite never screening
+   the completed employee records. Verify BOTH production source IDs, not
+   merely whether employee env keys exist in the workflow text. */
+const runtimeWorkflow = readFileSync('.github/workflows/sanctions-runtime-assurance.yml', 'utf8');
+check('runtime assurance explicitly defaults to the approved Customer Database',
+  /ASANA_CUSTOMER_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_CUSTOMER_PROJECT_GID\s*\|\|\s*'1214107620220121'\s*\}\}/.test(runtimeWorkflow));
+check('runtime assurance explicitly defaults to completed HR Employees population',
+  /ASANA_EMPLOYEE_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_EMPLOYEE_PROJECT_GID\s*\|\|\s*'1216239131596624'\s*\}\}/.test(runtimeWorkflow));
 
 /* If screen.py's own env-var name for this population ever changes, every one
    of the above should change together -- catch a partial rename early rather
