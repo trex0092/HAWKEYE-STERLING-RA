@@ -76,14 +76,14 @@ check('runtime assurance explicitly defaults to completed HR Employees populatio
    check against a stale or redirected repository variable. */
 const primaryScreenWorkflow = readFileSync('.github/workflows/sanctions-screen.yml', 'utf8');
 check('daily sanctions workflow explicitly binds approved Customer Database fallback',
-  /ASANA_CUSTOMER_PROJECT_GID:\\s*\\$\\{\\{\\s*vars\\.ASANA_CUSTOMER_PROJECT_GID\\s*\\|\\|\\s*'1214107620220121'\\s*\\}\\}/.test(primaryScreenWorkflow));
+  /ASANA_CUSTOMER_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_CUSTOMER_PROJECT_GID\s*\|\|\s*'1214107620220121'\s*\}\}/.test(primaryScreenWorkflow));
 check('daily sanctions workflow binds the exact approved HR Employees population',
-  /ASANA_EMPLOYEE_PROJECT_GID:\\s*\\$\\{\\{\\s*vars\\.ASANA_EMPLOYEE_PROJECT_GID\\s*\\|\\|\\s*'1216239131596624'\\s*\\}\\}/.test(primaryScreenWorkflow));
+  /ASANA_EMPLOYEE_PROJECT_GID:\s*\$\{\{\s*vars\.ASANA_EMPLOYEE_PROJECT_GID\s*\|\|\s*'1216239131596624'\s*\}\}/.test(primaryScreenWorkflow));
 check('JS source route refuses a redirected customer, employee, delivery or monitoring project',
-  /String\\(customer \\|\\| ''\\) !== CUSTOMER_PROJECT/.test(source) &&
-  /String\\(employee \\|\\| ''\\) !== EMPLOYEE_PROJECT/.test(source) &&
-  /String\\(results \\|\\| ''\\) !== MONITORING_PROJECT/.test(source) &&
-  /String\\(monitoring \\|\\| ''\\) !== MONITORING_PROJECT/.test(source));
+  /String\(customer \|\| ''\) !== CUSTOMER_PROJECT/.test(source) &&
+  /String\(employee \|\| ''\) !== EMPLOYEE_PROJECT/.test(source) &&
+  /String\(results \|\| ''\) !== MONITORING_PROJECT/.test(source) &&
+  /String\(monitoring \|\| ''\) !== MONITORING_PROJECT/.test(source));
 
 /* The retired manual workflow still supports dispatch and must never
    screen only customers while claiming complete sanctions coverage. */
