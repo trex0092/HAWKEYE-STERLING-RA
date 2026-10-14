@@ -196,17 +196,10 @@ jobs:
           # OFF unless the repository variable is set — CC-BY-NC data, see
           # docs/aims/third-party-register.md before enabling.
           ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}
-          # HR - Employees screening population (MLRO-directed 2026-07-29,
-          # see screen.py). Never forwarded here before, so screen.py always
-          # fell back to its own hardcoded default (1216139945846994), which
-          # does not exist in Asana, and that FATAL guard aborted the run
-          # (confirmed: run 35391973300, 2026-09-18, 'Asana employee fetch
-          # failed (404)'). Falls back to the live HR - Employees project, as
-          # the unified daily screen does: an UNSET repo variable expands to an
-          # empty string, and screen.py reads an empty value as "employee
-          # screening disabled", so the onboarding screen would silently skip
-          # the whole employee population.
-          ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID || '1216239131596624' }}
+          # Both approved Asana projects are mandatory screening populations.
+          # Pin HR here: a non-empty stale repository variable would otherwise
+          # redirect the Python engine to an unapproved or missing project.
+          ASANA_EMPLOYEE_DB_GID: '1216239131596624'
           ONBOARDING_WINDOW_HOURS: ${{ github.event.inputs.window_hours || '26' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # PDPL GATE: code defaults OFF; enabling requires explicit repo variable LLM_TRIAGE=1.
