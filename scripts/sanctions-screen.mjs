@@ -2501,6 +2501,10 @@ async function main() {
   try { subjects = await fetchAsanaSubjects(CUSTOMER_PROJECT_GID, asanaToken); }
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
+  // Preserve the population totals BEFORE concatenating employee records.
+  // These counts, not subject names, are published with the run's assurance.
+  const customerScreenedSubjects = subjects.length;
+  let employeeScreenedSubjects = 0;
   const onRunner = process.env.GITHUB_ACTIONS === 'true';
   let maskedCount = onRunner ? maskSubjectNames(subjects) : 0;
 
@@ -2509,6 +2513,7 @@ async function main() {
     try { employees = await fetchAsanaEmployeeSubjects(EMPLOYEE_PROJECT_GID, asanaToken); }
     catch (e) { return bailUnscreened('could not read the HR – Employees project (' + (e && e.message || e) + ') — employee screening is configured, so the run must not proceed without it', today); }
     if (!employees.length) return bailUnscreened('the HR – Employees project returned 0 subjects while employee screening is configured — set ASANA_EMPLOYEE_PROJECT_GID empty to disable it explicitly', today);
+    employeeScreenedSubjects = employees.length;
     console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
     if (onRunner) maskedCount += maskSubjectNames(employees);
     subjects = subjects.concat(employees);
@@ -2602,6 +2607,12 @@ async function main() {
   writeFileSync(RESULTS_FILE, JSON.stringify({
     date: today,
     screened: subjects.length, entities, individuals,
+    // This is an aggregate-only source receipt: no task IDs, names, employee
+    // identity attributes, notes or personal identifiers are exposed.
+    sourcePopulation: {
+      customer: { projectGid: CUSTOMER_PROJECT_GID, screenedSubjects: customerScreenedSubjects },
+      employee: { projectGid: EMPLOYEE_PROJECT_GID, screenedSubjects: employeeScreenedSubjects },
+    },
     newMatches: alerts.length, matchCount, clearedCount: cleared.length,
     degraded: screen.degraded,
     lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({
