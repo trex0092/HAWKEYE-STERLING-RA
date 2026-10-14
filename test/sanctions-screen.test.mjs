@@ -838,8 +838,13 @@ check('the issue step is always()-guarded so it still fires after the red bail',
   /if: always\(\) && \(steps\.screen\.outputs\.screen_error == 'true'/.test(screenYml));
 check('control-retry heals on missing SUCCESS (a red bail is now re-dispatched)',
   /conclusion.*success/.test(retryYml) && /sanctions-screen\.yml/.test(retryYml));
-check('operational sanctions screen is schedule/manual only — code pushes are validated by CI instead',
-  !/^\s*push:/m.test(screenYml)
+check('operational sanctions screen revalidates only approved main code changes, retaining manual/schedule controls',
+  /^  push:\s*$/m.test(screenYml)
+  && /branches:\s*\[main\]/.test(screenYml)
+  && /^\s*paths:\s*$/m.test(screenYml)
+  && screenYml.includes("      - '.github/workflows/sanctions-screen.yml'")
+  && screenYml.includes("      - 'scripts/screening-assurance.mjs'")
+  && !/^  pull_request:/m.test(screenYml)
   && /^\s*schedule:/m.test(screenYml)
   && /^\s*workflow_dispatch:/m.test(screenYml));
 check('sanctions runtime concurrency cannot be confused with source-code validation runs',
