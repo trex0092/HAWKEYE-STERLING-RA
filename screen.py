@@ -5144,24 +5144,37 @@ def _manual_review_hit(subject_type, subject_name, control_linkage):
             "matched_entry": "name not auto-screenable (non-Latin script or too short) — screen this subject manually against all lists",
             "score": 0, "name_score": 0, "core_score": 0, "confidence": "REVIEW"}
 
+def screening_individuals(record):
+    """Preserve every screened person; never omit the HR task's own identity."""
+    individuals = list(record.get("individuals") or [])
+    if record.get("kind") == "employee":
+        employee_name = record.get("name") or ""
+        if not employee_name.strip():
+            raise ValueError("HR employee task has no screenable name")
+        if employee_name not in individuals:
+            individuals.insert(0, employee_name)
+    return individuals
+
+
 def screen_customers(customers, all_lists):
     possible_matches, clear = [], []
     for c in customers:
         hits = []
-        if _unscreenable(c["name"]):
-            hits.append(_manual_review_hit("ENTITY", c["name"], False))
-        for h in screen_name(c["name"], all_lists):
-            hits.append({"subject_type":"ENTITY","subject_name":c["name"],
-                         "control_linkage": False, **h})
-        for ind in c["individuals"]:
+        is_employee = c.get("kind") == "employee"
+        if not is_employee:
+            if _unscreenable(c["name"]):
+                hits.append(_manual_review_hit("ENTITY", c["name"], False))
+            for h in screen_name(c["name"], all_lists):
+                hits.append({"subject_type":"ENTITY","subject_name":c["name"],
+                             "control_linkage": False, **h})
+        for ind in screening_individuals(c):
             if _unscreenable(ind):
-                hits.append(_manual_review_hit("INDIVIDUAL", ind, True))
+                hits.append(_manual_review_hit("INDIVIDUAL", ind, not is_employee))
             for h in screen_name(ind, all_lists):
-                # An owner / director / UBO matching a designation flags the
-                # COMPANY by ownership/control linkage (the 50%/control rule),
-                # even though the company name itself did not match.
+                # HR identities are individuals in their own right, not
+                # UBO/control linkages to an employing entity.
                 hits.append({"subject_type":"INDIVIDUAL","subject_name":ind,
-                             "control_linkage": True, **h})
+                             "control_linkage": not is_employee, **h})
         for ent in c.get("entity_owners", []):
             if _unscreenable(ent):
                 hits.append(_manual_review_hit("ENTITY (owner)", ent, True))
@@ -8025,8 +8038,9 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     # network-bound enrichment starts.
     subjects_all = []
     for c in customers:
-        subjects_all.append(("COMPANY", c["name"], None, c))
-        for ind in c.get("individuals", []):
+        if c.get("kind") != "employee":
+            subjects_all.append(("COMPANY", c["name"], None, c))
+        for ind in screening_individuals(c):
             subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
         # Corporate owners/parents are sanctions-screened (50%/control rule) —
         # sweep their adverse media too, or a designated parent's coverage is
