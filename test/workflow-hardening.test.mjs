@@ -377,13 +377,15 @@ check('Dockerfile lint action pinned to exact upstream starter SHA',
 check('Dockerfile lint is blocking, not a no-fail badge',
   /failure-threshold:\s*warning/.test(dockerLint) &&
   /no-fail:\s*false/.test(dockerLint));
-check('source SBOM uses the pinned upstream starter Syft action',
-  /anchore\/sbom-action@[a-f0-9]{40}/.test(sbom));
-check('source SBOM has a portable confirmed artifact name and valid Syft inputs',
+check('source SBOM uses reviewed pinned Node24-compatible Anchore action',
+  /anchore\/sbom-action@e22c389904149dbc22b58101806040fa8d37a610/.test(sbom));
+check('source SBOM uses supported modern artifact upload and 14-day retention',
   /format:\s*spdx-json/.test(sbom) &&
   /artifact-name:\s*hawkeye-source-sbom\s*$/m.test(sbom) &&
   /dependency-snapshot:\s*false/.test(sbom) &&
-  !/^\s*(upload-artifact|upload-release-assets|upload-artifact-retention):/m.test(sbom));
+  /upload-artifact:\s*true/.test(sbom) &&
+  /upload-artifact-retention:\s*14/.test(sbom) &&
+  /upload-release-assets:\s*false/.test(sbom));
 for (const [name, body] of [['Dockerfile lint', dockerLint], ['SBOM', sbom]]) {
   check(name + ' uses read-only token and has no pull_request_target trigger',
     /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(body) &&
@@ -393,9 +395,10 @@ for (const [name, body] of [['Dockerfile lint', dockerLint], ['SBOM', sbom]]) {
     !/^\s+(?:docker push|npm publish|npx semantic-release|gh release create)\b/m.test(body) &&
     /persist-credentials:\s*false/.test(body));
 }
-check('SBOM cannot silently submit dependencies or release assets with a write-capable token',
+check('SBOM cannot silently submit dependencies or publish assets with a write-capable token',
   /dependency-snapshot:\s*false/.test(sbom) &&
-  !/^\s*(upload-release-assets|github-token):/m.test(sbom) &&
+  /upload-release-assets:\s*false/.test(sbom) &&
+  !/^\s*github-token:/m.test(sbom) &&
   !/\brelease:\s*\n|\bpackages:\s*write/.test(sbom));
 check('scheduled source SBOM is correctly classified for independent control freshness',
   /'source-sbom.yml':\s*'read-only weekly source dependency inventory/.test(
