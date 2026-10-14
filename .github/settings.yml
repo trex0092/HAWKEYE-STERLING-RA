@@ -156,6 +156,39 @@ labels:
   - name: config
     color: "37474f"
     description: Toolchain / repository configuration
+  # Priority and evidence-state labels are deliberately MANUAL; no path rule
+  # can know whether a control is urgent, verified or MLRO-approved.
+  - name: "priority/P0"
+    color: "b60205"
+    description: Immediate AML or security integrity blocker, explicit human triage
+  - name: "priority/P1"
+    color: "d93f0b"
+    description: High-priority operational, compliance or security remediation
+  - name: "priority/P2"
+    color: "e4b03b"
+    description: Planned hardening or moderate operational improvement
+  - name: "status/evidence-needed"
+    color: "d4c5f9"
+    description: Implementation exists but independent live evidence is outstanding
+  - name: "status/mlro-review"
+    color: "c2e0c6"
+    description: Consequential screening decision awaiting human MLRO review
+  # Auto-labelable areas, scoped by .github/labeler.yml.
+  - name: "area/asana-delivery"
+    color: "0e8a16"
+    description: Asana case, evidence, report or escalation transport and read-back
+  - name: "area/ai-security"
+    color: "5319e7"
+    description: AI model isolation, prompt injection, read-only tools and red teaming
+  - name: "area/supply-chain"
+    color: "0366d6"
+    description: Reproducible SBOM, Dockerfile, dependencies and supply-chain security
+  - name: "area/agent-skills"
+    color: "7057ff"
+    description: Agent skills, code-review conventions and reusable safety workflows
+  - name: "area/repo-protection"
+    color: "0052cc"
+    description: Branch policy, review ownership, GitHub Actions or label governance
 
 # ── Branch protection ───────────────────────────────────────────────────────────
 # main is the deploy branch. No direct pushes: every change lands via a reviewed,
