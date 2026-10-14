@@ -3,6 +3,9 @@ name: Source supply-chain SBOM (Syft)
 # Adapted from actions/starter-workflows/code-scanning/anchore-syft.yml.
 # Generates a downloadable SPDX inventory; does not publish a package/image,
 # push to any repository, submit dependency snapshots or use credentials.
+# The pinned Syft action itself uploads the artifact using artifact-name.
+# Unsupported upstream inputs must not be included: the old job failed
+# artifact creation using a filename-shaped artifact name on 14 October.
 on:
   pull_request:
     paths:
@@ -61,8 +64,7 @@ jobs:
         with:
           path: .
           format: spdx-json
-          artifact-name: hawkeye-source-sbom.spdx.json
+          # GitHub Actions artifact container NAME, not a filename.
+          # SPDX contents are JSON; use a portable slash/dot-free artifact ID.
+          artifact-name: hawkeye-source-sbom
           dependency-snapshot: false
-          upload-artifact: true
-          upload-release-assets: false
-          upload-artifact-retention: 14
