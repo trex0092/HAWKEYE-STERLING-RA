@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, createVerifiedScreeningCase, unverifiedCaseCreationState, postVerifiedCaseAgingNotice, applyVerifiedCaseDisposition, verifyScreeningCaseAuditStory, CASE_FALSE_POSITIVE_AUDIT, CASE_ESCALATE_AUDIT, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, createVerifiedScreeningCase, unverifiedCaseCreationState, postVerifiedCaseAgingNotice, selectDispositionReadBatch, DEFAULT_CASE_DISPOSITION_READ_CAP, MAX_CASE_DISPOSITION_READ_CAP, applyVerifiedCaseDisposition, verifyScreeningCaseAuditStory, CASE_FALSE_POSITIVE_AUDIT, CASE_ESCALATE_AUDIT, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
 import { caseSection, SECTIONS } from '../scripts/asana-sections.mjs';
 
 let passed = 0, failed = 0;
@@ -551,6 +551,51 @@ check('digest: absent match counts never masquerade as all-clear', (() => {
 check('digest title states the outcome and volume',
   resultsDigestTitle(RESULTS) === '🛡️ Sanctions Screen — ' + TODAY + ' — 1 new match(es) · 778 screened'
   && resultsDigestTitle({ ...RESULTS, newMatches: 0 }).includes('no new matches'));
+
+/* The 14 Oct live case ledger had 210 open cases; a fixed first-60 scan
+   could indefinitely miss human MLRO dispositions on 150 cases. */
+{
+  const ledger = Array.from({ length: 210 }, (_, i) => [
+    'case-' + String(i).padStart(4, '0'),
+    { taskGid: String(1210000000000000 + i), cleared: false }
+  ]);
+  const allToday = selectDispositionReadBatch(ledger, '2026-10-14');
+  check('default MLRO disposition read covers all 210 currently open cases in one run',
+    DEFAULT_CASE_DISPOSITION_READ_CAP >= 210 &&
+    allToday.total === 210 && allToday.selected.length === 210 &&
+    allToday.deferred === 0 &&
+    new Set(allToday.selected.map(entry => entry[0])).size === 210);
+  const bounded = selectDispositionReadBatch(ledger, '2026-10-14', 60);
+  check('explicit lower Asana read budget never silently claims all cases were scanned',
+    bounded.selected.length === 60 && bounded.deferred === 150);
+  const repeated = selectDispositionReadBatch(ledger, '2026-10-14', 60);
+  check('same-day MLRO read batch is deterministic and retry-safe',
+    JSON.stringify(bounded.selected) === JSON.stringify(repeated.selected));
+  const observed = new Set();
+  for (let day = 0; day < 4; day++) {
+    const selected = selectDispositionReadBatch(ledger,
+      addDays('2026-10-14', day), 60).selected;
+    for (const [key] of selected) observed.add(key);
+  }
+  check('over the next four UTC days the bounded 60-case scan reaches all 210 cases',
+    observed.size === 210);
+  const closed = [
+    ['closed', { taskGid: '111', cleared: true }],
+    ['escalated', { taskGid: '222', escalated: true }],
+    ['dispositioned', { taskGid: '333', disposition: { kind: 'false-positive' } }],
+    ['missing', { cleared: false }],
+    ['open', { taskGid: '444', cleared: false }]
+  ];
+  const active = selectDispositionReadBatch(closed, '2026-10-14');
+  check('disposition scanner never re-enters completed, escalated or phantom cases',
+    active.total === 1 && active.selected[0][0] === 'open');
+  let refusedCap = false, refusedDate = false;
+  try { selectDispositionReadBatch(ledger, '2026-10-14', MAX_CASE_DISPOSITION_READ_CAP + 1); }
+  catch { refusedCap = true; }
+  try { selectDispositionReadBatch(ledger, '2026-02-30', 60); }
+  catch { refusedDate = true; }
+  check('invalid read budgets and impossible calendar dates fail closed', refusedCap && refusedDate);
+}
 
 /* ── Disposition read-back (analyst feedback loop) ── */
 check('parseDisposition: untouched template parses as null (no false trigger)',

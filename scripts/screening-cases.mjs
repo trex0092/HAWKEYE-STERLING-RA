@@ -75,6 +75,42 @@ export async function postVerifiedCaseAgingNotice(request, caseGid, ageDays,
   return { confirmed: true, alreadyRecorded: result.alreadyRecorded === true };
 }
 
+/* The live AML queue exceeded the historical 60-case read cap: the 14 Oct
+   screening job read only the FIRST 60 of 210 open cases every day, so newer
+   human MLRO dispositions after position 60 could be ignored indefinitely.
+   Normally verify up to 250 human decisions each run (210 currently).
+   If the queue grows beyond a bounded API budget, rotate deterministically
+   by UTC day to avoid permanently starving later keys. This changes READ-ONLY
+   preflight coverage; all disposition writes still require independent Asana
+   story, task-state and human-mark verification before ledger updates. */
+export const DEFAULT_CASE_DISPOSITION_READ_CAP = 250;
+export const MAX_CASE_DISPOSITION_READ_CAP = 500;
+export function selectDispositionReadBatch(entries, day, cap = DEFAULT_CASE_DISPOSITION_READ_CAP) {
+  if (!Array.isArray(entries) || !Number.isSafeInteger(cap) ||
+      cap < 1 || cap > MAX_CASE_DISPOSITION_READ_CAP ||
+      typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    throw new Error('Invalid bounded Asana MLRO disposition read parameters');
+  }
+  const utc = Date.parse(day + 'T00:00:00Z');
+  if (!Number.isFinite(utc) || new Date(utc).toISOString().slice(0, 10) !== day) {
+    throw new Error('Invalid Asana disposition UTC day');
+  }
+  const eligible = entries.filter((row) =>
+    Array.isArray(row) && row.length === 2 && row[1] &&
+    row[1].taskGid && !row[1].cleared &&
+    !row[1].disposition && !row[1].escalated);
+  // Do not depend on insertion order or expose customer names/keys to Actions.
+  eligible.sort((a, b) => String(a[0]) < String(b[0]) ? -1 :
+    String(a[0]) > String(b[0]) ? 1 : 0);
+  const total = eligible.length;
+  if (!total) return { selected: [], total: 0, deferred: 0 };
+  const count = Math.min(cap, total);
+  const dayNumber = Math.floor(utc / 86400000);
+  const offset = (dayNumber * cap) % total;
+  const selected = Array.from({ length: count }, (_, i) => eligible[(offset + i) % total]);
+  return { selected, total, deferred: total - selected.length };
+}
+
 export function caseTitle(key, s) {
   /* UBO keys carry the customer gid as their third segment; LEGAL-ENTITY keys
      have no '|' at all, so every company case used to be titled CASE-XXXXXX.
@@ -628,14 +664,15 @@ async function main() {
      pins the case against every auto-clear. Read failures are logged and
      skipped — a case we could not read simply keeps its current lifecycle. */
   const dispositionActions = [];
-  const READ_CAP = Number(process.env.CASE_DISPOSITION_READ_CAP) || 60;
-  const openCases = Object.entries(casesState)
-    .filter(([, cs]) => cs && cs.taskGid && !cs.cleared && !cs.disposition && !cs.escalated);
-  if (openCases.length > READ_CAP) {
-    console.log('screening-cases: disposition read capped at ' + READ_CAP + ' of '
-      + openCases.length + ' open case(s) this run (CASE_DISPOSITION_READ_CAP)');
+  const READ_CAP = Number(process.env.CASE_DISPOSITION_READ_CAP ?? DEFAULT_CASE_DISPOSITION_READ_CAP);
+  const dispositionBatch = selectDispositionReadBatch(Object.entries(casesState), today, READ_CAP);
+  if (dispositionBatch.deferred) {
+    console.log('screening-cases: read-only MLRO disposition scan covers ' +
+      dispositionBatch.selected.length + ' of ' + dispositionBatch.total +
+      ' open cases; next UTC day rotates the bounded selection (' +
+      dispositionBatch.deferred + ' deferred)');
   }
-  for (const [key, cs] of openCases.slice(0, READ_CAP)) {
+  for (const [key, cs] of dispositionBatch.selected) {
     let dis = null;
     try {
       const d = await asana('/tasks/' + cs.taskGid + '?opt_fields=notes');
