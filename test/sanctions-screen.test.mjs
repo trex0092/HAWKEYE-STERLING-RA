@@ -222,6 +222,54 @@ check('parsePrincipals does NOT capture names outside the identifications sectio
 check('parsePrincipals is empty for a record with no identifications section',
   parsePrincipals({ name: 'Co', notes: 'SECTION 1 — CUSTOMER INFORMATION\n    Company: CO' }).length === 0);
 
+/* A structured SECTION 4 previously suppressed owner/UBO lines elsewhere in
+   the record, even when the separate Python engine screened those identities.
+   Exercise both natural-person and corporate-owner rows with synthetic names.
+   Generic "Name:" evidence outside identification sections is NOT a party. */
+{
+  const task = { gid: 'owner-drift-1', name: 'Synthetic Trading LLC', notes: [
+    'SECTION 4 — IDENTIFICATIONS',
+    'Individual 1 — Director',
+    'Name: Synthetic Director',
+    'Nationality: UAE',
+    'SECTION 5 — OWNERSHIP CONTEXT',
+    'UBO: Synthetic Additional Person',
+    'Parent Company: Synthetic Holding LLC',
+    'Name: should-not-be-captured',
+    'Shareholder: N/A',
+    'Owner: 75% of shares',
+  ].join('\n') };
+  const extra = parsePrincipals(task);
+  check('owner/UBO rows outside Section 4 are unioned with identified directors',
+    extra.length === 3 && extra.some(p => p.name === 'Synthetic Director') &&
+    extra.some(p => p.name === 'Synthetic Additional Person' && !p.corporate) &&
+    extra.some(p => p.name === 'Synthetic Holding LLC' && p.corporate));
+  check('owner-only rows do not turn placeholders, ownership percentages or unrelated Name fields into identities',
+    !extra.some(p => /should-not-be-captured|75%|N\/A/.test(p.name)));
+  const rows = parseSubjects([task]);
+  check('owner-only party and corporate parent each get separate customer-linked screening slots',
+    rows.length === 4 &&
+    rows.some(p => p.name === 'Synthetic Additional Person' && p.entityType === 'individual' && p.gid === task.gid) &&
+    rows.some(p => p.name === 'Synthetic Holding LLC' && p.entityType === 'organisation' && p.gid === task.gid));
+  const ownerOnly = parsePrincipals({
+    gid: 'owner-drift-2', name: 'Synthetic Group', notes: 'SECTION 1 — CUSTOMER INFORMATION\nUBO: Synthetic Name In Notes'
+  });
+  check('explicit UBO name remains screenable when customer has no Section 4 block',
+    ownerOnly.length === 1 && ownerOnly[0].name === 'Synthetic Name In Notes');
+  const repeated = parsePrincipals({
+    gid: 'owner-drift-3', name: 'Synthetic Holdings', notes: [
+      'SECTION 4 — IDENTIFICATIONS',
+      'Individual 1 — Director',
+      'Name: Synthetic Repeated Person',
+      'UBO: Synthetic Repeated Person',
+      'SECTION 5 — OTHER',
+      'Shareholder: Synthetic Repeated Person',
+    ].join('\n'),
+  });
+  check('same principal repeated on explicit owner lines is not double-counted',
+    repeated.length === 1 && repeated[0].name === 'Synthetic Repeated Person');
+}
+
 const withPpl = parseSubjects([cddTask]);
 check('parseSubjects emits the entity PLUS each principal as its own subject',
   withPpl.length === 3 &&
