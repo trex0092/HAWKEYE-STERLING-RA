@@ -35,7 +35,8 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
   fitAsanaText, fitAsanaName, publicAsanaRejection } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
-import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName } from './sanctions-match.mjs';
+import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName, sigTokens } from './sanctions-match.mjs';
+import { fetchGkgWindowHits } from './gdelt-gkg.mjs';
 import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS, providerFailureStatus, resetProviderFailureStatus } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
@@ -2243,6 +2244,23 @@ export async function screenLocally(subjects, cfg) {
   /* Daily-rotated processing order (enrichment fairness — see rotateByDay);
      results are re-sorted to the input order below so reports/state stay
      stable regardless of the day's rotation. */
+  /* GDELT via the 48-hour bulk GKG window instead of one throttled DOC API call
+     per subject. Used only when at least 90% of the window loads; otherwise the
+     per-subject DOC path runs unchanged (fail-safe, never a silent partial). */
+  let gkg = null;
+  if (cfg.adverseMedia && process.env.GDELT_GKG !== '0') {
+    const gkgSubjects = [];
+    for (const s of subjects) {
+      if (s.entityType === 'organisation') gkgSubjects.push([s.key, s.name, 'org']);
+      else if (s.entityType === 'individual') gkgSubjects.push([s.key, s.name, 'person']);
+      else { gkgSubjects.push([s.key, s.name, 'person']); gkgSubjects.push([s.key, s.name, 'org']); }
+    }
+    gkg = await fetchGkgWindowHits({ subjects: gkgSubjects, normalizeFn: normalizeName, coreTokensFn: sigTokens });
+    console.log('sanctions-screen: GDELT GKG window ok=' + gkg.ok + ' files ' + gkg.filesOk + '/' + gkg.total
+      + ' missing ' + gkg.filesMissing + ' failed ' + gkg.filesFailed + ' rows ' + gkg.rows
+      + ' subjects matched ' + gkg.hitsBySubject.size);
+    if (!gkg.ok) gkg = null;
+  }
   const rotatedSubjects = rotateByDay(subjects);
   const results = await mapLimit(rotatedSubjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr, phonMode);   // { name, topScore, band, recommendation, hitCount, lists[] }
@@ -2315,7 +2333,8 @@ export async function screenLocally(subjects, cfg) {
       }
     };
     if (cfg.adverseMedia && enrich) {
-      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs,
+        gdeltItems: gkg ? (gkg.hitsBySubject.get(s.key) || []) : undefined });
       if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
       if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
       if (!am.backbones?.bing) amBackboneFailures.bing++;
@@ -2464,7 +2483,7 @@ export async function screenLocally(subjects, cfg) {
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, amBackboneFailureStatus: providerFailureStatus(), pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, amBackboneFailureStatus: providerFailureStatus(), amGdeltGkg: gkg ? { used: gkg.ok, filesOk: gkg.filesOk, filesTotal: gkg.total, filesMissing: gkg.filesMissing, filesFailed: gkg.filesFailed, rows: gkg.rows, subjectsMatched: gkg.hitsBySubject.size } : { used: false }, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 /* A corrupt or malformed persisted AML ledger is NOT the same as a clean
@@ -2786,6 +2805,7 @@ async function main() {
       /* HTTP status of every failed Google News / GDELT request this run (0 = socket/timeout).
          Explains an outage in evidence instead of leaving the cause to the step log. */
       amBackboneFailureStatus: screen.amBackboneFailureStatus || { googleNews: {}, gdelt: {} },
+      amGdeltGkg: screen.amGdeltGkg || { used: false },
       amBackbones: cfg.adverseMedia
         ? [
             ...(screen.amBackboneFailures?.googleNews === 0 ? ['Google News RSS'] : []),

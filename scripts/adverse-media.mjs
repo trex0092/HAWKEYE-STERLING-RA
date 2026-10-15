@@ -1151,7 +1151,10 @@ async function fetchGdelt(name, timeoutMs) {
    The return shape is a superset of the original { hit, score, band, top, count,
    terms } — existing callers are unaffected. Tunables: ADVERSE_MEDIA_LOCALES,
    ADVERSE_MEDIA_CONCURRENCY, ADVERSE_MEDIA_TIMESPAN, opts.{concurrency,locales}. */
-export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, locales } = {}) {
+/* gdeltItems: article items for this subject from a GKG window (see
+   gdelt-gkg.mjs). When given, the GDELT backbone uses them and makes no
+   per-subject DOC API request; undefined keeps the DOC API path. */
+export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, locales, gdeltItems } = {}) {
   const xmlAccept = 'application/rss+xml, application/xml, text/xml';
   const explicitIds = String(process.env.ADVERSE_MEDIA_LOCALES || '').trim();
   const localeSet = locales || (explicitIds ? activeLocales() : budgetedLocales());
@@ -1171,7 +1174,7 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   };
 
   const [gd, initialBing, localeResults] = await Promise.all([
-    fetchGdelt(name, timeoutMs),
+    gdeltItems !== undefined ? Promise.resolve(gdeltItems) : fetchGdelt(name, timeoutMs),
     bingOn ? fetchBing() : Promise.resolve(null),
     mapPool(localeSet, conc, loc =>
       fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))),
