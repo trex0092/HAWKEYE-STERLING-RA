@@ -15,32 +15,71 @@ Writes: /tmp/customers.json — customer entities, principals/UBOs and employees
 import requests, json, os, re
 
 def extract_principals(notes):
-    # Pull natural-person principals (UBOs / shareholders / directors) out
-    # of the CDD record's "SECTION 4 — IDENTIFICATIONS" block so each is
-    # screened in their own right, not just the company name.
-    if not notes: return []
-    m = re.search(r'SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)([\s\S]*?)(?=\n\s*(?:SECTION|PART)\b|$)', notes, re.I)
-    if not m: return []
-    block = m.group(0); people = []; seen = set()
-    def push(name, role, nat):
-        n = re.sub(r'\s+', ' ', (name or '')).strip()
-        k = n.lower()
-        if not n or k in seen: return
-        if re.match(r'^(n/?a|none|nil|not applicable|pending|tbc)$', n, re.I): return
-        seen.add(k); people.append({"name": n, "role": re.sub(r'\s+', ' ', (role or 'Principal')).strip(), "nationality": (nat or '').strip()})
-    structured = False
-    for p in re.split(r'(?=Individual\s*\d+\s*[—–\-:])', block):
-        rm = re.match(r'Individual\s*\d+\s*[—–\-:]\s*([^\n]*)', p, re.I)
-        nm = re.search(r'\bName\s*:\s*([^\n]+)', p, re.I)
-        if rm and nm:
-            structured = True
-            nat = re.search(r'\bNationality\s*:\s*([^\n]+)', p, re.I)
-            push(nm.group(1), rm.group(1), nat.group(1) if nat else '')
-    if not structured:
-        for nm in re.finditer(r'\b(?:Name|UBO|Beneficial Owner|Authori[sz]ed Signatory|Signatory|Shareholder|Director|Partner)\s*:\s*([^\n]+)', block, re.I):
-            push(nm.group(1), 'Principal', '')
-    return people
+    """Extract structured Section 4 identities AND explicit owner/UBO rows.
 
+    The JS engine added the second path in #941. Keeping the manual Python
+    workflow on Section 4 alone silently omits principals identified outside
+    that section. Generic "Name:" lines outside Section 4 are deliberately
+    ignored because they can describe contacts or unrelated findings.
+    """
+    if not notes:
+        return []
+    people, seen = [], set()
+
+    def push(name, role, nat, corporate=False):
+        n = re.sub(r"\s+", " ", (name or "")).strip()
+        key = n.casefold()
+        if not n or key in seen or not any(ch.isalpha() for ch in n):
+            return
+        if re.fullmatch(r"n/?a|none|nil|not applicable|pending|tbc|tbd|unknown", n, re.I):
+            return
+        seen.add(key)
+        people.append({
+            "name": n,
+            "role": re.sub(r"\s+", " ", (role or "Principal")).strip(),
+            "nationality": (nat or "").strip(),
+            "corporate": bool(corporate),
+        })
+
+    section = re.search(
+        r"SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)"
+        r"[\s\S]*?(?=\n\s*(?:SECTION|PART)\b|$)", notes, re.I)
+    block = section.group(0) if section else ""
+    structured = False
+    for part in re.split(r"(?=Individual\s*\d+\s*[—–\-:])", block):
+        role = re.match(r"Individual\s*\d+\s*[—–\-:]\s*([^\n]*)", part, re.I)
+        name = re.search(r"\bName\s*:\s*([^\n]+)", part, re.I)
+        if role and name:
+            structured = True
+            nat = re.search(r"\bNationality\s*:\s*([^\n]+)", part, re.I)
+            kind = re.search(r"\bIndividual\s*/\s*Corporate\s*:\s*([^\n]+)", part, re.I)
+            corporate = bool(kind and re.search(
+                r"\b(?:company|corporate|entity|legal person|llp|ltd|limited|trust|foundation|partnership)\b",
+                kind.group(1), re.I))
+            push(name.group(1), role.group(1), nat.group(1) if nat else "", corporate)
+    if block and not structured:
+        for name in re.finditer(
+            r"\b(?:Name|UBO|Beneficial Owner|Authori[sz]ed Signatory|Signatory|Shareholder|Director|Partner)"
+            r"\s*:\s*([^\n]+)", block, re.I):
+            push(name.group(1), "Principal", "")
+
+    # This path deliberately runs even when Section 4 was structured.
+    owner_pattern = re.compile(
+        r"^\s*(Parent(?:\s+Company)?|Shareholder|Ultimate\s+Beneficial\s+Owner|UBO|"
+        r"Holding(?:\s+Company)?|Owner|Owned\s+by|Beneficial\s+Owner)"
+        r"\s*(?:\([^)]*\))?\s*[:\-–—]\s*([^\r\n]+)", re.I | re.M)
+    for owner in owner_pattern.finditer(notes):
+        name = re.sub(r"\([^)]*\)", " ", owner.group(2))
+        name = re.sub(r"\s+", " ", name).strip().strip(".,;").strip()
+        if len(name) < 5 or re.match(r"^\d+(?:\.\d+)?\s*%", name):
+            continue
+        corporate = bool(
+            re.search(
+                r"\b(?:llc|ltd|limited|llp|inc|corp|company|group|holdings?|gmbh|fze|fzco|dmcc|trust|foundation|partnership)\b",
+                name, re.I)
+            or re.match(r"Parent|Holding", owner.group(1), re.I))
+        push(name, owner.group(1), "", corporate)
+    return people
 
 # This workflow is manual-only, but must not create a customer-only sanctions
 # all-clear. The approved screening population is BOTH source projects.
@@ -132,7 +171,8 @@ def compile_screening_subjects(customer_rows, employee_rows):
             subjects.append({
                 "name": person["name"], "gid": task["gid"],
                 "url": task.get("permalink_url", ""),
-                "kind": "individual", "parent": name,
+                "kind": "entity" if person.get("corporate") else "individual",
+                "parent": name,
                 "role": person.get("role", ""),
                 "nationality": person.get("nationality", "")
             })
