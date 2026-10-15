@@ -595,6 +595,16 @@
       "_note": "Japan's Ministry of Finance sanctions under the Foreign Exchange and Foreign Trade Law. ADDED 2026-09-25: split out of asia-html-cluster (Japan MOF used dated XLSX filenames, no stable endpoint per the 2026-08-05 survey) once OpenSanctions' jp_mof_sanctions was confirmed live: http 200, 2,804 entities, 2.1MB, Japanese-script names intact."
     },
     {
+      "id": "jp-mof-official",
+      "name": "Japan — Economic Sanctions consolidated list (Ministry of Finance, CSV)",
+      "jurisdiction": "Japan",
+      "url": "https://www.mof.go.jp/policy/international_policy/gaitame_kawase/gaitame/economic_sanctions/shisantouketsu20261014.csv",
+      "type": "csv",
+      "parser": "csv",
+      "enabled": false,
+      "_note": "CANDIDATE, DISABLED. Official Japan MOF consolidated economic-sanctions list, CSV (XLSX also linked on the same page). Page at mof.go.jp/policy/international_policy/gaitame_kawase/gaitame/economic_sanctions/list.html, dated 2026-10-13 (HTTP 200 text/html via Firecrawl). The CSV has NOT been probed; its content type, encoding and column layout are unknown. Enable only after a source-probe run reports a parsed name count, then record it here. The OpenSanctions mirror jp-mof stays enabled until then."
+    },
+    {
       "id": "sg-terrorists",
       "name": "Singapore — Targeted Financial Sanctions",
       "jurisdiction": "Singapore",
