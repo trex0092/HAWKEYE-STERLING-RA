@@ -3,7 +3,7 @@
      { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
    Usage: node test/sanctions-screen.test.mjs */
 import {
-  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, requireCompleteAsanaPopulation, requireDistinctSourceKeys, normalizeResult, normalizeScreenResponse,
+  normalizeName, parseSubject, parseSubjects, parsePrincipals, screeningPrincipalName, subjectLabel, normalizeHit, parseEmployeeSubjects, requireCompleteAsanaPopulation, requireDistinctSourceKeys, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, parseScreeningState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
@@ -187,6 +187,25 @@ const personSubjects = parseSubjects([personTask]);
 const person = personSubjects.find(x => x.entityType === 'individual');
 check('parseSubjects carries structured identity attributes into the screening subject',
   person && person.nationality === 'Jordan' && person.dob === '09/04/1980' && person.passport === 'N-12345');
+
+/* A person with an annotated stake or related corporate party must be
+   screened under the person's actual name, not with KYC metadata appended.
+   Keep genuine alternate spellings in parentheses for review. */
+const annotatedTask = { gid: 'principal-annotation-synthetic', name: 'Synthetic Trading LLC',
+  notes: 'SECTION 4 — IDENTIFICATIONS\n' +
+    'Individual 1 — Shareholder\nName: Synthetic Director One (60% shares)\nNationality: Testland\n' +
+    'Individual 2 — Shareholder\nName: Synthetic Director Two (Synthetic Parent Holdings LLC)\nNationality: Testland\n' };
+const annotatedPeople = parsePrincipals(annotatedTask);
+check('JS principal parser removes shares and related-company annotations, not people',
+  annotatedPeople.length === 2 &&
+  annotatedPeople.map(x => x.name).join('|') === 'Synthetic Director One|Synthetic Director Two');
+check('JS name cleaning preserves parenthetical alternate name spellings',
+  screeningPrincipalName('Synthetic Example (also known as Test Alias)') ===
+    'Synthetic Example (also known as Test Alias)');
+check('JS structured annotation cleaning keeps the original source GID for each screened party',
+  parseSubjects([annotatedTask]).filter(x => !!x.parent).every(x =>
+    x.gid === annotatedTask.gid && !x.name.includes('(')));
+
 // 2026-09-24: parseSubjects no longer filters on `completed` (see the NOTE
 // at its definition) — this function is shared with the HR - Employees
 // fetch, where "completed" means "training finished", not "off-boarded",
