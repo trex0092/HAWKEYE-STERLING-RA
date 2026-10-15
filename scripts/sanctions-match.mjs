@@ -457,6 +457,22 @@ export function isScreenableName(value) {
   return (v.match(/\p{L}/gu) || []).length >= 2 && !SCHEDULE_REF_RE.test(v);
 }
 
+/* Atom feeds that carry one entity per <entry>, with the listed name in its
+   <title> (Public Safety Canada listed entities). Titles are kept whole:
+   a purely numeric entity name such as "764" is a real listing, so the
+   letter-count rule in isScreenableName does not apply here; a title must
+   carry a letter or be at least three characters. */
+export function parseAtomEntries(body) {
+  const s = String(body), names = [];
+  const entryRe = /<entry\b[^>]*>([\s\S]*?)<\/entry>/gi;
+  let m;
+  while ((m = entryRe.exec(s))) {
+    const t = decodeXml(firstTag(m[1], "title") || "").replace(/\s+/g, " ").trim();
+    if (t && (/\p{L}/u.test(t) || t.length >= 3)) names.push(t);
+  }
+  return names;
+}
+
 export function parseGenericXml(body) {
   const s = String(body), names = [];
   const recordRe = /<(record|entry|sanctionEntity|sanctionentity|individual|entity|target)\b[^>]*>([\s\S]*?)<\/\1>/gi;
@@ -1285,6 +1301,7 @@ export function parseList(source, body) {
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
   if (p === 'ods' || source.type === 'ods') return parseOdsList(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
+  if (p === 'atom') return parseAtomEntries(body);             // Atom feed, name in each <entry><title> (Canada listed entities)
   if (p === 'xml' || source.type === 'xml') return parseGenericXml(body);
   const xml = parseGenericXml(body);
   if (xml.length) return xml;

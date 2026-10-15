@@ -1084,9 +1084,9 @@
       "jurisdiction": "Canada",
       "url": "https://www.publicsafety.gc.ca/cnt/_xml/lstd-ntts-eng.xml",
       "type": "xml",
-      "parser": "xml",
+      "parser": "atom",
       "enabled": false,
-      "_note": "CANDIDATE, DISABLED. Official Public Safety Canada listed-entities XML (organisations only). Fetched 200 text/xml via Firecrawl on 2026-10-15; schema NOT yet validated from the runner. Enable only after a source-probe run confirms status, structure and a name count, then record the result here. Would replace the OpenSanctions mirror ca-listed-terrorists, which stays enabled until then."
+      "_note": "CANDIDATE, DISABLED. Official Public Safety Canada listed-entities Atom feed (organisations only). Probe run 38764716900 (2026-10-15, runner): HTTP 200 text/xml, 153194 bytes; the generic XML parser read 0 names because the names sit in <entry><title>. Parser set to atom (parseAtomEntries). Enable only after a probe run with parser atom reports a name count, then record the count here."
     },
     {
       "id": "lv-magnitsky",
