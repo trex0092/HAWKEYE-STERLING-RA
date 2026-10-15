@@ -123,3 +123,57 @@ export function unzipSingleEntry(buf) {
   if (method !== 8) throw new Error('gkg: unsupported zip method ' + method);
   return inflateRawSync(data, { finishFlush: zlibConstants.Z_SYNC_FLUSH }).toString('utf8');
 }
+
+export const GKG_HOST = 'https://data.gdeltproject.org/gdeltv2/';
+
+/* Fetch and match one 48-hour GKG window (default: 192 files, 15 minutes each).
+   Returns subject key -> article items shaped like the DOC API's, so the
+   adverse-media scorer consumes them unchanged. Fails LOUD: if fewer than
+   minFileRatio of the window loads, ok is false and the caller must fall back
+   to the per-subject DOC API rather than report a partial window as complete. */
+export async function fetchGkgWindowHits({
+  subjects, normalizeFn, coreTokensFn, now = new Date(), hours = 48, lagSlots = 1,
+  concurrency = 4, minFileRatio = 0.9, fetchFn = globalThis.fetch, timeoutMs = 120000,
+}) {
+  const stamps = gkgFileStamps(now, hours, lagSlots);
+  const idx = gkgSubjectIndex(subjects, normalizeFn, coreTokensFn);
+  const hitsBySubject = new Map();
+  const counts = { filesOk: 0, filesMissing: 0, filesFailed: 0, rows: 0, badRows: 0 };
+  let next = 0;
+  const worker = async () => {
+    while (next < stamps.length) {
+      const stamp = stamps[next++];
+      let text;
+      try {
+        const res = await fetchFn(GKG_HOST + stamp + '.gkg.csv.zip', {
+          signal: globalThis.AbortSignal.timeout(timeoutMs),
+        });
+        if (res.status === 404) { counts.filesMissing++; continue; }
+        if (!res.ok) { counts.filesFailed++; continue; }
+        text = unzipSingleEntry(Buffer.from(await res.arrayBuffer()));
+      } catch {
+        counts.filesFailed++;
+        continue;
+      }
+      const parsed = parseGkgRows(text);
+      counts.filesOk++;
+      counts.rows += parsed.rows.length;
+      counts.badRows += parsed.bad;
+      for (const row of parsed.rows) {
+        for (const key of gkgMatch(row, idx, normalizeFn, coreTokensFn)) {
+          if (!hitsBySubject.has(key)) hitsBySubject.set(key, []);
+          hitsBySubject.get(key).push({
+            title: row.title || row.url,
+            link: row.url,
+            source: row.source,
+            date: row.stamp,
+          });
+        }
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+  const total = stamps.length;
+  const ok = counts.filesOk >= Math.ceil(total * minFileRatio);
+  return { ok, total, hitsBySubject, ...counts };
+}

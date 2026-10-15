@@ -9,7 +9,7 @@ import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, sco
   gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker,
   checkAdverseMedia, providerFailureStatus, resetProviderFailureStatus } from '../scripts/adverse-media.mjs';
 import { readFileSync } from 'node:fs';
-import { gkgFileStamps, parseGkgRows, gkgSubjectIndex, gkgMatch, unzipSingleEntry } from '../scripts/gdelt-gkg.mjs';
+import { gkgFileStamps, parseGkgRows, gkgSubjectIndex, gkgMatch, unzipSingleEntry, fetchGkgWindowHits } from '../scripts/gdelt-gkg.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -639,6 +639,44 @@ resetGdeltBreaker();
     resetAdverseMediaRateGates();
   }
 }
+
+/* ── GKG window fetch: matched hits, and fail-loud below the file threshold ── */
+async function gkgWindowCheck() {
+  const gkgRow = (name) => {
+    const f = Array(27).fill('0');
+    f[1] = '20261015144500'; f[3] = 'news.example'; f[4] = 'https://news.example/a';
+    f[7] = 'T'; f[12] = name + ',0'; f[25] = 'srclc:en'; f[26] = '<PAGE_TITLE>Headline</PAGE_TITLE>';
+    return f.join('\t');
+  };
+  const body = Buffer.from(gkgRow('Ahmad Mahmood') + '\n');
+  const fname = Buffer.from('x.gkg.csv');
+  const h = Buffer.alloc(30);
+  h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(0, 8); h.writeUInt32LE(body.length, 18);
+  h.writeUInt32LE(body.length, 22); h.writeUInt16LE(fname.length, 26); h.writeUInt16LE(0, 28);
+  const zip = Buffer.concat([h, fname, body]);
+  const norm = s => s.toLowerCase().replace(/[,.]/g, ' ').trim();
+  const core = s => s.split(/\s+/).filter(Boolean);
+  const now = new Date('2026-10-15T14:52:30Z');
+  const stamps = gkgFileStamps(now, 48, 1);
+  const run = (missingEvery) => fetchGkgWindowHits({
+    subjects: [['k1', 'Ahmad Mahmood', 'person']], normalizeFn: norm, coreTokensFn: core,
+    now, hours: 48, lagSlots: 1, concurrency: 4, timeoutMs: 5000,
+    fetchFn: async (url) => {
+      const stamp = url.match(/(\d{14})\.gkg/)[1];
+      const i = stamps.indexOf(stamp);
+      if (missingEvery && i % missingEvery === 0) return { status: 404, ok: false };
+      return { status: 200, ok: true, arrayBuffer: async () => zip };
+    },
+  });
+  const full = await run(0);
+  const partial = await run(5);       // 20% of files missing: below the 90% line
+  const hit = full.hitsBySubject.get('k1');
+  const ok = full.ok && full.filesOk === 192 && hit && hit.length === 192
+    && hit[0].title === 'Headline' && hit[0].link === 'https://news.example/a'
+    && partial.ok === false && partial.filesMissing > 0;
+  check('gkg window: full window yields matched article items; partial window fails loud', ok);
+}
+await gkgWindowCheck();
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed ? 1 : 0);

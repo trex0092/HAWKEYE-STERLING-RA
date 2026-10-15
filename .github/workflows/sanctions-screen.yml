@@ -139,6 +139,7 @@ jobs:
             ofsistorage.blob.core.windows.net:443
             news.google.com:443
             api.gdeltproject.org:443
+            data.gdeltproject.org:443
             www.bing.com:443
             www.wikidata.org:443
             ws-public.interpol.int:443
