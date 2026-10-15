@@ -1085,8 +1085,9 @@
       "url": "https://www.publicsafety.gc.ca/cnt/_xml/lstd-ntts-eng.xml",
       "type": "xml",
       "parser": "atom",
-      "enabled": false,
-      "_note": "CANDIDATE, DISABLED. Official Public Safety Canada listed-entities Atom feed (organisations only). Probe run 38764716900 (2026-10-15, runner): HTTP 200 text/xml, 153194 bytes; the generic XML parser read 0 names because the names sit in <entry><title>. Parser set to atom (parseAtomEntries). Enable only after a probe run with parser atom reports a name count, then record the count here."
+      "enabled": true,
+      "_note": "Official Public Safety Canada listed-entities Atom feed (organisations only). Source-probe run 38765564858 (runner, 2026-10-15, commit f941cef): HTTP 200 text/xml, 153194 bytes, parser atom read 90 names. Enabled with minNames 50, a floor well under the observed count, so a collapse of the feed degrades loudly. Additive to the OpenSanctions mirror ca-listed-terrorists, which stays enabled.",
+      "minNames": 50
     },
     {
       "id": "lv-magnitsky",
