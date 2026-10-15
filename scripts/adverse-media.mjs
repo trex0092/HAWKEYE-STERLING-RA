@@ -1050,8 +1050,24 @@ export function gnewsCanRequest(localeId = 'en-US', nowMs = Date.now()) {
 export function gnewsBreakerPermit(localeId = 'en-US', nowMs = Date.now()) {
   return gnewsCanRequest(localeId, nowMs) ? _gnews.permit(nowMs) : null;
 }
+/* Per-run tally of failed backbone requests by HTTP status (0 = network/timeout).
+   Recorded so the evidence says WHY a provider was unavailable (429 throttling,
+   403/503 refusal, socket failure), not only that it was. */
+const _failureStatus = { googleNews: {}, gdelt: {} };
+function tallyFailure(provider, status) {
+  const key = String(Number.isFinite(status) ? status : 0);
+  _failureStatus[provider][key] = (_failureStatus[provider][key] || 0) + 1;
+}
+export function providerFailureStatus() {
+  return { googleNews: { ..._failureStatus.googleNews }, gdelt: { ..._failureStatus.gdelt } };
+}
+export function resetProviderFailureStatus() {
+  _failureStatus.googleNews = {};
+  _failureStatus.gdelt = {};
+}
 export function noteGnewsResult(ok, status, ticket = null) {
   if (ok) { _gnews.success(ticket); return; }
+  tallyFailure('googleNews', status);
   if (ticket?.probe || [429, 403, 503, 0].includes(status)) {
     if (_gnews.failure(ticket)) {
       console.error('adverse-media: Google News circuit OPEN; only one en-US probe is admitted after cooldown');
@@ -1117,7 +1133,7 @@ async function fetchGdelt(name, timeoutMs) {
     gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt,
       'application/json', timeoutMs, null, _gdeltGate, permit);
   }
-  if (gd === null) gdeltBreakerRecordFailure(ticket);
+  if (gd === null) { tallyFailure('gdelt', wideStatus); gdeltBreakerRecordFailure(ticket); }
   else gdeltBreakerRecordSuccess(ticket);
   return gd;
 }

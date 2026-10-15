@@ -36,7 +36,7 @@ import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDela
   fitAsanaText, fitAsanaName, publicAsanaRejection } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName } from './sanctions-match.mjs';
-import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
+import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS, providerFailureStatus, resetProviderFailureStatus } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 import { checkFbi } from './fbi-check.mjs';
@@ -2216,6 +2216,7 @@ export async function screenLocally(subjects, cfg) {
   const amSecondPassQueue = [];
   let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0 };
+  resetProviderFailureStatus();
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
      bound the whole enrichment phase by a wall-clock budget: once it elapses the
@@ -2463,7 +2464,7 @@ export async function screenLocally(subjects, cfg) {
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, amBackboneFailureStatus: providerFailureStatus(), pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 /* A corrupt or malformed persisted AML ledger is NOT the same as a clean
@@ -2782,6 +2783,9 @@ async function main() {
       amRotationCycleDays: cfg.adverseMedia ? rotationCycleDays() : 0,
       amMatrixTotal: LOCALES.length,
       amBackboneFailures: screen.amBackboneFailures || { googleNews: 0, gdelt: 0, bing: 0 },
+      /* HTTP status of every failed Google News / GDELT request this run (0 = socket/timeout).
+         Explains an outage in evidence instead of leaving the cause to the step log. */
+      amBackboneFailureStatus: screen.amBackboneFailureStatus || { googleNews: {}, gdelt: {} },
       amBackbones: cfg.adverseMedia
         ? [
             ...(screen.amBackboneFailures?.googleNews === 0 ? ['Google News RSS'] : []),

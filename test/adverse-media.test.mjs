@@ -7,7 +7,7 @@ import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, sco
   RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS, ADVERSE_BACKBONE_MAX_ATTEMPTS, resetAdverseMediaRateGates,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
   gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker,
-  checkAdverseMedia } from '../scripts/adverse-media.mjs';
+  checkAdverseMedia, providerFailureStatus, resetProviderFailureStatus } from '../scripts/adverse-media.mjs';
 import { readFileSync } from 'node:fs';
 
 let passed = 0, failed = 0;
@@ -322,6 +322,25 @@ check('bingNewsUrl targets the Bing News RSS endpoint with quoted name + risk te
   && bingNewsUrl('Acme Co').includes('format=rss')
   && decodeURIComponent(bingNewsUrl('Acme Co')).includes('"Acme Co"')
   && decodeURIComponent(bingNewsUrl('Acme Co')).includes('money laundering'));
+
+/* ── Failure-status tally — the evidence must say WHY a provider was down ── */
+check('failure tally: each failed Google News request is counted under its HTTP status; success is not', (() => {
+  resetProviderFailureStatus(); resetGnewsBreaker();
+  noteGnewsResult(false, 429); noteGnewsResult(false, 429); noteGnewsResult(false, 503);
+  noteGnewsResult(true, 200); noteGnewsResult(false, 0);
+  const t = providerFailureStatus();
+  const ok = t.googleNews['429'] === 2 && t.googleNews['503'] === 1 && t.googleNews['0'] === 1
+    && !('200' in t.googleNews) && Object.keys(t.gdelt).length === 0;
+  resetProviderFailureStatus(); resetGnewsBreaker();
+  return ok;
+})());
+check('failure tally: returned copy cannot mutate module state', (() => {
+  resetProviderFailureStatus(); noteGnewsResult(false, 429);
+  providerFailureStatus().googleNews['429'] = 99;
+  const ok = providerFailureStatus().googleNews['429'] === 1;
+  resetProviderFailureStatus(); resetGnewsBreaker();
+  return ok;
+})());
 
 /* ── Google News run-level breaker — refusals stop the hammering, loudly ── */
 check('breaker: refusal shapes accumulate and open at the threshold; success resets', (() => {
