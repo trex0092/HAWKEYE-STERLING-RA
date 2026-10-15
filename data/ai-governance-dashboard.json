@@ -82,7 +82,7 @@
   ],
   "governance_signals": {
     "control_effectiveness_rate": 100,
-    "third_party_assessment_coverage": 66.7,
+    "third_party_assessment_coverage": 55.6,
     "audit_finding_closure_rate": 95.2,
     "governance_drift_count": 0,
     "residual_above_appetite": 2,

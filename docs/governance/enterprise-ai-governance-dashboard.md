@@ -22,7 +22,7 @@
 | Signal | Current value | Source |
 |---|---:|---|
 | Automated proof-path coverage (GRC control-effectiveness metric) | 100% | `data/grc-metrics.json` |
-| Third-party assessment coverage | 66.7% | `data/grc-metrics.json` |
+| Third-party assessment coverage | 55.6% | `data/grc-metrics.json` |
 | Audit finding closure rate | 95.2% | `data/grc-metrics.json` |
 | Governance drift count | 0 | `data/grc-metrics.json` |
 | Risks above appetite | 2 | `data/grc-metrics.json` |
