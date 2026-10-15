@@ -65,6 +65,16 @@ for (const s of enabled) {
   }
 }
 
+/* Asana attachment read-back (scripts/screening-delivery.mjs) fetches the signed
+   download_url that Asana returns, which is served from the Asana CDN, not from
+   app.asana.com. Without an allowlist entry the harden-runner egress block kills
+   the byte-verification step: run 38689787317 logged
+   "domain not allowed: asanausercontent.com" and failed evidence delivery. */
+const delivery = read('scripts/screening-delivery.mjs');
+check('delivery reads the signed Asana download_url for byte verification', /download_url/.test(delivery));
+check('sanctions-screen.yml egress allowlist admits the Asana attachment CDN (*.asanausercontent.com:443)',
+  allowed.has('*.asanausercontent.com:443'));
+
 const seen = new Map();
 for (const s of enabled) seen.set(s.id, (seen.get(s.id) || 0) + 1);
 const dupes = [...seen].filter(([, n]) => n > 1).map(([id]) => id);
