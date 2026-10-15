@@ -75,6 +75,14 @@ check('delivery reads the signed Asana download_url for byte verification', /dow
 check('sanctions-screen.yml egress allowlist admits the Asana attachment CDN (*.asanausercontent.com:443)',
   allowed.has('*.asanausercontent.com:443'));
 
+/* Official Canada listed-entities feed: names sit in <entry><title>. A numeric
+   title ("764") is a real listing and must survive; an empty entry must not. */
+import { parseAtomEntries } from "../scripts/sanctions-match.mjs";
+const atomFixture = "<feed><entry><title>764</title><id>2025-121</id></entry><entry><title>  Order of Nine Angles </title></entry><entry><title></title></entry></feed>";
+const atomNames = parseAtomEntries(atomFixture);
+check("atom feed: entry titles become names, numeric title kept, empty title dropped", atomNames.length === 2 && atomNames[0] === "764" && atomNames[1] === "Order of Nine Angles");
+check("candidate ca-listed-terrorists-official uses the atom parser", (enabled.concat(core, extra).find(x => x.id === "ca-listed-terrorists-official") || {}).parser === "atom");
+
 const seen = new Map();
 for (const s of enabled) seen.set(s.id, (seen.get(s.id) || 0) + 1);
 const dupes = [...seen].filter(([, n]) => n > 1).map(([id]) => id);
