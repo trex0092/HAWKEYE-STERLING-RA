@@ -284,19 +284,18 @@ export function parseSubject(task) {
   };
 }
 
-/* Pull the natural-person principals (UBOs / shareholders / directors / signatories)
-   out of a customer record so each is screened in their OWN right — not only the
-   company name. The CDD notes record them under "SECTION 4 — IDENTIFICATIONS" as
-   repeated "Individual N — <role>" blocks, each with a "Name:" (and usually a
-   "Nationality:"). Returns [{ name, role, nationality }]. Tolerant: if the block
-   isn't structured that way it falls back to every "Name:" inside the section. */
+/* Pull principals (UBOs / shareholders / directors / corporate parents) out
+   of the structured SECTION 4 identification blocks and explicit owner/UBO
+   lines elsewhere in the customer note. Keep individuals linked to the record
+   and corporate parents classified as organisations. Generic "Name:" fields
+   outside SECTION 4 are deliberately excluded: they may describe unrelated
+   contacts, sanctions lists, or test matches rather than identified parties. */
 export function parsePrincipals(task) {
   const notes = String((task && task.notes) || '');
   if (!notes) return [];
   // Isolate the identifications section (stop at the next "SECTION n" or EOF).
   const sec = /SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)[\s\S]*?(?=\n\s*(?:SECTION|PART)\b|$)/i.exec(notes);
   const block = sec ? sec[0] : '';
-  if (!block) return [];
   const people = [];
   const seen = new Set();
   const push = (name, role, nationality, dob = '', passport = '', corporate = false) => {
@@ -342,6 +341,23 @@ export function parsePrincipals(task) {
     const nameRe = /\b(?:Name|UBO|Beneficial Owner|Authori[sz]ed Signatory|Signatory|Shareholder|Director|Partner)\s*:\s*([^\n]+)/gi;
     let n;
     while ((n = nameRe.exec(block))) push(n[1], 'Principal', '');
+  }
+  // Owner-only rows are a second, mandatory extractor, not an alternative to
+  // structured identities. screen.py extracts these from the entire CDD note;
+  // JS previously dropped them whenever SECTION 4 was present (or absent).
+  // Keep matches anchored to explicit owner/UBO role labels so free-text
+  // risk descriptions and unrelated "Name:" fields do not become identities.
+  const ownerRe = /^\s*(Parent(?:\s+Company)?|Shareholder|Ultimate\s+Beneficial\s+Owner|UBO|Holding(?:\s+Company)?|Owner|Owned\s+by|Beneficial\s+Owner)\s*(?:\([^)]*\))?\s*[:\-–—]\s*([^\r\n]+)/gim;
+  let owner;
+  while ((owner = ownerRe.exec(notes))) {
+    const name = owner[2].replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ')
+      .trim().replace(/^[.,;]+|[.,;]+$/g, '').trim();
+    if (name.length < 5 || !/\p{L}/u.test(name) ||
+        /^(?:n\/?a|none|nil|not applicable|pending|tbc|tbd|unknown)$/i.test(name) ||
+        /^\d+(?:\.\d+)?\s*%/.test(name)) continue;
+    const corporate = /\b(?:llc|ltd|limited|llp|inc|corp|company|group|holdings?|gmbh|fze|fzco|dmcc|trust|foundation|partnership)\b/i.test(name) ||
+      /^(?:Parent|Holding)/i.test(owner[1]);
+    push(name, owner[1], '', '', '', corporate);
   }
   return people;
 }
