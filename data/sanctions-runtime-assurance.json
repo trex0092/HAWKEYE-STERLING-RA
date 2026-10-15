@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-15T14:56:50.063Z",
-  "githubRunId": "38755767820",
-  "commit": "5fb954b78108097204884aea2c84b31f27505b38",
+  "generatedAt": "2026-10-15T15:34:50.964Z",
+  "githubRunId": "38761415728",
+  "commit": "caac3b96ce324560f4a8c80e2ca192e836b5389e",
   "screenedSubjects": 991,
   "sourceProjects": {
     "customer": {
@@ -34,9 +34,9 @@
         "partial": false
       },
       {
-        "id": "ofac-sdn",
-        "name": "US OFAC — SDN list (CSV)",
-        "count": 19411,
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3773,
         "partial": false
       },
       {
@@ -46,9 +46,9 @@
         "partial": false
       },
       {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3773,
+        "id": "ofac-sdn",
+        "name": "US OFAC — SDN list (CSV)",
+        "count": 19411,
         "partial": false
       },
       {
