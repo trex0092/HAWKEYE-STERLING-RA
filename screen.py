@@ -4284,6 +4284,30 @@ def extract_owner_individuals(notes):
     if not notes: return []
     return list(dict.fromkeys(c for c in _owner_candidates(notes) if not _looks_corporate(c)))
 
+# An Asana "Name:" field sometimes appends the shareholder's COMPANY or
+# stake/role in parentheses, e.g. "Jane Example (Example Holdings LLC)".
+# kyc.parse_customer retains the annotation, while extract_individuals removes
+# it. _individuals_union previously treated these two renderings as TWO
+# different people and inflated the screening denominator. Strip ONLY
+# role/stake/company metadata: genuine alternative names in parentheses stay
+# available as separate screened spellings rather than being silently lost.
+_PRINCIPAL_METADATA_PARENS = re.compile(r"\(([^()]*)\)")
+_PRINCIPAL_METADATA_CONTENT = re.compile(
+    r"%|\b(?:shares?|stake|holding|holdings?|equity|shareholder|director|"
+    r"beneficial owner|ubo|owner|manager|signatory|partner|representative|"
+    r"company|trading|group|llc|ltd|limited|llp|inc|corp|corporation|"
+    r"fze|fzco|fzc|dmcc|gmbh|pjsc|plc|trust|foundation)\b", re.I)
+
+
+def _screening_principal_name(name):
+    """Return a person's name without clearly labelled stake/firm metadata."""
+    raw = str(name or "")
+    cleaned = _PRINCIPAL_METADATA_PARENS.sub(
+        lambda m: " " if _PRINCIPAL_METADATA_CONTENT.search(m.group(1))
+        else m.group(0), raw)
+    return re.sub(r"\s+", " ", cleaned).strip(" \t.,;:-–—")
+
+
 def _individuals_union(struct_names, notes):
     """UNION of the structured KYC parse, the regex Name: extractor and the
     owner-line individuals — deduped case/diacritic-insensitively. The old
@@ -4296,10 +4320,13 @@ def _individuals_union(struct_names, notes):
     out, seen = [], set()
     for nm in (list(struct_names) + extract_individuals(notes)
                + extract_owner_individuals(notes)):
-        k = _norm_lower(nm) or unicodedata.normalize("NFC", str(nm)).strip().lower()
+        # Normalize record-format metadata consistently BEFORE dedupe.
+        # Parenthetical aliases not matched by the metadata rule remain intact.
+        person_name = _screening_principal_name(nm)
+        k = _norm_lower(person_name) or unicodedata.normalize("NFC", person_name).strip().lower()
         if k and k not in seen:
             seen.add(k)
-            out.append(nm)
+            out.append(person_name)
     return out
 
 # Customer rows that cannot be screened because the Asana record is missing a
