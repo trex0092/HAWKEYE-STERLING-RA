@@ -2260,10 +2260,16 @@
       "detectedAt": "2026-10-15T01:44:48.354Z",
       "prevCount": 19432,
       "newCount": 19431,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38667311806,
+        "startedAt": "2026-10-15T01:44:53Z"
+      },
+      "status": "complete",
       "chainPrev": "2c04498dd0c16ec131a5ebc9a0f65faf548a069dc9d24a2ed36903600a30c5bd",
-      "chainHash": "ef5065b8eb7f73296525bbe81153288ad115511be977192e2544dac859e61928"
+      "chainHash": "ef5065b8eb7f73296525bbe81153288ad115511be977192e2544dac859e61928",
+      "latencyHours": 0,
+      "resolutionHash": "393c596acea88d4d931b650a9011c67e8219b647f2152b6af3313c2d99866f2c"
     },
     {
       "id": "ofac-sdn-alt",
@@ -2273,10 +2279,16 @@
       "detectedAt": "2026-10-15T01:44:48.354Z",
       "prevCount": 20189,
       "newCount": 20185,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38667311806,
+        "startedAt": "2026-10-15T01:44:53Z"
+      },
+      "status": "complete",
       "chainPrev": "ef5065b8eb7f73296525bbe81153288ad115511be977192e2544dac859e61928",
-      "chainHash": "0e9772dd4b54a6ec49d8b1788dc119652dd14ad04dec83be61342ea32302c29e"
+      "chainHash": "0e9772dd4b54a6ec49d8b1788dc119652dd14ad04dec83be61342ea32302c29e",
+      "latencyHours": 0,
+      "resolutionHash": "acb0f12c99c43c0c0e01d6acc3ca08d69e9aaf22292de797eee66d92c71c3f9e"
     },
     {
       "id": "ofac-consolidated",
@@ -2286,10 +2298,16 @@
       "detectedAt": "2026-10-15T01:44:48.354Z",
       "prevCount": 442,
       "newCount": null,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38667311806,
+        "startedAt": "2026-10-15T01:44:53Z"
+      },
+      "status": "complete",
       "chainPrev": "0e9772dd4b54a6ec49d8b1788dc119652dd14ad04dec83be61342ea32302c29e",
-      "chainHash": "76feff9d2784e2374af40fd7322b2ab73c29061b7b5e8a57e9fc475f1d30a970"
+      "chainHash": "76feff9d2784e2374af40fd7322b2ab73c29061b7b5e8a57e9fc475f1d30a970",
+      "latencyHours": 0,
+      "resolutionHash": "c354dee5b0b1759994c219a49bb1792d73ebd872a5c32fa38537ef47a93281fc"
     },
     {
       "id": "un-consolidated",
@@ -2299,10 +2317,16 @@
       "detectedAt": "2026-10-15T01:44:48.354Z",
       "prevCount": 1010,
       "newCount": 1010,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38667311806,
+        "startedAt": "2026-10-15T01:44:53Z"
+      },
+      "status": "complete",
       "chainPrev": "76feff9d2784e2374af40fd7322b2ab73c29061b7b5e8a57e9fc475f1d30a970",
-      "chainHash": "d5bb63aa04542c35b6675300b18c51e8e4bf97025cb9e35ee60b62bd43c3d5db"
+      "chainHash": "d5bb63aa04542c35b6675300b18c51e8e4bf97025cb9e35ee60b62bd43c3d5db",
+      "latencyHours": 0,
+      "resolutionHash": "a53bb76acdb94af18e4e1d6aa9c77a0164f6b722f2766e9849277366aa48b8c6"
     },
     {
       "id": "fr-dgt",
@@ -2312,10 +2336,29 @@
       "detectedAt": "2026-10-15T01:44:48.354Z",
       "prevCount": 20577,
       "newCount": 20932,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38667311806,
+        "startedAt": "2026-10-15T01:44:53Z"
+      },
+      "status": "complete",
+      "chainPrev": "d5bb63aa04542c35b6675300b18c51e8e4bf97025cb9e35ee60b62bd43c3d5db",
+      "chainHash": "58e74df41c617f76d704b935611cadaee666b6216eddc2ec0290604c22b184e5",
+      "latencyHours": 0,
+      "resolutionHash": "f5b604d24d8ab7f8af04ffb339c8cebf9d5a562fd82df9c2d7e3d17d841330ae"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-15T09:47:37.943Z",
+      "prevCount": 20932,
+      "newCount": 20986,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "d5bb63aa04542c35b6675300b18c51e8e4bf97025cb9e35ee60b62bd43c3d5db",
-      "chainHash": "58e74df41c617f76d704b935611cadaee666b6216eddc2ec0290604c22b184e5"
+      "chainPrev": "58e74df41c617f76d704b935611cadaee666b6216eddc2ec0290604c22b184e5",
+      "chainHash": "0b5c293d8d464f0fffa6d380c7abd6eb9f189b59acd3c907126fb7bc5ffa7bce"
     }
   ]
 }
