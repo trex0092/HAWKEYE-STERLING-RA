@@ -601,8 +601,9 @@
       "url": "https://www.mof.go.jp/policy/international_policy/gaitame_kawase/gaitame/economic_sanctions/shisantouketsu20261014.csv",
       "type": "csv",
       "parser": "mofjpcsv",
-      "enabled": false,
-      "_note": "CANDIDATE, DISABLED. Official Japan MOF consolidated economic-sanctions list, CSV. Probe run 38767696500 (runner, 2026-10-15): HTTP 200 text/csv, 3,326,871 bytes. The first probe used the generic CSV parser, which read the category column (2,901 meaningless values). Parser set to mofjpcsv, which reads the English name and English alias columns by header. Enable only after a probe run with this parser reports a name count, then record it here. The OpenSanctions mirror jp-mof stays enabled until then."
+      "enabled": true,
+      "_note": "Official Japan MOF consolidated economic-sanctions list, CSV. Probe run 38768497138 (runner, 2026-10-15, commit 01dfbd8): HTTP 200 text/csv, 3,326,871 bytes; parser mofjpcsv read 8,191 names (English names and English aliases, columns found by header). Enabled with minNames 4000, well under the observed count. Additive to the OpenSanctions mirror jp-mof, which stays enabled.",
+      "minNames": 4000
     },
     {
       "id": "sg-terrorists",
