@@ -457,6 +457,32 @@ export function isScreenableName(value) {
   return (v.match(/\p{L}/gu) || []).length >= 2 && !SCHEDULE_REF_RE.test(v);
 }
 
+/* Japan MOF consolidated economic-sanctions CSV. The column order is the
+   publisher's, so the name columns are found by their Japanese header text,
+   not by position: 氏名（英語） (English name) and the English alias column
+   (別名・別称（英語）, split on ; or |). A row with no English name is skipped
+   rather than guessed at; the Japanese name is not used here. */
+export function parseMofJpCsv(body) {
+  const rows = parseDelimited(String(body || "").replace(/^\uFEFF/, ""), ",");
+  if (!rows.length) return [];
+  const header = rows[0].map(h => String(h || "").trim());
+  const nameIdx = header.indexOf("氏名（英語）");
+  const aliasIdx = header.indexOf("別名・別称（英語）");
+  if (nameIdx < 0) return [];
+  const names = [];
+  for (const r of rows.slice(1)) {
+    const n = String(r[nameIdx] || "").replace(/\s+/g, " ").trim();
+    if (n && isScreenableName(n)) names.push(n);
+    if (aliasIdx >= 0 && n) {
+      for (const piece of String(r[aliasIdx] || "").split(/[;|]/)) {
+        const a = piece.replace(/\s+/g, " ").trim();
+        if (a && isScreenableName(a)) names.push(a);
+      }
+    }
+  }
+  return names;
+}
+
 /* Atom feeds that carry one entity per <entry>, with the listed name in its
    <title> (Public Safety Canada listed entities). Titles are kept whole:
    a purely numeric entity name such as "764" is a real listing, so the
@@ -1301,6 +1327,7 @@ export function parseList(source, body) {
   if (p === 'dfat' || p === 'xlsx' || source.type === 'xlsx' || /dfat/.test(id)) return parseDfatXlsx(body);
   if (p === 'ods' || source.type === 'ods') return parseOdsList(body);
   if (p === 'seco' || /seco/.test(id)) return parseSecoXml(body);
+  if (p === 'mofjpcsv') return parseMofJpCsv(body);
   if (p === 'atom') return parseAtomEntries(body);             // Atom feed, name in each <entry><title> (Canada listed entities)
   if (p === 'xml' || source.type === 'xml') return parseGenericXml(body);
   const xml = parseGenericXml(body);
