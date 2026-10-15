@@ -290,6 +290,18 @@ export function parseSubject(task) {
    and corporate parents classified as organisations. Generic "Name:" fields
    outside SECTION 4 are deliberately excluded: they may describe unrelated
    contacts, sanctions lists, or test matches rather than identified parties. */
+/* A structured KYC Name may be followed by a parenthesized share percentage
+   or corporate affiliation. These are not parts of the person's name. Python
+   _individuals_union removes the same annotation, preventing two screening
+   slots for one recorded individual. Keep true parenthesized aliases intact. */
+export function screeningPrincipalName(value) {
+  return String(value || '')
+    .replace(/\(([^()]*)\)/g, (full, note) =>
+      /%|\b(?:shares?|stake|holding|holdings?|equity|shareholder|director|beneficial owner|ubo|owner|manager|signatory|partner|representative|company|trading|group|llc|ltd|limited|llp|inc|corp|corporation|fze|fzco|fzc|dmcc|gmbh|pjsc|plc|trust|foundation)\b/i.test(note)
+        ? ' ' : full)
+    .replace(/\s+/g, ' ').trim().replace(/^[\s.,;:\-–—]+|[\s.,;:\-–—]+$/g, '');
+}
+
 export function parsePrincipals(task) {
   const notes = String((task && task.notes) || '');
   if (!notes) return [];
@@ -299,7 +311,7 @@ export function parsePrincipals(task) {
   const people = [];
   const seen = new Set();
   const push = (name, role, nationality, dob = '', passport = '', corporate = false) => {
-    const n = String(name || '').replace(/\s+/g, ' ').trim();
+    const n = screeningPrincipalName(name);
     // The sanctions matcher may not normalize an unfamiliar script. Such an
     // identity must reach its MANUAL REVIEW path, not vanish in extraction.
     // Keep the raw fallback in a disjoint key namespace (same as parseSubject).
