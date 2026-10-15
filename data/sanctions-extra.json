@@ -1079,6 +1079,16 @@
       "_note": "ADDED 2026-10-08. Source-probe run 37772831908 (GitHub runner, 2026-10-08, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Public Safety Canada\" (official: true), 86 targets, last change 2026-07-17. Entities listed under s.83.05 of the Criminal Code; s.83.08 freezes the property of a listed entity, so this is a financial-freezing list, unlike the proscription-only feeds kept disabled (de-bfv-banned-orgs, ie-unlawful-orgs). Runner-verified by source-probe run 37773821358 (GitHub runner, 2026-10-08, this branch): targets.simple.csv fetched and the registry parser read 764 names (names and aliases), minNames met. Hosted by OpenSanctions (CC-BY-NC, off under OPENSANCTIONS_DATA=0) because no keyless machine-readable official endpoint is configured. minNames is about 70% of the catalogue target count. The country's register status is unchanged: it was already screened through another national source."
     },
     {
+      "id": "ca-listed-terrorists-official",
+      "name": "Canada — Listed Terrorist Entities (Public Safety Canada, XML)",
+      "jurisdiction": "Canada",
+      "url": "https://www.publicsafety.gc.ca/cnt/_xml/lstd-ntts-eng.xml",
+      "type": "xml",
+      "parser": "xml",
+      "enabled": false,
+      "_note": "CANDIDATE, DISABLED. Official Public Safety Canada listed-entities XML (organisations only). Fetched 200 text/xml via Firecrawl on 2026-10-15; schema NOT yet validated from the runner. Enable only after a source-probe run confirms status, structure and a name count, then record the result here. Would replace the OpenSanctions mirror ca-listed-terrorists, which stays enabled until then."
+    },
+    {
       "id": "lv-magnitsky",
       "name": "Latvia — Saeima Magnitsky-law sanctions list",
       "jurisdiction": "Latvia",
