@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
-import { checkStored, approvedSourcePopulationIssue } from './screening-assurance.mjs';
+import { checkStored, approvedSourcePopulationIssue, strictProviderCoverageIssues } from './screening-assurance.mjs';
 
 export const PROJECT = '1216203370612914';
 export const DESTINATIONS = Object.freeze({
@@ -187,6 +187,12 @@ function rowDomains(row) {
 
 export function buildReports(results, assurance, state, context) {
   const deliveryOperational = validateEvidence(results, assurance, state, context);
+  const strictIssues = strictProviderCoverageIssues(results, assurance);
+  if (assurance.providerCoverage &&
+      (assurance.providerCoverage.complete !== (strictIssues.length === 0) ||
+        JSON.stringify(assurance.providerCoverage.reasons) !== JSON.stringify(strictIssues))) {
+    throw new Error('Provider-depth assurance contradicts run-level provider evidence');
+  }
   // Human review should not require opening 500 numbered evidence pages merely
   // to verify WHICH Asana projects were screened. Only approved project GIDs
   // and aggregate counts appear in this readable summary, never identities.
@@ -216,7 +222,10 @@ export function buildReports(results, assurance, state, context) {
       'Required screening assurance: ' + (assurance.operational ? 'OPERATIONAL' : 'DEGRADED') +
         ' (independent sanctions, adverse-media and PEP verification).',
       'Overall screening evidence: ' + (deliveryOperational ? 'OPERATIONAL' : 'DEGRADED / PROVISIONAL') +
-        '. This report is never a substitute for human MLRO disposition.'];
+        '. This report is never a substitute for human disposition.',
+      'Configured provider depth: ' + (strictIssues.length ? 'INCOMPLETE / NOT FULL COVERAGE' : 'COMPLETE FOR THIS RUN') +
+        ' (stricter than required-domain OPERATIONAL; not a cross-engine parity attestation).',
+      'Independent cross-engine record-level population parity: NOT ATTESTED by this run.'];
     if (results.degraded !== false || results.lists.some(list => list.partial)) {
       summary.push('WARNING: One or more supplementary sanctions sources were unavailable or partial.' +
         ' Required-source and fallback coverage are separately verified by the assurance receipt.' +
@@ -224,6 +233,7 @@ export function buildReports(results, assurance, state, context) {
         'Partial loaded list(s): ' + (results.lists.filter(list => list.partial)
           .map(list => list.name).join('; ') || 'see full failures and assurance warnings below'));
     }
+    for (const issue of strictIssues) summary.push('Provider coverage gap: ' + issue);
     for (const key of domains) {
       const item = assurance.domains[key];
       summary.push('\n' + LABELS[key] + ': ' + (item.operational ? 'OPERATIONAL' : 'DEGRADED'));
@@ -244,6 +254,7 @@ export function buildReports(results, assurance, state, context) {
     const evidence = JSON.stringify({
       screeningDate: results.date, generatedAt: assurance.generatedAt,
       run: assurance.run, domain, screened: results.screened,
+      providerCoverage: { complete: strictIssues.length === 0, reasons: strictIssues },
       assurance: Object.fromEntries(domains.map(key => [key, assurance.domains[key]])),
       lists: results.lists, failures: results.failures || [],
       enrichment: results.enrichment || {}, newOrChangedFindings: alerts,
@@ -464,9 +475,12 @@ export async function publishDailyScreening({ results, assurance, state, request
     }
   }
   if (errors.length) throw new AggregateError(errors, errors.map(error => error.message).join('; '));
+  const strictIssues = strictProviderCoverageIssues(results, assurance);
   return { version: 1, runId: String(runId), screeningDate: results.date, projectGid: PROJECT,
     verifiedAt: new Date(nowMs).toISOString(),
     operational: validateEvidence(results, assurance, state, { runId, nowMs }),
+    providerCoverageComplete: strictIssues.length === 0,
+    providerCoverageReasons: strictIssues,
     requiredDomainsOperational: assurance.operational, reports: delivered };
 }
 
