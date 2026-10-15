@@ -153,6 +153,28 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const ok = assessRuntime({ results, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
   check('runtime assurance passes only when all three domains have complete current evidence',
     ok.operational && ok.domains.sanctions.operational && ok.domains.adverseMedia.operational && ok.domains.pep.operational);
+  check('strict provider depth is complete only with every provider and no source exceptions',
+    ok.providerCoverage.complete && ok.providerCoverage.reasons.length === 0);
+  const reducedNews = structuredClone(results);
+  reducedNews.enrichment.amPartial = 1;
+  reducedNews.enrichment.amBackboneFailures.googleNews = 1;
+  reducedNews.enrichment.amBackbones = ['GDELT global index', 'Bing News'];
+  const newsAssessment = assessRuntime({ results: reducedNews, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('single-backbone fallback remains operational but NEVER means complete configured provider depth',
+    newsAssessment.operational && !newsAssessment.providerCoverage.complete &&
+      newsAssessment.providerCoverage.reasons.some(reason => reason.includes('Google News RSS')));
+  const unscreenablePep = structuredClone(pep);
+  unscreenablePep.sourceUnscreenable = [{ synthetic: true }];
+  const pepAssessment = assessRuntime({ results, pepDataset: unscreenablePep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('unscreenable PEP entries prevent strict full provider-depth certification',
+    pepAssessment.operational && !pepAssessment.providerCoverage.complete &&
+      pepAssessment.providerCoverage.reasons.some(reason => reason.includes('unscreenable')));
+  const partialList = structuredClone(results);
+  partialList.degraded = true;
+  partialList.failures = ['Synthetic unavailable optional national source'];
+  const sanctionAssessment = assessRuntime({ results: partialList, pepDataset: pep, contract, nowMs, expectedAdverseMatrix: 79 });
+  check('supplementary sanctions outage remains distinguishable from required-domain operational status',
+    sanctionAssessment.operational && !sanctionAssessment.providerCoverage.complete);
   check('green source evidence independently identifies both approved Asana projects with reconciled counts',
     ok.run.sourcePopulation.customer.projectGid === '1214107620220121'
     && ok.run.sourcePopulation.employee.projectGid === '1216239131596624'
