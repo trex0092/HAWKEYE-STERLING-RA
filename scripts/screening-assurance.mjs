@@ -84,6 +84,58 @@ function domain(ok, reasons, evidence, warnings = []) {
   return { operational: !!ok, reasons: reasons.filter(Boolean), warnings: warnings.filter(Boolean), evidence };
 }
 
+/* Independent strict provider-depth indicator. "Operational" means the
+   required screening contract worked for every subject; it deliberately allows
+   declared fallbacks and single-backbone news coverage. Complete configured
+   PROVIDER DEPTH requires every configured backbone, no reduced redundancy,
+   no partial sanctions source, and no unscreenable PEP source entry. This is
+   NOT a claim of end-to-end cross-engine population parity or universal
+   coverage of sources that are not part of the configured contract. */
+export function strictProviderCoverageIssues(results, assurance) {
+  const issues = [];
+  if (assurance?.operational !== true) issues.push('required-domain runtime assurance is not operational');
+  if (results?.degraded !== false || !Array.isArray(results?.failures) || results.failures.length) {
+    issues.push('screening run reports degraded, missing or failed sanctions-source evidence');
+  }
+  if (!Array.isArray(results?.lists) || !results.lists.length ||
+      results.lists.some(x => !x || x.partial !== false || !Number.isSafeInteger(x.count) || x.count <= 0)) {
+    issues.push('one or more sanctions lists are missing, partial or invalid');
+  }
+  const s = assurance?.domains?.sanctions?.evidence;
+  if (!Array.isArray(s?.loadedSources) || !s.loadedSources.length ||
+      s.loadedSources.some(x => !x || x.partial !== false || !Number.isSafeInteger(x.count) || x.count <= 0)) {
+    issues.push('sanctions assurance contains incomplete provider receipts');
+  }
+  if (!Array.isArray(s?.servedByFallback) || s.servedByFallback.length) {
+    issues.push('at least one required sanctions source used a substitute or fallback status is unverifiable');
+  }
+  const media = assurance?.domains?.adverseMedia?.evidence;
+  if (!media || !['errors', 'partialSubjects', 'skippedSubjects'].every(k =>
+      Number.isSafeInteger(media[k]) && media[k] === 0)) {
+    issues.push('adverse media has missing, skipped or reduced-redundancy subjects');
+  }
+  for (const [key, label] of [['googleNews', 'Google News RSS'],
+    ['gdelt', 'GDELT global index'], ['bing', 'Bing News']]) {
+    if (!Number.isSafeInteger(media?.backboneFailures?.[key]) ||
+        media.backboneFailures[key] !== 0 ||
+        !Array.isArray(media.globalBackbones) || !media.globalBackbones.includes(label)) {
+      issues.push(label + ' did not return complete subject-level provider coverage');
+    }
+  }
+  const pep = assurance?.domains?.pep?.evidence;
+  if (pep?.partial !== false || !Array.isArray(pep?.sourceUnscreenable) ||
+      pep.sourceUnscreenable.length) {
+    issues.push('PEP artifact has partial or unscreenable source entries, or no complete exception inventory');
+  }
+  if (pep?.dailyScreenActive !== true ||
+      pep?.liveLookupEnabled !== true ||
+      pep?.liveLookupErrors !== 0 ||
+      pep?.skippedSubjects !== 0) {
+    issues.push('PEP full-artifact consumption or supplementary live lookup coverage is unverified');
+  }
+  return issues;
+}
+
 export function assessRuntime({
   results,
   pepDataset,
@@ -343,8 +395,17 @@ export function assessRuntime({
     skippedSubjects: num(e.skipped),
   }, pepWarnings);
 
+  const providerCoverageIssues = strictProviderCoverageIssues(results, {
+    operational: sanctions.operational && adverseMedia.operational && pep.operational,
+    domains: { sanctions, adverseMedia, pep },
+  });
   return {
     version: 1,
+    providerCoverage: {
+      complete: providerCoverageIssues.length === 0,
+      reasons: providerCoverageIssues,
+      scope: 'configured provider depth only; independent cross-engine record parity not attested',
+    },
     generatedAt: new Date(nowMs).toISOString(),
     run: {
       date: results?.date || '',
