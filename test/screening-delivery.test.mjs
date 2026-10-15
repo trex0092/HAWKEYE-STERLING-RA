@@ -1,9 +1,10 @@
 /* Synthetic, offline integration tests. Never call Asana or live providers. */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { publishDailyScreening, buildReports, splitEvidence, textSize, validateEvidence,
   PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName,
-  isTransientEvidenceDeliveryFailure, deliverWithOneRecoveryRetry, EVIDENCE_DELIVERY_RETRY_DELAY_MS, uploadAttachment } from '../scripts/screening-delivery.mjs';
+  isTransientEvidenceDeliveryFailure, deliverWithOneRecoveryRetry, EVIDENCE_DELIVERY_RETRY_DELAY_MS, uploadAttachment, sha256Utf8, readAsanaAttachmentHash } from '../scripts/screening-delivery.mjs';
 
 const NOW = Date.parse('2026-09-30T10:00:00Z');
 function fixture() {
@@ -130,6 +131,14 @@ function api() {
     attachments.set(id, { gid: id, name, parent, text, type, hidden: hideUploads });
     calls.push({ path: 'upload', method: 'POST', data: { parent, name } });
     return id;
+  };
+  upload.readBack = async (id, parent, name) => {
+    const item = attachments.get(String(id));
+    if (!item || item.parent !== parent || item.name !== name || item.hidden) {
+      throw new Error('Synthetic attachment readback failed');
+    }
+    return { sha256: createHash('sha256').update(Buffer.from(item.text, 'utf8')).digest('hex'),
+      bytes: Buffer.byteLength(item.text, 'utf8') };
   };
   return { request, upload, tasks, calls, add, attachments,
     hideUploads: v => { hideUploads = v; }, setIntercept: fn => { intercept = fn; } };
@@ -686,4 +695,46 @@ test('a same-run re-attempt keeps a single findings table', async () => {
   for (const report of first.reports) {
     assert.equal([...fake.attachments.values()].filter(a => a.parent === report.taskGid).length, 1);
   }
+});
+
+test('evidence report hashes reconstruct without losing Unicode or JSON structure', () => {
+  const input = fixture();
+  input.state.subjects.multilingual = { name: 'Synthetic Unicode', lists: ['UN'], detail: 'م😀'.repeat(18000) };
+  const report = buildReports(input.results, input.assurance, input.state, input)[0];
+  const value = report.pages.join('');
+  assert.equal(sha256Utf8(value), report.evidenceSha256);
+  assert.equal(JSON.parse(value).storedFindings.multilingual.detail, input.state.subjects.multilingual.detail);
+  assert.equal(report.attachment.sha256, sha256Utf8(report.attachment.csv));
+});
+
+test('CSV byte readback rejects tampering without marking either report verified', async () => {
+  const fake = api(), original = fake.upload.readBack;
+  fake.upload.readBack = async (...args) => {
+    const proof = await original(...args);
+    return { ...proof, sha256: '0'.repeat(64) };
+  };
+  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload }),
+    /byte\/hash mismatch/);
+  for (const task of fake.tasks.values()) {
+    assert.doesNotMatch(String(task.notes), /^DELIVERY VERIFIED/);
+  }
+});
+
+test('CSV readback requires actual downloaded bytes, correct parent and HTTPS URL', async () => {
+  const csv = Buffer.from('\ufeffstatus,subject\n', 'utf8');
+  const request = async () => ({ data: {
+    name: 'test.csv', parent: { gid: '123' }, download_url: 'https://example.invalid/file'
+  } });
+  const download = async () => ({ ok: true, body: (async function* () { yield csv; })() });
+  const proof = await readAsanaAttachmentHash(request, '123', 'test.csv', '456', download);
+  assert.equal(proof.sha256, createHash('sha256').update(csv).digest('hex'));
+  assert.equal(proof.bytes, csv.byteLength);
+  await assert.rejects(readAsanaAttachmentHash(
+    async () => ({ data: { name: 'test.csv', parent: { gid: 'wrong' },
+      download_url: 'https://example.invalid/file' } }), '123', 'test.csv', '456', download),
+    /metadata read-back/);
+  await assert.rejects(readAsanaAttachmentHash(
+    async () => ({ data: { name: 'test.csv', parent: { gid: '123' },
+      download_url: 'http://example.invalid/file' } }), '123', 'test.csv', '456', download),
+    /not HTTPS/);
 });
