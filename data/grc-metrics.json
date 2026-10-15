@@ -29,13 +29,14 @@
       "basis": "Not instrumented: the register still carries open rows without owner-approved target dates, so the KRI cannot be aged consistently; maintainer-owned engineering rows carry dates, while governance/vendor rows remain undated until the responsible human owner sets them. The gap is counted per row by openActionsWithoutTargetDate. See KRI-09 in data/risk-appetite.json."
     },
     "thirdPartyAssessmentCoverage": {
-      "value": 66.7,
-      "numerator": 6,
+      "value": 55.6,
+      "numerator": 5,
       "denominator": 9,
       "basis": "Vendors whose safeguard/DPA position is settled ÷ vendors in the third-party register. A cell still asking for a confirmation counts as outstanding.",
       "outstanding": [
         "Asana",
         "Anthropic",
+        "Microsoft (Bing News RSS)",
         "Composio"
       ]
     },
@@ -119,7 +120,7 @@
       "appetite_ref": "RA-04",
       "owner": "MLRO / DPO",
       "escalation_sla": "Same business day to the MLRO and the DPO; the affected path is gated OFF before the escalation, not after it.",
-      "value": 66.7,
+      "value": 55.6,
       "threshold": {
         "operator": ">=",
         "value": 100
