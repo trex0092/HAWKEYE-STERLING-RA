@@ -300,10 +300,13 @@ export function parsePrincipals(task) {
   const seen = new Set();
   const push = (name, role, nationality, dob = '', passport = '', corporate = false) => {
     const n = String(name || '').replace(/\s+/g, ' ').trim();
-    const k = normalizeName(n);
-    if (!n || !k || seen.has(k)) return;
+    // The sanctions matcher may not normalize an unfamiliar script. Such an
+    // identity must reach its MANUAL REVIEW path, not vanish in extraction.
+    // Keep the raw fallback in a disjoint key namespace (same as parseSubject).
+    const k = normalizeName(n) || (n ? 'raw:' + n.normalize('NFC').toLowerCase() : '');
+    if (!n || !/\p{L}/u.test(n) || seen.has(k)) return;
     // Guard against label rows being read as a name.
-    if (/^(n\/?a|none|nil|not applicable|pending|tbc)$/i.test(n)) return;
+    if (/^(n\/?a|none|nil|not applicable|pending|tbc|tbd|unknown)$/i.test(n)) return;
     seen.add(k);
     people.push({
       name: n,
@@ -370,7 +373,7 @@ export function parsePrincipals(task) {
 export function parseSubjects(tasks) {
   const out = [];
   const seen = new Set();
-  for (const t of (Array.isArray(tasks) ? tasks : [])) {
+  for (const [rowIndex, t] of (Array.isArray(tasks) ? tasks : []).entries()) {
     // NOTE (2026-09-24): do NOT filter on t.completed here. This function is
     // shared by both the Customer Database fetch and the HR - Employees fetch
     // (see EMPLOYEE_PROJECT_GID below). "completed" does not mean the same
@@ -384,19 +387,24 @@ export function parseSubjects(tasks) {
     // has zero live effect on customer screening: the Customer Database
     // currently has 0 completed tasks (checked via the Asana API).
     const s = parseSubject(t);
-    // Dedupe the legal ENTITY by normalized name, but do NOT skip the whole
-    // record on a collision: two distinct active customers can share a legal
-    // name (duplicate onboarding / same trade name), and the second one's
-    // principals (UBOs/directors) must still be screened — they are keyed by
-    // parent gid below, so they never collide. Only the duplicate entity row is
-    // suppressed; principals are always processed.
-    if (s.name && !seen.has(s.key)) {
-      seen.add(s.key);
-      out.push(s);
+    // Each approved Asana GID is a DISTINCT screening obligation. Two records
+    // may share a normalized name without being the same legal entity or staff
+    // member. Historically this parser silently removed the second top-level
+    // row; the source-population guard then failed rather than screening it.
+    // Preserve the original key for the first occurrence (case-state
+    // continuity), and disambiguate every subsequent same-name record by GID.
+    // Missing/duplicate GIDs still fail the independent source-population gate.
+    const entityKey = seen.has(s.key)
+      ? s.key + '|record|' + String(t?.gid || 'unidentified-row-' + rowIndex)
+      : s.key;
+    if (s.name) {
+      if (seen.has(entityKey)) throw new Error('Repeated top-level screening identity');
+      seen.add(entityKey);
+      out.push({ ...s, key: entityKey });
     }
     for (const p of parsePrincipals(t)) {
-      const norm = normalizeName(p.name);
-      if (!norm) continue;
+      const norm = normalizeName(p.name) ||
+        ('raw:' + p.name.normalize('NFC').toLowerCase());
       /* Key an individual by (name + parent customer), NOT by name alone, so a
          principal is never dropped by a normalized-name collision with a legal
          entity or with a same-named principal of a DIFFERENT customer — every
