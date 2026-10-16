@@ -74,6 +74,9 @@ const delivery = read('scripts/screening-delivery.mjs');
 check('delivery reads the signed Asana download_url for byte verification', /download_url/.test(delivery));
 check('sanctions-screen.yml egress allowlist admits the Asana attachment CDN (*.asanausercontent.com:443)',
   allowed.has('*.asanausercontent.com:443'));
+/* The run 38761415815 log showed "domain not allowed: asanausercontent.com": a wildcard
+   does not match the bare apex host, so the apex needs its own entry. */
+check('sanctions-screen.yml egress allowlist admits the bare apex asanausercontent.com:443', allowed.has('asanausercontent.com:443'));
 
 /* Official Canada listed-entities feed: names sit in <entry><title>. A numeric
    title ("764") is a real listing and must survive; an empty entry must not. */
