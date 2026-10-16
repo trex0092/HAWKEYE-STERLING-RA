@@ -2885,5 +2885,15 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(e => { console.error(e); process.exit(1); });
+  /* Heartbeat: a run killed without an exception (the 13 Oct and 16 Oct full
+     runs ended with no error text, only a failed step) leaves no trace of how
+     far it got. One line a minute with elapsed time and resident memory shows
+     where the run stopped and whether memory was climbing. */
+  const startedAt = Date.now();
+  const heartbeat = setInterval(() => {
+    const mb = Math.round(process.memoryUsage().rss / 1048576);
+    console.log('sanctions-screen: heartbeat +' + Math.round((Date.now() - startedAt) / 1000) + 's rss ' + mb + ' MB');
+  }, 60000);
+  heartbeat.unref();
+  main().catch(e => { console.error(e); process.exit(1); }).finally(() => clearInterval(heartbeat));
 }
