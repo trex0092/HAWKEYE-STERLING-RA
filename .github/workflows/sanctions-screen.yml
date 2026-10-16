@@ -208,7 +208,7 @@ jobs:
           # commercial licence). Unset = on. See docs/aims/third-party-register.md.
           OPENSANCTIONS_DATA: ${{ vars.OPENSANCTIONS_DATA }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID }}
+          ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121' }}
           ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID || '1216239131596624' }}
           # "Sanctions updates" section, gid 1218451960830318. Repointed
           # 2026-09-16: same fix as sanctions-watch.yml -- this was reading
@@ -391,6 +391,7 @@ jobs:
           fi
 
       - name: Refresh runtime assurance watchdog
+        id: refresh_assurance
         if: always() && steps.screen.outputs.screen_error != 'true' && steps.persist.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -407,6 +408,42 @@ jobs:
             exit 1
           fi
           echo "::notice::Screening Assurance dispatched against freshly persisted runtime evidence."
+
+      - name: Escalate incomplete screening or failed evidence delivery directly to Asana
+        id: asana-failure-alert
+        # Failure to publish encrypted screening/case state or dispatch the
+        # fresh assurance watchdog is also an operational evidence incident.
+        # Even if the Asana report appeared, those failures are not clearance.
+        # The MLRO queue must receive aggregate-only alert evidence.
+        if: always() && (steps.screen.outcome == 'failure' || steps.screen.outputs.screen_error == 'true' || steps.cases.outcome == 'failure' || steps.delivery.outcome == 'failure' || steps.assurance.outcome == 'failure' || steps.persist.outcome == 'failure' || steps.refresh_assurance.outcome == 'failure')
+        timeout-minutes: 3
+        env:
+          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+          ASANA_SECTION_GID: '1218451960830318'
+          ASANA_ALERT_REFRESH_OPEN: '1'
+          SCREEN_FAILED: ${{ steps.screen.outcome }}
+          SCREEN_ERROR: ${{ steps.screen.outputs.screen_error }}
+          CASES_FAILED: ${{ steps.cases.outcome }}
+          DELIVERY_FAILED: ${{ steps.delivery.outcome }}
+          ASSURANCE_FAILED: ${{ steps.assurance.outcome }}
+          PERSIST_FAILED: ${{ steps.persist.outcome }}
+          REFRESH_ASSURANCE_FAILED: ${{ steps.refresh_assurance.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$SCREEN_FAILED" = "failure" ] || [ "$SCREEN_ERROR" = "true" ]; then
+            node scripts/asana-alert.mjs \
+              "SCREENING ABORTED: daily sanctions / adverse-media / PEP processing incomplete" \
+              "The mandatory daily screening did not complete. Do NOT infer clearance, accept a clean result or close a case. Review the failed workflow, source availability and outstanding human-owned screening cases. Run: $RUN_URL"
+          elif [ "$PERSIST_FAILED" = "failure" ] || [ "$ASSURANCE_FAILED" = "failure" ] || [ "$REFRESH_ASSURANCE_FAILED" = "failure" ]; then
+            node scripts/asana-alert.mjs \
+              "SCREENING EVIDENCE INTEGRITY FAILED: case state or assurance not confirmed" \
+              "Screening state was not safely persisted, its assurance evidence could not be produced, or the independent runtime check could not be dispatched. Report delivery does NOT establish valid current evidence; MLRO must reconcile case state and verify a fresh completed assurance run. Keep cases open and do NOT infer clearance. Run: $RUN_URL"
+          else
+            node scripts/asana-alert.mjs \
+              "SCREENING DELIVERY FAILED: compliance case or evidence synchronization" \
+              "The screening case lifecycle or independent evidence delivery step failed. Compliance evidence and dispositions have NOT been remotely verified. Keep affected cases open, investigate the failed Asana synchronization and verify a complete rerun. Run: $RUN_URL"
+          fi
+
 
       - name: Open a GitHub issue if the screen could not run, or a hit was not delivered
         # In case-engine mode alerts are suppressed (asana_posted is always false)
