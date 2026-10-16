@@ -2374,10 +2374,16 @@
       "detectedAt": "2026-10-16T01:08:26.336Z",
       "prevCount": 19431,
       "newCount": 19458,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38852351401,
+        "startedAt": "2026-10-16T04:46:34Z"
+      },
+      "status": "complete",
       "chainPrev": "0b5c293d8d464f0fffa6d380c7abd6eb9f189b59acd3c907126fb7bc5ffa7bce",
-      "chainHash": "5cae2e0d89cc8db7d10b66ddfc7f7e02962a43d80b7d825cefed239ac8bc9686"
+      "chainHash": "5cae2e0d89cc8db7d10b66ddfc7f7e02962a43d80b7d825cefed239ac8bc9686",
+      "latencyHours": 3.6,
+      "resolutionHash": "dca739873aa079d05fbfea5c09060feaad21a0374adb80c0cefd095cf5014d1c"
     },
     {
       "id": "ofac-sdn-alt",
@@ -2387,10 +2393,16 @@
       "detectedAt": "2026-10-16T01:08:26.336Z",
       "prevCount": 20185,
       "newCount": 20197,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38852351401,
+        "startedAt": "2026-10-16T04:46:34Z"
+      },
+      "status": "complete",
       "chainPrev": "5cae2e0d89cc8db7d10b66ddfc7f7e02962a43d80b7d825cefed239ac8bc9686",
-      "chainHash": "79f930afc995c8fa38b7cda9a5ce61295930f94e7fa60d671c2b1f60e2a8fb58"
+      "chainHash": "79f930afc995c8fa38b7cda9a5ce61295930f94e7fa60d671c2b1f60e2a8fb58",
+      "latencyHours": 3.6,
+      "resolutionHash": "3cd4c4ad0536a16e72e8c8191325ed61c563e79fc43480ae91e4f7733653716f"
     },
     {
       "id": "ofac-consolidated",
@@ -2400,10 +2412,16 @@
       "detectedAt": "2026-10-16T01:08:26.336Z",
       "prevCount": 442,
       "newCount": null,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38852351401,
+        "startedAt": "2026-10-16T04:46:34Z"
+      },
+      "status": "complete",
       "chainPrev": "79f930afc995c8fa38b7cda9a5ce61295930f94e7fa60d671c2b1f60e2a8fb58",
-      "chainHash": "65b0bfcab3aa5c520d8fb694e8f4fbe4ccaef299f780b64fd82fe3099de53608"
+      "chainHash": "65b0bfcab3aa5c520d8fb694e8f4fbe4ccaef299f780b64fd82fe3099de53608",
+      "latencyHours": 3.6,
+      "resolutionHash": "d1913a8ada82ee88420130a13767d9f9e506d0c53bbd64df752afcfa38698afc"
     },
     {
       "id": "un-consolidated",
@@ -2413,10 +2431,16 @@
       "detectedAt": "2026-10-16T01:08:26.336Z",
       "prevCount": 1010,
       "newCount": 1010,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38852351401,
+        "startedAt": "2026-10-16T04:46:34Z"
+      },
+      "status": "complete",
       "chainPrev": "65b0bfcab3aa5c520d8fb694e8f4fbe4ccaef299f780b64fd82fe3099de53608",
-      "chainHash": "b74f05bbb32489c212ca69b3e044088d0b0b2bd300ebe47d724ba6119d94af08"
+      "chainHash": "b74f05bbb32489c212ca69b3e044088d0b0b2bd300ebe47d724ba6119d94af08",
+      "latencyHours": 3.6,
+      "resolutionHash": "53aa3c070a327728a35e66acf996406c860b1b1032e3f0da6b3ed90d2cba90d7"
     },
     {
       "id": "uk-ofsi",
@@ -2426,10 +2450,16 @@
       "detectedAt": "2026-10-16T01:08:26.336Z",
       "prevCount": 58610,
       "newCount": 58610,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38852351401,
+        "startedAt": "2026-10-16T04:46:34Z"
+      },
+      "status": "complete",
       "chainPrev": "b74f05bbb32489c212ca69b3e044088d0b0b2bd300ebe47d724ba6119d94af08",
-      "chainHash": "65524eeb2f64d82ad4b3649d62f694a0246765e73b72e52b94201e98b5fc414c"
+      "chainHash": "65524eeb2f64d82ad4b3649d62f694a0246765e73b72e52b94201e98b5fc414c",
+      "latencyHours": 3.6,
+      "resolutionHash": "2a8786446a7ae48094a7693c93a22f882ff2b201c44fd0e9650006d9b93ed0a6"
     },
     {
       "id": "eu-fsf",
@@ -2439,10 +2469,16 @@
       "detectedAt": "2026-10-16T01:08:26.336Z",
       "prevCount": 43842,
       "newCount": 43852,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38852351401,
+        "startedAt": "2026-10-16T04:46:34Z"
+      },
+      "status": "complete",
       "chainPrev": "65524eeb2f64d82ad4b3649d62f694a0246765e73b72e52b94201e98b5fc414c",
-      "chainHash": "f92db0bbf9268a7df6f12f4f3ccb69990e5272c5b03a641f902476348fc74772"
+      "chainHash": "f92db0bbf9268a7df6f12f4f3ccb69990e5272c5b03a641f902476348fc74772",
+      "latencyHours": 3.6,
+      "resolutionHash": "7b2ef119168c00c2c33613ecaee615a70ec856114c07ac2dd232fcba8515c19d"
     },
     {
       "id": "fr-dgt",
@@ -2452,10 +2488,42 @@
       "detectedAt": "2026-10-16T01:08:26.336Z",
       "prevCount": 20986,
       "newCount": 21224,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 38852351401,
+        "startedAt": "2026-10-16T04:46:34Z"
+      },
+      "status": "complete",
+      "chainPrev": "f92db0bbf9268a7df6f12f4f3ccb69990e5272c5b03a641f902476348fc74772",
+      "chainHash": "0443548546a2951220184bf7e562474ffbabf2c934b64d31247b5fbbfa42fb26",
+      "latencyHours": 3.6,
+      "resolutionHash": "5e2b31078bb39a58f90314d5bf3bbd3fa00c8cbc7715e2f4de05ac83d5d1ed8b"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-16T09:40:55.072Z",
+      "prevCount": 58610,
+      "newCount": 58610,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "f92db0bbf9268a7df6f12f4f3ccb69990e5272c5b03a641f902476348fc74772",
-      "chainHash": "0443548546a2951220184bf7e562474ffbabf2c934b64d31247b5fbbfa42fb26"
+      "chainPrev": "0443548546a2951220184bf7e562474ffbabf2c934b64d31247b5fbbfa42fb26",
+      "chainHash": "4ed30f61646db7f553c09fe336dbe4e59143bfa6c61523725a3a0d3aaf3c36eb"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-16T09:40:55.072Z",
+      "prevCount": 21224,
+      "newCount": 21274,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "4ed30f61646db7f553c09fe336dbe4e59143bfa6c61523725a3a0d3aaf3c36eb",
+      "chainHash": "d809a0d7352e3daebba84714e94a6465062ffd77a7fed2d3c5c7d26527812286"
     }
   ]
 }
