@@ -1026,7 +1026,7 @@ async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, per
     });
     if (!res.ok) {
       if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after'))
-        || (res.status === 429 ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
+        || ([429, 503].includes(res.status) ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
       if (note) note(false, res.status, ticket);
       return null;
     }

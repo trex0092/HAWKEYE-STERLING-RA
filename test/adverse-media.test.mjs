@@ -676,6 +676,14 @@ async function gkgWindowCheck() {
     && partial.ok === false && partial.filesMissing > 0;
   check('gkg window: full window yields matched article items; partial window fails loud', ok);
 }
+/* A 503 from Google News means the shared queue is being refused: it must pause the
+   queue like a 429 does, not fire the next burst into the same refusal. */
+{
+  const src = readFileSync(new URL('../scripts/adverse-media.mjs', import.meta.url), 'utf8');
+  check('google news: HTTP 503 defers the shared request queue with the same backoff as 429',
+    /\[429, 503\]\.includes\(res\.status\) \? ADVERSE_RATE_LIMIT_BACKOFF_MS/.test(src));
+}
+
 await gkgWindowCheck();
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
