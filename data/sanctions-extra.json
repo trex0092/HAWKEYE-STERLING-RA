@@ -595,17 +595,6 @@
       "_note": "Japan's Ministry of Finance sanctions under the Foreign Exchange and Foreign Trade Law. ADDED 2026-09-25: split out of asia-html-cluster (Japan MOF used dated XLSX filenames, no stable endpoint per the 2026-08-05 survey) once OpenSanctions' jp_mof_sanctions was confirmed live: http 200, 2,804 entities, 2.1MB, Japanese-script names intact."
     },
     {
-      "id": "jp-mof-official",
-      "name": "Japan — Economic Sanctions consolidated list (Ministry of Finance, CSV)",
-      "jurisdiction": "Japan",
-      "url": "https://www.mof.go.jp/policy/international_policy/gaitame_kawase/gaitame/economic_sanctions/shisantouketsu20261014.csv",
-      "type": "csv",
-      "parser": "mofjpcsv",
-      "enabled": true,
-      "_note": "Official Japan MOF consolidated economic-sanctions list, CSV. Probe run 38768497138 (runner, 2026-10-15, commit 01dfbd8): HTTP 200 text/csv, 3,326,871 bytes; parser mofjpcsv read 8,191 names (English names and English aliases, columns found by header). Enabled with minNames 4000, well under the observed count. Additive to the OpenSanctions mirror jp-mof, which stays enabled.",
-      "minNames": 4000
-    },
-    {
       "id": "sg-terrorists",
       "name": "Singapore — Targeted Financial Sanctions",
       "jurisdiction": "Singapore",
@@ -626,16 +615,6 @@
       "enabled": true,
       "minNames": 40,
       "_note": "Malaysia Ministry of Home Affairs (Kementerian Dalam Negeri) terrorism designations. ADDED 2026-09-25: split out of asia-html-cluster once OpenSanctions' my_moha_sanctions was confirmed live: http 200, 79 entities, including domestic designations beyond the UN list (e.g. Jamaat-ul-Mujahideen Bangladesh)."
-    },
-    {
-      "id": "my-moha-official",
-      "name": "Malaysia — Specified Entities list under s.66B AMLA (Ministry of Home Affairs, XML)",
-      "jurisdiction": "Malaysia",
-      "url": "https://www.moha.gov.my/utama/images/Bahagian%20Keselamatan%20dan%20Ketenteraman%20Awam/SENARAI_KEMENTERIAN_DALAM_NEGERI/SENARAI_KDN_2026_BI.xml",
-      "type": "xml",
-      "parser": "xml",
-      "enabled": false,
-      "_note": "CANDIDATE, DISABLED. Official Malaysia MOHA list under s.66B(1) AMLA 2001, linked from the official page moha.gov.my/utama/index.php/en/component/content/article/350-list-of-ministries-of-home-affairs. Fetched HTTP 200 text/xml via Firecrawl on 2026-10-16. The XML has fixed-position records, not a standard tag structure; the generic parser is expected to read 0 names. The runner probe shows the real layout before a parser is written. The OpenSanctions mirror my-moha stays enabled until then."
     },
     {
       "id": "id-dttot",
@@ -1098,17 +1077,6 @@
       "enabled": true,
       "minNames": 60,
       "_note": "ADDED 2026-10-08. Source-probe run 37772831908 (GitHub runner, 2026-10-08, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Public Safety Canada\" (official: true), 86 targets, last change 2026-07-17. Entities listed under s.83.05 of the Criminal Code; s.83.08 freezes the property of a listed entity, so this is a financial-freezing list, unlike the proscription-only feeds kept disabled (de-bfv-banned-orgs, ie-unlawful-orgs). Runner-verified by source-probe run 37773821358 (GitHub runner, 2026-10-08, this branch): targets.simple.csv fetched and the registry parser read 764 names (names and aliases), minNames met. Hosted by OpenSanctions (CC-BY-NC, off under OPENSANCTIONS_DATA=0) because no keyless machine-readable official endpoint is configured. minNames is about 70% of the catalogue target count. The country's register status is unchanged: it was already screened through another national source."
-    },
-    {
-      "id": "ca-listed-terrorists-official",
-      "name": "Canada — Listed Terrorist Entities (Public Safety Canada, XML)",
-      "jurisdiction": "Canada",
-      "url": "https://www.publicsafety.gc.ca/cnt/_xml/lstd-ntts-eng.xml",
-      "type": "xml",
-      "parser": "atom",
-      "enabled": true,
-      "_note": "Official Public Safety Canada listed-entities Atom feed (organisations only). Source-probe run 38765564858 (runner, 2026-10-15, commit f941cef): HTTP 200 text/xml, 153194 bytes, parser atom read 90 names. Enabled with minNames 50, a floor well under the observed count, so a collapse of the feed degrades loudly. Additive to the OpenSanctions mirror ca-listed-terrorists, which stays enabled.",
-      "minNames": 50
     },
     {
       "id": "lv-magnitsky",

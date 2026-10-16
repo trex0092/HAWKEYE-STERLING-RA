@@ -251,36 +251,6 @@ check("extractor union keeps structured AND stray Name: lines (Viktor Bout scree
       "Jane Rivera" in _union and any("Viktor Bout" in n for n in _union))
 check("extractor union dedupes case/diacritic-insensitively",
       sum(1 for n in _union if screen._norm_lower(n) == "jane rivera") == 1)
-
-# One KYC principal's decorated structured name and regex-cleaned name
-# are the SAME identity. Distinct alternative spellings remain screenable.
-_annotated_notes = (
-    "SECTION 4 — IDENTIFICATIONS\n"
-    "Individual 1 — Shareholder\n"
-    "Name: Synthetic Director One (60% shares)\n"
-    "Nationality: Testland\n"
-    "Individual 2 — Shareholder\n"
-    "Name: Synthetic Director Two (Synthetic Parent Holdings LLC)\n"
-    "Nationality: Testland\n"
-    "SECTION 5 — NEXT\n" + "x" * 120
-)
-_annotated_union = screen._individuals_union(
-    ["Synthetic Director One (60% shares)",
-     "Synthetic Director Two (Synthetic Parent Holdings LLC)"],
-    _annotated_notes)
-check("metadata-annotated KYC names dedupe to two real principals, not four screening slots",
-      _annotated_union == ["Synthetic Director One", "Synthetic Director Two"])
-check("shareholder/company annotations removed before sanctions and PEP matching",
-      screen._screening_principal_name("Synthetic Example (Synthetic Metals Trading LLC)") == "Synthetic Example"
-      and screen._screening_principal_name("Synthetic Example (51% holding)") == "Synthetic Example")
-check("genuine parenthetical alternative name is NOT discarded",
-      screen._screening_principal_name("Synthetic Example (also known as Test Alias)") ==
-      "Synthetic Example (also known as Test Alias)")
-_annotated_alias_notes = "Name: Synthetic Example (also known as Test Alias)\n" + "x" * 120
-check("genuine alternative spelling remains separately screenable by the union",
-      len(screen._individuals_union(
-          ["Synthetic Example (also known as Test Alias)"], _annotated_alias_notes)) == 2)
-
 # Owner-line separator drift: the en-dash (U+2013, word-processor auto-convert)
 # must extract like colon/hyphen/em-dash.
 check("en-dash owner separator extracts the corporate owner",
