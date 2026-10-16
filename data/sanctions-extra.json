@@ -628,6 +628,16 @@
       "_note": "Malaysia Ministry of Home Affairs (Kementerian Dalam Negeri) terrorism designations. ADDED 2026-09-25: split out of asia-html-cluster once OpenSanctions' my_moha_sanctions was confirmed live: http 200, 79 entities, including domestic designations beyond the UN list (e.g. Jamaat-ul-Mujahideen Bangladesh)."
     },
     {
+      "id": "my-moha-official",
+      "name": "Malaysia — Specified Entities list under s.66B AMLA (Ministry of Home Affairs, XML)",
+      "jurisdiction": "Malaysia",
+      "url": "https://www.moha.gov.my/utama/images/Bahagian%20Keselamatan%20dan%20Ketenteraman%20Awam/SENARAI_KEMENTERIAN_DALAM_NEGERI/SENARAI_KDN_2026_BI.xml",
+      "type": "xml",
+      "parser": "xml",
+      "enabled": false,
+      "_note": "CANDIDATE, DISABLED. Official Malaysia MOHA list under s.66B(1) AMLA 2001, linked from the official page moha.gov.my/utama/index.php/en/component/content/article/350-list-of-ministries-of-home-affairs. Fetched HTTP 200 text/xml via Firecrawl on 2026-10-16. The XML has fixed-position records, not a standard tag structure; the generic parser is expected to read 0 names. The runner probe shows the real layout before a parser is written. The OpenSanctions mirror my-moha stays enabled until then."
+    },
+    {
       "id": "id-dttot",
       "name": "Indonesia — DTTOT (Suspected Terrorists List)",
       "jurisdiction": "Indonesia",
