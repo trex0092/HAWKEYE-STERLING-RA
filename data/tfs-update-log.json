@@ -2355,10 +2355,107 @@
       "detectedAt": "2026-10-15T09:47:37.943Z",
       "prevCount": 20932,
       "newCount": 20986,
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 38726317413,
+        "startedAt": "2026-10-15T11:17:49Z"
+      },
+      "status": "complete",
+      "chainPrev": "58e74df41c617f76d704b935611cadaee666b6216eddc2ec0290604c22b184e5",
+      "chainHash": "0b5c293d8d464f0fffa6d380c7abd6eb9f189b59acd3c907126fb7bc5ffa7bce",
+      "latencyHours": 1.5,
+      "resolutionHash": "695533fa05d79ceccb19372c33d0e8d4da8ad72f1d458b203dc31ca79c1477d0"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-16T01:08:26.336Z",
+      "prevCount": 19431,
+      "newCount": 19458,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "58e74df41c617f76d704b935611cadaee666b6216eddc2ec0290604c22b184e5",
-      "chainHash": "0b5c293d8d464f0fffa6d380c7abd6eb9f189b59acd3c907126fb7bc5ffa7bce"
+      "chainPrev": "0b5c293d8d464f0fffa6d380c7abd6eb9f189b59acd3c907126fb7bc5ffa7bce",
+      "chainHash": "5cae2e0d89cc8db7d10b66ddfc7f7e02962a43d80b7d825cefed239ac8bc9686"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-16T01:08:26.336Z",
+      "prevCount": 20185,
+      "newCount": 20197,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "5cae2e0d89cc8db7d10b66ddfc7f7e02962a43d80b7d825cefed239ac8bc9686",
+      "chainHash": "79f930afc995c8fa38b7cda9a5ce61295930f94e7fa60d671c2b1f60e2a8fb58"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-16T01:08:26.336Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "79f930afc995c8fa38b7cda9a5ce61295930f94e7fa60d671c2b1f60e2a8fb58",
+      "chainHash": "65b0bfcab3aa5c520d8fb694e8f4fbe4ccaef299f780b64fd82fe3099de53608"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-10-15",
+      "detectedAt": "2026-10-16T01:08:26.336Z",
+      "prevCount": 1010,
+      "newCount": 1010,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "65b0bfcab3aa5c520d8fb694e8f4fbe4ccaef299f780b64fd82fe3099de53608",
+      "chainHash": "b74f05bbb32489c212ca69b3e044088d0b0b2bd300ebe47d724ba6119d94af08"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-16T01:08:26.336Z",
+      "prevCount": 58610,
+      "newCount": 58610,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "b74f05bbb32489c212ca69b3e044088d0b0b2bd300ebe47d724ba6119d94af08",
+      "chainHash": "65524eeb2f64d82ad4b3649d62f694a0246765e73b72e52b94201e98b5fc414c"
+    },
+    {
+      "id": "eu-fsf",
+      "list": "EU — Consolidated financial sanctions list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-16T01:08:26.336Z",
+      "prevCount": 43842,
+      "newCount": 43852,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "65524eeb2f64d82ad4b3649d62f694a0246765e73b72e52b94201e98b5fc414c",
+      "chainHash": "f92db0bbf9268a7df6f12f4f3ccb69990e5272c5b03a641f902476348fc74772"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-16T01:08:26.336Z",
+      "prevCount": 20986,
+      "newCount": 21224,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "f92db0bbf9268a7df6f12f4f3ccb69990e5272c5b03a641f902476348fc74772",
+      "chainHash": "0443548546a2951220184bf7e562474ffbabf2c934b64d31247b5fbbfa42fb26"
     }
   ]
 }
