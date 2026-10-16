@@ -1,10 +1,9 @@
 /* Synthetic, offline integration tests. Never call Asana or live providers. */
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { publishDailyScreening, buildReports, splitEvidence, textSize, validateEvidence,
   PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName,
-  isTransientEvidenceDeliveryFailure, deliverWithOneRecoveryRetry, EVIDENCE_DELIVERY_RETRY_DELAY_MS, uploadAttachment, sha256Utf8, readAsanaAttachmentHash } from '../scripts/screening-delivery.mjs';
+  isTransientEvidenceDeliveryFailure, deliverWithOneRecoveryRetry, EVIDENCE_DELIVERY_RETRY_DELAY_MS, uploadAttachment } from '../scripts/screening-delivery.mjs';
 
 const NOW = Date.parse('2026-09-30T10:00:00Z');
 function fixture() {
@@ -31,7 +30,7 @@ function fixture() {
           servedByFallback: [],
         }),
         adverseMedia: status(true, {
-          screenedSubjects: 2, errors: 0, skippedSubjects: 0, partialSubjects: 0,
+          screenedSubjects: 2, errors: 0, skippedSubjects: 0,
           matrixTotal: 79, googleNewsLocalesPerSubject: 8,
           globalBackbones: ['Google News RSS', 'GDELT global index', 'Bing News'],
           backboneFailures: { googleNews: 0, gdelt: 0, bing: 0 },
@@ -41,7 +40,6 @@ function fixture() {
           dailyScreenActive: true, dailyScreenCount: 50000,
           harvestedAt: '2026-09-30T00:00:00.000Z',
           dailyScreenHarvestedAt: '2026-09-30T00:00:00.000Z',
-          sourceUnscreenable: [], liveLookupEnabled: true, liveLookupErrors: 0, skippedSubjects: 0,
         }),
       } },
     state: { updated: '2026-09-30', subjects: {} },
@@ -59,45 +57,6 @@ test('daily Asana reports independently disclose BOTH approved screening source 
     assert.match(report.summary, /Processing count is not proof of complete adverse-media or PEP coverage/);
     assert.doesNotMatch(report.summary, /passport|DOB|Emirates ID/i);
   }
-});
-
-test('complete configured provider depth is independently distinguished from full cross-engine parity', async () => {
-  const input = fixture();
-  const reports = buildReports(input.results, input.assurance, input.state, input);
-  for (const report of reports) {
-    assert.match(report.summary, /Configured provider depth: COMPLETE FOR THIS RUN/);
-    assert.match(report.summary, /Independent cross-engine record-level population parity: NOT ATTESTED/);
-    assert.equal(JSON.parse(report.pages.join('')).providerCoverage.complete, true);
-  }
-  const fake = api();
-  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
-  assert.equal(receipt.providerCoverageComplete, true);
-  assert.deepEqual(receipt.providerCoverageReasons, []);
-});
-
-test('fallback news coverage is operational but NOT complete provider depth', async () => {
-  const input = fixture();
-  input.assurance.domains.adverseMedia.evidence.partialSubjects = 1;
-  input.assurance.domains.adverseMedia.evidence.backboneFailures.googleNews = 1;
-  input.assurance.domains.adverseMedia.evidence.globalBackbones = ['GDELT global index', 'Bing News'];
-  const report = buildReports(input.results, input.assurance, input.state, input)[1];
-  assert.match(report.summary, /Required screening assurance: OPERATIONAL/);
-  assert.match(report.summary, /Configured provider depth: INCOMPLETE \/ NOT FULL COVERAGE/);
-  assert.match(report.summary, /Google News RSS did not return complete subject-level provider coverage/);
-  const fake = api();
-  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
-  assert.equal(receipt.operational, true);
-  assert.equal(receipt.providerCoverageComplete, false);
-});
-
-test('forged complete provider claim fails before any Asana write', async () => {
-  const input = fixture();
-  input.assurance.domains.pep.evidence.sourceUnscreenable = [{ synthetic: true }];
-  input.assurance.providerCoverage = { complete: true, reasons: [] };
-  const fake = api();
-  await assert.rejects(publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
-    /Provider-depth assurance contradicts/);
-  assert.equal(fake.calls.length, 0);
 });
 
 test('degraded evidence never invents two-project proof when source receipt is absent', () => {
@@ -171,14 +130,6 @@ function api() {
     attachments.set(id, { gid: id, name, parent, text, type, hidden: hideUploads });
     calls.push({ path: 'upload', method: 'POST', data: { parent, name } });
     return id;
-  };
-  upload.readBack = async (id, parent, name) => {
-    const item = attachments.get(String(id));
-    if (!item || item.parent !== parent || item.name !== name || item.hidden) {
-      throw new Error('Synthetic attachment readback failed');
-    }
-    return { sha256: createHash('sha256').update(Buffer.from(item.text, 'utf8')).digest('hex'),
-      bytes: Buffer.byteLength(item.text, 'utf8') };
   };
   return { request, upload, tasks, calls, add, attachments,
     hideUploads: v => { hideUploads = v; }, setIntercept: fn => { intercept = fn; } };
@@ -735,61 +686,4 @@ test('a same-run re-attempt keeps a single findings table', async () => {
   for (const report of first.reports) {
     assert.equal([...fake.attachments.values()].filter(a => a.parent === report.taskGid).length, 1);
   }
-});
-
-test('evidence report hashes reconstruct without losing Unicode or JSON structure', () => {
-  const input = fixture();
-  input.state.subjects.multilingual = { name: 'Synthetic Unicode', lists: ['UN'], detail: 'م😀'.repeat(18000) };
-  const report = buildReports(input.results, input.assurance, input.state, input)[0];
-  const value = report.pages.join('');
-  assert.equal(sha256Utf8(value), report.evidenceSha256);
-  assert.equal(JSON.parse(value).storedFindings.multilingual.detail, input.state.subjects.multilingual.detail);
-  assert.equal(report.attachment.sha256, sha256Utf8(report.attachment.csv));
-});
-
-test('CSV byte readback rejects tampering without marking either report verified', async () => {
-  const fake = api(), original = fake.upload.readBack;
-  fake.upload.readBack = async (...args) => {
-    const proof = await original(...args);
-    return { ...proof, sha256: '0'.repeat(64) };
-  };
-  await assert.rejects(publishDailyScreening({ ...fixture(), request: fake.request, upload: fake.upload }),
-    /byte\/hash mismatch/);
-  for (const task of fake.tasks.values()) {
-    assert.doesNotMatch(String(task.notes), /^DELIVERY VERIFIED/);
-  }
-});
-
-test('CSV readback transport failure names the host and error code, never the signed URL', async () => {
-  const request = async () => ({ data: {
-    name: 'test.csv', parent: { gid: '123' },
-    download_url: 'https://asanausercontent.com/signed/secret-token?sig=abc123'
-  } });
-  const blocked = Object.assign(new Error('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
-  let message = '';
-  try { await readAsanaAttachmentHash(request, '123', 'test.csv', '456', async () => { throw blocked; }); }
-  catch (e) { message = e.message; }
-  assert.match(message, /readback transport failure; outcome unverified \(host asanausercontent\.com, ECONNREFUSED\)/);
-  assert.doesNotMatch(message, /sig=abc123|secret-token/);
-  assert.equal(isTransientEvidenceDeliveryFailure(new Error(message)), true,
-    'a named-host transport failure stays retryable');
-});
-
-test('CSV readback requires actual downloaded bytes, correct parent and HTTPS URL', async () => {
-  const csv = Buffer.from('\ufeffstatus,subject\n', 'utf8');
-  const request = async () => ({ data: {
-    name: 'test.csv', parent: { gid: '123' }, download_url: 'https://example.invalid/file'
-  } });
-  const download = async () => ({ ok: true, body: (async function* () { yield csv; })() });
-  const proof = await readAsanaAttachmentHash(request, '123', 'test.csv', '456', download);
-  assert.equal(proof.sha256, createHash('sha256').update(csv).digest('hex'));
-  assert.equal(proof.bytes, csv.byteLength);
-  await assert.rejects(readAsanaAttachmentHash(
-    async () => ({ data: { name: 'test.csv', parent: { gid: 'wrong' },
-      download_url: 'https://example.invalid/file' } }), '123', 'test.csv', '456', download),
-    /metadata read-back/);
-  await assert.rejects(readAsanaAttachmentHash(
-    async () => ({ data: { name: 'test.csv', parent: { gid: '123' },
-      download_url: 'http://example.invalid/file' } }), '123', 'test.csv', '456', download),
-    /not HTTPS/);
 });

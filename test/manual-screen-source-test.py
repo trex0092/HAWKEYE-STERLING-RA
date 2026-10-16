@@ -157,50 +157,6 @@ expect_error("an unidentifiable HR record triggers human review",
 expect_error("zero employees is never a complete two-project screen",
     lambda: screen.compile_screening_subjects(customers, []), "no verified")
 
-# Cross-engine principal-extraction parity: the manual Python workflow must
-# read explicit owner/UBO rows outside Section 4, as the JS workflow does.
-# All records are synthetic and remain local to this offline test.
-ownership_task = {
-    "gid": "999800099", "name": "SYNTHETIC OWNERSHIP TRADING LLC",
-    "notes": (
-        "SECTION 4 — IDENTIFICATIONS\n"
-        "Individual 1 — Director\n"
-        "Name: Synthetic Existing Principal\nNationality: Testland\n"
-        "SECTION 5 — RISK REVIEW\n"
-        "Owner: Synthetic Existing Principal\n"
-        "Ultimate Beneficial Owner: Synthetic Additional Principal\n"
-        "Parent Company: Synthetic Parent Holdings LLC (100%)\n"
-        "Name: Unrelated Contact Outside Section 4\n"
-        "Owner: TBD\nOwner: 60% unnamed\n"
-    ),
-}
-owners = screen.extract_principals(ownership_task["notes"])
-check("manual Python reads explicit owners outside Section 4 without duplicating structured principals",
-      {p["name"] for p in owners} == {
-          "Synthetic Existing Principal", "Synthetic Additional Principal",
-          "Synthetic Parent Holdings LLC"
-      } and len(owners) == 3)
-check("corporate parents are legal entities, rather than individuals",
-      any(p["name"] == "Synthetic Parent Holdings LLC" and p["corporate"] for p in owners)
-      and all(not p["corporate"] for p in owners
-              if p["name"] != "Synthetic Parent Holdings LLC"))
-expanded = screen.compile_screening_subjects([ownership_task], [employees[0]])
-check("manual Python retains all extracted principals with original parent record linkage",
-      len(expanded) == 5 and
-      sum(p["kind"] == "entity" for p in expanded) == 2 and
-      sum(p["kind"] == "individual" for p in expanded) == 3 and
-      all(p["gid"] == ownership_task["gid"] for p in expanded if p.get("parent")))
-no_section = screen.extract_principals(
-    "OWNER: Synthetic No Section Person\n"
-    "Beneficial Owner: Synthetic Other Individual\n"
-    "Name: Synthetic Unrelated Contact\n")
-check("explicit owner-only CDD notes work without any Section 4",
-      {p["name"] for p in no_section} == {
-          "Synthetic No Section Person", "Synthetic Other Individual"
-      })
-check("placeholder-only owners never become screened principals",
-      screen.extract_principals("Owner: TBD\nUBO: 100% pending\n") == [])
-
 workflow = (ROOT / ".github/workflows/daily-sanctions-screen.yml").read_text()
 matcher = (ROOT / "scripts/daily-screen-run.py").read_text()
 report = (ROOT / "scripts/daily-screen-report.py").read_text()

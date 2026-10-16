@@ -35,9 +35,8 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
   fitAsanaText, fitAsanaName, publicAsanaRejection } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
-import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName, sigTokens } from './sanctions-match.mjs';
-import { fetchGkgWindowHits } from './gdelt-gkg.mjs';
-import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS, providerFailureStatus, resetProviderFailureStatus } from './adverse-media.mjs';
+import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName } from './sanctions-match.mjs';
+import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
 import { checkInterpol } from './interpol-check.mjs';
 import { checkFbi } from './fbi-check.mjs';
@@ -285,41 +284,27 @@ export function parseSubject(task) {
   };
 }
 
-/* Pull principals (UBOs / shareholders / directors / corporate parents) out
-   of the structured SECTION 4 identification blocks and explicit owner/UBO
-   lines elsewhere in the customer note. Keep individuals linked to the record
-   and corporate parents classified as organisations. Generic "Name:" fields
-   outside SECTION 4 are deliberately excluded: they may describe unrelated
-   contacts, sanctions lists, or test matches rather than identified parties. */
-/* A structured KYC Name may be followed by a parenthesized share percentage
-   or corporate affiliation. These are not parts of the person's name. Python
-   _individuals_union removes the same annotation, preventing two screening
-   slots for one recorded individual. Keep true parenthesized aliases intact. */
-export function screeningPrincipalName(value) {
-  return String(value || '')
-    .replace(/\(([^()]*)\)/g, (full, note) =>
-      /%|\b(?:shares?|stake|holding|holdings?|equity|shareholder|director|beneficial owner|ubo|owner|manager|signatory|partner|representative|company|trading|group|llc|ltd|limited|llp|inc|corp|corporation|fze|fzco|fzc|dmcc|gmbh|pjsc|plc|trust|foundation)\b/i.test(note)
-        ? ' ' : full)
-    .replace(/\s+/g, ' ').trim().replace(/^[\s.,;:\-–—]+|[\s.,;:\-–—]+$/g, '');
-}
-
+/* Pull the natural-person principals (UBOs / shareholders / directors / signatories)
+   out of a customer record so each is screened in their OWN right — not only the
+   company name. The CDD notes record them under "SECTION 4 — IDENTIFICATIONS" as
+   repeated "Individual N — <role>" blocks, each with a "Name:" (and usually a
+   "Nationality:"). Returns [{ name, role, nationality }]. Tolerant: if the block
+   isn't structured that way it falls back to every "Name:" inside the section. */
 export function parsePrincipals(task) {
   const notes = String((task && task.notes) || '');
   if (!notes) return [];
   // Isolate the identifications section (stop at the next "SECTION n" or EOF).
   const sec = /SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)[\s\S]*?(?=\n\s*(?:SECTION|PART)\b|$)/i.exec(notes);
   const block = sec ? sec[0] : '';
+  if (!block) return [];
   const people = [];
   const seen = new Set();
   const push = (name, role, nationality, dob = '', passport = '', corporate = false) => {
-    const n = screeningPrincipalName(name);
-    // The sanctions matcher may not normalize an unfamiliar script. Such an
-    // identity must reach its MANUAL REVIEW path, not vanish in extraction.
-    // Keep the raw fallback in a disjoint key namespace (same as parseSubject).
-    const k = normalizeName(n) || (n ? 'raw:' + n.normalize('NFC').toLowerCase() : '');
-    if (!n || !/\p{L}/u.test(n) || seen.has(k)) return;
+    const n = String(name || '').replace(/\s+/g, ' ').trim();
+    const k = normalizeName(n);
+    if (!n || !k || seen.has(k)) return;
     // Guard against label rows being read as a name.
-    if (/^(n\/?a|none|nil|not applicable|pending|tbc|tbd|unknown)$/i.test(n)) return;
+    if (/^(n\/?a|none|nil|not applicable|pending|tbc)$/i.test(n)) return;
     seen.add(k);
     people.push({
       name: n,
@@ -358,23 +343,6 @@ export function parsePrincipals(task) {
     let n;
     while ((n = nameRe.exec(block))) push(n[1], 'Principal', '');
   }
-  // Owner-only rows are a second, mandatory extractor, not an alternative to
-  // structured identities. screen.py extracts these from the entire CDD note;
-  // JS previously dropped them whenever SECTION 4 was present (or absent).
-  // Keep matches anchored to explicit owner/UBO role labels so free-text
-  // risk descriptions and unrelated "Name:" fields do not become identities.
-  const ownerRe = /^\s*(Parent(?:\s+Company)?|Shareholder|Ultimate\s+Beneficial\s+Owner|UBO|Holding(?:\s+Company)?|Owner|Owned\s+by|Beneficial\s+Owner)\s*(?:\([^)]*\))?\s*[:\-–—]\s*([^\r\n]+)/gim;
-  let owner;
-  while ((owner = ownerRe.exec(notes))) {
-    const name = owner[2].replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ')
-      .trim().replace(/^[.,;]+|[.,;]+$/g, '').trim();
-    if (name.length < 5 || !/\p{L}/u.test(name) ||
-        /^(?:n\/?a|none|nil|not applicable|pending|tbc|tbd|unknown)$/i.test(name) ||
-        /^\d+(?:\.\d+)?\s*%/.test(name)) continue;
-    const corporate = /\b(?:llc|ltd|limited|llp|inc|corp|company|group|holdings?|gmbh|fze|fzco|dmcc|trust|foundation|partnership)\b/i.test(name) ||
-      /^(?:Parent|Holding)/i.test(owner[1]);
-    push(name, owner[1], '', '', '', corporate);
-  }
   return people;
 }
 
@@ -386,7 +354,7 @@ export function parsePrincipals(task) {
 export function parseSubjects(tasks) {
   const out = [];
   const seen = new Set();
-  for (const [rowIndex, t] of (Array.isArray(tasks) ? tasks : []).entries()) {
+  for (const t of (Array.isArray(tasks) ? tasks : [])) {
     // NOTE (2026-09-24): do NOT filter on t.completed here. This function is
     // shared by both the Customer Database fetch and the HR - Employees fetch
     // (see EMPLOYEE_PROJECT_GID below). "completed" does not mean the same
@@ -400,24 +368,19 @@ export function parseSubjects(tasks) {
     // has zero live effect on customer screening: the Customer Database
     // currently has 0 completed tasks (checked via the Asana API).
     const s = parseSubject(t);
-    // Each approved Asana GID is a DISTINCT screening obligation. Two records
-    // may share a normalized name without being the same legal entity or staff
-    // member. Historically this parser silently removed the second top-level
-    // row; the source-population guard then failed rather than screening it.
-    // Preserve the original key for the first occurrence (case-state
-    // continuity), and disambiguate every subsequent same-name record by GID.
-    // Missing/duplicate GIDs still fail the independent source-population gate.
-    const entityKey = seen.has(s.key)
-      ? s.key + '|record|' + String(t?.gid || 'unidentified-row-' + rowIndex)
-      : s.key;
-    if (s.name) {
-      if (seen.has(entityKey)) throw new Error('Repeated top-level screening identity');
-      seen.add(entityKey);
-      out.push({ ...s, key: entityKey });
+    // Dedupe the legal ENTITY by normalized name, but do NOT skip the whole
+    // record on a collision: two distinct active customers can share a legal
+    // name (duplicate onboarding / same trade name), and the second one's
+    // principals (UBOs/directors) must still be screened — they are keyed by
+    // parent gid below, so they never collide. Only the duplicate entity row is
+    // suppressed; principals are always processed.
+    if (s.name && !seen.has(s.key)) {
+      seen.add(s.key);
+      out.push(s);
     }
     for (const p of parsePrincipals(t)) {
-      const norm = normalizeName(p.name) ||
-        ('raw:' + p.name.normalize('NFC').toLowerCase());
+      const norm = normalizeName(p.name);
+      if (!norm) continue;
       /* Key an individual by (name + parent customer), NOT by name alone, so a
          principal is never dropped by a normalized-name collision with a legal
          entity or with a same-named principal of a DIFFERENT customer — every
@@ -2217,7 +2180,6 @@ export async function screenLocally(subjects, cfg) {
   const amSecondPassQueue = [];
   let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0 };
-  resetProviderFailureStatus();
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
      bound the whole enrichment phase by a wall-clock budget: once it elapses the
@@ -2244,23 +2206,6 @@ export async function screenLocally(subjects, cfg) {
   /* Daily-rotated processing order (enrichment fairness — see rotateByDay);
      results are re-sorted to the input order below so reports/state stay
      stable regardless of the day's rotation. */
-  /* GDELT via the 48-hour bulk GKG window instead of one throttled DOC API call
-     per subject. Used only when at least 90% of the window loads; otherwise the
-     per-subject DOC path runs unchanged (fail-safe, never a silent partial). */
-  let gkg = null;
-  if (cfg.adverseMedia && process.env.GDELT_GKG !== '0') {
-    const gkgSubjects = [];
-    for (const s of subjects) {
-      if (s.entityType === 'organisation') gkgSubjects.push([s.key, s.name, 'org']);
-      else if (s.entityType === 'individual') gkgSubjects.push([s.key, s.name, 'person']);
-      else { gkgSubjects.push([s.key, s.name, 'person']); gkgSubjects.push([s.key, s.name, 'org']); }
-    }
-    gkg = await fetchGkgWindowHits({ subjects: gkgSubjects, normalizeFn: normalizeName, coreTokensFn: sigTokens });
-    console.log('sanctions-screen: GDELT GKG window ok=' + gkg.ok + ' files ' + gkg.filesOk + '/' + gkg.total
-      + ' missing ' + gkg.filesMissing + ' failed ' + gkg.filesFailed + ' rows ' + gkg.rows
-      + ' subjects matched ' + gkg.hitsBySubject.size);
-    if (!gkg.ok) gkg = null;
-  }
   const rotatedSubjects = rotateByDay(subjects);
   const results = await mapLimit(rotatedSubjects, cfg.concurrency, async (s) => {
     const raw = screenName(s.name, index, thr, phonMode);   // { name, topScore, band, recommendation, hitCount, lists[] }
@@ -2333,8 +2278,7 @@ export async function screenLocally(subjects, cfg) {
       }
     };
     if (cfg.adverseMedia && enrich) {
-      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs,
-        gdeltItems: gkg ? (gkg.hitsBySubject.get(s.key) || []) : undefined });
+      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
       if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
       if (!am.backbones?.bing) amBackboneFailures.bing++;
@@ -2483,7 +2427,7 @@ export async function screenLocally(subjects, cfg) {
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');
-  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, amBackboneFailureStatus: providerFailureStatus(), amGdeltGkg: gkg ? { used: gkg.ok, filesOk: gkg.filesOk, filesTotal: gkg.total, filesMissing: gkg.filesMissing, filesFailed: gkg.filesFailed, rows: gkg.rows, subjectsMatched: gkg.hitsBySubject.size } : { used: false }, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
+  return { results, anyOk: true, degraded, errored: 0, amErrors, amPartial, amRetryAttempted, amRetryRecovered, amSecondPassAttempted: amSecondPass.attempted, amSecondPassRecovered: amSecondPass.recovered, amBackboneFailures, pepErrors, interpolErrors, fbiErrors, enrichSkipped, notes: loaded.notes, coverage: loaded, shadow };
 }
 
 /* A corrupt or malformed persisted AML ledger is NOT the same as a clean
@@ -2802,10 +2746,6 @@ async function main() {
       amRotationCycleDays: cfg.adverseMedia ? rotationCycleDays() : 0,
       amMatrixTotal: LOCALES.length,
       amBackboneFailures: screen.amBackboneFailures || { googleNews: 0, gdelt: 0, bing: 0 },
-      /* HTTP status of every failed Google News / GDELT request this run (0 = socket/timeout).
-         Explains an outage in evidence instead of leaving the cause to the step log. */
-      amBackboneFailureStatus: screen.amBackboneFailureStatus || { googleNews: {}, gdelt: {} },
-      amGdeltGkg: screen.amGdeltGkg || { used: false },
       amBackbones: cfg.adverseMedia
         ? [
             ...(screen.amBackboneFailures?.googleNews === 0 ? ['Google News RSS'] : []),
@@ -2885,15 +2825,5 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  /* Heartbeat: a run killed without an exception (the 13 Oct and 16 Oct full
-     runs ended with no error text, only a failed step) leaves no trace of how
-     far it got. One line a minute with elapsed time and resident memory shows
-     where the run stopped and whether memory was climbing. */
-  const startedAt = Date.now();
-  const heartbeat = setInterval(() => {
-    const mb = Math.round(process.memoryUsage().rss / 1048576);
-    console.log('sanctions-screen: heartbeat +' + Math.round((Date.now() - startedAt) / 1000) + 's rss ' + mb + ' MB');
-  }, 60000);
-  heartbeat.unref();
-  main().catch(e => { console.error(e); process.exit(1); }).finally(() => clearInterval(heartbeat));
+  main().catch(e => { console.error(e); process.exit(1); });
 }
