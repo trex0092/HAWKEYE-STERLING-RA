@@ -831,10 +831,11 @@ const CORP_STOP_MEDIA = new Set([
    multi-language stream. */
 export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
   const nm = normalize(name);
-  // Retain meaningful two-character given names even when the surname is
-  // longer. Otherwise "Li Wang" is reduced to "Wang" and any unrelated Wang
-  // can trigger a false adverse-media flag.
-  let nameTokens = nm.split(' ').filter(t => t.length >= 2);
+  // Prefer tokens ≥3 chars; but for short multi-token names (e.g. "Xi Bo",
+  // common in East-Asian names) that filter is empty — fall back to ≥2 so the
+  // subject is still matchable rather than silently never flagged.
+  let nameTokens = nm.split(' ').filter(t => t.length >= 3);
+  if (!nameTokens.length) nameTokens = nm.split(' ').filter(t => t.length >= 2);
   // Drop corporate/legal boilerplate so a headline needn't carry "LLC / General
   // Trading" to match; keep the full set only when the name is all boilerplate.
   const sig = nameTokens.filter(t => !CORP_STOP_MEDIA.has(t));
@@ -847,11 +848,7 @@ export function scoreAdverseMedia(name, items, terms = ADVERSE_TERMS) {
     const title = normalize(it.title);
     const desc = normalize(it.description || '');
     const hay = desc ? title + ' ' + desc : title;
-    // Compare whole normalized tokens. Substring checks incorrectly matched
-    // John Smith against Johnny Smithson (or Ann King against Joann Kingston),
-    // creating unsupported adverse-media flags from unrelated articles.
-    const hayTokens = new Set(hay.split(/\s+/u).filter(Boolean));
-    const hasName = nameTokens.length > 0 && nameTokens.every(t => hayTokens.has(t));
+    const hasName = nameTokens.length > 0 && nameTokens.every(t => hay.includes(t));
     if (!hasName) continue;
     const hitTerms = terms.filter(t => hay.includes(normalize(t)));
     if (!hitTerms.length) continue;
@@ -1026,7 +1023,7 @@ async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, per
     });
     if (!res.ok) {
       if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after'))
-        || ([429, 503].includes(res.status) ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
+        || (res.status === 429 ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
       if (note) note(false, res.status, ticket);
       return null;
     }
@@ -1050,24 +1047,8 @@ export function gnewsCanRequest(localeId = 'en-US', nowMs = Date.now()) {
 export function gnewsBreakerPermit(localeId = 'en-US', nowMs = Date.now()) {
   return gnewsCanRequest(localeId, nowMs) ? _gnews.permit(nowMs) : null;
 }
-/* Per-run tally of failed backbone requests by HTTP status (0 = network/timeout).
-   Recorded so the evidence says WHY a provider was unavailable (429 throttling,
-   403/503 refusal, socket failure), not only that it was. */
-const _failureStatus = { googleNews: {}, gdelt: {} };
-function tallyFailure(provider, status) {
-  const key = String(Number.isFinite(status) ? status : 0);
-  _failureStatus[provider][key] = (_failureStatus[provider][key] || 0) + 1;
-}
-export function providerFailureStatus() {
-  return { googleNews: { ..._failureStatus.googleNews }, gdelt: { ..._failureStatus.gdelt } };
-}
-export function resetProviderFailureStatus() {
-  _failureStatus.googleNews = {};
-  _failureStatus.gdelt = {};
-}
 export function noteGnewsResult(ok, status, ticket = null) {
   if (ok) { _gnews.success(ticket); return; }
-  tallyFailure('googleNews', status);
   if (ticket?.probe || [429, 403, 503, 0].includes(status)) {
     if (_gnews.failure(ticket)) {
       console.error('adverse-media: Google News circuit OPEN; only one en-US probe is admitted after cooldown');
@@ -1122,18 +1103,13 @@ async function fetchGdelt(name, timeoutMs) {
   const noteWide = (_ok, status) => { wideStatus = status; };
   let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,
     'application/json', timeoutMs, noteWide, _gdeltGate, permit);
-  // Retry the smaller query only when GDELT has actually rejected the query
-  // syntax/size or replied HTTP 200 with an invalid body. Server errors,
-  // throttling, network failures and timeouts are not query rejections:
-  // retrying immediately on the same provider doubles outage traffic and
-  // cannot fix a 503. Keep those failures visible to the circuit breaker.
-  const queryRejected = [200, 400, 413, 414, 422, 431].includes(wideStatus);
-  if (gd === null && queryRejected && wide.length > GDELT_RISK_TERMS.length && permit()) {
+  // A 429 is not a query rejection. A shorter query consumes the same quota.
+  if (gd === null && wideStatus !== 429 && wide.length > GDELT_RISK_TERMS.length && permit()) {
     console.warn('adverse-media: GDELT rejected the widened query; retrying on the base term set');
     gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt,
       'application/json', timeoutMs, null, _gdeltGate, permit);
   }
-  if (gd === null) { tallyFailure('gdelt', wideStatus); gdeltBreakerRecordFailure(ticket); }
+  if (gd === null) gdeltBreakerRecordFailure(ticket);
   else gdeltBreakerRecordSuccess(ticket);
   return gd;
 }
@@ -1151,10 +1127,7 @@ async function fetchGdelt(name, timeoutMs) {
    The return shape is a superset of the original { hit, score, band, top, count,
    terms } — existing callers are unaffected. Tunables: ADVERSE_MEDIA_LOCALES,
    ADVERSE_MEDIA_CONCURRENCY, ADVERSE_MEDIA_TIMESPAN, opts.{concurrency,locales}. */
-/* gdeltItems: article items for this subject from a GKG window (see
-   gdelt-gkg.mjs). When given, the GDELT backbone uses them and makes no
-   per-subject DOC API request; undefined keeps the DOC API path. */
-export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, locales, gdeltItems } = {}) {
+export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, locales } = {}) {
   const xmlAccept = 'application/rss+xml, application/xml, text/xml';
   const explicitIds = String(process.env.ADVERSE_MEDIA_LOCALES || '').trim();
   const localeSet = locales || (explicitIds ? activeLocales() : budgetedLocales());
@@ -1174,7 +1147,7 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   };
 
   const [gd, initialBing, localeResults] = await Promise.all([
-    gdeltItems !== undefined ? Promise.resolve(gdeltItems) : fetchGdelt(name, timeoutMs),
+    fetchGdelt(name, timeoutMs),
     bingOn ? fetchBing() : Promise.resolve(null),
     mapPool(localeSet, conc, loc =>
       fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))),

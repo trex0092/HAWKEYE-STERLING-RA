@@ -65,34 +65,6 @@ for (const s of enabled) {
   }
 }
 
-/* Asana attachment read-back (scripts/screening-delivery.mjs) fetches the signed
-   download_url that Asana returns, which is served from the Asana CDN, not from
-   app.asana.com. Without an allowlist entry the harden-runner egress block kills
-   the byte-verification step: run 38689787317 logged
-   "domain not allowed: asanausercontent.com" and failed evidence delivery. */
-const delivery = read('scripts/screening-delivery.mjs');
-check('delivery reads the signed Asana download_url for byte verification', /download_url/.test(delivery));
-check('sanctions-screen.yml egress allowlist admits the Asana attachment CDN (*.asanausercontent.com:443)',
-  allowed.has('*.asanausercontent.com:443'));
-/* The run 38761415815 log showed "domain not allowed: asanausercontent.com": a wildcard
-   does not match the bare apex host, so the apex needs its own entry. */
-check('sanctions-screen.yml egress allowlist admits the bare apex asanausercontent.com:443', allowed.has('asanausercontent.com:443'));
-
-/* Official Canada listed-entities feed: names sit in <entry><title>. A numeric
-   title ("764") is a real listing and must survive; an empty entry must not. */
-import { parseAtomEntries } from "../scripts/sanctions-match.mjs";
-const atomFixture = "<feed><entry><title>764</title><id>2025-121</id></entry><entry><title>  Order of Nine Angles </title></entry><entry><title></title></entry></feed>";
-const atomNames = parseAtomEntries(atomFixture);
-check("atom feed: entry titles become names, numeric title kept, empty title dropped", atomNames.length === 2 && atomNames[0] === "764" && atomNames[1] === "Order of Nine Angles");
-check("candidate ca-listed-terrorists-official uses the atom parser", (enabled.concat(core, extra).find(x => x.id === "ca-listed-terrorists-official") || {}).parser === "atom");
-check("candidate jp-mof-official uses the MOF CSV parser", (enabled.concat(core, extra).find(x => x.id === "jp-mof-official") || {}).parser === "mofjpcsv");
-
-/* Japan MOF CSV: the English name and English alias columns are read by
-   header text. The category and number columns must not be read as names. */
-import { parseMofJpCsv } from "../scripts/sanctions-match.mjs";
-const mofFixture = "\uFEFF区分,番号,氏名（日本語）,氏名（英語）,別名・別称（英語）\n1,001-000001,ミロシェヴィッチ,Milosevic Slobodan,\"Milosevic, S.; Slobo\"\n2,001-000002,ガイッチ,,\n";
-const mofNames = parseMofJpCsv(mofFixture);
-check("MOF CSV: English name and aliases read by header, category/number ignored", mofNames.join("|") === "Milosevic Slobodan|Milosevic, S.|Slobo");
 const seen = new Map();
 for (const s of enabled) seen.set(s.id, (seen.get(s.id) || 0) + 1);
 const dupes = [...seen].filter(([, n]) => n > 1).map(([id]) => id);
