@@ -326,8 +326,11 @@ export async function readAsanaAttachmentHash(request, parent, name, attachmentI
     response = await download(url.href, {
       signal: globalThis.AbortSignal.timeout(60000), redirect: 'follow',
     });
-  } catch {
-    throw new Error('Asana attachment readback transport failure; outcome unverified');
+  } catch (err) {
+    /* Name the host and the transport error code, never the signed URL: a
+       harden-runner egress block or a DNS failure is otherwise invisible. */
+    const code = err?.cause?.code || err?.code || err?.name || 'error';
+    throw new Error('Asana attachment readback transport failure; outcome unverified (host ' + url.hostname + ', ' + String(code) + ')');
   }
   if (!response?.ok) throw new Error('Asana attachment readback HTTP ' + String(response?.status ?? 'unknown'));
   if (!response.body || typeof response.body[Symbol.asyncIterator] !== 'function') {

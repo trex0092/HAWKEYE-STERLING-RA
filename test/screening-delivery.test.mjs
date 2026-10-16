@@ -760,6 +760,21 @@ test('CSV byte readback rejects tampering without marking either report verified
   }
 });
 
+test('CSV readback transport failure names the host and error code, never the signed URL', async () => {
+  const request = async () => ({ data: {
+    name: 'test.csv', parent: { gid: '123' },
+    download_url: 'https://asanausercontent.com/signed/secret-token?sig=abc123'
+  } });
+  const blocked = Object.assign(new Error('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
+  let message = '';
+  try { await readAsanaAttachmentHash(request, '123', 'test.csv', '456', async () => { throw blocked; }); }
+  catch (e) { message = e.message; }
+  assert.match(message, /readback transport failure; outcome unverified \(host asanausercontent\.com, ECONNREFUSED\)/);
+  assert.doesNotMatch(message, /sig=abc123|secret-token/);
+  assert.equal(isTransientEvidenceDeliveryFailure(new Error(message)), true,
+    'a named-host transport failure stays retryable');
+});
+
 test('CSV readback requires actual downloaded bytes, correct parent and HTTPS URL', async () => {
   const csv = Buffer.from('\ufeffstatus,subject\n', 'utf8');
   const request = async () => ({ data: {
