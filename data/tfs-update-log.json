@@ -2524,6 +2524,32 @@
       "status": "pending-rescreen",
       "chainPrev": "4ed30f61646db7f553c09fe336dbe4e59143bfa6c61523725a3a0d3aaf3c36eb",
       "chainHash": "d809a0d7352e3daebba84714e94a6465062ffd77a7fed2d3c5c7d26527812286"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-10-16",
+      "detectedAt": "2026-10-17T00:16:46.401Z",
+      "prevCount": 1010,
+      "newCount": 1010,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "d809a0d7352e3daebba84714e94a6465062ffd77a7fed2d3c5c7d26527812286",
+      "chainHash": "3c8736f3130530617c267d4d3ddc20d93505da37fa9e100505cca65fc71a4ffa"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-17T00:16:46.401Z",
+      "prevCount": 21274,
+      "newCount": 21412,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "3c8736f3130530617c267d4d3ddc20d93505da37fa9e100505cca65fc71a4ffa",
+      "chainHash": "081e95190bba88235589d221719de001317a2a82de5f6b26ee7a4443690a64d4"
     }
   ]
 }
