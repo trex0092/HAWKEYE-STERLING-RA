@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-16T10:00:24.835Z",
-  "githubRunId": "38884207881",
+  "generatedAt": "2026-10-17T00:17:58.159Z",
+  "githubRunId": "38985633071",
   "commit": "8f127d9f24d940fdb60605cd160c49aeb82b2ae6",
   "screenedSubjects": 991,
   "sourceProjects": {
@@ -23,9 +23,7 @@
   ],
   "operational": true,
   "reasons": [],
-  "warnings": [
-    "one or more supplementary sanctions sources were unavailable or partial"
-  ],
+  "warnings": [],
   "evidence": {
     "screenedSubjects": 991,
     "loadedSources": [
@@ -57,6 +55,12 @@
         "id": "eu-fsf",
         "name": "EU — Consolidated financial sanctions list (CSV)",
         "count": 31044,
+        "partial": false
+      },
+      {
+        "id": "fr-dgt",
+        "name": "France — Registre national des gels (DGT)",
+        "count": 21415,
         "partial": false
       }
     ],
@@ -94,8 +98,6 @@
       }
     ],
     "servedByFallback": [],
-    "notes": [
-      "France — Registre national des gels (DGT) could not be loaded (fetch failed <- ECONNRESET: read ECONNRESET) - coverage degraded"
-    ]
+    "notes": []
   }
 }
