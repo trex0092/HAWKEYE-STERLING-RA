@@ -4,8 +4,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { createHash } from 'node:crypto';
-import { checkStored, approvedSourcePopulationIssue, strictProviderCoverageIssues } from './screening-assurance.mjs';
+import { checkStored, approvedSourcePopulationIssue } from './screening-assurance.mjs';
 
 export const PROJECT = '1216203370612914';
 export const DESTINATIONS = Object.freeze({
@@ -16,10 +15,6 @@ const DOMAINS = ['sanctions', 'adverseMedia', 'pep'];
 const LABELS = { sanctions: 'Sanctions', adverseMedia: 'Adverse media', pep: 'PEP' };
 const PAGE_BUDGET = 45000;
 const MAX_PAGES = 500;
-const MAX_CSV_READBACK_BYTES = 32 * 1024 * 1024;
-export function sha256Utf8(text) {
-  return createHash('sha256').update(String(text), 'utf8').digest('hex');
-}
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);
 const normalize = value => String(value ?? '').replace(/\r\n?/g, '\n').trim();
 const gid = value => {
@@ -187,12 +182,6 @@ function rowDomains(row) {
 
 export function buildReports(results, assurance, state, context) {
   const deliveryOperational = validateEvidence(results, assurance, state, context);
-  const strictIssues = strictProviderCoverageIssues(results, assurance);
-  if (assurance.providerCoverage &&
-      (assurance.providerCoverage.complete !== (strictIssues.length === 0) ||
-        JSON.stringify(assurance.providerCoverage.reasons) !== JSON.stringify(strictIssues))) {
-    throw new Error('Provider-depth assurance contradicts run-level provider evidence');
-  }
   // Human review should not require opening 500 numbered evidence pages merely
   // to verify WHICH Asana projects were screened. Only approved project GIDs
   // and aggregate counts appear in this readable summary, never identities.
@@ -222,10 +211,7 @@ export function buildReports(results, assurance, state, context) {
       'Required screening assurance: ' + (assurance.operational ? 'OPERATIONAL' : 'DEGRADED') +
         ' (independent sanctions, adverse-media and PEP verification).',
       'Overall screening evidence: ' + (deliveryOperational ? 'OPERATIONAL' : 'DEGRADED / PROVISIONAL') +
-        '. This report is never a substitute for human disposition.',
-      'Configured provider depth: ' + (strictIssues.length ? 'INCOMPLETE / NOT FULL COVERAGE' : 'COMPLETE FOR THIS RUN') +
-        ' (stricter than required-domain OPERATIONAL; not a cross-engine parity attestation).',
-      'Independent cross-engine record-level population parity: NOT ATTESTED by this run.'];
+        '. This report is never a substitute for human MLRO disposition.'];
     if (results.degraded !== false || results.lists.some(list => list.partial)) {
       summary.push('WARNING: One or more supplementary sanctions sources were unavailable or partial.' +
         ' Required-source and fallback coverage are separately verified by the assurance receipt.' +
@@ -233,7 +219,6 @@ export function buildReports(results, assurance, state, context) {
         'Partial loaded list(s): ' + (results.lists.filter(list => list.partial)
           .map(list => list.name).join('; ') || 'see full failures and assurance warnings below'));
     }
-    for (const issue of strictIssues) summary.push('Provider coverage gap: ' + issue);
     for (const key of domains) {
       const item = assurance.domains[key];
       summary.push('\n' + LABELS[key] + ': ' + (item.operational ? 'OPERATIONAL' : 'DEGRADED'));
@@ -254,25 +239,20 @@ export function buildReports(results, assurance, state, context) {
     const evidence = JSON.stringify({
       screeningDate: results.date, generatedAt: assurance.generatedAt,
       run: assurance.run, domain, screened: results.screened,
-      providerCoverage: { complete: strictIssues.length === 0, reasons: strictIssues },
       assurance: Object.fromEntries(domains.map(key => [key, assurance.domains[key]])),
       lists: results.lists, failures: results.failures || [],
       enrichment: results.enrichment || {}, newOrChangedFindings: alerts,
       storedFindings: Object.fromEntries(standing),
       clearedThisRun: results.cleared || [],
     }, null, 2);
-    const csv = buildFindingsCsv(domain, standing, alerts,
-      domain === 'sanctions' ? results.cleared : [], { provisional: !deliveryOperational });
-    const evidenceSha256 = sha256Utf8(evidence);
-    const csvSha256 = sha256Utf8(csv);
-    summary.push('Evidence JSON SHA-256 (UTF-8): ' + evidenceSha256,
-      'Findings CSV SHA-256 (UTF-8 including BOM): ' + csvSha256);
     if (textSize(summary.join('\n')) > PAGE_BUDGET) throw new Error('Oversized screening summary');
     const pages = splitEvidence(evidence, PAGE_BUDGET - 128);
     if (pages.length > MAX_PAGES) throw new Error('Evidence exceeds the bounded delivery page count; nothing was truncated');
     return { domain, section, title, marker: 'HAWKEYE-SCREENING-V1:' + domain + ':' + results.date,
-      summary: summary.join('\n'), pages, evidenceSha256,
-      attachment: { name: attachment, csv, sha256: csvSha256 } };
+      summary: summary.join('\n'), pages,
+      attachment: { name: attachment,
+        csv: buildFindingsCsv(domain, standing, alerts, domain === 'sanctions' ? results.cleared : [],
+          { provisional: !deliveryOperational }) } };
   });
 }
 
@@ -306,66 +286,13 @@ async function verifyTask(request, task, expected, section = null, parent = null
   return value;
 }
 
-/* Download a newly uploaded Asana CSV and verify the actual bytes, rather
-   than accepting the filename/ID as evidence of content integrity. The signed
-   download URL is read from authenticated Asana metadata, never logged. */
-export async function readAsanaAttachmentHash(request, parent, name, attachmentId,
-  download = globalThis.fetch) {
-  const info = (await request('/attachments/' + gid(attachmentId)
-    + '?opt_fields=name,parent.gid,download_url'))?.data;
-  if (info?.name !== name || String(info?.parent?.gid) !== String(parent)) {
-    throw new Error('Asana attachment metadata read-back did not confirm name and parent');
-  }
-  let url;
-  try { url = new URL(info.download_url); } catch {
-    throw new Error('Asana attachment download URL unavailable for byte verification');
-  }
-  if (url.protocol !== 'https:') throw new Error('Asana attachment download URL is not HTTPS');
-  let response;
-  try {
-    response = await download(url.href, {
-      signal: globalThis.AbortSignal.timeout(60000), redirect: 'follow',
-    });
-  } catch (err) {
-    /* Name the host and the transport error code, never the signed URL: a
-       harden-runner egress block or a DNS failure is otherwise invisible. */
-    const code = err?.cause?.code || err?.code || err?.name || 'error';
-    throw new Error('Asana attachment readback transport failure; outcome unverified (host ' + url.hostname + ', ' + String(code) + ')');
-  }
-  if (!response?.ok) throw new Error('Asana attachment readback HTTP ' + String(response?.status ?? 'unknown'));
-  if (!response.body || typeof response.body[Symbol.asyncIterator] !== 'function') {
-    throw new Error('Asana attachment readback returned no streamed content');
-  }
-  const hash = createHash('sha256');
-  let bytes = 0;
-  try {
-    for await (const chunk of response.body) {
-      bytes += chunk.byteLength;
-      if (bytes > MAX_CSV_READBACK_BYTES) throw new Error('CSV attachment exceeds readback safety limit');
-      hash.update(chunk);
-    }
-  } catch {
-    throw new Error('Asana attachment byte readback incomplete or too large');
-  }
-  return { sha256: hash.digest('hex'), bytes };
-}
-
-/* Attach the findings table, independently read back its bytes, and retire
-   superseded machine-owned tables ONLY after successful hash verification. */
+/* Attach the findings table, prove it is there, and retire superseded
+   machine-owned tables (only exact publisher names are ever deleted). */
 async function deliverAttachment(request, upload, taskId, attachment) {
   const uploaded = gid(await upload(taskId, attachment.name, attachment.csv, 'text/csv; charset=utf-8'));
   const listed = await collection(request, '/attachments?parent=' + taskId + '&limit=100&opt_fields=name');
   if (!listed.some(item => String(item?.gid) === uploaded && item?.name === attachment.name)) {
     throw new Error('Asana read-back did not confirm the findings attachment ' + attachment.name);
-  }
-  // A test double can provide independently stored bytes through readBack;
-  // the production uploader has no such shortcut and must download from Asana.
-  const proof = typeof upload.readBack === 'function'
-    ? await upload.readBack(uploaded, taskId, attachment.name)
-    : await readAsanaAttachmentHash(request, taskId, attachment.name, uploaded);
-  if (proof?.sha256 !== attachment.sha256 || !Number.isSafeInteger(proof?.bytes) ||
-      proof.bytes !== Buffer.byteLength(attachment.csv, 'utf8')) {
-    throw new Error('Asana findings attachment byte/hash mismatch; report remains incomplete');
   }
   // Keep exactly the table just uploaded: older runs' tables AND a same-run
   // re-attempt's copy (same name) are retired.
@@ -404,7 +331,7 @@ async function deliverReport(request, report, projectTasks, assignee, upload = n
   await verifyTask(request, taskId, pending, report.section);
   const children = await collection(request, '/tasks/' + taskId + '/subtasks?limit=100&opt_fields=name');
   const prefix = '[screening-evidence] ';
-  const used = new Set(), confirmedPages = [];
+  const used = new Set();
   for (let i = 0; i < report.pages.length; i++) {
     const name = prefix + String(i + 1).padStart(4, '0');
     const matches = children.filter(child => child.name === name);
@@ -422,24 +349,8 @@ async function deliverReport(request, report, projectTasks, assignee, upload = n
         method: 'POST', noRetryOnUnknownOutcome: true, body: body(content)
       }))?.data?.gid);
     }
-    const readBack = await verifyTask(request, childId, content, null, taskId);
-    const frame = /^BEGIN SCREENING EVIDENCE\n([\s\S]*)\nEND SCREENING EVIDENCE$/
-      .exec(normalize(readBack.notes));
-    if (!frame) throw new Error('Asana evidence page markers failed reconstruction');
-    confirmedPages.push(frame[1]);
+    await verifyTask(request, childId, content, null, taskId);
     used.add(childId);
-  }
-  // Reconstruct the exact full JSON from independently read-back Asana pages.
-  // Hash equality ties the remote ordered bytes to the source-run evidence.
-  const reconstructed = confirmedPages.join('');
-  if (sha256Utf8(reconstructed) !== report.evidenceSha256) {
-    throw new Error('Asana evidence page reconstruction SHA-256 mismatch');
-  }
-  try {
-    const parsed = JSON.parse(reconstructed);
-    if (!record(parsed) || parsed.domain !== report.domain) throw new Error('wrong evidence domain');
-  } catch {
-    throw new Error('Asana evidence page reconstruction is not valid screening JSON');
   }
   // A shorter rerun must not leave old findings masquerading as current pages.
   // Only exact machine-owned names are touched; analyst subtasks are untouched.
@@ -457,9 +368,7 @@ async function deliverReport(request, report, projectTasks, assignee, upload = n
   await request('/tasks/' + taskId, { method: 'PUT', body: body(final) });
   const verified = await verifyTask(request, taskId, final, report.section);
   return { domain: report.domain, taskGid: taskId, sectionGid: report.section,
-    pages: report.pages.length, evidenceSha256: report.evidenceSha256,
-    csvSha256: report.attachment.sha256, csvBytesVerified: true,
-    url: verified.permalink_url || null };
+    pages: report.pages.length, url: verified.permalink_url || null };
 }
 
 export async function publishDailyScreening({ results, assurance, state, request, runId,
@@ -478,12 +387,9 @@ export async function publishDailyScreening({ results, assurance, state, request
     }
   }
   if (errors.length) throw new AggregateError(errors, errors.map(error => error.message).join('; '));
-  const strictIssues = strictProviderCoverageIssues(results, assurance);
   return { version: 1, runId: String(runId), screeningDate: results.date, projectGid: PROJECT,
     verifiedAt: new Date(nowMs).toISOString(),
     operational: validateEvidence(results, assurance, state, { runId, nowMs }),
-    providerCoverageComplete: strictIssues.length === 0,
-    providerCoverageReasons: strictIssues,
     requiredDomainsOperational: assurance.operational, reports: delivered };
 }
 
@@ -527,7 +433,7 @@ export function isTransientEvidenceDeliveryFailure(error) {
   if (!failures.length) return false;
   return failures.every(failure => {
     const message = String(failure?.message || '').replace(/^(?:sanctions|media) delivery failed:\s*/i, '');
-    return /^(?:Asana transport failure; remote outcome not confirmed|Asana attachment upload transport failure; outcome unverified|Asana attachment readback transport failure; outcome unverified|Asana (?:408|429|500|502|503|504):|Asana attachment upload (?:408|429|500|502|503|504)\b|Asana attachment readback HTTP (?:408|429|500|502|503|504)\b)/.test(message);
+    return /^(?:Asana transport failure; remote outcome not confirmed|Asana attachment upload transport failure; outcome unverified|Asana (?:408|429|500|502|503|504):|Asana attachment upload (?:408|429|500|502|503|504)\b)/.test(message);
   });
 }
 

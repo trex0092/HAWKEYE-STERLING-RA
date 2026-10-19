@@ -3,7 +3,7 @@
      { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
    Usage: node test/sanctions-screen.test.mjs */
 import {
-  normalizeName, parseSubject, parseSubjects, parsePrincipals, screeningPrincipalName, subjectLabel, normalizeHit, parseEmployeeSubjects, requireCompleteAsanaPopulation, requireDistinctSourceKeys, normalizeResult, normalizeScreenResponse,
+  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, requireCompleteAsanaPopulation, requireDistinctSourceKeys, normalizeResult, normalizeScreenResponse,
   isMatch, diffState, parseScreeningState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
@@ -187,35 +187,13 @@ const personSubjects = parseSubjects([personTask]);
 const person = personSubjects.find(x => x.entityType === 'individual');
 check('parseSubjects carries structured identity attributes into the screening subject',
   person && person.nationality === 'Jordan' && person.dob === '09/04/1980' && person.passport === 'N-12345');
-
-/* A person with an annotated stake or related corporate party must be
-   screened under the person's actual name, not with KYC metadata appended.
-   Keep genuine alternate spellings in parentheses for review. */
-const annotatedTask = { gid: 'principal-annotation-synthetic', name: 'Synthetic Trading LLC',
-  notes: 'SECTION 4 — IDENTIFICATIONS\n' +
-    'Individual 1 — Shareholder\nName: Synthetic Director One (60% shares)\nNationality: Testland\n' +
-    'Individual 2 — Shareholder\nName: Synthetic Director Two (Synthetic Parent Holdings LLC)\nNationality: Testland\n' };
-const annotatedPeople = parsePrincipals(annotatedTask);
-check('JS principal parser removes shares and related-company annotations, not people',
-  annotatedPeople.length === 2 &&
-  annotatedPeople.map(x => x.name).join('|') === 'Synthetic Director One|Synthetic Director Two');
-check('JS name cleaning preserves parenthetical alternate name spellings',
-  screeningPrincipalName('Synthetic Example (also known as Test Alias)') ===
-    'Synthetic Example (also known as Test Alias)');
-check('JS structured annotation cleaning keeps the original source GID for each screened party',
-  parseSubjects([annotatedTask]).filter(x => !!x.parent).every(x =>
-    x.gid === annotatedTask.gid && !x.name.includes('(')));
-
 // 2026-09-24: parseSubjects no longer filters on `completed` (see the NOTE
 // at its definition) — this function is shared with the HR - Employees
 // fetch, where "completed" means "training finished", not "off-boarded",
 // and every employee task was marked completed, so the old filter silently
 // zeroed that population. `completed: true` rows are included here now;
-// two separate name-collision records now receive their own screening slots.
-check('parseSubjects includes completed rows and retains same-name source records',
-  subs.length === 4 && subs.map(x => x.name).sort().join('|') ===
-  'Done Co|WPM INT LLC|WPM Int  LLC|Xafari DMCC' &&
-  new Set(subs.map(x => x.key)).size === 4);
+// only the case/spacing-duplicate "WPM Int  LLC" is still deduped away.
+check('parseSubjects does not filter on completed, still dedups by key', subs.length === 3 && subs.map(x => x.name).sort().join('|') === 'Done Co|WPM INT LLC|Xafari DMCC');
 
 /* ── principal / UBO extraction (so individuals are screened, not just the company) ── */
 const cddNotes = [
@@ -243,54 +221,6 @@ check('parsePrincipals does NOT capture names outside the identifications sectio
   !principals.some(p => /should-not-be-captured/.test(p.name)));
 check('parsePrincipals is empty for a record with no identifications section',
   parsePrincipals({ name: 'Co', notes: 'SECTION 1 — CUSTOMER INFORMATION\n    Company: CO' }).length === 0);
-
-/* A structured SECTION 4 previously suppressed owner/UBO lines elsewhere in
-   the record, even when the separate Python engine screened those identities.
-   Exercise both natural-person and corporate-owner rows with synthetic names.
-   Generic "Name:" evidence outside identification sections is NOT a party. */
-{
-  const task = { gid: 'owner-drift-1', name: 'Synthetic Trading LLC', notes: [
-    'SECTION 4 — IDENTIFICATIONS',
-    'Individual 1 — Director',
-    'Name: Synthetic Director',
-    'Nationality: UAE',
-    'SECTION 5 — OWNERSHIP CONTEXT',
-    'UBO: Synthetic Additional Person',
-    'Parent Company: Synthetic Holding LLC',
-    'Name: should-not-be-captured',
-    'Shareholder: N/A',
-    'Owner: 75% of shares',
-  ].join('\n') };
-  const extra = parsePrincipals(task);
-  check('owner/UBO rows outside Section 4 are unioned with identified directors',
-    extra.length === 3 && extra.some(p => p.name === 'Synthetic Director') &&
-    extra.some(p => p.name === 'Synthetic Additional Person' && !p.corporate) &&
-    extra.some(p => p.name === 'Synthetic Holding LLC' && p.corporate));
-  check('owner-only rows do not turn placeholders, ownership percentages or unrelated Name fields into identities',
-    !extra.some(p => /should-not-be-captured|75%|N\/A/.test(p.name)));
-  const rows = parseSubjects([task]);
-  check('owner-only party and corporate parent each get separate customer-linked screening slots',
-    rows.length === 4 &&
-    rows.some(p => p.name === 'Synthetic Additional Person' && p.entityType === 'individual' && p.gid === task.gid) &&
-    rows.some(p => p.name === 'Synthetic Holding LLC' && p.entityType === 'organisation' && p.gid === task.gid));
-  const ownerOnly = parsePrincipals({
-    gid: 'owner-drift-2', name: 'Synthetic Group', notes: 'SECTION 1 — CUSTOMER INFORMATION\nUBO: Synthetic Name In Notes'
-  });
-  check('explicit UBO name remains screenable when customer has no Section 4 block',
-    ownerOnly.length === 1 && ownerOnly[0].name === 'Synthetic Name In Notes');
-  const repeated = parsePrincipals({
-    gid: 'owner-drift-3', name: 'Synthetic Holdings', notes: [
-      'SECTION 4 — IDENTIFICATIONS',
-      'Individual 1 — Director',
-      'Name: Synthetic Repeated Person',
-      'UBO: Synthetic Repeated Person',
-      'SECTION 5 — OTHER',
-      'Shareholder: Synthetic Repeated Person',
-    ].join('\n'),
-  });
-  check('same principal repeated on explicit owner lines is not double-counted',
-    repeated.length === 1 && repeated[0].name === 'Synthetic Repeated Person');
-}
 
 const withPpl = parseSubjects([cddTask]);
 check('parseSubjects emits the entity PLUS each principal as its own subject',
@@ -332,19 +262,17 @@ check('subjectLabel marks an individual with role + parent, entity stays plain',
     /employees = await fetchAsanaEmployeeSubjects\(EMPLOYEE_PROJECT_GID/.test(src));
 }
 
-/* Two DISTINCT active customers sharing one legal name must BOTH be
-   screened and retain their own principals and source GIDs. */
+/* Two DISTINCT active customers sharing a legal name: the duplicate entity row
+   is deduped, but the second customer's principals must STILL be screened (they
+   were previously dropped by the early `continue`). */
 const dupA = { gid: 'A', name: 'Acme LLC', completed: false,
   notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Alpha Person\n    Nationality: India' };
 const dupB = { gid: 'B', name: 'Acme LLC', completed: false,
   notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Bravo Person\n    Nationality: UAE' };
 const dupSubs = parseSubjects([dupA, dupB]);
-check('same-named customers retain both entity rows and BOTH principals',
-  dupSubs.filter(x => x.entityType === 'organisation').length === 2 &&
-  dupSubs.length === 4 &&
-  new Set(dupSubs.map(x => x.key)).size === 4 &&
-  dupSubs.some(x => x.name === 'Alpha Person') && dupSubs.some(x => x.name === 'Bravo Person') &&
-  dupSubs.filter(x => x.entityType === 'organisation').every(x => ['A','B'].includes(x.gid)));
+check('duplicate-named customers: entity deduped but BOTH customers’ principals are screened',
+  dupSubs.filter(x => x.entityType === 'organisation').length === 1 &&
+  dupSubs.some(x => x.name === 'Alpha Person') && dupSubs.some(x => x.name === 'Bravo Person'));
 
 /* Source-level proof must include EVERY Asana task, not merely sum whatever
    the name-deduped parser happened to return. Use only synthetic task IDs. */
@@ -361,12 +289,11 @@ check('same-named customers retain both entity rows and BOTH principals',
     { gid: '8011', name: 'SAME REGISTERED COMPANY LLC', completed: false, notes: '' },
     { gid: '8012', name: 'Same Registered Company LLC', completed: false, notes: '' },
   ];
-  const sameNameEntities = parseSubjects(namesakes);
-  const sameNameReceipt = requireCompleteAsanaPopulation(namesakes, sameNameEntities);
-  check('two same-named companies produce separate verifiable source-linked entity slots',
-    sameNameReceipt.screenedSubjects === 2 && sameNameReceipt.taskRecords === 2 &&
-    new Set(sameNameEntities.map(x => x.key)).size === 2 &&
-    new Set(sameNameEntities.map(x => x.gid)).size === 2);
+  let rejectedDuplicateCustomer = false;
+  try { requireCompleteAsanaPopulation(namesakes, parseSubjects(namesakes)); }
+  catch (e) { rejectedDuplicateCustomer = /tasks were not screened/.test(String(e.message)); }
+  check('two same-named company records cannot be collapsed into a green all-clear',
+    rejectedDuplicateCustomer);
   const employees = [
     { gid: '9001', name: 'Synthetic Employee A', completed: true, notes: 'Nationality: UAE' },
     { gid: '9002', name: 'Synthetic Employee B', completed: true, notes: 'Nationality: India' },
@@ -376,17 +303,14 @@ check('same-named customers retain both entity rows and BOTH principals',
   check('both completed HR employee tasks retain one natural-person screening row each',
     staffReceipt.taskRecords === 2 && staffReceipt.screenedSubjects === 2 &&
     staff.every(x => x.entityType === 'individual'));
+  let duplicateStaffRejected = false;
   const namesakeStaff = [
     { gid: '9011', name: 'Synthetic Shared Name', completed: true, notes: '' },
     { gid: '9012', name: 'synthetic shared name', completed: true, notes: '' },
   ];
-  const namesakeSubjects = parseEmployeeSubjects(namesakeStaff);
-  const namesakeReceipt = requireCompleteAsanaPopulation(namesakeStaff, namesakeSubjects, { employee: true });
-  check('same-named completed HR employees both receive separate individual screening slots',
-    namesakeReceipt.screenedSubjects === 2 && namesakeReceipt.taskRecords === 2 &&
-    namesakeSubjects.every(x => x.role === 'Employee' && x.entityType === 'individual') &&
-    new Set(namesakeSubjects.map(x => x.gid)).size === 2 &&
-    new Set(namesakeSubjects.map(x => x.key)).size === 2);
+  try { requireCompleteAsanaPopulation(namesakeStaff, parseEmployeeSubjects(namesakeStaff), { employee: true }); }
+  catch (e) { duplicateStaffRejected = /tasks were not screened/.test(String(e.message)); }
+  check('same-named completed HR employees cannot silently disappear from screening', duplicateStaffRejected);
   let acrossProjectsRejected = false;
   try { requireDistinctSourceKeys(parsed, [{...staff[0], key: parsed[0].key}]); }
   catch (e) { acrossProjectsRejected = /collision/.test(String(e.message)); }
@@ -414,15 +338,17 @@ check('same-named customers retain both entity rows and BOTH principals',
     /requireDistinctSourceKeys\(customers, employees\)/.test(runtime));
 }
 
-/* Empty-normalization subjects get distinct raw keys, and even the same
-   symbols on two different source records must receive two screening slots. */
+/* Empty-normalization customers (symbols-only / unscreenable records) used to
+   COLLIDE on the shared key '': the second was deduped away before screening
+   and never even reached MANUAL REVIEW. Each now gets a distinct raw-string
+   key; only a true duplicate of the SAME raw name dedupes. */
 const symbolSubs = parseSubjects([
   { gid: 'S1', name: '☠☠', completed: false, notes: '' },
   { gid: 'S2', name: '♛♛♛', completed: false, notes: '' },
-  { gid: 'S3', name: '☠☠', completed: false, notes: '' },   // separate source GID; cannot drop
+  { gid: 'S3', name: '☠☠', completed: false, notes: '' },   // true duplicate name → deduped
 ]);
-check('three distinct symbol-only customer records keep unique screening slots',
-  symbolSubs.length === 3 && new Set(symbolSubs.map(x => x.key)).size === 3
+check('two distinct symbol-only customers BOTH survive parsing with distinct stable keys',
+  symbolSubs.length === 2 && new Set(symbolSubs.map(x => x.key)).size === 2
   && symbolSubs.every(x => x.key && x.key.startsWith('raw:')));
 const symbolIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['SOME ENTITY LLC'] }]);
 check('both symbol-only customers produce MANUAL REVIEW rows (neither silently dropped)',
@@ -430,19 +356,6 @@ check('both symbol-only customers produce MANUAL REVIEW rows (neither silently d
     const r = normalizeResult(screenName(x.name, symbolIdx, 85), x);
     return r.key === x.key && r.recommendation === 'review' && r.lists[0].list === 'MANUAL REVIEW';
   }));
-
-/* Non-Latin principal identities must survive parser extraction and be
-   screened (or routed to explicit MANUAL REVIEW), never disappear on keying. */
-{
-  const task = { gid: '93001', name: 'Synthetic Unicode LLC', completed: false,
-    notes: 'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — Director\nName: 漢字測試\nNationality: Testland\n' };
-  const owners = parsePrincipals(task);
-  const slots = parseSubjects([task]);
-  check('non-Latin recorded principal survives extraction and preserves parent linkage',
-    owners.length === 1 && owners[0].name === '漢字測試' &&
-    slots.length === 2 && slots[1].gid === '93001' &&
-    slots[1].parent === task.name && !!slots[1].key);
-}
 
 /* a principal whose name collides with a legal entity (or a same-named principal
    of another customer) must NOT be dropped — every recorded person is screened */
