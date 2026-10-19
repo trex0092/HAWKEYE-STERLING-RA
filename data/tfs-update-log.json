@@ -2574,6 +2574,19 @@
       "chainHash": "081e95190bba88235589d221719de001317a2a82de5f6b26ee7a4443690a64d4",
       "latencyHours": 0,
       "resolutionHash": "a45e94ed8c88faf8f9ca423a4eefe0f32772b654f2643cb81dc7ffd8eb437531"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-19T10:41:01.270Z",
+      "prevCount": 21412,
+      "newCount": 21481,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "081e95190bba88235589d221719de001317a2a82de5f6b26ee7a4443690a64d4",
+      "chainHash": "d4a24107d8ea79f23172df39ecae6b71ae1b3f7fe38dee18ff66bffc94342d4e"
     }
   ]
 }
