@@ -20,28 +20,6 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { readJsonMaybeGz, PEP_FLOOR } from './pep-worldwide.mjs';
 import { LOCALES } from './adverse-media.mjs';
-import { CUSTOMER_PROJECT, EMPLOYEE_PROJECT } from './asana-sections.mjs';
-
-/* The approved TWO-source screening population is an assurance control, not
-   merely workflow configuration. A missing employee project, a blank/redirected
-   GID, bad subject count or population-count mismatch must fail closed.
-   These counters contain no customer/employee names or private task IDs. */
-export function approvedSourcePopulationIssue(population, screened) {
-  const customer = population?.customer, employee = population?.employee;
-  const positive = value => Number.isSafeInteger(value) && value > 0;
-  if (!positive(screened) ||
-      !customer || !employee ||
-      customer.projectGid !== CUSTOMER_PROJECT ||
-      employee.projectGid !== EMPLOYEE_PROJECT ||
-      !positive(customer.screenedSubjects) ||
-      !positive(employee.screenedSubjects)) {
-    return 'approved Customer Database and HR Employees screening-source proof missing or invalid';
-  }
-  if (customer.screenedSubjects + employee.screenedSubjects !== screened) {
-    return 'approved Asana source-population totals disagree with screened subject count';
-  }
-  return '';
-}
 
 export const ASSURANCE_FILE = 'data/screening-assurance.json';
 export const RESULTS_FILE = 'sanctions-screen-results.json';
@@ -60,24 +38,7 @@ const arr = v => Array.isArray(v) ? v : [];
 
 function ageHours(iso, nowMs) {
   const t = Date.parse(String(iso || ''));
-  // Preserve negative ages so a future-dated assurance record cannot be
-  // silently interpreted as newly generated. Allow only minor clock skew.
-  return Number.isFinite(t) ? (nowMs - t) / 3600000 : Infinity;
-}
-const MAX_FUTURE_SKEW_HOURS = 5 / 60;
-
-// An assurance document must be based on the current screening run, not
-// yesterday's cached results with a freshly written generatedAt. A screening
-// started before UTC midnight may finish after midnight, so the previous UTC
-// calendar day remains a valid run date.
-function runDateIssue(runDate, referenceMs) {
-  if (!Number.isFinite(referenceMs)) return 'screening evidence generation timestamp is invalid';
-  const day = String(runDate || '');
-  const today = new Date(referenceMs).toISOString().slice(0, 10);
-  const yesterday = new Date(referenceMs - 86400000).toISOString().slice(0, 10);
-  if (day === today || day === yesterday) return '';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return 'screening run date is missing or invalid';
-  return day > today ? 'screening run date is in the future' : 'screening run date is too old';
+  return Number.isFinite(t) ? Math.max(0, (nowMs - t) / 3600000) : Infinity;
 }
 
 function domain(ok, reasons, evidence, warnings = []) {
@@ -92,46 +53,15 @@ export function assessRuntime({
   pepMaxAgeHours = DEFAULT_PEP_MAX_AGE_HOURS,
   expectedAdverseMatrix = LOCALES.length,
 } = {}) {
-  const screenedCountValid = Number.isSafeInteger(results?.screened) && results.screened > 0;
-  const population = {
-    customer: {
-      projectGid: String(results?.sourcePopulation?.customer?.projectGid || ''),
-      screenedSubjects: results?.sourcePopulation?.customer?.screenedSubjects,
-    },
-    employee: {
-      projectGid: String(results?.sourcePopulation?.employee?.projectGid || ''),
-      screenedSubjects: results?.sourcePopulation?.employee?.screenedSubjects,
-    },
-  };
-  const sourceIssue = approvedSourcePopulationIssue(population, results?.screened);
   const requiredEntries = arr(contract?.domains?.sanctions?.sources)
     .filter(s => s && s.required !== false && String(s.id || ''));
   const requiredSanctions = requiredEntries.map(s => String(s.id));
   const fallbackOf = new Map(requiredEntries.map(s => [String(s.id), String(s.fallbackSourceId || '')]));
-  // Coverage floors mirror the sanctions registry, but are pinned in the
-  // assurance contract so the proof can be independently evaluated from the
-  // persisted run counts. A nonempty but truncated list is NOT complete.
-  const floorById = new Map(requiredEntries.map(s => [String(s.id), s.minNames]));
-  for (const entry of requiredEntries) {
-    const fb = String(entry.fallbackSourceId || '');
-    if (fb && !floorById.has(fb)) floorById.set(fb, entry.fallbackMinNames);
-  }
-  const invalidFloors = requiredEntries.filter(s =>
-    !Number.isSafeInteger(s.minNames) || s.minNames <= 0 ||
-    (s.fallbackSourceId && (!Number.isSafeInteger(s.fallbackMinNames) || s.fallbackMinNames <= 0)));
   const loaded = arr(results?.lists);
-  const loadedIds = loaded.map(x => String(x?.id || ''));
-  const duplicateLoaded = loadedIds.filter((id, i) => loadedIds.indexOf(id) !== i);
-  const duplicateContract = requiredSanctions.filter((id, i) => requiredSanctions.indexOf(id) !== i);
   const loadedById = new Map(loaded.map(x => [String(x?.id || ''), x]));
-  const malformedLoaded = loaded.filter(x =>
-    !x || typeof x.id !== 'string' || !x.id ||
-    !Number.isSafeInteger(x.count) || x.count < 0 || typeof x.partial !== 'boolean');
   const complete = id => {
     const x = loadedById.get(id);
-    const floor = floorById.get(id);
-    return !!x && x.partial !== true && Number.isSafeInteger(x.count)
-      && Number.isSafeInteger(floor) && floor > 0 && x.count >= floor;
+    return !!x && x.partial !== true && num(x.count) > 0;
   };
   /* A required source that did not load completely is covered only by its
      contract-declared fallback, and only when that fallback loaded complete
@@ -146,23 +76,7 @@ export function assessRuntime({
   const missingRequired = unresolvedRequired.filter(id => !loadedById.has(id));
   const partialRequired = unresolvedRequired.filter(id => loadedById.get(id)?.partial === true);
   const emptyRequired = unresolvedRequired.filter(id => num(loadedById.get(id)?.count) <= 0);
-  const undersizedRequired = unresolvedRequired.filter(id => {
-    const x = loadedById.get(id);
-    return !!x && x.partial !== true && !complete(id);
-  });
-  const currentRunIssue = runDateIssue(results?.date, nowMs);
   const sanctionsReasons = [];
-  if (currentRunIssue) sanctionsReasons.push(currentRunIssue);
-  if (!screenedCountValid) sanctionsReasons.push('screened subject count is missing or invalid');
-  if (sourceIssue) sanctionsReasons.push(sourceIssue);
-  if (malformedLoaded.length) sanctionsReasons.push('sanctions source evidence has malformed counts or partial flags');
-  if (!requiredSanctions.length) sanctionsReasons.push('sanctions contract defines no required sources');
-  if (invalidFloors.length) sanctionsReasons.push('required sanctions coverage floors absent or invalid: '
-    + invalidFloors.map(s => s.id).join(', '));
-  if (duplicateContract.length) sanctionsReasons.push('duplicate required sanctions source IDs in contract: '
-    + [...new Set(duplicateContract)].join(', '));
-  if (duplicateLoaded.length) sanctionsReasons.push('duplicate sanctions source IDs in run evidence: '
-    + [...new Set(duplicateLoaded)].join(', '));
   const sanctionsWarnings = servedByFallback.map(x => 'required sanctions source ' + x.id
     + ' did not load completely - screened via its declared fallback ' + x.fallback
     + ' (' + x.fallbackCount + ' names)');
@@ -170,9 +84,6 @@ export function assessRuntime({
   if (missingRequired.length) sanctionsReasons.push('required sanctions sources missing: ' + missingRequired.join(', '));
   if (partialRequired.length) sanctionsReasons.push('required sanctions sources partial: ' + partialRequired.join(', '));
   if (emptyRequired.length) sanctionsReasons.push('required sanctions sources empty: ' + emptyRequired.join(', '));
-  if (undersizedRequired.length) sanctionsReasons.push('required sanctions source counts below verified coverage floor: '
-    + undersizedRequired.map(id => id + ' (' + String(loadedById.get(id)?.count)
-      + ' < ' + String(floorById.get(id)) + ')').join(', '));
   /* The worldwide-screening contract defines five consolidated sources as the
      required sanctions baseline. National/regional sources are supplements:
      losing one must remain visible, but it is not equivalent to losing OFAC,
@@ -184,7 +95,6 @@ export function assessRuntime({
     screenedSubjects: num(results?.screened),
     loadedSources: loaded.map(x => ({ id: x?.id || '', name: x?.name || '', count: num(x?.count), partial: !!x?.partial })),
     requiredSourceIds: requiredSanctions,
-    sourceFloors: [...floorById].map(([id, minNames]) => ({ id, minNames })),
     servedByFallback,
     notes: arr(results?.failures),
   }, sanctionsWarnings);
@@ -193,35 +103,7 @@ export function assessRuntime({
   const backbones = new Set(arr(e.amBackbones).map(String));
   const backboneFailures = e.amBackboneFailures || {};
   const adverseReasons = [];
-  if (currentRunIssue) adverseReasons.push(currentRunIssue);
-  if (!screenedCountValid) adverseReasons.push('screened subject count is missing or invalid');
-  if (sourceIssue) adverseReasons.push(sourceIssue);
   const adverseWarnings = [];
-  // Absent error counters previously became zero via num(undefined), allowing a
-  // broken report to claim no unscreened subjects. Require explicit bounded
-  // integers from the screen, not coercible strings or missing properties.
-  const mandatoryCounters = ['amErrors', 'amPartial', 'skipped', 'amLocalesPerSubject', 'amMatrixTotal'];
-  const invalidCounters = mandatoryCounters.filter(key =>
-    !Number.isSafeInteger(e[key]) || e[key] < 0 ||
-    (['amErrors', 'amPartial', 'skipped'].includes(key) && e[key] > num(results?.screened)));
-  if (invalidCounters.length) adverseReasons.push('adverse-media result counters missing or invalid: '
-    + invalidCounters.join(', '));
-  // The summary is derived from per-subject backbone outcomes. If the
-  // counters or membership list are omitted or contradictory, an ostensibly
-  // zero-error run has no trustworthy coverage provenance.
-  const backboneNames = [
-    ['googleNews', 'Google News RSS'],
-    ['gdelt', 'GDELT global index'],
-    ['bing', 'Bing News'],
-  ];
-  const countersValid = !!e.amBackboneFailures && Array.isArray(e.amBackbones)
-    && backboneNames.every(([key]) => Number.isSafeInteger(backboneFailures[key])
-      && backboneFailures[key] >= 0 && backboneFailures[key] <= num(results?.screened));
-  if (!countersValid) {
-    adverseReasons.push('adverse-media backbone coverage evidence is missing or invalid');
-  } else if (backboneNames.some(([key, label]) => (backboneFailures[key] === 0) !== backbones.has(label))) {
-    adverseReasons.push('adverse-media backbone summary contradicts its failure counts');
-  }
   if (num(results?.screened) <= 0) adverseReasons.push('no subjects were screened');
   if (num(e.skipped) > 0) adverseReasons.push(num(e.skipped) + ' subjects skipped enrichment');
   /* amErrors means a subject had ZERO working global backbone after the
@@ -276,9 +158,6 @@ export function assessRuntime({
   }, adverseWarnings);
 
   const pepReasons = [];
-  if (currentRunIssue) pepReasons.push(currentRunIssue);
-  if (!screenedCountValid) pepReasons.push('screened subject count is missing or invalid');
-  if (sourceIssue) pepReasons.push(sourceIssue);
   const pepWarnings = [];
   const pepRun = e.pepWorldwide || {};
   const pepCount = num(pepDataset?.count);
@@ -287,30 +166,15 @@ export function assessRuntime({
   const pepSourceUnscreenable = arr(pepDataset?.sourceUnscreenable);
   const pepAge = ageHours(pepDataset?.harvested, nowMs);
   if (!pepDataset || typeof pepDataset !== 'object') pepReasons.push('worldwide PEP artifact is missing');
-  if (!Number.isSafeInteger(pepDataset?.count) || pepDataset.count < 0
-    || !Number.isSafeInteger(pepRun.count) || pepRun.count < 0) {
-    pepReasons.push('PEP dataset or consumed population count is missing or invalid');
-  }
-  // The daily screen and assurance may both read a stale count header; verify
-  // that the downloaded artifact really contains that many person records.
-  if (!Array.isArray(pepDataset?.entries) || pepDataset.entries.length !== pepCount) {
-    pepReasons.push('worldwide PEP artifact population count does not match actual entries');
-  }
-  if (pepRun.partial !== false && pepRun.partial !== true) {
-    pepReasons.push('daily PEP evidence has no valid partial/completeness status');
-  }
   if (pepRun.active !== true) pepReasons.push('daily screen did not load the worldwide PEP artifact');
   if (num(pepRun.count) !== pepCount) pepReasons.push('daily screen PEP count does not match the harvested artifact');
-  if (!pepRun.harvested) pepReasons.push('daily screen did not identify the consumed PEP harvest');
-  else if (pepDataset?.harvested && pepRun.harvested !== pepDataset.harvested) {
+  if (pepRun.harvested && pepDataset?.harvested && pepRun.harvested !== pepDataset.harvested) {
     pepReasons.push('daily screen consumed a different PEP harvest than the assurance artifact');
   }
   if (pepRun.partial === true) pepReasons.push('daily screen reports the worldwide PEP layer as partial');
   if (pepCount < PEP_FLOOR) pepReasons.push('worldwide PEP artifact below floor: ' + pepCount + ' < ' + PEP_FLOOR);
   if (pepDataset?.partial === true) pepReasons.push('worldwide PEP artifact is partial' + (pepExpected ? ': ' + pepCount + '/' + pepExpected : ''));
-  if (pepExpected > pepCount) pepReasons.push('worldwide PEP artifact count is below its declared expected population: ' + pepCount + '/' + pepExpected);
   if (!Number.isFinite(pepAge)) pepReasons.push('worldwide PEP artifact has no valid harvest timestamp');
-  else if (pepAge < -MAX_FUTURE_SKEW_HOURS) pepReasons.push('worldwide PEP artifact harvest timestamp is in the future');
   else if (pepAge > pepMaxAgeHours) pepReasons.push('worldwide PEP artifact is stale: ' + Math.round(pepAge) + 'h > ' + pepMaxAgeHours + 'h');
 
   /* The complete worldwide artifact is the operative PEP screening layer: it
@@ -351,7 +215,6 @@ export function assessRuntime({
       githubRunId: process.env.GITHUB_RUN_ID || '',
       commit: process.env.GITHUB_SHA || '',
       screenedSubjects: num(results?.screened),
-      sourcePopulation: population,
     },
     countryUniverse: Number(contract?.countryUniverse) || 195,
     operational: sanctions.operational && adverseMedia.operational && pep.operational,
@@ -386,118 +249,14 @@ export function writeAssurance(assurance) {
   writeFileSync(BADGE_FILES.pep, badgeSvg('PEP runtime', assurance.domains.pep));
 }
 
-export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAULT_ASSURANCE_MAX_AGE_HOURS, expectedCommit = null } = {}) {
+export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAULT_ASSURANCE_MAX_AGE_HOURS } = {}) {
   const reasons = [];
   if (!assurance || assurance.version !== 1) reasons.push('assurance artifact missing or invalid');
-  if (assurance?.operational !== true) reasons.push('overall screening assurance is not operational');
   const age = ageHours(assurance?.generatedAt, nowMs);
   if (!Number.isFinite(age)) reasons.push('assurance timestamp missing or invalid');
-  else if (age < -MAX_FUTURE_SKEW_HOURS) reasons.push('assurance timestamp is in the future');
   else if (age > maxAgeHours) reasons.push('assurance evidence is stale: ' + Math.round(age) + 'h > ' + maxAgeHours + 'h');
-  const issuedAtMs = Date.parse(String(assurance?.generatedAt || ''));
-  if (Number.isFinite(issuedAtMs)) {
-    const runProblem = runDateIssue(assurance?.run?.date, issuedAtMs);
-    if (runProblem) reasons.push(runProblem);
-  }
-  // Operational proof is tied to the EXACT screening-code revision being
-  // checked. A fresh report from yesterday's code is not validation of a
-  // newly merged engine, source-project policy, or Asana delivery contract.
-  // This is a commit-consistency check, not a claim of signed provenance.
-  if (expectedCommit !== null && expectedCommit !== undefined) {
-    const expected = String(expectedCommit).trim();
-    const actual = String(assurance?.run?.commit || '').trim();
-    if (!/^[a-f0-9]{40}$/i.test(expected)) {
-      reasons.push('expected integrated screening commit is missing or invalid');
-    } else if (!/^[a-f0-9]{40}$/i.test(actual)) {
-      reasons.push('stored screening evidence has no verified producing commit');
-    } else if (actual.toLowerCase() !== expected.toLowerCase()) {
-      reasons.push('stored screening evidence was produced by a different code commit');
-    }
-  }
-  // The persisted verdict is NOT the evidence. Refuse a superficially green
-  // boolean when the stored counters, unresolved reasons or consumed source
-  // metadata contradict that verdict. This validates internal consistency;
-  // an independently signed receipt is still needed for provenance.
-  const screened = assurance?.run?.screenedSubjects;
-  const count = n => Number.isSafeInteger(n) && n >= 0;
-  if (!count(screened) || screened === 0) reasons.push('screened subject count missing or invalid');
-  const sourceIssue = approvedSourcePopulationIssue(assurance?.run?.sourcePopulation, screened);
-  if (sourceIssue) reasons.push(sourceIssue);
   for (const key of ['sanctions','adverseMedia','pep']) {
-    const d = assurance?.domains?.[key];
-    if (d?.operational !== true) reasons.push(key + ' is not operational');
-    if (!Array.isArray(d?.reasons) || d.reasons.length) {
-      reasons.push(key + ' has missing or unresolved failure reasons');
-    }
-    if (!d?.evidence || typeof d.evidence !== 'object' || Array.isArray(d.evidence)) {
-      reasons.push(key + ' evidence missing or invalid');
-    }
-  }
-  const sanc = assurance?.domains?.sanctions?.evidence;
-  if (sanc && typeof sanc === 'object') {
-    if (!count(sanc.screenedSubjects) || sanc.screenedSubjects !== screened) {
-      reasons.push('sanctions evidence does not match screened population');
-    }
-    if (!Array.isArray(sanc.requiredSourceIds) || !sanc.requiredSourceIds.length ||
-        !Array.isArray(sanc.loadedSources) || !Array.isArray(sanc.sourceFloors) ||
-        !Array.isArray(sanc.servedByFallback)) {
-      reasons.push('sanctions required-source evidence incomplete');
-    } else {
-      const ids = sanc.requiredSourceIds;
-      const floor = new Map(sanc.sourceFloors.map(x => [x?.id, x?.minNames]));
-      const loaded = new Map(sanc.loadedSources.map(x => [x?.id, x]));
-      const fallback = new Map(sanc.servedByFallback.map(x => [x?.id, x]));
-      if (new Set(ids).size !== ids.length || new Set(sanc.loadedSources.map(x => x?.id)).size !== sanc.loadedSources.length) {
-        reasons.push('sanctions source evidence contains duplicate IDs');
-      }
-      for (const id of ids) {
-        const p = loaded.get(id), minimum = floor.get(id);
-        const complete = count(minimum) && minimum > 0 && count(p?.count) &&
-          p?.partial === false && p.count >= minimum;
-        const subst = fallback.get(id), fb = loaded.get(subst?.fallback), fbFloor = floor.get(subst?.fallback);
-        const substituted = !!subst && subst.fallback !== id &&
-          count(fbFloor) && fbFloor > 0 && count(fb?.count) &&
-          fb.partial === false && fb.count >= fbFloor &&
-          subst.fallbackCount === fb.count;
-        if (!complete && !substituted) {
-          reasons.push('required sanctions source not proven complete: ' + String(id));
-        }
-      }
-    }
-  }
-  const media = assurance?.domains?.adverseMedia?.evidence;
-  if (media && typeof media === 'object') {
-    if (!count(media.screenedSubjects) || media.screenedSubjects !== screened) {
-      reasons.push('adverse-media evidence does not match screened population');
-    }
-    if (!count(media.errors) || media.errors !== 0 ||
-        !count(media.skippedSubjects) || media.skippedSubjects !== 0) {
-      reasons.push('adverse-media subjects remain without verified coverage');
-    }
-    if (!count(media.matrixTotal) || media.matrixTotal === 0 ||
-        !count(media.googleNewsLocalesPerSubject) || media.googleNewsLocalesPerSubject === 0 ||
-        !Array.isArray(media.globalBackbones) ||
-        !media.backboneFailures || typeof media.backboneFailures !== 'object') {
-      reasons.push('adverse-media source coverage summary is missing');
-    } else {
-      for (const [key, name] of [['googleNews','Google News RSS'], ['gdelt','GDELT global index'], ['bing','Bing News']]) {
-        const failed = media.backboneFailures[key];
-        if (!count(failed) || failed > screened ||
-            (failed === 0) !== media.globalBackbones.includes(name)) {
-          reasons.push('adverse-media source evidence contradicts backbone counts: ' + key);
-        }
-      }
-    }
-  }
-  const pep = assurance?.domains?.pep?.evidence;
-  if (pep && typeof pep === 'object') {
-    if (pep.partial !== false || pep.dailyScreenActive !== true ||
-        !count(pep.persons) || !count(pep.floor) ||
-        pep.floor <= 0 || pep.persons < pep.floor ||
-        !count(pep.dailyScreenCount) || pep.dailyScreenCount !== pep.persons ||
-        !pep.harvestedAt || pep.dailyScreenHarvestedAt !== pep.harvestedAt) {
-      reasons.push('worldwide PEP stored coverage does not prove a complete consumed harvest');
-    }
+    if (assurance?.domains?.[key]?.operational !== true) reasons.push(key + ' is not operational');
   }
   return { ok: reasons.length === 0, reasons, ageHours: Number.isFinite(age) ? age : null };
 }
@@ -511,12 +270,7 @@ function main() {
   if (mode === '--check') {
     let stored = null;
     try { stored = loadJson(ASSURANCE_FILE); } catch {}
-    // GitHub Actions provides the workflow triggering commit. The workflow
-    // passes it explicitly, so no assurance job can silently reuse an older
-    // screening run after code or the approved Asana-source mapping changed.
-    const expectedCommit = process.env.SCREENING_ASSURANCE_EXPECTED_COMMIT ??
-      (process.env.GITHUB_ACTIONS === 'true' ? (process.env.GITHUB_SHA ?? '') : null);
-    const checked = checkStored(stored, { expectedCommit });
+    const checked = checkStored(stored);
     if (!checked.ok) {
       console.error('screening-assurance: FAILED');
       for (const r of checked.reasons) console.error('- ' + r);

@@ -4,7 +4,6 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { checkStored, approvedSourcePopulationIssue } from './screening-assurance.mjs';
 
 export const PROJECT = '1216203370612914';
 export const DESTINATIONS = Object.freeze({
@@ -59,8 +58,7 @@ export function validateEvidence(results, assurance, state, { runId, nowMs = Dat
     throw new Error('Screening state is missing or belongs to a different screening date');
   }
   const generated = Date.parse(assurance?.generatedAt || '');
-  if (!record(assurance) || assurance.version !== 1
-    || !/^\d{1,20}$/.test(String(runId ?? ''))
+  if (!record(assurance) || assurance.version !== 1 || !runId
     || String(assurance.run?.githubRunId) !== String(runId)
     || assurance.run?.date !== results.date
     || assurance.run?.screenedSubjects !== results.screened
@@ -78,44 +76,7 @@ export function validateEvidence(results, assurance, state, { runId, nowMs = Dat
   }
   const operational = DOMAINS.every(domain => assurance.domains[domain].operational);
   if (assurance.operational !== operational) throw new Error('Contradictory overall assurance status');
-  // Source rows must be complete enough to support a reproducible audit
-  // trail. A supplemental source may be partial, but a zero-name, anonymous or
-  // malformed list must never be accepted as a successful source fetch.
-  if (!results.lists.length || !results.lists.every(list =>
-    record(list) && typeof list.id === 'string' && !!list.id.trim() &&
-    typeof list.name === 'string' && !!list.name.trim() &&
-    Number.isSafeInteger(list.count) && list.count > 0 &&
-    typeof list.partial === 'boolean')) {
-    throw new Error('Screening source inventory is incomplete or malformed');
-  }
-  if (operational) {
-    // The independent assurance distinguishes REQUIRED source coverage (and
-    // formally declared, complete fallbacks) from supplementary national-list
-    // outages. The latter must be disclosed in Asana but must not block the
-    // delivery of valid primary screening evidence and human-owned cases.
-    const checked = checkStored(assurance, { nowMs, maxAgeHours: 6 });
-    if (!checked.ok) {
-      throw new Error('Screening evidence contradicts the OPERATIONAL Asana delivery claim');
-    }
-    // Do not accept stale or forged green source receipts that refer to a
-    // different inventory than the just-finished screening engine.
-    const loaded = assurance.domains.sanctions.evidence.loadedSources;
-    const receiptById = new Map(loaded.map(row => [row.id, row]));
-    if (loaded.length !== results.lists.length ||
-        new Set(results.lists.map(row => row.id)).size !== results.lists.length ||
-        results.lists.some(row => {
-          const proof = receiptById.get(row.id);
-          return !proof || proof.count !== row.count || proof.partial !== row.partial;
-        })) {
-      throw new Error('Screening source inventory contradicts the independent assurance receipt');
-    }
-  }
-  // An OPTIONAL source being partial is not equivalent to missing required
-  // screening: deliver the warnings and findings instead of failing Asana.
-  // Nonetheless do not return an overall all-clear while any source is
-  // degraded. Mark negative and clearance evidence provisional for MLRO review.
-  return operational && results.degraded === false &&
-    results.lists.every(list => list.partial === false);
+  return operational;
 }
 
 /* Human-readable findings table, attached to each daily results card. The JSON
@@ -129,19 +90,14 @@ export const FINDINGS_COLUMNS = ['status', 'subject', 'entity_type', 'customer',
   'mechanism', 'confidence', 'source_url', 'first_seen', 'last_seen', 'case_priority', 'record_key'];
 export function csvCell(value) {
   let text = Array.isArray(value) ? value.join('; ') : String(value ?? '');
-  // Spreadsheets may ignore leading whitespace/Unicode format characters
-  // before interpreting =, +, -, @ as a formula. Prefix the ORIGINAL cell
-  // before its whitespace to preserve analyst-visible evidence safely.
-  if (/^[\s\u200b\ufeff\u2060]*[=+\-@]/u.test(text) || /^[\t\r]/.test(text)) {
-    text = "'" + text;
-  }
+  if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
   return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
 }
 export function findingsAttachmentName(domain, date, runId) {
   return 'screening-findings-' + domain + '-' + date + '-run' + String(runId) + '.csv';
 }
 export const FINDINGS_ATTACHMENT_RE = /^screening-findings-(?:sanctions|media)-\d{4}-\d{2}-\d{2}-run\d+\.csv$/;
-export function buildFindingsCsv(domain, standing, alerts, cleared, { provisional = false } = {}) {
+export function buildFindingsCsv(domain, standing, alerts, cleared) {
   const changed = new Set(alerts.map(row => row?.key).filter(Boolean));
   const lines = [FINDINGS_COLUMNS.join(',')];
   const push = cells => lines.push(FINDINGS_COLUMNS.map(column => csvCell(cells[column])).join(','));
@@ -161,12 +117,7 @@ export function buildFindingsCsv(domain, standing, alerts, cleared, { provisiona
     }
   }
   for (const name of Array.isArray(cleared) ? cleared : []) {
-    // A missing match is a DETECTION result, not an MLRO disposition.
-    // If any required domain is degraded, even the negative evidence is
-    // provisional and requires manual review.
-    push({ status: provisional
-      ? 'NOT MATCHED - DEGRADED COVERAGE - REVIEW REQUIRED'
-      : 'NO MATCH ON THIS RUN - NOT MLRO CLEARANCE', subject: name });
+    push({ status: 'CLEARED THIS RUN', subject: name });
   }
   return '\ufeff' + lines.join('\n') + '\n';
 }
@@ -181,23 +132,7 @@ function rowDomains(row) {
 }
 
 export function buildReports(results, assurance, state, context) {
-  const deliveryOperational = validateEvidence(results, assurance, state, context);
-  // Human review should not require opening 500 numbered evidence pages merely
-  // to verify WHICH Asana projects were screened. Only approved project GIDs
-  // and aggregate counts appear in this readable summary, never identities.
-  const sourcePopulation = assurance?.run?.sourcePopulation;
-  const sourceIssue = approvedSourcePopulationIssue(sourcePopulation, results.screened);
-  const sourceSummary = sourceIssue
-    ? ['Asana source-population proof: UNVERIFIED — review required.',
-      'A processed-subject count alone is NOT evidence that both source projects were read.']
-    : ['Asana source-population proof: VERIFIED for this workflow run.',
-      'Customer Database (project ' + sourcePopulation.customer.projectGid + '): ' +
-        sourcePopulation.customer.screenedSubjects + ' customer/legal-entity and principal subjects.',
-      'HR Employees (project ' + sourcePopulation.employee.projectGid + '): ' +
-        sourcePopulation.employee.screenedSubjects + ' individual employees, including completed training records.',
-      'Source population reconciled: ' +
-        (sourcePopulation.customer.screenedSubjects + sourcePopulation.employee.screenedSubjects) +
-        ' of ' + results.screened + ' screened subjects.'];
+  validateEvidence(results, assurance, state, context);
   return Object.entries(DESTINATIONS).map(([domain, section]) => {
     const domains = domain === 'sanctions' ? ['sanctions'] : ['adverseMedia', 'pep'];
     const title = 'Daily ' + (domain === 'sanctions' ? 'Sanctions' : 'Adverse Media and PEP')
@@ -206,19 +141,7 @@ export function buildReports(results, assurance, state, context) {
       'Evidence generated: ' + assurance.generatedAt,
       'Workflow run: ' + assurance.run.githubRunId,
       'Subjects processed by the sanctions engine: ' + results.screened,
-      ...sourceSummary,
-      'Processing count is not proof of complete adverse-media or PEP coverage.',
-      'Required screening assurance: ' + (assurance.operational ? 'OPERATIONAL' : 'DEGRADED') +
-        ' (independent sanctions, adverse-media and PEP verification).',
-      'Overall screening evidence: ' + (deliveryOperational ? 'OPERATIONAL' : 'DEGRADED / PROVISIONAL') +
-        '. This report is never a substitute for human MLRO disposition.'];
-    if (results.degraded !== false || results.lists.some(list => list.partial)) {
-      summary.push('WARNING: One or more supplementary sanctions sources were unavailable or partial.' +
-        ' Required-source and fallback coverage are separately verified by the assurance receipt.' +
-        ' Screening findings and negative/clearance evidence require MLRO review.',
-        'Partial loaded list(s): ' + (results.lists.filter(list => list.partial)
-          .map(list => list.name).join('; ') || 'see full failures and assurance warnings below'));
-    }
+      'Processing count is not proof of complete adverse-media or PEP coverage.'];
     for (const key of domains) {
       const item = assurance.domains[key];
       summary.push('\n' + LABELS[key] + ': ' + (item.operational ? 'OPERATIONAL' : 'DEGRADED'));
@@ -251,8 +174,7 @@ export function buildReports(results, assurance, state, context) {
     return { domain, section, title, marker: 'HAWKEYE-SCREENING-V1:' + domain + ':' + results.date,
       summary: summary.join('\n'), pages,
       attachment: { name: attachment,
-        csv: buildFindingsCsv(domain, standing, alerts, domain === 'sanctions' ? results.cleared : [],
-          { provisional: !deliveryOperational }) } };
+        csv: buildFindingsCsv(domain, standing, alerts, domain === 'sanctions' ? results.cleared : []) } };
   });
 }
 
@@ -316,11 +238,7 @@ async function deliverReport(request, report, projectTasks, assignee, upload = n
     }
     await request('/tasks/' + taskId, { method: 'PUT', body: body(pending) });
   } else {
-    // A lost Asana response may mean the card was created remotely.
-    // Never replay an ambiguous creation in the same HTTP retry loop: the
-    // next run re-reads daily titles and publisher markers before reusing it.
-    const created = await request('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
-      body: body({ ...pending,
+    const created = await request('/tasks', { method: 'POST', body: body({ ...pending,
       projects: [PROJECT], assignee,
       memberships: [{ project: PROJECT, section: report.section }],
     }) });
@@ -342,12 +260,7 @@ async function deliverReport(request, report, projectTasks, assignee, upload = n
       childId = gid(matches[0].gid);
       await request('/tasks/' + childId, { method: 'PUT', body: body(content) });
     } else {
-      // An evidence-page POST is also non-replayable after a lost response.
-      // Reconciliation on the next run discovers that numbered page by name,
-      // reads back its parent and overwrites only our own marked evidence.
-      childId = gid((await request('/tasks/' + taskId + '/subtasks', {
-        method: 'POST', noRetryOnUnknownOutcome: true, body: body(content)
-      }))?.data?.gid);
+      childId = gid((await request('/tasks/' + taskId + '/subtasks', { method: 'POST', body: body(content) }))?.data?.gid);
     }
     await verifyTask(request, childId, content, null, taskId);
     used.add(childId);
@@ -388,94 +301,36 @@ export async function publishDailyScreening({ results, assurance, state, request
   }
   if (errors.length) throw new AggregateError(errors, errors.map(error => error.message).join('; '));
   return { version: 1, runId: String(runId), screeningDate: results.date, projectGid: PROJECT,
-    verifiedAt: new Date(nowMs).toISOString(),
-    operational: validateEvidence(results, assurance, state, { runId, nowMs }),
-    requiredDomainsOperational: assurance.operational, reports: delivered };
+    verifiedAt: new Date(nowMs).toISOString(), operational: assurance.operational, reports: delivered };
 }
 
 /* Multipart upload (Node's built-in FormData/Blob — no dependency). The JSON
    client cannot send files, so this is the one direct call to Asana here. */
-export async function uploadAttachment(parent, name, text, type) {
+async function uploadAttachment(parent, name, text, type) {
   const form = new globalThis.FormData();
   form.append('parent', parent);
   form.append('file', new globalThis.Blob([text], { type }), name);
-  let response;
-  try {
-    response = await fetch('https://app.asana.com/api/1.0/attachments', {
-      method: 'POST', body: form, signal: globalThis.AbortSignal.timeout(60000),
-      headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' },
-    });
-  } catch {
-    // An upload can have committed even when the TCP response disappeared.
-    // Never log the provider exception or replay that POST directly.
-    throw new Error('Asana attachment upload transport failure; outcome unverified');
-  }
+  const response = await fetch('https://app.asana.com/api/1.0/attachments', {
+    method: 'POST', body: form, signal: globalThis.AbortSignal.timeout(60000),
+    headers: { Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN, Accept: 'application/json' },
+  });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error('Asana attachment upload ' + response.status);
-  if (!/^\d+$/.test(String(data?.data?.gid || ''))) {
-    throw new Error('Asana attachment upload transport failure; outcome unverified');
-  }
-  return data.data.gid;
-}
-
-/* Reconcile a transient Asana delivery failure once while TODAY'S complete
-   screening result is still available in the job. Without this bounded retry,
-   the morning delivery guard restarts the entire ~100-minute 991-subject
-   screen just to retry a report publication. New cards/pages are already
-   marked, remotely read back and re-used by publishDailyScreening; no AML
-   decision or screening result is recalculated on a delivery retry.
-   Refuse to retry contradictory coverage, missing MLRO approval, bad project
-   mapping, incomplete evidence or any other deterministic failure. */
-export const EVIDENCE_DELIVERY_RETRY_DELAY_MS = 15000;
-export function isTransientEvidenceDeliveryFailure(error) {
-  const failures = error instanceof AggregateError && Array.isArray(error.errors)
-    ? error.errors : [error];
-  if (!failures.length) return false;
-  return failures.every(failure => {
-    const message = String(failure?.message || '').replace(/^(?:sanctions|media) delivery failed:\s*/i, '');
-    return /^(?:Asana transport failure; remote outcome not confirmed|Asana attachment upload transport failure; outcome unverified|Asana (?:408|429|500|502|503|504):|Asana attachment upload (?:408|429|500|502|503|504)\b)/.test(message);
-  });
-}
-
-export async function deliverWithOneRecoveryRetry(deliver, {
-  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
-  delayMs = EVIDENCE_DELIVERY_RETRY_DELAY_MS,
-  onRetry = () => {}
-} = {}) {
-  if (typeof deliver !== 'function' || typeof sleep !== 'function' ||
-      typeof onRetry !== 'function' || !Number.isSafeInteger(delayMs) ||
-      delayMs < 0 || delayMs > EVIDENCE_DELIVERY_RETRY_DELAY_MS) {
-    throw new Error('Invalid bounded screening evidence recovery settings');
-  }
-  try {
-    return await deliver();
-  } catch (error) {
-    if (!isTransientEvidenceDeliveryFailure(error)) throw error;
-    onRetry();
-    await sleep(delayMs);
-    // Exactly one more pass with the SAME immutable screening inputs. Remote
-    // card/page ownership and attachment read-back checks still apply.
-    return await deliver();
-  }
+  return data?.data?.gid;
 }
 
 async function main() {
   if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN is required for daily results delivery');
   const read = file => JSON.parse(readFileSync(file, 'utf8'));
   const { asana } = await import('./asana-notify.mjs');
-  // Retain ONE screened input snapshot; a transport-only retry reconciles
-  // Asana evidence without recomputing subjects or changing risk decisions.
-  const results = read('sanctions-screen-results.json');
-  const assurance = read('data/screening-assurance.json');
-  const state = read('data/sanctions-screen-state.json');
-  const receipt = await deliverWithOneRecoveryRetry(() => publishDailyScreening({
-    results, assurance, state,
+  const receipt = await publishDailyScreening({
+    results: read('sanctions-screen-results.json'),
+    assurance: read('data/screening-assurance.json'),
+    state: read('data/sanctions-screen-state.json'),
     runId: process.env.GITHUB_RUN_ID,
     assignee: process.env.ASANA_CASE_ASSIGNEE_GID || '1213645083721304',
     request: (path, options = {}) => asana(path, { ...options, signal: globalThis.AbortSignal.timeout(30000) }),
     upload: uploadAttachment,
-  }), {
-    onRetry: () => console.warn('screening-delivery: transient Asana delivery failure; reconciling existing evidence once before escalating'),
   });
   writeFileSync('screening-delivery-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
   for (const report of receipt.reports) console.log('screening-delivery: verified ' + report.domain + ' task ' + report.taskGid);

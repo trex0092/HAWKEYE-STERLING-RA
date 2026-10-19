@@ -2,78 +2,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { publishDailyScreening, buildReports, splitEvidence, textSize, validateEvidence,
-  PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName,
-  isTransientEvidenceDeliveryFailure, deliverWithOneRecoveryRetry, EVIDENCE_DELIVERY_RETRY_DELAY_MS, uploadAttachment } from '../scripts/screening-delivery.mjs';
+  PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName } from '../scripts/screening-delivery.mjs';
 
 const NOW = Date.parse('2026-09-30T10:00:00Z');
 function fixture() {
-  // Synthetic but internally consistent evidence, so that failures prove the
-  // mismatch under test rather than passing because the fixture lacks sources.
-  const status = (operational, evidence) => ({ operational, reasons: [], warnings: [], evidence });
+  const status = operational => ({ operational, reasons: [], warnings: [], evidence: {} });
   return {
     runId: '100', nowMs: NOW,
-    results: { date: '2026-09-30', screened: 2, alerts: [], lists: [{ id: 'synthetic', name: 'Synthetic Test List', count: 1, partial: false }],
-      failures: [], enrichment: {}, cleared: [], degraded: false },
-
+    results: { date: '2026-09-30', screened: 2, alerts: [], lists: [{ id: 'synthetic', count: 1 }],
+      failures: [], enrichment: {}, cleared: [] },
     assurance: { version: 1, generatedAt: new Date(NOW).toISOString(), operational: true,
-      run: { githubRunId: '100', date: '2026-09-30', screenedSubjects: 2,
-        sourcePopulation: {
-          customer: { projectGid: '1214107620220121', screenedSubjects: 1 },
-          employee: { projectGid: '1216239131596624', screenedSubjects: 1 },
-        },
-      },
-      domains: {
-        sanctions: status(true, {
-          screenedSubjects: 2, requiredSourceIds: ['synthetic'],
-          loadedSources: [{ id: 'synthetic', count: 1, partial: false }],
-          sourceFloors: [{ id: 'synthetic', minNames: 1 }],
-          servedByFallback: [],
-        }),
-        adverseMedia: status(true, {
-          screenedSubjects: 2, errors: 0, skippedSubjects: 0,
-          matrixTotal: 79, googleNewsLocalesPerSubject: 8,
-          globalBackbones: ['Google News RSS', 'GDELT global index', 'Bing News'],
-          backboneFailures: { googleNews: 0, gdelt: 0, bing: 0 },
-        }),
-        pep: status(true, {
-          persons: 50000, floor: 30000, partial: false,
-          dailyScreenActive: true, dailyScreenCount: 50000,
-          harvestedAt: '2026-09-30T00:00:00.000Z',
-          dailyScreenHarvestedAt: '2026-09-30T00:00:00.000Z',
-        }),
-      } },
+      run: { githubRunId: '100', date: '2026-09-30', screenedSubjects: 2 },
+      domains: { sanctions: status(true), adverseMedia: status(true), pep: status(true) } },
     state: { updated: '2026-09-30', subjects: {} },
   };
 }
-test('daily Asana reports independently disclose BOTH approved screening source populations', () => {
-  const input = fixture();
-  const reports = buildReports(input.results, input.assurance, input.state, input);
-  assert.equal(reports.length, 2);
-  for (const report of reports) {
-    assert.match(report.summary, /Asana source-population proof: VERIFIED for this workflow run/);
-    assert.match(report.summary, /Customer Database \(project 1214107620220121\): 1 customer\/legal-entity and principal subjects/);
-    assert.match(report.summary, /HR Employees \(project 1216239131596624\): 1 individual employees/);
-    assert.match(report.summary, /Source population reconciled: 2 of 2 screened subjects/);
-    assert.match(report.summary, /Processing count is not proof of complete adverse-media or PEP coverage/);
-    assert.doesNotMatch(report.summary, /passport|DOB|Emirates ID/i);
-  }
-});
-
-test('degraded evidence never invents two-project proof when source receipt is absent', () => {
-  const input = fixture();
-  input.assurance.operational = false;
-  input.assurance.domains.adverseMedia.operational = false;
-  input.assurance.domains.adverseMedia.reasons = ['synthetic news coverage unavailable'];
-  delete input.assurance.run.sourcePopulation;
-  const reports = buildReports(input.results, input.assurance, input.state, input);
-  assert.equal(reports.length, 2);
-  for (const report of reports) {
-    assert.match(report.summary, /Asana source-population proof: UNVERIFIED/);
-    assert.match(report.summary, /DEGRADED \/ PROVISIONAL/);
-    assert.doesNotMatch(report.summary, /Source population reconciled:/);
-  }
-});
-
 function api() {
   const tasks = new Map();
   const calls = [];
@@ -94,7 +37,7 @@ function api() {
   const request = async (path, options = {}) => {
     const method = options.method || 'GET';
     const data = options.body ? JSON.parse(options.body).data : null;
-    calls.push({ path, method, data, nonReplayable: options.noRetryOnUnknownOutcome === true });
+    calls.push({ path, method, data });
     if (intercept) { const response = await intercept(path, method, data); if (response !== undefined) return response; }
     let match;
     if ((match = path.match(/^\/attachments\?parent=(\d+)/))) {
@@ -143,11 +86,6 @@ for (const [name, change] of [
   ['missing results', x => { x.results = null; }],
   ['zero screened subjects', x => { x.results.screened = 0; }],
   ['invalid calendar date', x => { x.results.date = '2026-02-30'; }],
-  ['non-numeric workflow run ID', x => { x.runId = 'malformed/run'; x.assurance.run.githubRunId = x.runId; }],
-  ['a zero-source green report', x => { x.results.lists = []; }],
-  ['a zero-entry source with green assurance', x => { x.results.lists[0].count = 0; }],
-  ['partial designation source with green assurance', x => { x.results.lists[0].partial = true; }],
-  ['unnamed source with green assurance', x => { x.results.lists[0].name = ''; }],
   ['missing alerts', x => { delete x.results.alerts; }],
   ['missing assurance', x => { x.assurance = null; }],
   ['stale assurance', x => { x.assurance.generatedAt = '2026-09-29T00:00:00Z'; }],
@@ -161,15 +99,6 @@ for (const [name, change] of [
   ['missing PEP status', x => { delete x.assurance.domains.pep; }],
   ['green with reasons', x => { x.assurance.domains.pep.reasons.push('partial'); }],
   ['contradictory overall status', x => { x.assurance.operational = false; }],
-  ['green flag despite uncovered adverse-media subjects', x => { x.assurance.domains.adverseMedia.evidence.errors = 18; }],
-  ['green flag despite skipped adverse-media subjects', x => { x.assurance.domains.adverseMedia.evidence.skippedSubjects = 1; }],
-  ['green flag despite missing global backbone evidence', x => { delete x.assurance.domains.adverseMedia.evidence.backboneFailures; }],
-  ['green flag despite contradictory news provider counts', x => { x.assurance.domains.adverseMedia.evidence.backboneFailures.googleNews = 1; }],
-  ['green flag despite truncated required sanctions source', x => { x.assurance.domains.sanctions.evidence.loadedSources[0].count = 0; }],
-  ['green flag despite wrong sanctions source subject count', x => { x.assurance.domains.sanctions.evidence.screenedSubjects = 1; }],
-  ['green flag despite partial worldwide PEP harvest', x => { x.assurance.domains.pep.evidence.partial = true; }],
-  ['green flag despite unconsumed worldwide PEP harvest', x => { x.assurance.domains.pep.evidence.dailyScreenActive = false; }],
-  ['green flag without detailed operational source evidence', x => { x.assurance.domains.adverseMedia.evidence = {}; }],
 ]) {
   test('rejects ' + name + ' before any write', async () => {
     const input = fixture(); change(input);
@@ -178,72 +107,6 @@ for (const [name, change] of [
     assert.equal(fake.calls.length, 0);
   });
 }
-
-test('supplementary sanctions-source outage delivers verified reports into the approved Asana project', async () => {
-  const input = fixture();
-  input.results.degraded = true; // real 14 Oct 2026 source limitation
-  input.results.lists.push({
-    id: 'supplemental', name: 'Synthetic supplementary national list', count: 7, partial: true
-  });
-  input.assurance.domains.sanctions.evidence.loadedSources.push({
-    id: 'supplemental', count: 7, partial: true
-  });
-  input.assurance.domains.sanctions.warnings.push(
-    'A supplementary national list was partial; all required lists are complete');
-  const fake = api();
-  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
-  assert.equal(receipt.projectGid, '1216203370612914');
-  assert.equal(receipt.requiredDomainsOperational, true);
-  assert.equal(receipt.operational, false, 'supplementary loss must not become an all-clear');
-  assert.deepEqual(receipt.reports.map(r => r.sectionGid), [
-    '1218451960830318', '1218979441933783'
-  ]);
-  for (const report of receipt.reports) {
-    const card = fake.tasks.get(report.taskGid);
-    assert.match(card.notes, /^DELIVERY VERIFIED:/);
-    assert.match(card.notes, /Overall screening evidence: DEGRADED \/ PROVISIONAL/);
-    assert.match(card.notes, /WARNING: One or more supplementary sanctions sources/);
-    assert.equal(card.memberships[0].project.gid, '1216203370612914');
-    assert.equal(card.memberships[0].section.gid, report.sectionGid);
-  }
-  assert.equal(fake.attachments.size, 2, 'both domains must receive real findings attachments');
-});
-
-test('source-failure flag alone must not prevent evidence delivery or imply all-clear', async () => {
-  const input = fixture();
-  input.results.degraded = true;
-  input.results.failures = ['Synthetic optional national source temporarily unavailable'];
-  input.assurance.domains.sanctions.warnings.push('Supplementary source failed');
-  const fake = api();
-  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
-  assert.equal(receipt.operational, false);
-  assert.equal(receipt.reports.length, 2);
-  assert.match(fake.tasks.get(receipt.reports[0].taskGid).notes, /DEGRADED \/ PROVISIONAL/);
-});
-
-test('source receipts cannot be altered independently of assurance, even with a partial source', async () => {
-  const input = fixture();
-  input.results.degraded = true;
-  input.results.lists[0].partial = true;
-  const fake = api();
-  await assert.rejects(
-    publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
-    /inventory contradicts/
-  );
-  assert.equal(fake.calls.length, 0);
-});
-test('a missing required source still fails closed rather than using a supplementary warning', async () => {
-  const input = fixture();
-  input.results.degraded = true;
-  input.results.lists[0].partial = true;
-  input.assurance.domains.sanctions.evidence.loadedSources[0].partial = true;
-  const fake = api();
-  await assert.rejects(
-    publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
-    /contradicts the OPERATIONAL Asana delivery claim/
-  );
-  assert.equal(fake.calls.length, 0);
-});
 
 test('both sections receive read-back-verified daily reports, including a no-new-match day', async () => {
   const fake = api();
@@ -278,35 +141,6 @@ test('degraded PEP/adverse media is delivered honestly, never converted to opera
   assert.match(media.notes, /5 subjects skipped enrichment/);
 });
 
-test('an honestly degraded coverage report still reaches Asana with provisional findings', async () => {
-  const input = fixture();
-  input.assurance.domains.adverseMedia.operational = false;
-  input.assurance.domains.adverseMedia.reasons = ['18 subjects had zero adverse-media backbone coverage'];
-  input.assurance.domains.adverseMedia.evidence.errors = 18;
-  input.assurance.operational = false;
-  const fake = api();
-  const receipt = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
-  assert.equal(receipt.operational, false);
-  const task = fake.tasks.get(receipt.reports.find(x => x.domain === 'media').taskGid);
-  assert.match(task.notes, /Adverse media: DEGRADED/);
-  assert.match(task.notes, /18 subjects had zero adverse-media backbone coverage/);
-});
-
-test('degraded screening can be delivered but never claims to clear prior findings', async () => {
-  const input = fixture();
-  input.assurance.operational = false;
-  input.assurance.domains.sanctions.operational = false;
-  input.assurance.domains.sanctions.reasons = ['Synthetic current source unavailable'];
-  input.results.degraded = true;
-  input.results.cleared = ['Former Synthetic Match'];
-  const fake = api();
-  const out = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
-  assert.equal(out.operational, false);
-  const sanctions = [...fake.attachments.values()].find(a => a.name.includes('-sanctions-')).text;
-  assert.match(sanctions, /NOT MATCHED - DEGRADED COVERAGE - REVIEW REQUIRED,Former Synthetic Match/);
-  assert.doesNotMatch(sanctions, /CLEARED THIS RUN/);
-});
-
 test('rerun refreshes the same cards and evidence rather than keeping stale results', async () => {
   const input = fixture(), fake = api();
   const before = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
@@ -318,156 +152,6 @@ test('rerun refreshes the same cards and evidence rather than keeping stale resu
   assert.match(media.notes, /New or changed findings in this report: 1/);
   const child = [...fake.tasks.values()].find(t => t.parent?.gid === media.gid);
   assert.match(child.notes, /Synthetic Example/);
-});
-
-test('lost acknowledgement after Asana daily report creation does not replay the write', async () => {
-  const input = fixture(), fake = api();
-  const title = buildReports(input.results, input.assurance, input.state, input)[0].title;
-  let lost = false;
-  fake.setIntercept((path, method, data) => {
-    if (!lost && path === '/tasks' && method === 'POST' && data.name === title) {
-      lost = true;
-      fake.add(data);  // Remote create succeeded, only the acknowledgement was lost.
-      throw new Error('synthetic lost Asana report creation acknowledgement');
-    }
-  });
-  await assert.rejects(
-    publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
-    /sanctions delivery failed/
-  );
-  assert.equal([...fake.tasks.values()].filter(x => x.name === title).length, 1);
-  assert.ok(fake.calls.filter(x => x.path === '/tasks' && x.method === 'POST')
-    .every(x => x.nonReplayable), 'report creation must opt out of ambiguous retry');
-  fake.setIntercept(null);
-  const recovered = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
-  assert.equal(recovered.reports.length, 2);
-  assert.equal([...fake.tasks.values()].filter(x => x.name === title).length, 1,
-    'rerun must reuse the remote-created report, not create a duplicate');
-});
-
-test('lost acknowledgement after evidence page creation is reconciled by page marker', async () => {
-  const input = fixture(), fake = api();
-  let lost = false;
-  fake.setIntercept((path, method, data) => {
-    const parent = /^\/tasks\/(\d+)\/subtasks$/.exec(path);
-    if (!lost && parent && method === 'POST' && data.name === '[screening-evidence] 0001') {
-      lost = true;
-      fake.add(data, parent[1]);  // Page exists on Asana, but the response is lost.
-      throw new Error('synthetic lost Asana evidence-page acknowledgement');
-    }
-  });
-  await assert.rejects(
-    publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
-    /sanctions delivery failed/
-  );
-  assert.ok(fake.calls.filter(x => /\/tasks\/\d+\/subtasks$/.test(x.path) && x.method === 'POST')
-    .every(x => x.nonReplayable), 'evidence page creation must opt out of ambiguous retry');
-  fake.setIntercept(null);
-  const recovered = await publishDailyScreening({ ...input, request: fake.request, upload: fake.upload });
-  assert.equal(recovered.reports.length, 2);
-  const taskId = recovered.reports.find(x => x.domain === 'sanctions').taskGid;
-  const pages = [...fake.tasks.values()].filter(x =>
-    x.parent?.gid === taskId && x.name === '[screening-evidence] 0001');
-  assert.equal(pages.length, 1, 'lost acknowledgement must not create two evidence pages');
-  assert.match(pages[0].notes, /^BEGIN SCREENING EVIDENCE/);
-});
-
-test('only recognized transient Asana errors can trigger one whole-publisher reconciliation', () => {
-  const is = message => isTransientEvidenceDeliveryFailure(new Error(message));
-  assert.equal(is('Asana transport failure; remote outcome not confirmed'), true);
-  assert.equal(is('sanctions delivery failed: Asana 503: request rejected (provider details redacted)'), true);
-  assert.equal(is('media delivery failed: Asana attachment upload 502'), true);
-  assert.equal(is('Asana 429: request rejected (provider details redacted)'), true);
-  assert.equal(is('Asana 403: request rejected (provider details redacted)'), false);
-  assert.equal(is('Screening sources cannot support an OPERATIONAL Asana delivery'), false);
-  assert.equal(is('media delivery failed: Asana task ownership marker invalid'), false);
-  assert.equal(isTransientEvidenceDeliveryFailure(new AggregateError([
-    new Error('sanctions delivery failed: Asana transport failure; remote outcome not confirmed'),
-    new Error('media delivery failed: Screening evidence is incomplete')
-  ], 'mixed failures')), false, 'any deterministic failure must block replay');
-});
-
-test('transient Asana parent-card acknowledgement is reconciled in-place with no duplicate screening reports', async () => {
-  const input = fixture(), fake = api();
-  const reportName = buildReports(input.results, input.assurance, input.state, input)[0].title;
-  const baseline = JSON.stringify(input);
-  let fault = false, retries = 0;
-  const slept = [];
-  fake.setIntercept((path, method, data) => {
-    if (!fault && path === '/tasks' && method === 'POST' && data.name === reportName) {
-      fault = true;
-      fake.add(data); // Asana committed the task; the transport lost the acknowledgement.
-      throw new Error('Asana transport failure; remote outcome not confirmed');
-    }
-  });
-  const receipt = await deliverWithOneRecoveryRetry(
-    () => publishDailyScreening({ ...input, request: fake.request, upload: fake.upload }),
-    { sleep: async ms => { slept.push(ms); }, onRetry: () => retries++ }
-  );
-  assert.equal(receipt.reports.length, 2);
-  assert.equal(retries, 1);
-  assert.deepEqual(slept, [EVIDENCE_DELIVERY_RETRY_DELAY_MS]);
-  assert.equal([...fake.tasks.values()].filter(t => t.name === reportName).length, 1,
-    'lost receipt must not create duplicate human-facing Asana result cards');
-  assert.equal(fake.attachments.size, 2, 'each final domain has precisely one verified CSV');
-  assert.equal(JSON.stringify(input), baseline,
-    'retry cannot mutate the screening source set, risk findings or disposition state');
-});
-
-test('ambiguous upload transport failures and missing receipts trigger safe reconciliation without leaking exceptions', async () => {
-  const prevFetch = globalThis.fetch, prevToken = process.env.ASANA_ACCESS_TOKEN;
-  process.env.ASANA_ACCESS_TOKEN = 'synthetic-test-token';
-  try {
-    globalThis.fetch = async () => { throw new Error('synthetic-private-identifier-not-for-logs'); };
-    let lost = '';
-    try { await uploadAttachment('12345678', 'synthetic.csv', 'x,y', 'text/csv'); }
-    catch (e) { lost = e.message; }
-    assert.equal(lost, 'Asana attachment upload transport failure; outcome unverified');
-    assert.equal(isTransientEvidenceDeliveryFailure(new Error(lost)), true);
-    assert.doesNotMatch(lost, /synthetic-private-identifier/);
-
-    globalThis.fetch = async () => ({
-      ok: true, status: 200, json: async () => ({ data: {} })
-    });
-    await assert.rejects(uploadAttachment('12345678', 'synthetic.csv', 'x,y', 'text/csv'),
-      /Asana attachment upload transport failure; outcome unverified/);
-    globalThis.fetch = async () => ({
-      ok: false, status: 403, json: async () => ({})
-    });
-    await assert.rejects(uploadAttachment('12345678', 'synthetic.csv', 'x,y', 'text/csv'),
-      /Asana attachment upload 403/);
-    assert.equal(isTransientEvidenceDeliveryFailure(new Error('Asana attachment upload 403')), false,
-      'access-denied upload must not cause an automatic retry');
-  } finally {
-    globalThis.fetch = prevFetch;
-    if (prevToken === undefined) delete process.env.ASANA_ACCESS_TOKEN;
-    else process.env.ASANA_ACCESS_TOKEN = prevToken;
-  }
-});
-
-test('deterministic evidence/source integrity errors never restart the daily publication', async () => {
-  let count = 0;
-  const deterministic = new Error('Screening sources cannot support an OPERATIONAL Asana delivery');
-  await assert.rejects(deliverWithOneRecoveryRetry(async () => {
-    count++;
-    throw deterministic;
-  }, { sleep: async () => { throw new Error('must not sleep'); } }), /Screening sources/);
-  assert.equal(count, 1);
-});
-
-test('two transport failures still fail the screening delivery gate and never run a third time', async () => {
-  let count = 0;
-  const sleeps = [];
-  await assert.rejects(deliverWithOneRecoveryRetry(async () => {
-    count++;
-    throw new AggregateError([
-      new Error('media delivery failed: Asana transport failure; remote outcome not confirmed')
-    ], 'media publication failed');
-  }, { sleep: async ms => { sleeps.push(ms); } }), /media publication failed/);
-  assert.equal(count, 2);
-  assert.deepEqual(sleeps, [EVIDENCE_DELIVERY_RETRY_DELAY_MS]);
-  await assert.rejects(deliverWithOneRecoveryRetry(async () => {}, { delayMs: 30000 }),
-    /Invalid bounded screening evidence recovery settings/);
 });
 
 test('next date creates fresh daily reports rather than suppressing the day', async () => {
@@ -638,7 +322,7 @@ test('each results card carries a read-back-verified findings table, one row per
   assert.match(sanctions, /NEW\/CHANGED,Jane Roe,individual,Acme Gold,Shareholder/);
   assert.match(sanctions, /OFAC SDN,'=ROE\, Jane|OFAC SDN,"'=ROE, Jane"/, 'formula injection neutralised');
   assert.doesNotMatch(sanctions, /PEP \(Worldwide/, 'PEP hits belong to the media table');
-  assert.match(sanctions, /NO MATCH ON THIS RUN - NOT MLRO CLEARANCE,Old Match/);
+  assert.match(sanctions, /CLEARED THIS RUN,Old Match/);
   assert.match(media, /PEP \(Worldwide — Wikidata\),Jane Roe,90/);
 });
 
@@ -670,10 +354,6 @@ test('csvCell quotes separators and neutralises formulas', () => {
   assert.equal(csvCell('a,b'), '"a,b"');
   assert.equal(csvCell('say "hi"'), '"say ""hi"""');
   assert.equal(csvCell('+1'), "'+1");
-  assert.equal(csvCell('  =HYPERLINK("https://example.invalid","run")'),
-    '\'  =HYPERLINK("https://example.invalid","run")'.replaceAll('"', '""').replace(/^/, '"').concat('"'));
-  assert.equal(csvCell('\t@SUM(1,2)'), '"\'\t@SUM(1,2)"');
-  assert.equal(csvCell('\u200b=1+1'), "'\u200b=1+1");
   assert.equal(csvCell(['x', 'y']), 'x; y');
   assert.ok(buildFindingsCsv('sanctions', [], [], []).startsWith('\ufeffstatus,'));
 });

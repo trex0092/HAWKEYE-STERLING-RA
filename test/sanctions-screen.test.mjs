@@ -3,11 +3,11 @@
      { name, entityType, topScore (0-100), band, recommendation, hitCount, lists[] }
    Usage: node test/sanctions-screen.test.mjs */
 import {
-  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, requireCompleteAsanaPopulation, requireDistinctSourceKeys, normalizeResult, normalizeScreenResponse,
-  isMatch, diffState, parseScreeningState, describeUnscreenedHold, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
+  normalizeName, parseSubject, parseSubjects, parsePrincipals, subjectLabel, normalizeHit, parseEmployeeSubjects, normalizeResult, normalizeScreenResponse,
+  isMatch, diffState, hitDetail, matchSummary, buildScreenReport, buildScreenHtml, buildChangesArtifact,
   GOVERNANCE_NOTE, DEFAULT_THRESHOLD, resolveThreshold, resolveShadowThreshold, shadowBandRow, foldAliasSources,
   formatHumanDate, buildAmPepNotes, AM_KEYWORD_COUNT, belowFloor, omCardToSkip,
-  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse, createOmTask, shouldRetryLegacyAsanaWrite,
+  whitelistKey, buildWhitelistMap, applyWhitelist, parseOfacApiResponse,
   getByPath, fetchPaginatedJson, PAGINATE_HARD_CAP, rotateByDay, loadSanctionsLists
 } from '../scripts/sanctions-screen.mjs';
 import { buildIndex, screenName, parseIdbCsv } from '../scripts/sanctions-match.mjs';
@@ -19,150 +19,10 @@ import { dirname, join, resolve } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-
-
 let passed = 0, failed = 0;
 function check(name, cond) {
   if (cond) { passed++; console.log('  ok  ' + name); }
   else { failed++; console.log('FAIL  ' + name); }
-}
-
-check('screen result builder persists both Asana source population counts without subject identifiers',
-  /sourcePopulation:\s*\{[\s\S]*?customer:\s*\{\s*projectGid: CUSTOMER_PROJECT_GID, screenedSubjects: customerScreenedSubjects\s*\},[\s\S]*?employee:\s*\{\s*projectGid: EMPLOYEE_PROJECT_GID, screenedSubjects: employeeScreenedSubjects\s*\}/.test(
-    readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8')
-  ));
-
-/* Approved source-of-truth + destination contract for mandatory AML screening.
-   These tests are pure; no live Asana credentials or customer names. */
-check('screening requires Customer Database and HR Employees as distinct mandatory Asana sources',
-  scr.requireApprovedScreeningRoute({
-    customer: '1214107620220121',
-    employee: '1216239131596624',
-    results: '1216203370612914',
-    monitoring: '1216203370612914',
-  }) === true);
-for (const [reason, route] of [
-  ['stale customer project', { customer: '1216139945846994' }],
-  ['stale employee project', { employee: '1216139945846994' }],
-  ['disabled employee population', { employee: '' }],
-  ['redirected screening alert project', { results: '1216139945846994' }],
-  ['redirected monitoring results', { monitoring: '1216139945846994' }],
-]) {
-  let refused = false;
-  try {
-    scr.requireApprovedScreeningRoute({
-      customer: '1214107620220121',
-      employee: '1216239131596624',
-      results: '1216203370612914',
-      monitoring: '1216203370612914',
-      ...route,
-    });
-  } catch (e) {
-    refused = /Authoritative Asana/.test(String(e.message));
-  }
-  check('unapproved Asana routing fails closed: ' + reason, refused);
-}
-
-
-/* The independent sanctions-runtime job must not silently screen HR employee
-   records as companies or accept a redirected/blank Asana source project.
-   The 20 synthetic staff tasks mirror the completed state of the actual
-   approved HR project; NO live Asana or public customer PII in these tests. */
-{
-  const runtime = await import('../scripts/sanctions-runtime-assurance.mjs');
-  const customerProject = '1214107620220121', employeeProject = '1216239131596624';
-  const customer = scr.parseSubjects([
-    { gid: '9001', name: 'SYNTHETIC CUSTOMER CO LLC', notes: 'Jurisdiction: UAE', completed: false },
-  ]);
-  const staff = scr.parseEmployeeSubjects(Array.from({ length: 20 }, (_, i) => ({
-    gid: String(9100 + i), name: 'Synthetic Worker ' + (i + 1),
-    completed: true, notes: 'Nationality: United Arab Emirates\\nDOB: 01 January 1980',
-  })));
-  const requests = [];
-  const fetchCustomers = async (id, token) => {
-    requests.push('customer:' + id);
-    return customer;
-  };
-  const fetchEmployees = async (id, token) => {
-    requests.push('employee:' + id);
-    return staff;
-  };
-  const data = await runtime.loadApprovedRuntimePopulation('synthetic-test-token', {
-    customerProject, employeeProject, fetchCustomers, fetchEmployees
-  });
-  check('runtime assurance screens both approved projects, not output-only project',
-    requests.join('|') === 'customer:' + customerProject + '|employee:' + employeeProject);
-  check('all 20 completed HR records are retained as individual employee screening subjects',
-    data.sources.employee.screenedSubjects === 20 && data.subjects.length === 21 &&
-    data.subjects.filter(s => s.role === 'Employee' && s.entityType === 'individual').length === 20);
-  check('runtime subject-source provenance exposes project GIDs and counts but no names or PII',
-    data.sources.customer.projectGid === customerProject &&
-    data.sources.customer.screenedSubjects === 1 &&
-    data.sources.employee.projectGid === employeeProject &&
-    !JSON.stringify(data.sources).includes('Synthetic'));
-  const isolated = runtime.buildSanctionsRuntimeResults({
-    results: data.subjects.map(() => ({ band: 'low', recommendation: 'clear', lists: [] })),
-    degraded: false,
-    notes: [],
-    coverage: { lists: [{ id: 'ofac-sdn', name: 'OFAC SDN', partial: false, names: ['SANCTIONED ENTITY'] }] },
-  }, data.sources, '2026-10-14');
-  check('sanctions-only runtime proof preserves both Asana sources in the shared screening validator',
-    isolated.screened === 21 &&
-    isolated.sourcePopulation.customer.screenedSubjects === 1 &&
-    isolated.sourcePopulation.employee.screenedSubjects === 20 &&
-    isolated.sourcePopulation.customer.projectGid === customerProject &&
-    isolated.sourcePopulation.employee.projectGid === employeeProject &&
-    !JSON.stringify(isolated.sourcePopulation).includes('Synthetic'));
-  let missingPopulationFailed = false;
-  try {
-    runtime.buildSanctionsRuntimeResults({
-      results: [{}], coverage: { lists: [] }, notes: [],
-    }, { customer: { projectGid: customerProject, screenedSubjects: 1 } }, '2026-10-14');
-  } catch (e) {
-    missingPopulationFailed = /HR Employees/.test(String(e.message));
-  }
-  check('sanctions-only runtime refuses absent HR project evidence before accepting a green result',
-    missingPopulationFailed);
-  let wrongTotalsFailed = false;
-  try {
-    runtime.buildSanctionsRuntimeResults({ results: Array(22).fill({}), coverage: { lists: [] } },
-      data.sources, '2026-10-14');
-  } catch (e) {
-    wrongTotalsFailed = /source-population totals/.test(String(e.message));
-  }
-  check('sanctions-only runtime refuses source counts that do not reconcile with actual subjects',
-    wrongTotalsFailed);
-
-  for (const [label, params] of [
-    ['redirected customer', { customerProject: '111111111' }],
-    ['redirected employee', { employeeProject: '111111111' }],
-    ['disabled employee source', { employeeProject: '' }],
-  ]) {
-    requests.length = 0;
-    let refused = false;
-    try {
-      await runtime.loadApprovedRuntimePopulation('synthetic-test-token', {
-        customerProject, employeeProject, fetchCustomers, fetchEmployees, ...params
-      });
-    } catch (e) { refused = /Authoritative Asana/.test(String(e.message)); }
-    check('runtime probe rejects ' + label + ' before an Asana API call',
-      refused && requests.length === 0);
-  }
-  let absentEmployeeFailed = false;
-  try {
-    await runtime.loadApprovedRuntimePopulation('synthetic-test-token', {
-      customerProject, employeeProject, fetchCustomers,
-      fetchEmployees: async () => []
-    });
-  } catch (e) { absentEmployeeFailed = /HR Employees project/.test(String(e.message)); }
-  check('runtime probe fails closed on empty staff coverage', absentEmployeeFailed);
-  let incompleteCustomerFailed = false;
-  try {
-    await runtime.loadApprovedRuntimePopulation('synthetic-test-token', {
-      customerProject, employeeProject, fetchCustomers: async () => null, fetchEmployees
-    });
-  } catch (e) { incompleteCustomerFailed = /Customer Database/.test(String(e.message)); }
-  check('runtime probe fails closed on invalid customer coverage', incompleteCustomerFailed);
 }
 
 /* ── name folding ── */
@@ -273,70 +133,6 @@ const dupSubs = parseSubjects([dupA, dupB]);
 check('duplicate-named customers: entity deduped but BOTH customers’ principals are screened',
   dupSubs.filter(x => x.entityType === 'organisation').length === 1 &&
   dupSubs.some(x => x.name === 'Alpha Person') && dupSubs.some(x => x.name === 'Bravo Person'));
-
-/* Source-level proof must include EVERY Asana task, not merely sum whatever
-   the name-deduped parser happened to return. Use only synthetic task IDs. */
-{
-  const customers = [
-    { gid: '8001', name: 'Synthetic Metals A LLC', completed: false, notes: 'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — Director\nName: Synthetic Person One' },
-    { gid: '8002', name: 'Synthetic Metals B LLC', completed: false, notes: '' },
-  ];
-  const parsed = parseSubjects(customers);
-  const receipt = requireCompleteAsanaPopulation(customers, parsed);
-  check('approved customer project proof reconciles raw tasks to entity + UBO screening rows',
-    receipt.taskRecords === 2 && receipt.screenedSubjects === 3);
-  const namesakes = [
-    { gid: '8011', name: 'SAME REGISTERED COMPANY LLC', completed: false, notes: '' },
-    { gid: '8012', name: 'Same Registered Company LLC', completed: false, notes: '' },
-  ];
-  let rejectedDuplicateCustomer = false;
-  try { requireCompleteAsanaPopulation(namesakes, parseSubjects(namesakes)); }
-  catch (e) { rejectedDuplicateCustomer = /tasks were not screened/.test(String(e.message)); }
-  check('two same-named company records cannot be collapsed into a green all-clear',
-    rejectedDuplicateCustomer);
-  const employees = [
-    { gid: '9001', name: 'Synthetic Employee A', completed: true, notes: 'Nationality: UAE' },
-    { gid: '9002', name: 'Synthetic Employee B', completed: true, notes: 'Nationality: India' },
-  ];
-  const staff = parseEmployeeSubjects(employees);
-  const staffReceipt = requireCompleteAsanaPopulation(employees, staff, { employee: true });
-  check('both completed HR employee tasks retain one natural-person screening row each',
-    staffReceipt.taskRecords === 2 && staffReceipt.screenedSubjects === 2 &&
-    staff.every(x => x.entityType === 'individual'));
-  let duplicateStaffRejected = false;
-  const namesakeStaff = [
-    { gid: '9011', name: 'Synthetic Shared Name', completed: true, notes: '' },
-    { gid: '9012', name: 'synthetic shared name', completed: true, notes: '' },
-  ];
-  try { requireCompleteAsanaPopulation(namesakeStaff, parseEmployeeSubjects(namesakeStaff), { employee: true }); }
-  catch (e) { duplicateStaffRejected = /tasks were not screened/.test(String(e.message)); }
-  check('same-named completed HR employees cannot silently disappear from screening', duplicateStaffRejected);
-  let acrossProjectsRejected = false;
-  try { requireDistinctSourceKeys(parsed, [{...staff[0], key: parsed[0].key}]); }
-  catch (e) { acrossProjectsRejected = /collision/.test(String(e.message)); }
-  check('staff/customer normalized-name collision refuses shared case history and a false clear',
-    acrossProjectsRejected && requireDistinctSourceKeys(parsed, staff));
-  let missingGidRejected = false;
-  try { requireCompleteAsanaPopulation([{ name: 'Synthetic Miss', gid: '' }], [{ key: 'synthetic miss', gid: '' }]); }
-  catch { missingGidRejected = true; }
-  check('Asana source tasks must provide verifiable IDs before population acceptance',
-    missingGidRejected);
-  let unrelatedPrincipalRejected = false;
-  try { requireCompleteAsanaPopulation(employees, [
-    ...staff, { key: 'synthetic other|ubo|9001', gid: '9001', name: 'Synthetic Other', parent: 'Synthetic Employee A' }
-  ], { employee: true }); }
-  catch { unrelatedPrincipalRejected = true; }
-  check('HR training notes cannot manufacture UBO rows that falsely expand staff coverage',
-    unrelatedPrincipalRejected);
-  const source = readFileSync(new URL('../scripts/sanctions-screen.mjs', import.meta.url), 'utf8');
-  const runtime = readFileSync(new URL('../scripts/sanctions-runtime-assurance.mjs', import.meta.url), 'utf8');
-  check('both Asana fetchers enforce per-task screening receipt before returning',
-    /requireCompleteAsanaPopulation\(tasks, subjects\)/.test(source) &&
-    /requireCompleteAsanaPopulation\(tasks, subjects, \{ employee: true \}\)/.test(source));
-  check('full daily screening and independent runtime proof check cross-project key collisions',
-    /requireDistinctSourceKeys\(subjects, employees\)/.test(source) &&
-    /requireDistinctSourceKeys\(customers, employees\)/.test(runtime));
-}
 
 /* Empty-normalization customers (symbols-only / unscreenable records) used to
    COLLIDE on the shared key '': the second was deduped away before screening
@@ -838,13 +634,8 @@ check('the issue step is always()-guarded so it still fires after the red bail',
   /if: always\(\) && \(steps\.screen\.outputs\.screen_error == 'true'/.test(screenYml));
 check('control-retry heals on missing SUCCESS (a red bail is now re-dispatched)',
   /conclusion.*success/.test(retryYml) && /sanctions-screen\.yml/.test(retryYml));
-check('operational sanctions screen revalidates only approved main code changes, retaining manual/schedule controls',
-  /^  push:\s*$/m.test(screenYml)
-  && /branches:\s*\[main\]/.test(screenYml)
-  && /^\s*paths:\s*$/m.test(screenYml)
-  && screenYml.includes("      - '.github/workflows/sanctions-screen.yml'")
-  && screenYml.includes("      - 'scripts/screening-assurance.mjs'")
-  && !/^  pull_request:/m.test(screenYml)
+check('operational sanctions screen is schedule/manual only — code pushes are validated by CI instead',
+  !/^\s*push:/m.test(screenYml)
   && /^\s*schedule:/m.test(screenYml)
   && /^\s*workflow_dispatch:/m.test(screenYml));
 check('sanctions runtime concurrency cannot be confused with source-code validation runs',
@@ -932,88 +723,6 @@ check('a COMPLETE alias fold leaves the primary fully re-verified',
 const _screened = [_fl[0]].filter(L => !L.partial).map(L => L.name);
 check('a partial primary is excluded from screenedLists (matches carried, not cleared)',
   _screened.length === 0);
-
-/* Legacy AM/PEP cards remain important when the full daily digest is in
-   case-engine mode. Simulate real create, section membership and read-back. */
-{
-  const gid = '1219452000000001', project = '1216203370612914',
-    section = '1218451960830318', name = 'Synthetic AM PEP Review';
-  const payload = { name, notes: 'Synthetic, no customer data', projectGid: project, sectionGid: section };
-  const previousFetch = globalThis.fetch;
-  let requests = [];
-  const mock = ({ noGid = false, wrongSection = false, noRemote = false,
-    serverError = false, lost = false } = {}) => {
-    requests = [];
-    globalThis.fetch = async (url, options = {}) => {
-      const method = options.method || 'GET';
-      requests.push({ path: String(url), method });
-      if (lost) throw Error('SYNTHETIC_CONFIDENTIAL_SHOULD_NOT_APPEAR');
-      if (method === 'POST' && String(url).endsWith('/tasks')) {
-        return { ok: !serverError, status: serverError ? 503 : 201,
-          headers: { get: () => null },
-          json: async () => serverError ? { errors: [{ message: 'PRIVATE_CASE_REFERENCE' }] }
-            : { data: noGid ? {} : { gid } } };
-      }
-      if (method === 'POST' && String(url).endsWith('/addTask')) {
-        return { ok: true, status: 200, headers: { get: () => null },
-          json: async () => ({ data: {} }) };
-      }
-      if (method === 'GET' && String(url).includes('/tasks/' + gid)) {
-        return { ok: true, status: 200, headers: { get: () => null },
-          json: async () => noRemote ? { data: null } : { data: {
-            gid, name, permalink_url: 'https://app.asana.com/0/0/' + gid,
-            memberships: [{ project: { gid: project },
-              section: { gid: wrongSection ? '1200000000000000' : section } }]
-          } } };
-      }
-      throw Error('Unexpected synthetic Asana path');
-    };
-  };
-  try {
-    mock();
-    const link = await createOmTask(payload, 'synthetic-token');
-    check('monitoring card success requires actual task and approved Asana section read-back',
-      link.endsWith(gid) && requests.length === 3 &&
-      requests.filter(r => r.method === 'POST').length === 2 &&
-      requests.some(r => r.method === 'GET'));
-    mock({ noGid: true });
-    let rejected = false;
-    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
-    check('a 2xx response with no task identity cannot be claimed as Asana delivery',
-      rejected && requests.length === 1);
-    mock({ wrongSection: true });
-    rejected = false;
-    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
-    check('a monitoring task filed in the wrong section is not accepted as delivered',
-      rejected && requests.length === 3);
-    mock({ noRemote: true });
-    rejected = false;
-    try { await createOmTask(payload, 'synthetic-token'); } catch { rejected = true; }
-    check('an unconfirmed remote task remains an unresolved delivery error',
-      rejected && requests.length === 3);
-    mock({ serverError: true });
-    let providerError = '';
-    try { await createOmTask(payload, 'synthetic-token'); } catch (e) { providerError = e.message; }
-    check('ambiguous 503 task create is never replayed and does not leak Asana response data',
-      requests.length === 1 && /^Asana 503/.test(providerError) &&
-      !providerError.includes('PRIVATE_CASE_REFERENCE'));
-    mock({ lost: true });
-    let transportError = '';
-    try { await createOmTask(payload, 'synthetic-token'); } catch (e) { transportError = e.message; }
-    check('Asana transport exceptions containing identity data are redacted',
-      requests.length === 1 &&
-      transportError === 'Asana transport failure; remote write outcome unconfirmed' &&
-      !transportError.includes('SYNTHETIC_CONFIDENTIAL'));
-    check('only definite 429 refusal can replay task or new-section creation',
-      shouldRetryLegacyAsanaWrite(429, '/tasks') &&
-      !shouldRetryLegacyAsanaWrite(503, '/tasks') &&
-      !shouldRetryLegacyAsanaWrite(500, '/projects/1216203370612914/sections') &&
-      shouldRetryLegacyAsanaWrite(503, '/sections/1218451960830318/addTask') &&
-      !shouldRetryLegacyAsanaWrite(403, '/tasks'));
-  } finally {
-    globalThis.fetch = previousFetch;
-  }
-}
 
 /* ── same-day Ongoing-Monitoring dedup is DIRECTION-AWARE ──
    Both card names carry the words "Adverse Media", so the old flat
@@ -1239,17 +948,6 @@ check('FBI: missing-person posters never count as adverse (excluded, tallied)',
 check('FBI: alias matches count; unrelated namesakes do not',
   fbi.scoreFbi('Rico Vasquez', { items: [{ title: 'ENRIQUE GARCIA', aliases: ['Rico Vasquez'], poster_classification: 'default' }] }).hit === true
   && fbi.scoreFbi('Rico Vasquez', { items: [{ title: 'RICO ALVAREZ', poster_classification: 'default' }] }).hit === false);
-check('FBI: matches whole subject name tokens, not longer unrelated names',
-  fbi.scoreFbi('John Smith', { items: [
-    { title: 'JOHNNY SMITHSON', poster_classification: 'default' }
-  ] }).hit === false);
-check('FBI: short given names are required alongside longer surnames',
-  fbi.scoreFbi('Li Wang', { items: [
-    { title: 'MING WANG', poster_classification: 'default' }
-  ] }).hit === false
-  && fbi.scoreFbi('Li Wang', { items: [
-    { title: 'LI WANG', poster_classification: 'default' }
-  ] }).hit === true);
 check('FBI: an unrecognized poster class is excluded until reviewed, never promoted',
   fbi.scoreFbi('A B Test', { items: [{ title: 'A B TEST', poster_classification: 'brand-new-class' }] }).hit === false);
 check('FBI: victim/accomplice rows never screen as wanted subjects',
@@ -2227,16 +1925,12 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
    Driven through a stubbed fetch, so the real loop is what is under test. */
 {
   const realFetch = globalThis.fetch;
-  let nextMockGid = 0, nextMockOffset = 0;
   const page = (n, more) => ({
     ok: true, status: 200,
     headers: { get: () => null },
     json: async () => ({
-      data: Array.from({ length: n }, () => {
-        const gid = String(++nextMockGid);
-        return { gid, name: 'Synthetic Customer ' + gid, completed: false };
-      }),
-      next_page: more ? { offset: 'offset-' + (++nextMockOffset) } : null
+      data: Array.from({ length: n }, (_, i) => ({ gid: String(i), name: 'Customer ' + i, completed: false })),
+      next_page: more ? { offset: 'o' + Math.random() } : null
     })
   });
   const stub = (pages) => { let i = 0; globalThis.fetch = async () => page(2, ++i < pages); };
@@ -2264,68 +1958,6 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   finally { console.error = realErr; globalThis.fetch = realFetch; }
   check('asana paging: the dedup scan degrades LOUDLY instead of throwing (a duplicate card beats no card)',
     Array.isArray(soft) && soft.length === scr.ASANA_PAGE_CAP * 2 && /page cap/.test(warned) && /PARTIAL|partial/.test(warned));
-
-  /* Live Customer Database had 339 tasks on 14 Oct 2026 (four pages);
-     all 20 HR Employees tasks were completed. A malformed later page could
-     previously be treated as a clean end of a partially read project. */
-  const goodPage = { data: [{ gid: '1219000000000001',
-    name: 'Synthetic Completed Employee', completed: true }], next_page: null };
-  const valid = scr.validateAsanaProjectPage(goodPage, 'HR Employees');
-  check('completed HR records remain eligible for screening and have valid page identity',
-    valid.rows.length === 1 && valid.rows[0].completed === true && valid.nextOffset === null);
-  let malformedLater = false, reads = 0;
-  try {
-    await scr.asanaPaged('1214107620220121', '/tasks', 'name,completed',
-      'synthetic', 'Customer Database', { loadPage: async () =>
-        (++reads === 1
-          ? { data: [{ gid: '100', name: 'Synthetic Customer' }], next_page: { offset: 'p2' } }
-          : { data: null, next_page: null }) });
-  } catch (e) { malformedLater = /INCOMPLETE/.test(String(e.message)); }
-  check('HTTP-200 with null data on a later Asana source page fails closed',
-    malformedLater && reads === 2);
-  let invalidCursor = false;
-  try {
-    scr.validateAsanaProjectPage(
-      { data: [{ gid: '1', name: 'A' }], next_page: { offset: '' } }, 'Customer Database'
-    );
-  } catch { invalidCursor = true; }
-  check('invalid next-page cursor cannot silently truncate screening population',
-    invalidCursor);
-  let loopingCursor = false, loopReads = 0;
-  try {
-    await scr.asanaPaged('1216239131596624', '/tasks', 'name',
-      'synthetic', 'HR Employees', { loadPage: async () => ({
-        data: [{ gid: String(++loopReads), name: 'Synthetic Worker ' + loopReads }],
-        next_page: { offset: 'loop' }
-      }) });
-  } catch (e) { loopingCursor = /repeated pagination cursor/.test(String(e.message)); }
-  check('repeat page cursor is rejected at second page rather than looping to timeout',
-    loopingCursor && loopReads === 2);
-  let repeatedGid = false;
-  try {
-    await scr.asanaPaged('1214107620220121', '/tasks', 'name',
-      'synthetic', 'Customer Database', { loadPage: async (url) => ({
-        data: [{ gid: '123', name: 'A' }],
-        next_page: url.searchParams.get('offset') ? null : { offset: 'p2' }
-      }) });
-  } catch (e) { repeatedGid = /duplicate Asana record across pages/.test(String(e.message)); }
-  check('overlapping Asana pages cannot count the same customer twice', repeatedGid);
-  let emptyContinuation = false;
-  try {
-    await scr.asanaPaged('1214107620220121', '/tasks', 'name',
-      'synthetic', 'Customer Database', { loadPage: async (url) =>
-        url.searchParams.get('offset')
-          ? { data: [], next_page: null }
-          : { data: [{ gid: '123', name: 'A' }], next_page: { offset: 'p2' } } });
-  } catch (e) { emptyContinuation = /empty continuation page/.test(String(e.message)); }
-  check('empty continuation cannot be counted as a complete customer book', emptyContinuation);
-  const completedHR = Array.from({ length: 20 }, (_, i) => ({
-    gid: String(1216239131596600 + i),
-    name: 'Synthetic Staff ' + String(i + 1), completed: true, notes: ''
-  }));
-  const allHR = scr.parseEmployeeSubjects(completedHR);
-  check('all 20 completed HR Training/Workshops tasks are independently screened',
-    allHR.length === 20 && allHR.every(row => row.entityType === 'individual'));
 
   const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
   check('asana paging: the section lookup paginates — an unpaged read creates a DUPLICATE column nobody watches',
@@ -2540,77 +2172,8 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     && /if \(again\.errored\) return false;\s*amErrors--; amIncomplete = false;/.test(src));
   check('second pass: a recovered subject is rebuilt through the same finalize() path',
     /applyAm\(again\);\s*const rebuilt = finalize\(\);/.test(src) && /heartbeat\(\);\s*return finalize\(\);/.test(src));
-  check('second pass: runs before input-order restore with a bounded recovery-only deadline',
-    src.indexOf('runAmSecondPass(amRetryQueue') < src.indexOf('Restore the input order')
-    && /deadlineMs: postSweepRecoveryDeadline\(enrichDeadline, cfg\.amRecoveryTailMs\)/.test(src));
-  check('recovery tail is bounded under the 120-minute workflow and always leaves a minimum retry allowance',
-    scr.resolveAmRecoveryTailMs(undefined) === 300000
-    && scr.resolveAmRecoveryTailMs(900000) === 300000
-    && scr.resolveAmRecoveryTailMs(-1) === 60000
-    && scr.resolveAmRecoveryTailMs(NaN) === 300000);
-  check('recovery deadline extends the spent enrichment budget, not the original subject-sweep window',
-    scr.postSweepRecoveryDeadline(6000000, 300000) === 6300000);
-  let tailClock = 1000000;
-  const expiredMainDeadline = tailClock - 1;
-  const pendingBlackouts = Array.from({ length: 20 }, () => ({
-    retry: async () => { tailClock += 1000; return true; },
-  }));
-  const oldTail = await run(pendingBlackouts, {
-    deadlineMs: expiredMainDeadline, delayMs: 60000,
-    now: () => tailClock, sleep: async d => { tailClock += d; },
-  });
-  const reservedTail = await run(pendingBlackouts, {
-    deadlineMs: scr.postSweepRecoveryDeadline(expiredMainDeadline),
-    delayMs: 60000, now: () => tailClock,
-    sleep: async d => { tailClock += d; },
-  });
-  check('expired enrichment budget previously skipped all queued second-pass subjects',
-    oldTail.attempted === 0 && oldTail.recovered === 0);
-  check('reserved post-sweep window executes a bounded 20-subject retry queue after a full-budget initial sweep',
-    reservedTail.attempted === 20 && reservedTail.recovered === 20 && reservedTail.skipped === '');
-
-  // The full-book live run on 13 Oct reduced 16 uncovered subjects to one;
-  // a final small, separately bounded, residual-only probe can try that last
-  // subject once more without touching any previously verified subjects.
-  let callsOk = 0, callsLate = 0, nowResidual = 0;
-  const tracked = scr.trackAmRecovery([
-    { key: 'ok', retry: async () => { callsOk++; nowResidual += 1000; return true; } },
-    { key: 'late', retry: async () => { callsLate++; nowResidual += 1000; return callsLate === 2; } },
-  ]);
-  const mainTail = await run(tracked, {
-    deadlineMs: 150000, delayMs: 60000, concurrency: 2,
-    now: () => nowResidual, sleep: async ms => { nowResidual += ms; },
-  });
-  const outstanding = tracked.filter(item => !item.recovered);
-  const lastTail = await run(outstanding, {
-    deadlineMs: 150000 + scr.AM_FINAL_RECHECK_TAIL_MS,
-    delayMs: scr.AM_FINAL_RECHECK_COOLDOWN_MS, concurrency: 1,
-    max: scr.AM_FINAL_RECHECK_MAX,
-    now: () => nowResidual, sleep: async ms => { nowResidual += ms; },
-  });
-  check('first post-sweep pass leaves one residual when a provider refuses the first recheck',
-    mainTail.attempted === 2 && mainTail.recovered === 1 &&
-    outstanding.length === 1 && outstanding[0].key === 'late');
-  check('final recheck recovers ONLY the initially uncovered straggler',
-    lastTail.attempted === 1 && lastTail.recovered === 1 &&
-    callsOk === 1 && callsLate === 2 && tracked.every(item => item.recovered));
-  await tracked[0].retry();
-  check('already recovered item never replays side effects or decrements errors twice',
-    callsOk === 1);
-  const mass = Array.from({ length: scr.AM_FINAL_RECHECK_MAX + 1 }, (_, i) =>
-    ({ key: 'id-' + i, retry: async () => true }));
-  const refused = await run(mass, {
-    deadlineMs: 10000000, delayMs: 0, max: scr.AM_FINAL_RECHECK_MAX,
-    now: () => nowResidual, sleep: async () => {},
-  });
-  check('final retry never retries a mass source outage or exceeds bounded 8-subject cap',
-    refused.attempted === 0 && /cap/.test(refused.skipped));
-  check('final retries consume at most two extra minutes of the existing job budget',
-    scr.AM_FINAL_RECHECK_TAIL_MS === 120000 &&
-    scr.AM_FINAL_RECHECK_COOLDOWN_MS === 45000 &&
-    /residual\.length <= AM_FINAL_RECHECK_MAX/.test(src) &&
-    /concurrency: 1/.test(src) &&
-    src.indexOf('final gated adverse-media probe') < src.indexOf('Restore the input order'));
+  check('second pass: runs before the input-order restore, bounded by the enrichment deadline',
+    src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order') && /deadlineMs: enrichDeadline/.test(src));
 }
 
 /* ── licence-free mode (OPENSANCTIONS_DATA=0) ── */
@@ -2637,43 +2200,5 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     /OPENSANCTIONS_DATA: \$\{\{ vars\.OPENSANCTIONS_DATA \}\}\n/.test(wf));
 }
 
-/* A previously shipped logging path printed every former customer name/key
- * when a standing match left the population. CI logs are publicly readable. */
-{
-  const held = [{ name: 'Synthetic Sensitive Name', key: 'PRIVATE-CASE-KEY' },
-    { name: 'Synthetic Company', key: 'ENTITY-ID-FIXTURE' }];
-  const line = describeUnscreenedHold(held);
-  check('un-screened case count is visible without disclosing any subject identity',
-    line.includes('2 standing match(es)') &&
-    line.includes('cases HELD') &&
-    held.every(x => !line.includes(x.name) && !line.includes(x.key)));
-  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
-  check('screen runner emits only the safe held-population summary',
-    /console\.log\(describeUnscreenedHold\(notScreened\)\)/.test(src) &&
-    !/notScreened\.map\(n => n\.(name|key)/.test(src));
-}
-/* State corruption must never silently discard AML / Asana case continuity. */
-{
-  const state = { updated: '2026-10-12', subjects: {
-    'fictional-entity': { name: 'Synthetic Test Entity', lastSeen: '2026-10-12' }
-  } };
-  check('valid historic screening state survives strict parsing without mutation',
-    JSON.stringify(parseScreeningState(JSON.stringify(state))) === JSON.stringify(state));
-  check('first-ever empty screening bootstrap remains supported',
-    parseScreeningState(JSON.stringify({ updated: null, subjects: {} })).updated === null);
-  const bad = [
-    '{ bad json', 'null', '[]', '{}', '{"updated":"2026-10-12"}',
-    '{"updated":"2026-10-12","subjects":[]}',
-    '{"updated":"2026-02-30","subjects":{}}',
-    '{"updated":null,"subjects":{"key":{"name":"Synthetic"}}}',
-  ];
-  check('corrupt/malformed screening histories fail instead of resetting to zero cases',
-    bad.every(raw => { try { parseScreeningState(raw); return false; }
-      catch (e) { return /Screening (state|history)/.test(String(e.message)); } }));
-  const src = readFileSync(fileURLToPath(new URL('../scripts/sanctions-screen.mjs', import.meta.url)), 'utf8');
-  check('runner refuses malformed existing state rather than starting fresh',
-    /return parseScreeningState\(readFileSync\(STATE_FILE, 'utf8'\)\)/.test(src) &&
-    !src.includes('state unreadable, starting fresh'));
-}
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

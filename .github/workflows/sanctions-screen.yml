@@ -51,31 +51,15 @@ on:
   # so a missed dispatch still lands ~08:00-10:00 UAE, not mid-afternoon.
   schedule:
     - cron: '17 0 * * *'   # 00:17 UTC = 04:17 UAE daily (odd minute) — backstop to the on-time dispatch
-  # A merged change to the screening engine or its assurance/delivery contract
-  # invalidates prior exact-commit runtime evidence. Revalidate automatically
-  # on integrated main, not on unreviewed PRs or unrelated documentation.
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/sanctions-screen.yml'
-      - '.github/workflows/screening-assurance.yml'
-      - '.github/workflows/sanctions-runtime-assurance.yml'
-      - 'scripts/sanctions-screen.mjs'
-      - 'scripts/screening-assurance.mjs'
-      - 'scripts/screening-delivery.mjs'
-      - 'scripts/screening-cases.mjs'
-      - 'data/worldwide-screening-sources.json'
-      - 'screen.py'
-      - 'kyc.py'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Operational control: CI tests proposals; relevant accepted changes on main
-# receive a fresh full-population run and exact-commit assurance. Ordinary
-# application/doc merges do not trigger costly screening. Non-cancelling
-# concurrency prevents a new push from discarding an active run's evidence.
+# This workflow is an OPERATIONAL control, not a code-validation workflow.
+# Source changes are exercised by CI. Keeping the runtime workflow schedule/
+# manual-only prevents ordinary merges from creating hour-long full-base
+# screens or being mistaken by freshness checks for today's mandatory control.
 concurrency:
   group: sanctions-screen-runtime
   cancel-in-progress: false
@@ -90,14 +74,13 @@ jobs:
     runs-on: ubuntu-latest
     # The 2026-09-30 run reached the 90-minute enrichment budget with five
     # subjects remaining. Allow 100 minutes without increasing provider rates.
-    # Keep 15+ minutes of job headroom after the capped 5-minute adverse-media
-    # recovery tail for case review, Asana delivery, and state persistence.
+    # Keep 20 minutes of job headroom for list loading, cases, delivery and state.
     # Skipped enrichment still fails assurance; a larger budget is not proof
     # that every provider answered or that the full population was covered.
     timeout-minutes: 120
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           disable-sudo: true
           # Allowlist derived from the job's actual fetches: runner/toolchain
@@ -180,7 +163,7 @@ jobs:
           # authenticates with an ephemeral env token, and the overlay fetch
           # is anonymous (public repo).
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
 
@@ -244,11 +227,6 @@ jobs:
           ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
           SCREEN_ENRICH_BUDGET_MS: '6000000'
-          # The initial 100-minute phase exhausted its deadline on 13 Oct and
-          # permitted only 2 of 20 queued zero-backbone subjects to retry.
-          # Reserve max 5 minutes exclusively for post-sweep failed subjects;
-          # the domain still fails assurance until actual coverage is proven.
-          SCREEN_AM_RECOVERY_RESERVE_MS: '300000'
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           # Personal EU FSF crawler token (optional): the shared public token now
           # redirects to EU Login. Unset = public token, and the EU list fails loudly.
@@ -293,9 +271,7 @@ jobs:
         if: steps.screen.outputs.screen_error != 'true'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          # Case and daily-results evidence MUST reach this approved MLRO
-          # project, even if an unrelated repository variable is repointed.
-          ASANA_CASES_PROJECT_GID: '1216203370612914'
+          ASANA_CASES_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
           # "Sanctions updates" section — the run's RESULTS surface (Asana, not
           # GitHub). Repointed 2026-09-16: this literal fallback pointed at
@@ -309,43 +285,7 @@ jobs:
           # was merged into HAWKEYE STERLING APP.
           ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
-          # Telemetry-only, no external paid API is enabled by this variable.
-          API_COST_TELEMETRY_ENABLED: '1'
-          API_QUOTA_ALERT_TELEMETRY_ENABLED: '1'
         run: node scripts/screening-cases.mjs
-
-      - name: API cost summary (metadata only)
-        if: always() && !cancelled()
-        continue-on-error: true
-        env:
-          # Independently dated publisher prices only; never assume a missing
-          # price or absent usage receipt means zero spend.
-          API_USD_RATES_JSON: ${{ vars.API_USD_RATES_JSON }}
-        run: |
-          # The dashboard CLI REQUIRES a ledger and a verified price table.
-          # Invoking it with no args always exits 2 and loses the monitoring
-          # signal. Missing pricing or token usage is UNKNOWN, never priced.
-          if [ ! -s api-cost-ledger.jsonl ] || [ -z "${API_USD_RATES_JSON:-}" ]; then
-            echo 'API cost dashboard: INCOMPLETE (no verified prices or usage receipts)'
-            {
-              echo '## API Cost Dashboard'
-              echo 'INCOMPLETE: No verified pricing table and sanitized paid-usage receipts were both available. Missing evidence is not zero spending.'
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            umask 077
-            PRICE_FILE="${RUNNER_TEMP}/hawkeye-screen-verified-prices.json"
-            trap 'rm -f "$PRICE_FILE"' EXIT
-            printf '%s' "$API_USD_RATES_JSON" > "$PRICE_FILE"
-            node scripts/api-cost-dashboard.mjs --ledger api-cost-ledger.jsonl --prices "$PRICE_FILE"
-          fi
-
-      - name: API credit/quota alerts (sanitized categories only)
-        if: always() && !cancelled()
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          API_QUOTA_ALERT_ISSUES: '1'
-        run: node scripts/api-quota-alerts.mjs
 
       - name: Screening metrics (non-blocking observability)
         if: always()
@@ -504,52 +444,38 @@ jobs:
               "The screening case lifecycle or independent evidence delivery step failed. Compliance evidence and dispositions have NOT been remotely verified. Keep affected cases open, investigate the failed Asana synchronization and verify a complete rerun. Run: $RUN_URL"
           fi
 
-      - name: Open a GitHub issue when screening or coverage needs human attention
-        # Never copy the screening report into this public issue: it contains
-        # customer, principal and employee names. Keep coverage failures red and
-        # open an aggregate-only human follow-up.
-        if: always() && (steps.screen.outputs.screen_error == 'true' || steps.assurance.outcome == 'failure' || steps.persist.outcome == 'failure' || steps.refresh_assurance.outcome == 'failure' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true' && steps.cases.outcome != 'success'))
+
+      - name: Open a GitHub issue if the screen could not run, or a hit was not delivered
+        # In case-engine mode alerts are suppressed (asana_posted is always false)
+        # and the MLRO CASES are the delivery surface — so a new match is only
+        # "undelivered" when the cases step ALSO failed. Without the cases-outcome
+        # guard this opened a false "not delivered" issue on every real match, and
+        # (conversely) stayed silent when case delivery genuinely failed.
+        # always() is load-bearing twice over: an unscreened bail now FAILS the
+        # screen step (red run — so control-retry re-dispatches), and this step
+        # must still run afterwards to file the issue from the bail's outputs.
+        if: always() && (steps.screen.outputs.screen_error == 'true' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true' && steps.cases.outcome != 'success'))
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
+          TITLE: ${{ steps.screen.outputs.title }}
           SCREEN_ERROR: ${{ steps.screen.outputs.screen_error }}
-          ASSURANCE_OUTCOME: ${{ steps.assurance.outcome }}
-          PERSIST_OUTCOME: ${{ steps.persist.outcome }}
-          REFRESH_OUTCOME: ${{ steps.refresh_assurance.outcome }}
         with:
           script: |
-            const assuranceFailed = process.env.ASSURANCE_OUTCOME === 'failure';
-            const evidenceStateFailed = process.env.PERSIST_OUTCOME === 'failure' ||
-              process.env.REFRESH_OUTCOME === 'failure';
-            const screenFailed = process.env.SCREEN_ERROR === 'true';
-            const title = evidenceStateFailed
-              ? 'Sanctions Screen — state persistence or assurance dispatch requires review'
-              : assuranceFailed
-              ? 'Sanctions Screen — worldwide assurance requires review'
-              : screenFailed
-                ? 'Sanctions Screen — run requires review'
-                : 'Sanctions Screen — delivery requires review';
-            const runUrl = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY
-              + '/actions/runs/' + process.env.GITHUB_RUN_ID;
-            const note = evidenceStateFailed
-              ? 'Encrypted screening or case state was not confirmed as persisted, or the independent assurance dispatch failed. Human MLRO review and a fresh evidence-verified run are required; do not clear cases.'
-              : assuranceFailed
-              ? 'Worldwide runtime assurance failed. Review the aggregate domain evidence on the restricted operational record; the run remains degraded until coverage is verified.'
-              : screenFailed
-                ? 'The daily customer screen could not complete. No clearance can be inferred; investigate the run and retry after the cause is corrected.'
-                : 'A screening match could not be delivered to the case system. Review through the restricted case channel and preserve human MLRO review.';
+            const fs = require('fs');
+            let report = '';
+            try { report = fs.readFileSync('sanctions-screen-report.md', 'utf8'); } catch {}
+            const failed = process.env.SCREEN_ERROR === 'true';
+            const note = failed
+              ? ['', '---',
+                 '> The daily customer screen **could not run**, so no clearance can be inferred.',
+                 '> Check the `ASANA_ACCESS_TOKEN` secret and that the sanctions lists are reachable, then re-run.'].join('\n')
+              : ['', '---',
+                 '> A customer match was detected but **could not be delivered to Asana** (token missing or the API call failed),',
+                 '> so this issue was opened instead. The match must still be reviewed (MLRO + four-eyes).'].join('\n');
             const { owner, repo } = context.repo;
-            const body = [
-              'Automated screening requires human follow-up.',
-              '',
-              'Workflow run: ' + runUrl,
-              '',
-              note,
-              '',
-              'This public issue intentionally omits customer, principal, employee, and case identifiers. Do not post them in comments. Do not record a clearance or disposition here.'
-            ].join('\n');
             await github.rest.issues.create({
               owner, repo,
-              title,
-              body,
+              title: process.env.TITLE || 'Sanctions Screen — attention required',
+              body: (report || 'See the workflow run.') + note,
               labels: ['sanctions-screen'],
             });
