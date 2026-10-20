@@ -445,37 +445,24 @@ jobs:
           fi
 
 
-      - name: Open a GitHub issue if the screen could not run, or a hit was not delivered
-        # In case-engine mode alerts are suppressed (asana_posted is always false)
-        # and the MLRO CASES are the delivery surface — so a new match is only
-        # "undelivered" when the cases step ALSO failed. Without the cases-outcome
-        # guard this opened a false "not delivered" issue on every real match, and
-        # (conversely) stayed silent when case delivery genuinely failed.
-        # always() is load-bearing twice over: an unscreened bail now FAILS the
-        # screen step (red run — so control-retry re-dispatches), and this step
-        # must still run afterwards to file the issue from the bail's outputs.
-        if: always() && (steps.screen.outputs.screen_error == 'true' || (steps.screen.outputs.has_changes == 'true' && steps.screen.outputs.asana_posted != 'true' && steps.cases.outcome != 'success'))
+      - name: Open a GitHub issue when screening or coverage needs human attention
+        # Public repository: NEVER attach screening output, identities or case reports.
+        if: always() && (steps.screen.outputs.screen_error == 'true' || steps.assurance.outcome == 'failure' || steps.persist.outcome == 'failure' || steps.refresh_assurance.outcome == 'failure' || (steps.screen.outputs.has_changes == 'true' && steps.cases.outcome != 'success'))
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          TITLE: ${{ steps.screen.outputs.title }}
-          SCREEN_ERROR: ${{ steps.screen.outputs.screen_error }}
         with:
           script: |
-            const fs = require('fs');
-            let report = '';
-            try { report = fs.readFileSync('sanctions-screen-report.md', 'utf8'); } catch {}
-            const failed = process.env.SCREEN_ERROR === 'true';
-            const note = failed
-              ? ['', '---',
-                 '> The daily customer screen **could not run**, so no clearance can be inferred.',
-                 '> Check the `ASANA_ACCESS_TOKEN` secret and that the sanctions lists are reachable, then re-run.'].join('\n')
-              : ['', '---',
-                 '> A customer match was detected but **could not be delivered to Asana** (token missing or the API call failed),',
-                 '> so this issue was opened instead. The match must still be reviewed (MLRO + four-eyes).'].join('\n');
             const { owner, repo } = context.repo;
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
             await github.rest.issues.create({
               owner, repo,
-              title: process.env.TITLE || 'Sanctions Screen — attention required',
-              body: (report || 'See the workflow run.') + note,
+              title: 'Sanctions Screen - operational assurance requires review',
+              body: [
+                'Automated screening or its evidence delivery requires human MLRO review.',
+                'Screening results, case synchronization, state persistence or assurance dispatch requires review.',
+                'Do not infer clearance from this run.',
+                'This public issue intentionally omits customer, principal, employee, and case identifiers.',
+                'Review restricted operational records and reconcile the screening outcome.',
+                'Workflow run: ' + runUrl,
+              ].join('\\n'),
               labels: ['sanctions-screen'],
             });
