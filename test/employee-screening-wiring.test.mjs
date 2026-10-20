@@ -89,9 +89,10 @@ const mainRevalidationSources = [
   'scripts/screening-delivery.mjs',
   'screen.py',
 ];
-check('merged screening-critical code triggers a full current-main run (no overlap or cancellation)',
-  primaryScreenWorkflow.includes('  push:\\n    branches: [main]\\n    paths:'.replaceAll('\\n', '\n')) &&
-  mainRevalidationSources.every(path => primaryScreenWorkflow.includes("      - '" + path + "'")) &&
+/* Runtime screening is intentionally schedule/manual-only: a code merge must
+   run CI, but must not create an unscheduled screening cycle. */
+check('production screening does not run automatically on code pushes', 
+  !/^  push:/m.test(primaryScreenWorkflow) &&
   /group:\s*sanctions-screen-runtime/.test(primaryScreenWorkflow) &&
   /cancel-in-progress:\s*false/.test(primaryScreenWorkflow));
 check('daily sanctions workflow explicitly binds approved Customer Database fallback',
