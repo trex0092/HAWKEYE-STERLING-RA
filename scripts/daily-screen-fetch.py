@@ -92,7 +92,8 @@ for t in fetch_source_tasks(pat, customer, "Customer Database"):
 
 # The HR project's completed tasks remain in scope. Completion represents
 # training status, not termination of employment.
-for t in fetch_source_tasks(pat, employee, "HR Employees"):
+token = pat
+for t in fetch_source_tasks(token, employee, "HR Employees"):
     name = str(t.get("name") or "").strip()
     if not name:
         continue
