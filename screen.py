@@ -4467,6 +4467,10 @@ def get_payment_register():
 
 
 def get_all_customers():
+    # Validate both authoritative populations before any remote read.
+    # An unset or redirected HR source cannot silently turn the run customer-only.
+    if ASANA_EMPLOYEE_DB_GID != "1216239131596624":
+        raise RuntimeError("FATAL: approved HR Employees project is required for screening")
     customers = []
     CUSTOMER_ROWS_SKIPPED.clear()
     params = {
