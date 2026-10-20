@@ -6696,6 +6696,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     sanc_status = "OK" if sanc_ok else ("DEGRADED" if any(core_loaded) else "FAILED")
     if sanc_ok and _stale:
         sanc_status = "DEGRADED (stale: " + ", ".join(f"{k.upper()} {a}d" for k, a in _stale) + ")"
+    if EOCN_REVIEW_ALERT.get("overdue"):
+        sanc_status = "DEGRADED (EOCN official review overdue)"
     pep_status = ("DEGRADED" if pep_degraded
                   else ("OK (worldwide PEP/RCA net)" if pep_mirror else "OK"))
     am_status = ("DEGRADED" if am_blackout
@@ -6721,6 +6723,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     A(f"Population screened: {stats['subjects_total']} subjects "
       f"({stats['companies_screened']} legal entities; "
       f"{stats['individuals_screened']} shareholders, directors and UBOs)")
+    A(f"Approved source records: {stats.get('customer_records', stats.get('customers_total', 0))} Customer Database tasks; "
+      f"{stats.get('employee_records', 0)} HR employee tasks (completed HR records included)")
     A(f"Control status:  Sanctions {sanc_status}  ·  Adverse media {am_status}  ·  PEP {pep_status}")
     if delta:
         A(f"New findings since the previous report:  {delta.get('sanctions',0)} sanctions  ·  "
@@ -8605,6 +8609,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     arrangements = sum(1 for m in possible_matches if m.get("arrangement"))
 
     stats = {"customers_total": len(customers),
+             "customer_records": sum(1 for c in customers if c.get("kind") != "employee"),
+             "employee_records": sum(1 for c in customers if c.get("kind") == "employee"),
              "customer_rows_skipped": len(CUSTOMER_ROWS_SKIPPED),
              "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": subjects_total,
