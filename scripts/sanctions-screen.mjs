@@ -291,7 +291,6 @@ export function parsePrincipals(task) {
   // Isolate the identifications section (stop at the next "SECTION n" or EOF).
   const sec = /SECTION\s*4\b[^\n]*(?:IDENTIFICATION|IDENTITIES|UBO|BENEFICIAL|SHAREHOLDER|DIRECTOR)[\s\S]*?(?=\n\s*(?:SECTION|PART)\b|$)/i.exec(notes);
   const block = sec ? sec[0] : '';
-  if (!block) return [];
   const people = [];
   const seen = new Set();
   const push = (name, role, nationality, dob = '', passport = '', corporate = false) => {
@@ -337,6 +336,23 @@ export function parsePrincipals(task) {
     const nameRe = /\b(?:Name|UBO|Beneficial Owner|Authori[sz]ed Signatory|Signatory|Shareholder|Director|Partner)\s*:\s*([^\n]+)/gi;
     let n;
     while ((n = nameRe.exec(block))) push(n[1], 'Principal', '');
+  }
+
+  /* The Python daily engine also screens explicitly named owners outside
+     Section 4. A customer can record a UBO or corporate parent on a separate
+     ownership line without an Individual-N block. Ignoring that party in
+     the JS pipeline is a sanctions false negative (including the 50%/control
+     corporate-ownership review). Match only named FIELD lines, not arbitrary
+     narrative mentions, and reuse the same per-customer deduplication. */
+  const ownerLine = /(?:^|\n)[ \t]*(Parent(?:\s+Company)?|Shareholder|Ultimate\s+Beneficial\s+Owner|UBO|Holding(?:\s+Company)?|Owner|Owned\s+by|Beneficial\s+Owner)[ \t]*(?:\([^\n)]*\))?[ \t]*[:\-–—][ \t]*([^\n]+)/gi;
+  const corporateForm = /\b(?:llc|l\.l\.c|fze|fzco|fzc|dmcc|dwc|pjsc|psc|plc|ltd|limited|inc|incorporated|corp|corporation|company|group|holdings?|gmbh|sarl|bv|nv|s\.a|ag|pte|sdn|bhd|establishment|industries|enterprises|trust|foundation|stiftung|waqf|anstalt)\b/i;
+  let owner;
+  while ((owner = ownerLine.exec(notes))) {
+    const named = String(owner[2]).replace(/\([^)]*\)/g, ' ')
+      .replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '').trim();
+    if (named.length < 5 || !/\p{L}/u.test(named) ||
+        /^(?:n\/?a|none|nil|not applicable|pending|tbc|tbd|unknown)$/i.test(named)) continue;
+    push(named, owner[1], '', '', '', corporateForm.test(named));
   }
   return people;
 }
