@@ -4478,6 +4478,13 @@ def _verified_asana_page(data, seen_offsets, population):
     offset = next_page.get("offset")
     if not isinstance(offset, str) or not offset or offset in seen_offsets:
         raise RuntimeError(f"FATAL: missing or repeated {population} continuation cursor")
+    # The primary JS engine caps Asana pagination as well. 100 pages allows
+    # 10,000 task rows at Asana's 100-row page limit. If a larger or unstable
+    # collection ever appears, fail loudly rather than loop without a bound.
+    if len(seen_offsets) >= 99:
+        raise RuntimeError(
+            f"FATAL: {population} Asana pagination exceeded the 100-page cap; "
+            "population read is incomplete")
     seen_offsets.add(offset)
     return offset
 
