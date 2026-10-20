@@ -133,7 +133,7 @@ check('parsePrincipals is empty for a record with no identifications section',
     'Name: N/A',
     'SECTION 5 — PF REVIEW',
     'Match context: Name: Fake Sanctions Match',
-  ].join('\\n') };
+  ].join('\n') };
   const parties = parsePrincipals(drifted);
   const subjects = parseSubjects([drifted]);
   check('mixed recognized and drifted Section-4 identity headers retain every named party',
@@ -141,15 +141,15 @@ check('parsePrincipals is empty for a record with no identifications section',
       && parties.some(x => x.name === 'Synthetic Shareholder')
       && subjects.length === 3);
   check('Section-4 identity fallback still excludes placeholders and later report narratives',
-    !parties.some(x => /Fake Sanctions Match|^N\\/A$/.test(x.name)));
+    !parties.some(x => /Fake Sanctions Match|^N\/A$/.test(x.name)));
 }
 
 /* Two distinct Asana customer records may legitimately share a trade name.
    The name-only entity deduper must not quietly screen only the first. */
 {
   const collision = [
-    {gid:'customer-a',name:'Synthetic Holdings LLC',notes:'SECTION 4 — IDENTIFICATIONS\\nIndividual 1 — Director\\nName: Synthetic Person A'},
-    {gid:'customer-b',name:'synthetic holdings llc',notes:'SECTION 4 — IDENTIFICATIONS\\nIndividual 1 — Director\\nName: Synthetic Person B'},
+    {gid:'customer-a',name:'Synthetic Holdings LLC',notes:'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — Director\nName: Synthetic Person A'},
+    {gid:'customer-b',name:'synthetic holdings llc',notes:'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — Director\nName: Synthetic Person B'},
   ];
   let failedClosed = false;
   try { parseSubjects(collision); } catch (e) {
