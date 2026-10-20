@@ -4482,6 +4482,25 @@ def _verified_asana_page(data, seen_offsets, population):
     return offset
 
 
+def _verify_distinct_asana_gid(task, seen_gids, population):
+    """One task must not silently count as two screening source records.
+
+    Pagination cursors only prove that pages advanced, not that Asana did not
+    repeat a task across pages or that a task was not multi-homed into both
+    mandatory projects. Detect duplicate GIDs before processing identity data.
+    Missing GIDs remain visible through the existing skipped-row attestation.
+    """
+    if not isinstance(task, dict):
+        raise RuntimeError(f"FATAL: malformed {population} task row in Asana screening population")
+    gid = str(task.get("gid") or "").strip()
+    if gid:
+        if gid in seen_gids:
+            raise RuntimeError(
+                f"FATAL: repeated Asana task identity in {population} screening population; "
+                "complete two-source screening cannot be attested")
+        seen_gids.add(gid)
+
+
 def get_all_customers():
     # Validate both authoritative populations before any remote read.
     # An unset or redirected HR source cannot silently turn the run customer-only.
@@ -4489,6 +4508,7 @@ def get_all_customers():
         raise RuntimeError("FATAL: approved HR Employees project is required for screening")
     customers = []
     customer_offsets = set()
+    seen_task_gids = set()  # shared by customers and HR: cross-project multi-homing cannot double-count
     CUSTOMER_ROWS_SKIPPED.clear()
     params = {
         "project": ASANA_CUSTOMER_DB_GID,
@@ -4503,6 +4523,7 @@ def get_all_customers():
         data = r.json()
         customer_next_offset = _verified_asana_page(data, customer_offsets, "customer")
         for t in data["data"]:
+            _verify_distinct_asana_gid(t, seen_task_gids, "customer")
             if not t.get("gid") or not t.get("name"):
                 # Keep the run alive (never crash the whole book on one bad row)
                 # but NEVER drop it silently — it is a customer we did not screen.
@@ -4579,6 +4600,7 @@ def get_all_customers():
             data = r.json()
             employee_next_offset = _verified_asana_page(data, employee_offsets, "employee")
             for t in data["data"]:
+                _verify_distinct_asana_gid(t, seen_task_gids, "employee")
                 if not t.get("gid") or not t.get("name"):
                     # Same guard as the customer loop above — an employee row
                     # without a usable identity is a person we did not screen,
