@@ -2602,10 +2602,16 @@
       "detectedAt": "2026-10-20T01:41:24.316Z",
       "prevCount": 442,
       "newCount": null,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 39354830391,
+        "startedAt": "2026-10-20T01:41:27Z"
+      },
+      "status": "complete",
       "chainPrev": "d4a24107d8ea79f23172df39ecae6b71ae1b3f7fe38dee18ff66bffc94342d4e",
-      "chainHash": "44af29c9f624a347fb823757045b95f7200ee24020b61d208853a3e14da6beda"
+      "chainHash": "44af29c9f624a347fb823757045b95f7200ee24020b61d208853a3e14da6beda",
+      "latencyHours": 0,
+      "resolutionHash": "7cde298d8e31c0764c9310e544d16f4147207fb33b51c5d48a3c2cbe79442563"
     },
     {
       "id": "fr-dgt",
@@ -2615,10 +2621,16 @@
       "detectedAt": "2026-10-20T01:41:24.316Z",
       "prevCount": 21481,
       "newCount": 21595,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 39354830391,
+        "startedAt": "2026-10-20T01:41:27Z"
+      },
+      "status": "complete",
       "chainPrev": "44af29c9f624a347fb823757045b95f7200ee24020b61d208853a3e14da6beda",
-      "chainHash": "70c0e35c45379e0d6388150037784aef474ab63e70019e23b83e7bcfd45d95bc"
+      "chainHash": "70c0e35c45379e0d6388150037784aef474ab63e70019e23b83e7bcfd45d95bc",
+      "latencyHours": 0,
+      "resolutionHash": "38ac7f5d9b62538f299530ebd76b49646c73d405d3094b234912813dc2032017"
     }
   ]
 }
