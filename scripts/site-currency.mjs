@@ -22,16 +22,18 @@
  *
  * The primary signal is now a Netlify-generated deploy marker:
  * `data/deploy-meta.json`, written from Netlify's immutable `COMMIT_REF`
- * during the build. That proves exactly which Git commit is live. Asset hashes
- * remain a secondary integrity diagnostic, so Netlify/CDN serve-time rewriting
- * can be surfaced without being misclassified as deployment staleness.
+ * during the build. That proves exactly which Git commit is live.
+ * Hashes of the served assets are INDEPENDENT integrity evidence: a matching
+ * marker cannot excuse mutated/unreadable/missing files. A missing marker
+ * cannot prove dynamic Netlify Functions are current, even if HTML matches.
+ * Site serving failures are distinct from a stale deployment marker.
  *
  * SCOPE (stated, not silent)
  * --------------------------
- * Every root-level `.html`, `.js`, `.css` and `.webmanifest` file — the whole
- * app surface, discovered from disk rather than listed, so a new root asset is
- * covered the day it is added (a hardcoded list is exactly how the shadow-
- * policy sweep in #338 acquired a blind spot). Binary assets under `assets/`
+ * Every root-level `.html`, `.js`, `.css` and `.webmanifest` file,
+ * plus the browser-fetched country-score suggestion JSON and robots.txt.
+ * Root assets are discovered from disk, so newly added entry points are
+ * covered automatically. Binary assets under `assets/`
  * (fonts, images) are NOT fetched: they are large and effectively immutable,
  * and any deploy carrying them also carries the text assets above. A stale
  * deploy cannot hide behind that gap.
@@ -47,12 +49,23 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SERVED_EXTENSIONS = new Set(['.html', '.js', '.css', '.webmanifest']);
+/* This is a narrow, reviewed allowlist of additional runtime assets that
+ * cannot be discovered by root-level HTML/JS/CSS suffixes. Do not add all
+ * data/*.json: most files are private governance snapshots or transient
+ * screening state and should not trigger daily paid Netlify rebuilds.
+ *
+ * country-score-suggested.json is fetched by app.js in the browser. It is
+ * explicitly a proposal surface, NOT an authorized country-risk override. */
+export const EXTRA_RUNTIME_ASSETS = Object.freeze([
+  'data/country-score-suggested.json',
+  'robots.txt',
+]);
 
 export function sha256(buf) {
   return createHash('sha256').update(buf).digest('hex');
@@ -100,10 +113,12 @@ export function firstDivergence(repoBuf, liveBuf, { context = 40, cap = 160 } = 
 
 /** Root-level assets the site publishes, discovered from disk. */
 export function discoverServedAssets(root = REPO_ROOT) {
-  return readdirSync(root, { withFileTypes: true })
+  const roots = readdirSync(root, { withFileTypes: true })
     .filter((e) => e.isFile() && SERVED_EXTENSIONS.has(path.extname(e.name)))
-    .map((e) => e.name)
-    .sort();
+    .map((e) => e.name);
+  const extras = EXTRA_RUNTIME_ASSETS.filter((name) =>
+    existsSync(path.join(root, name)));
+  return [...roots, ...extras].sort();
 }
 
 /**
@@ -162,51 +177,116 @@ export function decide(results, { graceSeconds = 86400, now = Math.floor(Date.no
 }
 
 /**
- * Unix seconds of the asset's most recent commit on the deploy branch, used
- * only to tell deploy lag from real drift.
- *
- * Read over the API rather than by shelling out to `git log`: the
- * hawkeye-no-child-process rule in `.semgrep/hawkeye.yml` forbids subprocess
- * spawning anywhere in application, script or function code, and a monitoring
- * probe is not the place to make an exception for a command-injection vector.
- * `fetch` is already this script's transport, and api.github.com is already on
- * both callers' egress allowlists.
- *
- * Returns NaN whenever the date cannot be established — no repo slug, no
- * network, a rate limit, an unparseable body. `decide()` treats an undatable
- * divergence as DRIFT, which is the safe direction: a divergence we cannot
- * prove is recent must not be excused as lag.
+ * Combine the primary deploy SHA and exact bytes the site serves.
+ * Pure for offline tests. In particular:
+ * - A correct deploy SHA cannot excuse missing/modified root assets.
+ * - Identical HTML does not prove that stale Netlify Functions were updated.
+ * - Deployment lag is allowed only when ALL changed deploy paths are dated
+ *   inside the configured grace window; undatable paths fail closed.
  */
-async function lastChangedAt(name, { timeoutMs = 15000 } = {}) {
-  const slug = process.env.GITHUB_REPOSITORY;
-  if (!slug) return NaN;
-  const branch = process.env.DEPLOY_BRANCH || 'main';
-  const url =
-    `https://api.github.com/repos/${slug}/commits` +
-    `?path=${encodeURIComponent(name)}&sha=${encodeURIComponent(branch)}&per_page=1`;
-  const headers = { Accept: 'application/vnd.github+json' };
-  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { headers, signal: ac.signal });
-    if (!res.ok) return NaN;
-    const body = await res.json();
-    const iso = body?.[0]?.commit?.committer?.date;
-    const ms = Date.parse(iso || '');
-    return Number.isFinite(ms) ? Math.floor(ms / 1000) : NaN;
-  } catch {
-    return NaN;
-  } finally {
-    clearTimeout(timer);
+export function assessDeploymentIntegrity({
+  expectedCommit, markerCommit, changedPaths = null, changedAtSeconds = [],
+  markerCommittedAt = NaN, assetDecision,
+  graceSeconds = 86400, now = Math.floor(Date.now() / 1000)
+} = {}) {
+  if (!assetDecision || typeof assetDecision.verdict !== 'string') {
+    return { verdict: 'unverifiable', ok: false,
+      reason: 'asset comparison did not produce a verdict' };
   }
+  const knownMarker = typeof markerCommit === 'string' && /^[0-9a-f]{40}$/.test(markerCommit);
+  const knownExpected = typeof expectedCommit === 'string' && /^[0-9a-f]{40}$/.test(expectedCommit);
+  if (knownMarker && knownExpected && markerCommit === expectedCommit) {
+    return assetDecision.verdict === 'current'
+      ? { verdict: 'current', ok: true, reason: 'deploy marker and every served root asset match' }
+      : { verdict: 'integrity_failure', ok: false,
+          reason: 'deploy marker matches but live assets differ, are missing or cannot be read' };
+  }
+  if (knownMarker && knownExpected && markerCommit !== expectedCommit) {
+    if (!Array.isArray(changedPaths)) {
+      // Known stale root bytes are already hard evidence of drift. An
+      // incomplete GitHub compare cannot turn a proven failure into
+      // "unknown", or a clean-looking static site into "current".
+      if (assetDecision.verdict === 'drift' ||
+          assetDecision.verdict === 'integrity_failure') {
+        return { verdict: 'drift', ok: false,
+          reason: 'live root assets differ and full deploy-path comparison is unavailable' };
+      }
+      return { verdict: 'unverifiable', ok: false,
+        reason: 'deploy marker is behind main and full changed-path comparison is unavailable' };
+    }
+    if (changedPaths.length > 0) {
+      if (assetDecision.verdict === 'unverifiable') {
+        return { verdict: 'unverifiable', ok: false,
+          reason: 'unreadable live assets and stale deploy marker' };
+      }
+      // The MOST RECENT commit to a path cannot prove lag: a stale Function
+      // can be changed again today, concealing an unshipped edit from weeks
+      // ago. Require independently verified age for the *deployed marker*
+      // and all intervening comparison commits before granting grace.
+      const markerWithinGrace = Number.isFinite(markerCommittedAt) &&
+        markerCommittedAt <= now && now - markerCommittedAt <= graceSeconds;
+      const datesProveLag = graceSeconds > 0 && markerWithinGrace &&
+        changedPaths.length <= 100 &&
+        changedPaths.length === changedAtSeconds.length &&
+        changedAtSeconds.every(at => Number.isFinite(at) && at <= now && now - at <= graceSeconds);
+      if (datesProveLag && assetDecision.ok === true) {
+        return { verdict: 'lag', ok: true,
+          reason: 'deploy-relevant changes are within the grace window; production is not verified current yet' };
+      }
+      return { verdict: 'drift', ok: false,
+        reason: 'stale commit marker with deploy-relevant code/functions outside verified lag' };
+    }
+    // Only docs/CI have changed. A root asset mismatch therefore cannot be
+    // explained by an in-flight app build (the previous early-return bug).
+    return assetDecision.verdict === 'current'
+      ? { verdict: 'current', ok: true,
+          reason: 'only non-deploy files changed and every live root asset still matches' }
+      : { verdict: 'integrity_failure', ok: false,
+          reason: 'docs-only deploy-marker gap cannot excuse missing, unreadable or modified assets' };
+  }
+  if (knownExpected && !knownMarker) {
+    return { verdict: 'unverifiable', ok: false,
+      reason: 'missing/invalid live deploy marker: static assets cannot prove Netlify Functions are current' };
+  }
+  return { verdict: assetDecision.verdict, ok: assetDecision.ok === true,
+    reason: assetDecision.reason };
 }
 
+/** GitHub compare responses are bounded to 300 changed files and 250 commits.
+ * A partial comparison MUST NOT imply that Netlify Functions are current.
+ * The commit list (not the latest edit per path) gives a conservative lower
+ * bound on how long any unshipped change has been waiting. Parsing is pure
+ * and independently regression-tested using synthetic truncated responses.
+ */
+export function verifiedDeployComparison(body, base, head) {
+  const isSha = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
+  if (!isSha(base) || !isSha(head) ||
+      !body || body.status !== 'ahead' ||
+      body.base_commit?.sha !== base ||
+      body.merge_base_commit?.sha !== base ||
+      !Array.isArray(body.files) || body.files.length >= 300 ||
+      !Array.isArray(body.commits) || !Number.isSafeInteger(body.total_commits) ||
+      body.total_commits < 1 || body.commits.length !== body.total_commits ||
+      body.commits[body.commits.length - 1]?.sha !== head ||
+      body.files.some(file => !file || typeof file.filename !== 'string')) return null;
+  const markerAtMs = Date.parse(body.base_commit?.commit?.committer?.date || '');
+  const commitDates = body.commits.map(commit =>
+    Date.parse(commit?.commit?.committer?.date || ''));
+  if (!Number.isFinite(markerAtMs) ||
+      commitDates.some(ms => !Number.isFinite(ms))) return null;
+  return {
+    changedPaths: [...new Set(body.files.filter(file =>
+      isDeployRelevantPath(file.filename)).map(file => file.filename))],
+    markerCommittedAt: Math.floor(markerAtMs / 1000),
+    oldestComparedCommitAt: Math.floor(Math.min(...commitDates) / 1000),
+  };
+}
 
 export function isDeployRelevantPath(name) {
   const p = String(name || '').replace(/^\.\//, '');
   if (!p) return false;
   if (/^[^/]+\.(?:html|js|css|webmanifest)$/.test(p)) return true;
+  if (EXTRA_RUNTIME_ASSETS.includes(p)) return true;
   return p === 'netlify.toml' || p.startsWith('assets/') || p.startsWith('netlify/');
 }
 
@@ -218,11 +298,11 @@ async function deployRelevantChangesSince(base, head, timeoutMs = 15000) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const res = await fetch(`https://api.github.com/repos/${slug}/compare/${base}...${head}`, { headers, signal: ac.signal });
+    const res = await fetch(`https://api.github.com/repos/${slug}/compare/${base}...${head}`, {
+      headers, signal: ac.signal,
+    });
     if (!res.ok) return null;
-    const body = await res.json();
-    if (!Array.isArray(body.files)) return null;
-    return body.files.filter((x) => isDeployRelevantPath(x && x.filename)).map((x) => x.filename);
+    return verifiedDeployComparison(await res.json(), base, head);
   } catch {
     return null;
   } finally {
@@ -270,7 +350,8 @@ async function fetchAsset(origin, name, timeoutMs) {
   }
 }
 
-export async function compare({ origin, graceSeconds = 86400, timeoutMs = 30000 } = {}) {
+export async function compare({ origin, graceSeconds = 86400, timeoutMs = 30000,
+  oldestComparedCommitAt = NaN } = {}) {
   const assets = discoverServedAssets();
   const results = [];
   for (const name of assets) {
@@ -286,25 +367,17 @@ export async function compare({ origin, graceSeconds = 86400, timeoutMs = 30000 
         repoHash,
         liveHash,
         excerpt: match ? null : firstDivergence(repoBody, fetched.body),
-        changedAt: NaN,
+        changedAt: match ? NaN : oldestComparedCommitAt,
       });
     } else {
-      results.push({ name, status: fetched.status, repoHash, liveHash: null, detail: fetched.detail, changedAt: NaN });
+      results.push({ name, status: fetched.status, repoHash, liveHash: null,
+        detail: fetched.detail, changedAt: oldestComparedCommitAt });
     }
   }
 
-  /* Date only the divergences, and only when a grace window can act on the
-     answer. A matching asset's history is irrelevant, and with grace at zero
-     (the deploy workflow's publish-wait, which polls up to 30 times) every
-     divergence is drift regardless of age — so a healthy site makes no API
-     calls at all, and the polling caller makes none either. */
-  if (graceSeconds > 0) {
-    await Promise.all(
-      results
-        .filter((r) => r.status === 'differ' || r.status === 'missing')
-        .map(async (r) => { r.changedAt = await lastChangedAt(r.name); }),
-    );
-  }
+  // One bounded compare response supplies the *oldest* intervening commit.
+  // No extra per-file GitHub API calls, and recent re-edits cannot erase a
+  // much older unshipped deployment change. If unavailable, NaN fails closed.
 
   return { results, decision: decide(results, { graceSeconds }) };
 }
@@ -324,26 +397,41 @@ async function main() {
   const graceSeconds = Number.parseInt(process.env.GRACE_SECONDS || '86400', 10);
   const expectedCommit = String(process.env.EXPECTED_DEPLOY_SHA || process.env.GITHUB_SHA || '').trim().toLowerCase();
   const deployMeta = await fetchDeployMeta(origin);
+  let changedPaths = null;
+  let comparison = null;
 
   if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit)) {
     console.log(`deploy marker: live ${deployMeta.commit} · expected ${expectedCommit}`);
     if (deployMeta.commit !== expectedCommit) {
-      const changed = await deployRelevantChangesSince(deployMeta.commit, expectedCommit);
-      if (Array.isArray(changed) && changed.length === 0) {
-        console.log('verdict: CURRENT — commits since the live deploy marker contain no deploy-relevant app changes');
-        return;
-      }
-      if (Array.isArray(changed) && changed.length) {
-        annotate(`::notice::Live deploy marker is behind main and ${changed.length} deploy-relevant path(s) changed: ${changed.slice(0, 12).join(', ')}`);
+      comparison = await deployRelevantChangesSince(deployMeta.commit, expectedCommit);
+      changedPaths = comparison?.changedPaths ?? null;
+      if (Array.isArray(changedPaths) && changedPaths.length) {
+        annotate(`::notice::Live marker is behind main and ${changedPaths.length} deploy-relevant paths changed: ${changedPaths.slice(0, 12).join(', ')}`);
+      } else if (Array.isArray(changedPaths)) {
+        annotate('::notice::Only non-deploy files changed since marker; verifying served assets anyway.');
       } else {
-        annotate(`::notice::Live deploy marker is behind main; compare evidence unavailable, falling back to served-asset verification.`);
+        annotate('::notice::Stale marker with unavailable change comparison; current production cannot be established.');
       }
     }
   } else if (/^[0-9a-f]{40}$/.test(expectedCommit)) {
-    console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); falling back to asset comparison`);
+    console.log(`deploy marker unavailable (${deployMeta.reason || 'unknown'}); checking assets but Netlify Function freshness remains UNVERIFIABLE`);
   }
 
-  const { results, decision } = await compare({ origin, graceSeconds });
+  const { results, decision } = await compare({
+    origin, graceSeconds, oldestComparedCommitAt: comparison?.oldestComparedCommitAt ?? NaN,
+  });
+  // The same complete compare response supplies a conservative earliest
+  // unshipped commit date for every deploy path. We must not infer age from
+  // the latest edit, or make one HTTP request for every changed filename.
+  const changedAtSeconds = Array.isArray(changedPaths) && comparison
+    ? changedPaths.map(() => comparison.oldestComparedCommitAt)
+    : [];
+  const integrity = assessDeploymentIntegrity({
+    expectedCommit, markerCommit: deployMeta.ok ? deployMeta.commit : null,
+    changedPaths, changedAtSeconds,
+    markerCommittedAt: comparison?.markerCommittedAt ?? NaN,
+    assetDecision: decision, graceSeconds,
+  });
 
   const width = Math.max(...results.map((r) => r.name.length));
   for (const r of results) {
@@ -367,36 +455,25 @@ async function main() {
     console.log(`    live: ${e.live}`);
   }
   console.log('');
-  console.log(`verdict: ${decision.verdict.toUpperCase()} — ${decision.reason}`);
+  console.log(`asset comparison: ${decision.verdict.toUpperCase()} — ${decision.reason}`);
+  console.log(`verdict: ${integrity.verdict.toUpperCase()} — ${integrity.reason}`);
 
-  if (deployMeta.ok && /^[0-9a-f]{40}$/.test(expectedCommit) && deployMeta.commit === expectedCommit) {
-    if (!decision.ok) {
-      annotate(`::warning::Deploy commit is current, but ${decision.stale.length || decision.unreadable.length} served asset(s) differ or are unreadable. Treating this as serve-time integrity diagnostics, not deploy staleness.`);
-    }
-    console.log('verdict: CURRENT — deployed commit marker matches expected Git SHA');
-    return;
-  }
-
-  if (decision.ok) {
-    if (decision.verdict === 'lag') {
-      annotate(`::notice::Deploy lag — ${decision.stale.length} asset(s) not yet published, all within grace.`);
+  if (integrity.ok) {
+    if (integrity.verdict === 'lag') {
+      annotate('::notice::Deploy-relevant code is within the grace window. Production is NOT YET verified current.');
     }
     return;
   }
-
-  if (decision.verdict === 'unverifiable') {
-    annotate(`::error::Site currency UNVERIFIABLE — ${decision.reason}. Treating as a failure: an unread site is not a current site.`);
+  if (integrity.verdict === 'unverifiable') {
+    annotate(`::error::Site currency UNVERIFIABLE — ${integrity.reason}. Unknown coverage must never be called current.`);
     process.exit(2);
   }
-
+  if (integrity.verdict === 'integrity_failure') {
+    annotate(`::error::PRODUCTION INTEGRITY FAILURE — ${integrity.reason}. The SHA marker cannot excuse missing, unreadable, or mutated files.`);
+    process.exit(1);
+  }
   const names = decision.stale.map((r) => r.name).join(', ');
-  annotate(
-    `::error::PRODUCTION DRIFT — the live site is NOT serving what main ships. ` +
-      `Stale or absent: ${names}. Production deploys are not publishing: check the Netlify ` +
-      `deploy log (app.netlify.com/projects/hawkeye-sterling-ra/deploys), re-link the ` +
-      `repository under Build & deploy -> Continuous deployment, or set the ` +
-      `NETLIFY_BUILD_HOOK_URL secret so netlify-production-deploy.yml can publish.`,
-  );
+  annotate(`::error::PRODUCTION DRIFT — ${integrity.reason}. Stale or absent root assets: ${names || 'none (Netlify Functions/configuration may be behind)'}. Check Netlify Deploys and docs/runbooks/netlify-production-recovery.md.`);
   process.exit(1);
 }
 

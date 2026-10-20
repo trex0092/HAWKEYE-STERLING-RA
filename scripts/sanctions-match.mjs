@@ -1080,6 +1080,11 @@ export function parseUnJson(body) {
       if (typeof v === 'string' && v.trim()) parts.push(v.trim());
     }
     if (parts.length) { out.push(parts.join(' ').replace(/\s+/g, ' ').trim()); hit = true; }
+    /* NAME_ORIGINAL_SCRIPT: the party's name in its own script (Arabic, Cyrillic,
+       ...). Mirrors screen.py parse_un; recall-only. */
+    if (typeof rec.NAME_ORIGINAL_SCRIPT === 'string' && rec.NAME_ORIGINAL_SCRIPT.trim()) {
+      out.push(rec.NAME_ORIGINAL_SCRIPT.trim()); hit = true;
+    }
     for (const ac of ['INDIVIDUAL_ALIAS', 'ENTITY_ALIAS']) {
       const arr = rec[ac];
       if (Array.isArray(arr)) for (const a of arr) {

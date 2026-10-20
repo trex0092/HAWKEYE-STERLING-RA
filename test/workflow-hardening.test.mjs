@@ -1,3 +1,4 @@
+import { decideUniqueDispatch, dispatchOnce } from '../scripts/github-workflow-dispatch-guard.mjs';
 /* Workflow-hardening ratchet — the 2026-08-05 full-estate audit found every
    deviation documented in-file; this guard FREEZES that state so a future
    workflow (or edit) cannot regress it silently. Line-based checks (no YAML
@@ -96,6 +97,23 @@ for (const f of files) {
         sameLine || staysAudit);
     }
   }
+}
+
+/* A historical gitleaks alert may involve documented, publicly shareable
+ * Asana object IDs rather than authentication tokens. Only those two exact
+ * historical IDs and one clearly instructional key placeholder are exempted.
+ * A whole-file exemption would allow later REAL secrets to go undetected. */
+{
+  const gitleaks = readFileSync('.gitleaks.toml', 'utf8');
+  const exactIds = ['1218785568483509', '1218452114962158'];
+  check('historical Asana IDs are exempted by exact value only, not by source file',
+    exactIds.every(id => gitleaks.includes("'''" + id + "'''")) &&
+    !gitleaks.includes("'''screen\\.py'''") &&
+    !gitleaks.includes("'''\\.github/workflows/"));
+  check('instructional Composio placeholder has narrow, non-secret wording exemption',
+    gitleaks.includes("'''<?project API key>?'''") &&
+    !gitleaks.includes("'''COMPOSIO_API_KEY'''") &&
+    !gitleaks.includes("'''docs/composio-integration"));
 }
 
 /* The exceptions table itself must stay honest: no empty reasons. */
@@ -282,6 +300,156 @@ for (const [id, reason] of DOCUMENTED_EXCEPTIONS) {
   check(`checked every job that can outlive the reclaim window (${guarded})`, guarded >= 1);
   check(`no egress block pins a hosted-compute shard — the suffix rotates, so a pin is a reclaim bug${pinnedAll.length ? ' (offending: ' + pinnedAll.slice(0, 4).join(', ') + ')' : ''}`,
     pinnedAll.length === 0);
+}
+
+
+const dedupeNow = Date.parse('2026-10-12T12:00:00Z');
+const dedupeRun = (patch={}) => ({
+  id: 100, head_branch: 'main', event: 'workflow_dispatch',
+  status: 'completed', conclusion: 'success', created_at: '2026-10-12T11:56:00Z', ...patch
+});
+check('duplicate dispatch gate prevents any active workflow being re-triggered',
+  decideUniqueDispatch([dedupeRun({status:'in_progress'})],
+    {nowMs:dedupeNow}).action === 'skip');
+check('a prior-day long-running active AML sweep blocks a duplicate dispatch',
+  decideUniqueDispatch([dedupeRun({
+    status: 'in_progress', conclusion: null,
+    created_at: '2026-10-11T22:00:00Z'
+  })], { nowMs: dedupeNow, sinceMs: Date.parse('2026-10-12T00:00:00Z') }).action === 'skip');
+check('older completed runs remain eligible while old active runs remain blocked',
+  decideUniqueDispatch([dedupeRun({
+    status: 'completed', created_at: '2026-10-11T22:00:00Z'
+  })], { nowMs: dedupeNow }).action === 'dispatch');
+check('recent completed or failed dispatches still have a quiet period',
+  decideUniqueDispatch([dedupeRun({conclusion:'failure'})],
+    {nowMs:dedupeNow}).action === 'skip');
+check('older completed runs can be retried after the quiet period',
+  decideUniqueDispatch([dedupeRun({created_at:'2026-10-12T10:00:00Z'})],
+    {nowMs:dedupeNow}).action === 'dispatch');
+check('future and unreadable run timestamps fail closed',
+  decideUniqueDispatch([dedupeRun({created_at:'invalid'})],
+    {nowMs:dedupeNow}).action === 'unknown' &&
+  decideUniqueDispatch([dedupeRun({created_at:'2026-10-15T00:00:00Z'})],
+    {nowMs:dedupeNow}).action === 'unknown');
+let dedupeCalls = [];
+const fakeApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  if (!options) return { data: { workflow_runs: [dedupeRun()] } };
+  return null;
+};
+const double = await dispatchOnce(fakeApi, '/actions/workflows/sanctions-screen.yml',
+  {nowMs:dedupeNow});
+check('just-in-time run listing suppresses duplicate POSTs',
+  double.action === 'skip' && dedupeCalls.join('|') === 'GET');
+dedupeCalls = [];
+const emptyApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  return options ? null : { data: { workflow_runs: [] } };
+};
+const dispatchedOnce = await dispatchOnce(emptyApi, '/actions/workflows/sanctions-screen.yml',
+  {nowMs:dedupeNow});
+check('genuinely missing run is dispatched once after a current history read',
+  dispatchedOnce.action === 'dispatched' && dedupeCalls.join('|') === 'GET|POST');
+dedupeCalls = [];
+const uncertainApi = async (path,options) => {
+  dedupeCalls.push(options?.method || 'GET');
+  if (!options) return { data: {} };
+  throw Error('should not call');
+};
+check('unavailable or malformed run listings block blind dispatches',
+  (await dispatchOnce(uncertainApi, '/actions/workflows/sanctions-screen.yml',
+    {nowMs:dedupeNow})).action === 'unknown' && dedupeCalls.join('|') === 'GET');
+let posts = 0;
+const ambiguous = await dispatchOnce(async (_path,opt) => {
+  if (!opt) return {data:{workflow_runs:[]}};
+  posts++; throw Error('POST outcome unknown');
+}, '/actions/workflows/sanctions-screen.yml', {nowMs:dedupeNow});
+check('ambiguous POST outcomes never cause an automatic replay',
+  ambiguous.action === 'unknown' && posts === 1);
+/* GitHub Packages starter templates must not silently publish a private
+   compliance repository, create release-triggered jobs, or grant write token. */
+const readiness = readFileSync(join(dir, 'npm-package-readiness.yml'), 'utf8');
+check('package readiness is manual-only and cannot publish on tag or release',
+  /workflow_dispatch:/.test(readiness) &&
+  !/^\s{2}(?:push|release|schedule|pull_request_target):/m.test(readiness) &&
+  !/\bnpm\s+publish\b|\bpackages:\s*write|\bid-token:\s*write/.test(readiness));
+check('private package readiness has exact action pins, no shared cache and no credentials',
+  /step-security\/harden-runner@[a-f0-9]{40}/.test(readiness) &&
+  /actions\/checkout@[a-f0-9]{40}/.test(readiness) &&
+  /actions\/setup-node@[a-f0-9]{40}/.test(readiness) &&
+  /persist-credentials:\s*false/.test(readiness) &&
+  /package-manager-cache:\s*false/.test(readiness) &&
+  /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(readiness));
+check('manual package audit only makes local dry-run and preserves private invariant',
+  /p\.private !== true/.test(readiness) &&
+  /npm pack --dry-run --ignore-scripts/.test(readiness) &&
+  /egress-policy:\s*block/.test(readiness));
+
+/* A manual user-supplied label is not executable shell code.
+   Keep diagnostics read-only, manually triggered and without log spoofing. */
+const manual = readFileSync(join(dir, 'manual.yml'), 'utf8');
+check('manual diagnostic cannot run on push, release, PR or schedule',
+  /workflow_dispatch:/.test(manual) &&
+  !/^\s{2}(?:push|pull_request|pull_request_target|release|schedule):/m.test(manual));
+check('manual diagnostic owns only read permission and restricted egress',
+  /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(manual) &&
+  /step-security\/harden-runner@[a-f0-9]{40}/.test(manual) &&
+  /egress-policy:\s*block/.test(manual) &&
+  /disable-sudo:\s*true/.test(manual));
+check('manual diagnostic passes user input through env, never shell expression interpolation',
+  /GREETING_NAME:\s*\$\{\{ inputs\.name \}\}/.test(manual) &&
+  /printf 'Hello %s\\n' "\$GREETING_NAME"/.test(manual) &&
+  !/run:[^\n]*\$\{\{\s*inputs\./.test(manual));
+check('manual diagnostic rejects log-control or shell-metacharacter inputs before printf',
+  /\^\[a-zA-Z0-9_-\]\{1,64\}\$/.test(manual) &&
+  /exit 1/.test(manual));
+
+/* Starter-workflows adaptation: prove these additional jobs can only lint and
+   collect dependency evidence, never publish artifacts to a package registry,
+   deploy services, or acquire write-capable repository credentials. */
+const dockerLint = readFileSync(join(dir, 'dockerfile-security-lint.yml'), 'utf8');
+const sbom = readFileSync(join(dir, 'source-sbom.yml'), 'utf8');
+const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+check('Dockerfile lint action pinned to exact upstream starter SHA',
+  /hadolint\/hadolint-action@[a-f0-9]{40}/.test(dockerLint));
+check('Dockerfile lint is blocking, not a no-fail badge',
+  /failure-threshold:\s*warning/.test(dockerLint) &&
+  /no-fail:\s*false/.test(dockerLint));
+check('source SBOM uses reviewed pinned Node24-compatible Anchore action',
+  /anchore\/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c/.test(sbom));
+check('source SBOM uses supported modern artifact upload and 14-day retention',
+  /format:\s*spdx-json/.test(sbom) &&
+  /artifact-name:\s*hawkeye-source-sbom\s*$/m.test(sbom) &&
+  /dependency-snapshot:\s*false/.test(sbom) &&
+  /upload-artifact:\s*true/.test(sbom) &&
+  /upload-artifact-retention:\s*14/.test(sbom) &&
+  /upload-release-assets:\s*false/.test(sbom));
+for (const [name, body] of [['Dockerfile lint', dockerLint], ['SBOM', sbom]]) {
+  check(name + ' uses read-only token and has no pull_request_target trigger',
+    /^permissions:\s*\n\s+contents:\s*read\s*$/m.test(body) &&
+    !/^  pull_request_target:/m.test(body) &&
+    !/packages:\s*write|contents:\s*write|id-token:\s*write/.test(body));
+  check(name + ' has no deploy, publish or credentialed checkout',
+    !/^\s+(?:docker push|npm publish|npx semantic-release|gh release create)\b/m.test(body) &&
+    /persist-credentials:\s*false/.test(body));
+}
+check('SBOM cannot silently submit dependencies or publish assets with a write-capable token',
+  /dependency-snapshot:\s*false/.test(sbom) &&
+  /upload-release-assets:\s*false/.test(sbom) &&
+  !/^\s*github-token:/m.test(sbom) &&
+  !/\brelease:\s*\n|\bpackages:\s*write/.test(sbom));
+check('scheduled source SBOM is correctly classified for independent control freshness',
+  /'source-sbom.yml':\s*'read-only weekly source dependency inventory/.test(
+    readFileSync(join(dir, '..', '..', 'scripts', 'freshness-check.mjs'), 'utf8')));
+if (pkg.private === true) {
+  const directPublish = files.filter(file => {
+    const lines = readFileSync(join(dir, file), 'utf8')
+      .split(/\r?\n/).filter(line => !/^\s*#/.test(line));
+    return lines.some(line =>
+      /^\s*(?:-\s*)?(?:run:\s*)?(?:npm|pnpm|yarn)\s+publish(?:\s|$)/.test(line));
+  });
+  check('a private NPM package is never published by GitHub Actions',
+    directPublish.length === 0);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

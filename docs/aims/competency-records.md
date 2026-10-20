@@ -6,7 +6,7 @@ maintained. Owner: MLRO. Review: annually.
 ## Required competencies
 | Role | Competency required |
 |---|---|
-| MLRO / reviewer | AML/CFT law (UAE FDL 26/2021, Cabinet 74/2020); FATF R.6/10/12; reading screening alerts; STR/goAML filing; TFS name-match handling — freeze without delay, PNMR/CNMR/FFR filing ([procedure](tfs-name-match-procedure.md)); sanctions-evasion typologies; four-eyes |
+| MLRO / reviewer | AML/CFT law (UAE FDL 10/2025 and Cabinet Resolution 134/2025, which repealed FDL 20/2018 as amended by FDL 26/2021; Cabinet 74/2020); FATF R.6/10/12; reading screening alerts; STR/goAML filing; TFS name-match handling — freeze without delay, PNMR/CNMR/FFR filing ([procedure](tfs-name-match-procedure.md)); sanctions-evasion typologies; four-eyes |
 | Compliance analyst | Customer onboarding; UBO identification; adverse-media/PEP interpretation; disposition of alerts |
 | System maintainer | The engine's design; how to read the audit trail / QA gate; how the LLM is gated; how to tune thresholds / concurrency |
 

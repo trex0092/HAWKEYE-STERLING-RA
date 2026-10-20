@@ -3,10 +3,12 @@ name: Netlify Production Deploy (build hook)
 # Production deploys stopped publishing after 27 Jun 2026: pushes to main no
 # longer trigger a Netlify production build (no Netlify status/check appears
 # on main commits — verified 25 Jul), while PR deploy previews still build.
-# The live site therefore serves the 27 Jun bundle (pre app.js split) and the
-# deploy badge shows the last failed production attempt. The July workaround
-# (netlify-deploy.yml, since repurposed) prescribed a Netlify BUILD HOOK but
-# its secret was never created.
+# The live site has repeatedly lagged main. On 2026-10-09 the
+# NETLIFY_BUILD_HOOK_URL repository secret WAS present, a build hook POST
+# returned HTTP 200, but production still served an older commit after the
+# full 18-minute verification window. HTTP 200 acknowledges a trigger only;
+# it does NOT attest that builds are active or auto publishing is unlocked.
+# See docs/runbooks/netlify-production-recovery.md before repeating builds.
 #
 # ONE-TIME SETUP (Netlify UI, ~1 minute):
 #   Netlify -> Site configuration -> Build & deploy -> Build hooks ->
@@ -33,16 +35,18 @@ on:
     branches:
       - main
     paths:
-      - 'index.html'
-      - 'console.html'
-      - 'advisor.html'
+      - '*.html'  # Include legal pages and 404.html, not just the three app shells
       - '*.js'
       - '*.css'
       - 'assets/**'
       - 'netlify/**'
       - 'netlify.toml'
-      - 'manifest.webmanifest'
-      - 'fonts.css'
+      - '*.webmanifest'  # Keep in step with Site Currency's discovered manifest inventory
+      - 'robots.txt'
+      # Browser-fetched advisory suggestions are served data, not daily state
+      # snapshots. This is an input display update, NOT permission to apply
+      # proposed country-risk score reductions or change scoring methodology.
+      - 'data/country-score-suggested.json'
   # Daily safety net (07:00 UTC, one hour ahead of the Site Currency alarm):
   # the path filter above is deliberately narrow, so a merge that changes what
   # main ships WITHOUT touching a served path (a Docker-only config, a script
@@ -75,7 +79,7 @@ jobs:
     timeout-minutes: 25 # headroom for the ~18-min publish-verify poll (slow Free-tier CDN propagation)
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           # Build hooks live on api.netlify.com; the publish check reads the
@@ -111,7 +115,6 @@ jobs:
           ALT_5: ${{ secrets.NETLIFY_WEBHOOK_URL }}
           # Saved on the adjacent Variables tab instead of Secrets:
           VAR_HOOK: ${{ vars.NETLIFY_BUILD_HOOK_URL }}
-          VARS_JSON: ${{ toJSON(vars) }}
         run: |
           set -u
           if [ -z "${HOOK_URL:-}" ]; then
@@ -128,8 +131,8 @@ jobs:
               HOOK_URL="$VAR_HOOK"; found="vars.NETLIFY_BUILD_HOOK_URL"
             fi
             if [ -z "$found" ]; then
-              echo "Repository/organization VARIABLE names visible to this run (secrets cannot be enumerated without over-provisioning):"
-              echo "$VARS_JSON" | python3 -c 'import json,sys; [print("  -", k) for k in sorted(json.load(sys.stdin) or {})]' || true
+              # Never materialize the full vars context: action-run logs can
+              # expose names AND values even when we intended to print names.
               echo "Probed and empty: NETLIFY_BUILD_HOOK_URL and common variants (NETLIFY_BUILD_HOOK, NETLIFY_BUILDHOOK_URL, NETLIFY_HOOK_URL, BUILD_HOOK_URL, NETLIFY_WEBHOOK_URL), plus the Variables tab."
               echo "Remaining causes: saved under an ENVIRONMENT (this workflow binds none — re-save as a Repository secret), saved on a different repository, or never saved on the GitHub side at all."
               if [ "$EVENT" = "push" ]; then
@@ -172,10 +175,24 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: steps.kick.outputs.kicked == 'true'
         with:
           node-version-file: .nvmrc
+
+      # Optional early diagnosis. Never uses the build hook as API read access:
+      # Netlify has a separate token and site identifier, both configured by
+      # the project owner. Without them, the existing exact-byte poll stays in
+      # force; a positive STOPPED/LOCKED/WRONG-BRANCH provider response aborts
+      # immediately rather than waiting 18 minutes without a possible deploy.
+      # This probe is GET-only and logs fixed status messages, never response
+      # bodies, site IDs, environment variables or authentication details.
+      - name: Inspect Netlify build activation and published deploy lock (optional)
+        if: steps.kick.outputs.kicked == 'true'
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID || vars.NETLIFY_SITE_ID }}
+        run: node scripts/netlify-deploy-preflight.mjs
 
       - name: Wait for the publish to reach the live site
         if: steps.kick.outputs.kicked == 'true'
@@ -215,7 +232,7 @@ jobs:
             sleep 20
           done
           cat /tmp/currency.txt
-          echo "::error::Build was triggered but after ~18 minutes the live site still does not serve this commit's assets (see the divergences listed above) — check the deploy log in the Netlify UI (app.netlify.com/projects/hawkeye-sterling-ra/deploys)."
+          echo "::error::Build hook returned HTTP success, but production did not publish this commit in ~18 minutes. The trigger is NOT evidence of a deploy. In Netlify verify Build status ACTIVE, production deploy UNLOCKED, correct project/branch and the latest hook-triggered deploy status; then review docs/runbooks/netlify-production-recovery.md. Do not repeat hooks blindly."
           exit 1
 
   # Self-heal — register item 26's first half. On 2026-08-04 four consecutive
@@ -245,7 +262,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -280,7 +297,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           egress-policy: block

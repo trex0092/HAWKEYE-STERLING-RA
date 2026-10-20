@@ -29,7 +29,7 @@
    always the SAME still-unresolved problem, not a new occurrence of it, so
    there's no time window to age out of — skip while it stays open, file
    again the first run after it's closed. */
-import { asana } from './asana-notify.mjs';
+import { asana, appendOpenAlertEvidence, findOpenMonitoringAlert, verifyNewMonitoringAlert } from './asana-notify.mjs';
 import { requireApprovedSection, verifySection, alertSection } from './asana-sections.mjs';
 
 const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWKEYE STERLING APP */
@@ -54,22 +54,24 @@ try {
     requireApprovedSection(PROJECT_GID, SECTION_GID);
     await verifySection(asana, PROJECT_GID, SECTION_GID);
   }
-  let existing = null, offset = '';
-  for (;;) {
-    const path = '/tasks?project=' + PROJECT_GID + '&completed_since=now'
-      + '&opt_fields=name,permalink_url&limit=100' + (offset ? '&offset=' + offset : '');
-    const d = await asana(path);
-    existing = (d.data || []).find(t => t && t.name === title) || null;
-    if (existing) break;
-    offset = d.next_page && d.next_page.offset;
-    if (!offset) break;
-  }
+  const existing = await findOpenMonitoringAlert(asana, PROJECT_GID, title);
   if (existing) {
-    console.log('alert already open (' + (existing.permalink_url || existing.gid)
-      + ') — not filing a duplicate: "' + title + '"');
+    if (process.env.ASANA_ALERT_REFRESH_OPEN === '1') {
+      const updated = await appendOpenAlertEvidence(asana, existing.gid, notes);
+      console.log('alert already open (' + (existing.permalink_url || existing.gid)
+        + ') — newest failure evidence ' + (updated.posted ? 'confirmed in a new story' : 'already recorded')
+        + '; no duplicate task or human disposition changed');
+    } else {
+      console.log('alert already open (' + (existing.permalink_url || existing.gid)
+        + ') — not filing a duplicate: "' + title + '"');
+    }
   } else {
     const d = await asana('/tasks', {
       method: 'POST',
+      // A lost response after remote creation is an UNKNOWN outcome. Retrying
+      // blindly duplicates a human-owned compliance alert; let the next run
+      // reconcile by exact open title before creating another task.
+      noRetryOnUnknownOutcome: true,
       body: JSON.stringify({ data: {
         name: title, notes, projects: [PROJECT_GID],
         ...(SECTION_GID ? { memberships: [{ project: PROJECT_GID, section: SECTION_GID }] } : {}),
@@ -77,10 +79,16 @@ try {
       } })
     });
     const gid = d?.data?.gid;
-    if (gid && SECTION_GID) {
+    // Fail loudly on a missing GID, never report a task as created just because
+    // Asana accepted the HTTP request but returned no verifiable task receipt.
+    if (!/^\d+$/.test(String(gid || ''))) throw new Error('Asana did not confirm monitoring alert creation');
+    if (SECTION_GID) {
       await asana('/sections/' + SECTION_GID + '/addTask', { method: 'POST', body: JSON.stringify({ data: { task: gid } }) });
     }
-    console.log('alert task created: ' + (d?.data?.permalink_url || '(task created; no permalink returned)'));
+    const confirmed = await verifyNewMonitoringAlert(asana, gid, {
+      title, projectGid: PROJECT_GID, sectionGid: SECTION_GID
+    });
+    console.log('alert task created and remotely verified: ' + (confirmed.permalink_url || gid));
   }
 } catch (e) {
   console.error('asana-alert: ' + String(e && e.message || e).slice(0, 300));

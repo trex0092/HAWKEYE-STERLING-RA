@@ -208,6 +208,10 @@ check('cite guard flags a repealed instrument cited as an operative basis',
   I.legalCiteGuard('Your STR duty arises under Federal Decree-Law No. 20 of 2018, Article 9.').length === 1);
 check('cite guard stays quiet when the repealed instrument is historical context',
   I.legalCiteGuard('Federal Decree-Law No. 20 of 2018 was repealed by Federal Decree-Law No. 10 of 2025.').length === 0);
+check('cite guard flags the repealed FDL 26/2021 amendment cited as a current basis',
+  I.legalCiteGuard('Retain records for 10 years under Federal Decree-Law No. 26 of 2021, Article 23.').join() === 'repealed FDL 26/2021');
+check('cite guard stays quiet on FDL 26/2021 as history ("duty formerly FDL 26/2021 Art. 23")',
+  I.legalCiteGuard('Retain 10 years under Federal Decree-Law No. 10 of 2025 (duty formerly FDL 26/2021 Art. 23).').length === 0);
 check('cite guard stays quiet on the vetted operative basis',
   I.legalCiteGuard('File within the deadline set by Cabinet Resolution No. (134) of 2025 under Federal Decree-Law No. 10 of 2025.').length === 0);
 check('cite guard flags an instrument outside the recognised corpus',
@@ -272,6 +276,20 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     /This output is decision support, not a decision\. MLRO review required\./.test(b.auditLine) &&
     /model=claude-/.test(b.auditLine));
 
+  // 6a-cache. The charter + knowledge prefix carries a prompt-cache breakpoint
+  // and the persona sits after it, so every persona shares one cached prefix.
+  let sentBody = null;
+  mockFetch(async (url, opts) => { sentBody = JSON.parse(opts.body); return { ok: true, json: async () => ({ content: [{ type: 'text', text: 'NO_MATCH against OFAC SDN as of 2026-06-01. GAPS: none.' }] }) }; });
+  await call(POST({ question: 'Screen Acme Trading FZE.', persona: 'vale' }, { 'x-nf-client-connection-ip': '203.0.113.91' }), 'test-key');
+  const sys = sentBody && sentBody.system;
+  check('handler: the shared charter prefix is sent as a cached system block',
+    Array.isArray(sys) && sys[0].cache_control && sys[0].cache_control.type === 'ephemeral'
+    && sys[0].text === I.SOUL_CHARTER + '\n\n' + I.KNOWLEDGE_CONTEXT);
+  check('handler: the persona follows the breakpoint, outside the cached prefix',
+    Array.isArray(sys) && sys.length === 2 && sys[1].text === I.PERSONA_SUFFIX.vale && !sys[1].cache_control);
+  check('handler: the cached prefix is identical across personas (one cache entry)',
+    I.buildSystemBlocks('sterling')[0].text === I.buildSystemBlocks('cobalt')[0].text);
+
   // 6b. Deep mode routes to the governed model, or reports its downgrade
   r = await call(POST({ question: 'Deep dive.', mode: 'deep' }), 'test-key');
   b = JSON.parse(r.body);
@@ -301,7 +319,8 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
       b.text === undefined && b.auditLine === undefined && typeof b.deepAccumulated === 'string');
 
     // hop 2: end_turn -> the full text is assembled, guarded and final
-    mockFetch(async () => ({ ok: true, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: ' Part two, concluding.' }] }) }));
+    let hop2Body = null;
+    mockFetch(async (_url, opts) => { hop2Body = JSON.parse(opts.body); return { ok: true, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: ' Part two, concluding.' }] }) }; });
     r = await call(POST({ question: 'Deep dive.', mode: 'deep', deepContinue: true, deepHop: b.deepHop, deepAccumulated: b.deepAccumulated }, contIp), 'test-key');
     const fin = JSON.parse(r.body);
     check('continuation: the final hop returns the assembled text',
@@ -309,6 +328,22 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     check('continuation: the final answer is deep, undegraded',
       fin.effectiveMode === 'deep' && fin.modeDegraded === false && fin.model === I.MODEL_BY_MODE.deep.model);
     check('continuation: the audit line records the hop count', /deepHops=2/.test(fin.auditLine));
+    /* Regression: the resumed hop used to END on an assistant message (a
+       last-turn prefill), which the 4.6+ models, the governed deep model
+       included, reject with HTTP 400. The request must end on a user turn. */
+    const hop2Msgs = (hop2Body && hop2Body.messages) || [];
+    check('continuation: a resumed hop never ends on an assistant prefill (400 on Claude 4.6+)',
+      hop2Msgs.length === 3 && hop2Msgs[2].role === 'user' && hop2Msgs[2].content === I.DEEP_CONTINUE_INSTRUCTION);
+    check('continuation: the prior output is replayed as the middle assistant turn',
+      hop2Msgs[1] && hop2Msgs[1].role === 'assistant' && /Part one of the deep analysis/.test(hop2Msgs[1].content));
+    check('usage tag records billed token counts and nothing else',
+      I.usageTag({ input_tokens: 812, output_tokens: 95, cache_read_input_tokens: 5771, cache_creation_input_tokens: 0, extra: 'x' })
+        === 'tokens=in:812,out:95,cacheRead:5771,cacheWrite:0' &&
+      I.usageTag({ input_tokens: 'NaN', output_tokens: -3 }) === 'tokens=in:0,out:0,cacheRead:0,cacheWrite:0');
+    check('continuation: chunks join with one space only where the seam has none',
+      I.joinContinuation('Part one.', 'Part two') === 'Part one. Part two' &&
+      I.joinContinuation('Part one. ', 'Part two') === 'Part one. Part two' &&
+      I.joinContinuation('Part one', ', then two') === 'Part one, then two');
 
     // Invariant 1: NO UNGUARDED TOKEN EVER LEAVES. A partial whose accumulated
     // text trips the tipping-off guard must be withheld ON THAT HOP -- not
@@ -355,6 +390,9 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     [400, /malformed/i, 'bad request'],
   ];
   let hintsOk = true, bodyLeak = false;
+  const loggedProviderDiagnostics = [];
+  const originalProviderWarn = console.warn;
+  console.warn = (...parts) => { loggedProviderDiagnostics.push(parts.join(' ')); };
   for (const [status, re] of HINTS) {
     mockFetch(async () => ({ ok: false, status, text: async () => 'SECRET-PROVIDER-DETAIL org_id=abc123' }));
     /* Distinct per-status client IP: these probes must not consume the shared
@@ -365,8 +403,12 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
     if (!re.test(rr.text) || !new RegExp('API error ' + status).test(rr.text)) hintsOk = false;
     if (/SECRET-PROVIDER-DETAIL|org_id/.test(rr.text)) bodyLeak = true;
   }
+  console.warn = originalProviderWarn;
   check('handler: every upstream status carries an operator-actionable next step', hintsOk);
   check('handler: the provider error BODY is still never reflected to the client', !bodyLeak);
+  check('handler: provider error bodies are not written to server logs',
+    !/SECRET-PROVIDER-DETAIL|org_id=abc123/.test(loggedProviderDiagnostics.join(' ')) &&
+    loggedProviderDiagnostics.some(x => /Anthropic API error 401/.test(x)));
 
   // 6d-bis/ter use a DISTINCT client IP so they don't consume the shared default
   // rate-limit bucket that the later cases rely on.
@@ -592,7 +634,11 @@ const POST = (body, headers) => ({ httpMethod: 'POST', headers: headers || {}, b
      quota apart from malformed, on both statuses that can carry it. */
   const evalSrc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'advisor-eval.mjs'), 'utf8');
 check('advisor eval aborts remaining live cases after a provider-wide quota/billing failure',
-  /provider-wide quota\/billing failure is terminal/.test(evalSrc)
+  // Categorization is now implemented and separately tested in
+  // advisor-eval-http.mjs; verify the live loop actually uses that decision.
+  /classifyAdvisorEvalFailure/.test(evalSrc)
+  && /terminal:\s*failure\.stop_run/.test(evalSrc)
+  && /if\s*\(r\.terminal\)/.test(evalSrc)
   && /break evalLoop/.test(evalSrc)
   && /NOT_ATTEMPTED/.test(evalSrc));
 check('advisor eval counts only evaluated cases as held, never the ones skipped after a terminal error',

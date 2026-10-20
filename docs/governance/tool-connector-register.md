@@ -103,7 +103,7 @@ and the Netlify functions read `ASANA_ACCESS_TOKEN`;
 `.github/workflows/netlify-deploy.yml` bridges them. Both are secrets; neither
 reaches the browser.
 
-The Composio bridge is documented in [`../composio-integration.md`](../composio-integration.md). It is an outer orchestration layer only. It is not called by sanctions, adverse-media, PEP, scoring or runtime-assurance code, and `APP_SHARED_TOKEN` is mandatory before the endpoint will operate.
+The Composio bridge is documented in [`../composio-integration.md`](../composio-integration.md). It remains an **outer, disabled-by-default orchestration layer**. Named tool execution is now default-denied without `COMPOSIO_READ_TOOL_SLUGS`; mutations, hosted MCP, remote attaches and presigned links require independent high-privilege gates. The optional local MCP `hawkeye_assess_connected_evidence` accepts only operator-normalised evidence-reference metadata and performs no network, model or customer data access. It does not change sanctioned/PEP/CDD decisions and is covered by the pre-existing local `mcp.tool` read-only authorization. `APP_SHARED_TOKEN` still lacks per-user identity (OA-20); this is not resolved by tool allowlisting. Provider approval remains OA-29.
 
 Vendor terms, DPA status, data residency and cross-border basis for these same
 services are **not** repeated here — they live in

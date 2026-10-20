@@ -34,6 +34,8 @@ import ai
 import str_dossier
 import tfs_dossier
 import payment_screen
+import kyc_document_evidence
+import composio_engine
 
 # ── input caps (defence in depth on untrusted MCP arguments) ──────────────────
 MAX_NAME_LEN = 512
@@ -281,6 +283,7 @@ def analyze_kyc_note(notes, today=None):
                 "nationality": p.get("nationality", ""),
                 "share_pct": p.get("share_pct"),
                 "pep_status": p.get("pep_status", ""),
+                "pep_country_qa": kyc.pep_country_qa_advisory(p.get("nationality", "")),
                 "id_masked": kyc.mask_id(p.get("id_number")),
                 "arrangement_role": p.get("arrangement_role", False),
                 "cdd_gaps": p.get("cdd_gaps", []),
@@ -289,6 +292,37 @@ def analyze_kyc_note(notes, today=None):
             for p in parsed.get("individuals", [])
         ],
     }
+
+
+# ── TOOL: compare_document_evidence (explicit, read-only and opt-in) ──────────
+def compare_document_evidence(notes, evidence, person_index=None, as_of=None):
+    """Compare normalized OCR evidence with ONE explicitly selected KYC party.
+    No image upload, model, network call or background processing. Never verifies
+    authenticity or clears existing CDD gaps. Returns field statuses without
+    echoing raw IDs, dates of birth, or names. Human review is always required.
+    """
+    _req_str(notes, "notes", cap=MAX_NOTES_LEN)
+    if type(person_index) is not int or person_index < 0:
+        raise ValueError("'person_index' must select a nonnegative individual index")
+    parsed = kyc.parse_customer(notes, kyc_document_evidence.parse_as_of(as_of))
+    individuals = parsed.get("individuals", [])
+    if person_index >= len(individuals):
+        raise ValueError("'person_index' is outside the KYC individuals list")
+    return kyc_document_evidence.compare_evidence(
+        evidence, individuals[person_index], person_index=person_index, as_of=as_of
+    )
+
+
+# ── TOOL: assess_connected_evidence (offline Composio metadata) ──────────────
+def assess_connected_evidence(manifest):
+    """Assess approved connected-app EVIDENCE REFERENCES for freshness/coverage.
+
+    Accepts only the versioned, metadata-only contract produced by a trusted
+    operator from approved Composio reads. Never calls Composio, accesses raw
+    emails/files, sends personal data, changes a KYC case or clears a finding.
+    A located reference remains unverified pending MLRO evidence review.
+    """
+    return composio_engine.assess_manifest(manifest)
 
 
 # ── TOOL: jurisdiction_risk ───────────────────────────────────────────────────
@@ -602,6 +636,52 @@ TOOLS = {
             "additionalProperties": False,
         },
     ),
+    "hawkeye_assess_connected_evidence": (
+        assess_connected_evidence,
+        assess_connected_evidence.__doc__,
+        {
+            "type": "object",
+            "properties": {
+                "manifest": {
+                    "type": "object",
+                    "description": (
+                        "hawkeye.composio-evidence/v1 metadata manifest with "
+                        "schema_version, as_of, freshness_days, requirements "
+                        "(approved source.category IDs) and observations. "
+                        "Never send provider responses, names, document text, "
+                        "messages, photos or passwords."
+                    ),
+                },
+            },
+            "required": ["manifest"],
+            "additionalProperties": False,
+        },
+    ),
+    "hawkeye_compare_document_evidence": (
+        compare_document_evidence,
+        compare_document_evidence.__doc__,
+        {
+            "type": "object",
+            "properties": {
+                "notes": {"type": "string", "description": "Existing structured KYC note, confidential PII."},
+                "evidence": {
+                    "type": "object",
+                    "description": (
+                        "Normalized hawkeye.document-evidence/v1 object: "
+                        "schema_version, opaque evidence_id, source, document_type, "
+                        "extraction_status and allowlisted fields. No raw image or vendor JSON."
+                    ),
+                },
+                "person_index": {
+                    "type": "integer", "minimum": 0,
+                    "description": "Explicit zero-based KYC individual index; never auto-select."
+                },
+                "as_of": {"type": "string", "description": "YYYY-MM-DD reference date for expiry checks."},
+            },
+            "required": ["notes", "evidence", "person_index"],
+            "additionalProperties": False,
+        },
+    ),
     "hawkeye_analyze_kyc_note": (
         analyze_kyc_note,
         analyze_kyc_note.__doc__,
@@ -722,8 +802,11 @@ def call_tool(name, arguments):
     if name not in TOOLS:
         raise KeyError(name)
     fn = TOOLS[name][0]
-    args = arguments if isinstance(arguments, dict) else {}
-    return fn(**args)
+    # Silently converting a malformed array/string/null payload to {} obscures
+    # invalid tool inputs; reject the original shape explicitly.
+    if not isinstance(arguments, dict):
+        raise ValueError("tool arguments must be an object")
+    return fn(**arguments)
 
 
 # ── read-only reference resources (name -> (uri, mimeType, loader)) ───────────
@@ -743,6 +826,11 @@ RESOURCES = {
         "FATF black/grey lists with each jurisdiction's action-plan assessment (verbatim, sourced)",
         "application/json",
         lambda: _read_json_file("data/fatf-assessments.json"),
+    ),
+    "hawkeye://reference/country-indicators": (
+        "Public-source country indicators (US INCSR, US TIP tiers, EU tax list), each sourced; context only, never scored",
+        "application/json",
+        lambda: _read_json_file("data/country-indicators.json"),
     ),
     "hawkeye://reference/internal-watchlist": (
         "Firm-internal watchlist (declined/known-bad counterparties)",

@@ -35,7 +35,7 @@ or stranding users on a cached app.
 1. **Statutory retention is not negotiable:** export the final state of all
    assessment records, screening evidence, audit logs, and retention snapshots
    (`data/retention/`) to the firm's archival store. UAE AML retention (10 years,
-   FDL 26/2021 Art. 23) **survives the system** — decommissioning the software
+   FDL 10/2025; duty formerly FDL 26/2021 Art. 23) **survives the system** — decommissioning the software
    never decommissions the records
    ([`../governance/data-retention.md`](../governance/data-retention.md)).
 2. Export the Asana projects (tasks are the filed compliance records) or confirm

@@ -1,0 +1,41 @@
+name: Safe manual diagnostic
+
+# Manual-only, read-only diagnostic. No releases, publishing or deployment.
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Optional ASCII diagnostic label'
+        required: false
+        default: World
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Restrict network and sudo
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          disable-sudo: true
+
+      - name: Validate and display diagnostic label
+        env:
+          GREETING_NAME: ${{ inputs.name }}
+        shell: bash
+        run: |
+          # Untrusted workflow input is data, NEVER interpolated into shell code.
+          if [[ ! "$GREETING_NAME" =~ ^[a-zA-Z0-9_-]{1,64}$ ]]; then
+            echo 'Invalid diagnostic label (ASCII letters, digits, underscores or hyphens only)' >&2
+            exit 1
+          fi
+          printf 'Hello %s\n' "$GREETING_NAME"

@@ -82,7 +82,7 @@ invent no facts. "Secure by design. Trust by default."
 
 ## 6. Accountability & audit
 - Every run is an immutable GitHub Actions record + an Asana task (10-year
-  retention, UAE FDL No. 26 of 2021 Art. 23).
+  retention, UAE FDL No. 10 of 2025; duty formerly FDL 26/2021 Art. 23).
 - The delta engine records what was reported and when (`data/screen-delta-state.json`).
 - Reduced coverage or model failure **degrades loudly** (red run + alert), never
   silently.
@@ -111,7 +111,7 @@ report** (report section ⑦, derived from live run state) and **enforced in CI*
 | Governance | Risk Framework | `ai.compute_risk_rating` (FATF R.10) + QA gate | engine_test; report §⑦ |
 | Governance | Accountability | `agents.py` identities + authorization; MLRO ownership | preflight test; report §⑥/⑦ |
 | Governance | Decision Oversight | MLRO human-in-the-loop; degrade-loudly | report §⑦ |
-| Compliance | Regulations | UAE FDL 26/2021 · Cabinet 74/2020 · FATF R.6/10/12 · AI Strategy 2031 | report header + §⑦ |
+| Compliance | Regulations | UAE FDL 10/2025 · Cabinet Resolution 134/2025 (formerly FDL 20/2018 as amended by FDL 26/2021) · Cabinet 74/2020 · FATF R.6/10/12 · AI Strategy 2031 | report header + §⑦ |
 | Compliance | Data Privacy | PDPL; no-egress default; LLM opt-in gated | §3; report §⑦ |
 | Compliance | Security Controls | prompt-injection defence + credential broker (least privilege) | engine_test; report §⑥/⑦ |
 | Compliance | Audits | agent audit trail + QA gate; 10-yr retention (Asana + GitHub) | report §⑥/⑦ |

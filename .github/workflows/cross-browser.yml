@@ -17,7 +17,7 @@ name: Cross-Browser Smoke
 on:
   push:
     branches: [main]
-    paths: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'advisor.js', 'i18n.js', 'app.css', 'console.css', 'advisor.css', 'fonts.css', 'assets/**', 'test/cross-browser.spec.mjs', 'test/keyboard.spec.mjs', 'test/print-report.spec.mjs', 'test/csp-runtime.spec.mjs', 'playwright.cross-browser.config.mjs', 'netlify.toml']
+    paths: ['index.html', 'console.html', 'advisor.html', 'app.js', 'console.js', 'advisor.js', 'i18n.js', 'app.css', 'console.css', 'advisor.css', 'fonts.css', 'assets/**', 'test/cross-browser.spec.mjs', 'test/keyboard.spec.mjs', 'test/print-report.spec.mjs', 'test/csp-runtime.spec.mjs', 'playwright.cross-browser.config.mjs', 'test/axe.spec.mjs', '.github/workflows/cross-browser.yml', 'test/api-platform/browser-gate.mjs', 'netlify.toml']
   pull_request:
   workflow_dispatch:
 
@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Harden the runner (egress audit)
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           # sudo must stay enabled: `playwright install --with-deps` runs
           # `sudo apt-get` to install the browser system libraries (same as
@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
 
@@ -57,16 +57,14 @@ jobs:
           npx playwright install --with-deps chromium firefox webkit
 
       - name: Cross-browser smoke
-        # Non-blocking, mirroring the Visual Regression workflow's browser step:
-        # the report is uploaded for inspection, but a single-engine quirk or a
-        # flaky browser launch never blocks the merge. Findings live in the
-        # uploaded artifact and the step annotation.
-        continue-on-error: true
+        # Required browser evidence must fail the job on a real test failure.
+        # Upload the report on both success and failure for diagnosis, but
+        # never convert a failing Playwright result into a green check.
         run: npx playwright test --config=playwright.cross-browser.config.mjs
 
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cross-browser-report
           path: playwright-report

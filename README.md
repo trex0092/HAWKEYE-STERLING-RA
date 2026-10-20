@@ -1,8 +1,8 @@
 # Hawkeye Sterling - Entity Risk Assessment (RA)
 
-**Project:** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md)
+**Project:** [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md) · [Roadmap](docs/executive/roadmap.md)
 
-**Technical & compliance:** [Architecture](docs/architecture/README.md) · [Compliance Methodology](docs/policies/README.md) · [Screening Coverage](data/screening-country-coverage.json) · [Data Sources](data/README.md) · [Controls](docs/governance/README.md) · [Operations](docs/security/deploy-rollback-runbook.md) · [Changelog](CHANGELOG.md) · [Citation](CITATION.cff) · [Docs index](docs/README.md)
+**Technical & compliance:** [Architecture](docs/architecture/README.md) · [Compliance Methodology](docs/policies/README.md) · [Screening Coverage](data/screening-country-coverage.json) · [Data Sources](data/README.md) · [Controls](docs/governance/README.md) · [AI Governance](docs/AI-GOVERNANCE.md) · [ISO 42001 Controls (Provisional)](data/iso42001-annex-a-evidence.json) · [Data Protection](docs/governance/dpia-2026.md) · [Operations](docs/security/deploy-rollback-runbook.md) · [Changelog](CHANGELOG.md) · [Citation](CITATION.cff) · [Docs index](docs/README.md)
 
 <!-- Runtime assurance: generated from the actual daily screen and persisted on screen-state.
      A green badge means the last run loaded every required sanctions backbone, completed
@@ -256,6 +256,71 @@ by **09:00 UAE**:
 - The FATF found that Bulgaria, Côte d'Ivoire, the DRC and Monaco had substantially completed their action plans, which warrants an on-site assessment. Algeria and Namibia were removed in June 2026.
 
 The register's `fatf` field marks each listed country, and the MCP server serves the file as `hawkeye://reference/fatf-assessments`. A test fails if this file, the register and the risk-scoring list [`data/jurisdiction-risk.json`](data/jurisdiction-risk.json) disagree. Update all three after every FATF plenary (February, June and October).
+
+### Other public country indicators (context, not scored)
+
+[`data/country-indicators.json`](data/country-indicators.json) adds three public-source country indicators next to a screening hit's jurisdiction in the daily report ("Country context (not scored)"), and the MCP server serves it as `hawkeye://reference/country-indicators`:
+
+- **US INCSR major money-laundering jurisdictions**: the 80 jurisdictions in the [2025 INCSR Volume II](https://www.state.gov/wp-content/uploads/2025/03/2025-International-Narcotics-Control-Strategy-Volume-2-Accessible.pdf) (March 2025).
+- **US Trafficking in Persons tiers**: the [2025 TIP Report](https://www.state.gov/reports/2025-trafficking-in-persons-report/) tier placements; only Tier 2 Watch List and Tier 3 are shown.
+- **EU list of non-cooperative jurisdictions for tax purposes**: the 10 Annex I jurisdictions adopted by the [Council on 17 February 2026](https://www.consilium.europa.eu/en/press/press-releases/2026/02/17/taxation-council-updates-the-eu-list-of-non-cooperative-jurisdictions-for-tax-purposes/).
+
+These never change the risk score; the FATF list above stays the only jurisdiction scoring input. Commercial country reports (KnowYourCountry, the Organized Crime Index) restrict redistribution, so they are linked, never copied: under the jurisdiction select the app links each country's KnowYourCountry AML profile and, for the 193 UN member states, its [Global Organized Crime Index](https://ocindex.net/) profile. The OC Index report is "all rights reserved" and its downloadable dataset states no reuse licence, so no Index score is stored or used in scoring.
+
+The same file also holds each jurisdiction's **FATF effectiveness ratings** (the 11 Immediate Outcomes) for the 199 jurisdictions in FATF's [consolidated assessment ratings](https://www.fatf-gafi.org/en/publications/Mutualevaluations/Assessment-ratings.html) (2013 Methodology table updated 24 August 2026; 2022 Methodology table updated 25 September 2026). FATF licenses this data under CC BY 4.0, and the file carries FATF's citation and adaptation notice.
+
+### Suggested country score (draft, pending MLRO approval)
+
+[`scripts/country-score.mjs`](scripts/country-score.mjs) computes a second, reproducible 1-3 score for every country and writes it to [`data/country-score-suggested.json`](data/country-score-suggested.json). The app shows it under the jurisdiction select and the daily report prints it next to a hit's jurisdiction, beside the current score. **It is never applied**: no scoring code reads it, and changing a country's score stays an MLRO decision through the existing override (a reason is mandatory).
+
+| Factor | Effect |
+|---|---|
+| FATF call for action (black list) | suggested 3 |
+| FATF grey list | suggested 3 |
+| FATF effectiveness: Immediate Outcomes rated High or Substantial | 0-1: 3 pts, 2-3: 2 pts, 4-6: 1 pt, 7-11: 0 |
+| US INCSR major money-laundering jurisdiction | 2 pts |
+| US TIP Tier 3 / Tier 2 Watch List | 2 pts / 1 pt |
+| EU tax list Annex I | 1 pt |
+
+Points give 0-2 = 1 Low, 3-5 = 2 Medium, 6-8 = 3 High. A jurisdiction FATF has not rated, and that is not FATF-listed, gets no suggestion. The weights were chosen when the method was proposed; no source sets them. Transparency International's Corruption Perceptions Index was proposed but is left out because TI's terms (CC BY-ND 4.0, no commercial use) do not allow it here. The method has no sanctions factor yet, so a suggestion below the current score is not a recommendation to lower it. `npm test` fails if the committed file drifts from its inputs (`node scripts/country-score.mjs --write` regenerates it).
+
+On 2026-10-08 the 17 suggestions above the then-current score were applied to the country list, on the approval of Luisa Fernanda (repository owner); no separate MLRO countersignature is recorded. The 53 lower suggestions were not applied: 39 of them would take a country off score 3, which also switches off the OECD Annex II escalation for artisanal (ASM) gold from that country.
+
+
+### Gold trade-route monitoring and PEP coverage QA (review-only)
+
+The transaction-monitoring engine includes explicit gold trade evidence rules:
+`GOLD_ROUTE_DEVIATION` compares the **recorded planned and actual transport
+routes** (ordered two-letter country codes); `GOLD_ROUTE_CHANGE` reports an
+expressly documented post-contract shipment-route or consignee change;
+`GOLD_ORIGIN_UNVERIFIED` reports an explicitly failed/unverified origin
+check. A malformed supplied route gives `GOLD_ROUTE_UNREADABLE`, which needs
+manual checking. An absent route or unknown origin is not treated as proof
+of a mismatch or a clean supply chain. All are MLRO review findings, not
+sanctions designations, fraud findings, reporting/freeze instructions or
+automatic customer decisions.
+
+A Payments Register template can provide `Gold trade: yes`,
+`Gold planned route: GH, AE`, `Gold actual route: GH, TR, AE`,
+`Gold route changed after contract: yes`, and
+`Gold origin verified: no`. Corresponding fields are also documented
+in `data/transaction-feed.schema.json`. Production transaction
+monitoring remains **inactive without an approved real feed**. Never
+commit actual transaction or shipment/customer PII to this repository.
+
+The existing `hawkeye_analyze_kyc_note` MCP tool also returns an
+`individuals[].pep_country_qa` reminder for Turkey (including Türkiye
+spelling), India and Papua New Guinea. These are **operator-selected
+screening-quality spot-check examples**, not newly elevated country risk
+scores or evidence of PEP exposure. A nationality never establishes a PEP
+finding, and a negative public-source match never confirms someone is not a
+PEP. No country scores, lists or Asana KYC records change.
+
+The **53 proposed country-score decreases remain unapplied**. In
+particular, 39 would lower a high-risk classification and affect the
+existing artisanal-gold EDD trigger. Such changes need separate documented
+risk-model validation and MLRO approval, not this engineering PR.
+
 
 ## MCP server (AI-agent access to the engine)
 

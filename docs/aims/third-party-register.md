@@ -64,6 +64,42 @@ from the vendor against the firm's contracted plan and recorded here.
 | Retention at processor | Per Anthropic terms; no training on submitted data; content not retained by the firm |
 
 ## Data-minimisation note
-The only processors that receive any subject identifier are Anthropic (name + one
-headline), Google, and Wikidata (name only). **No processor receives the full
-customer record.** All other processing is on-runner with no egress.
+The **current approved/default screening path** sends subject identifiers to
+Anthropic (only when its separately approved opt-in is active), Google and
+Wikidata. **No external model receives the full customer record by default.**
+All other screening/matching is performed on-runner.
+
+## OpenAI analyst digest candidate (NOT APPROVED, OFF by default)
+
+The repository also contains an optional `scripts/openai-screening-enrichment.mjs`
+path, which could send a **bounded sample of named sanctions/PEP/adverse-media
+screening evidence** to OpenAI for a reviewer-facing note in the daily Asana
+digest. This data is more sensitive than the single headline referenced for
+Anthropic above. Its provider DPA, retention region, contractual and UAE PDPL
+cross-border basis, ROPA and DPIA update, purpose/role permissions, and
+processor/subprocessor scope are **not verified here**. Do not treat this
+future processor as approved just because code or an API key exists.
+
+For technical cost control, the optional processor call is **skipped** if the
+deterministic screening run has no new/changed alerts or coverage failures.
+Otherwise the context selects critical/highest-scoring cases first, reserves
+limited room for sanctions, PEP and adverse-media source categories, and keeps
+omitted critical-alert and evidence counts visible. The strongest available
+list matches and local case-priority evidence are retained where the character
+budget allows. Output token ceilings adapt to case volume rather than spending
+the maximum on every call. Only a fully completed API response with the
+required analyst-note headings and bounded length can appear in the Asana
+digest; an incomplete or malformed note never changes a screening result.
+Logs contain numeric input/output/cached/reasoning token usage, not named
+prompts or original provider diagnostics. **No guaranteed cost reduction or
+quality improvement percentage** is asserted without a controlled benchmark
+using approved synthetic/labelled test cases.
+
+The feature is explicitly **default OFF** in code and needs
+`OPENAI_SCREENING_ENABLED=1` *and* a separately provisioned server-side
+`OPENAI_API_KEY` before any named evidence egress is possible. Do **not**
+enable it until MLRO/DPO/IT legal approval and the go-live controls above are
+recorded; if approved, add OpenAI to the active processor and data-residency
+tables above, refresh the generated GRC metric snapshot through its generator,
+and re-ratify the DPIA. The existing signed DPIA does not constitute such an
+approval. Neither a real key nor customer-screening evidence belongs in GitHub.

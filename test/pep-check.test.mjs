@@ -1,6 +1,7 @@
 /* Unit tests for PEP screening pure logic (no network).
    Usage: node test/pep-check.test.mjs */
 import { pepSearchUrl, scorePep, PEP_KEYWORDS, checkPep } from '../scripts/pep-check.mjs';
+import { spawnSync } from 'node:child_process';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -28,6 +29,25 @@ const wrongName = scorePep('John Smith', { search: [
 check('scorePep requires the subject name in the result label', wrongName.hit === false);
 
 check('scorePep tolerates an empty response', scorePep('Acme Co', {}).hit === false);
+check('two-character given names are not discarded when a surname is longer',
+  scorePep('Li Wang', { search: [
+    { id: 'Qbad', label: 'Ming Wang', description: 'Politician' }
+  ] }).hit === false
+  && scorePep('Li Wang', { search: [
+    { id: 'Qok', label: 'Li Wang', description: 'Politician' }
+  ] }).hit === true);
+check('a label containing longer unrelated name tokens cannot match',
+  scorePep('John Smith', { search: [
+    { id: 'QX', label: 'Johnny Smithson', description: 'Politician and senator' }
+  ] }).hit === false);
+check('a non-political banking description does not match the word king',
+  scorePep('Ann King', { search: [
+    { id: 'QY', label: 'Ann King', description: 'Banking executive' }
+  ] }).hit === false);
+check('both name and political-role substring false positives are rejected',
+  scorePep('Ann King', { search: [
+    { id: 'QZ', label: 'Joann Kingston', description: 'Banking executive' }
+  ] }).hit === false);
 check('PEP_KEYWORDS includes core political roles', PEP_KEYWORDS.includes('president') && PEP_KEYWORDS.includes('minister'));
 
 // Short multi-token names (every token <3 chars) must still match a real PEP
@@ -63,6 +83,15 @@ await (async () => {
   check('checkPep does not retry a non-transient status (404)', r3.errored === true && calls3 === 1);
 })();
 globalThis.fetch = _realFetch;
+
+const countryReport = spawnSync(process.execPath, ['scripts/country-coverage-report.mjs', '--check'], {
+  cwd: process.cwd(), encoding: 'utf8',
+});
+if (countryReport.status !== 0) {
+  console.error('country coverage report check output:\n' + countryReport.stdout + countryReport.stderr);
+}
+check('worldwide country coverage report validates the PEP scope matrix and stays in sync',
+  countryReport.status === 0 && countryReport.stdout.includes('Country coverage report is current.'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

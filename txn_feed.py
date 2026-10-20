@@ -29,6 +29,21 @@ def _fail(detail):
     raise FeedValidationError(detail)
 
 
+def _unique_json_members(pairs):
+    """Reject ambiguous JSON objects instead of silently taking the last key.
+
+    Duplicate "amount", "transaction_id", "complete" or "sha256" keys can
+    make the same attested file mean different things to different parsers.
+    Never include field values or customer data in validation errors.
+    """
+    obj = {}
+    for key, value in pairs:
+        if key in obj:
+            _fail("ambiguous transaction JSON contains duplicate object keys")
+        obj[key] = value
+    return obj
+
+
 def _json_bytes(path, limit):
     if not path or not os.path.isfile(path):
         _fail("feed or manifest missing; no all-clear permitted")
@@ -41,7 +56,8 @@ def _json_bytes(path, limit):
         if len(raw) != size or len(raw) > limit:
             _fail("feed or manifest changed during read")
         data = json.loads(raw.decode("utf-8"),
-                          parse_constant=lambda _value: _fail("non-finite JSON number"))
+                          parse_constant=lambda _value: _fail("non-finite JSON number"),
+                          object_pairs_hook=_unique_json_members)
     except (OSError, ValueError, UnicodeError) as exc:
         if isinstance(exc, FeedValidationError):
             raise
@@ -118,20 +134,29 @@ def validate_batch(records, manifest):
     return records
 
 
-def read_validated_feed(feed_path, manifest_path=None):
-    """Require independent completeness evidence for every configured live feed."""
+def _validated_feed_and_manifest(feed_path, manifest_path):
+    """Validate exactly the manifest bytes subsequently used for evidence.
+
+    Reading the manifest again after validation would permit a concurrent
+    replacement to change the preflight source/window shown in the report.
+    """
     raw, records = _json_bytes(feed_path, MAX_FEED_BYTES)
     _, manifest = _json_bytes(manifest_path, 16384)
     validate_batch(records, manifest)
     if hashlib.sha256(raw).hexdigest() != manifest["sha256"]:
         _fail("manifest digest mismatch; batch must not be screened")
+    return records, manifest
+
+
+def read_validated_feed(feed_path, manifest_path=None):
+    """Require independent completeness evidence for every configured live feed."""
+    records, _manifest = _validated_feed_and_manifest(feed_path, manifest_path)
     return records
 
 
 def validation_summary(feed_path, manifest_path):
     """Metadata only, safe for CI logs; no customer or transaction content."""
-    rows = read_validated_feed(feed_path, manifest_path)
-    _, manifest = _json_bytes(manifest_path, 16384)
+    rows, manifest = _validated_feed_and_manifest(feed_path, manifest_path)
     return {"validated": True, "records": len(rows),
             "source_id": manifest["source_id"],
             "window_start": manifest["window_start"],

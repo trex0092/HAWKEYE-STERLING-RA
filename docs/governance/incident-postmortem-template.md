@@ -5,7 +5,7 @@ Use this template for every confirmed **Critical** or **High** security incident
 escalated by the [AI Incident Runbook](ai-incident-runbook.md). The review is
 **blameless**: it examines systems and processes, not individuals. File the
 completed review in the private GitHub advisory and link it from the incident log
-in the AI Incident Runbook. Retain for ≥ 10 years (UAE FDL No. 26/2021, Art. 23).
+in the AI Incident Runbook. Retain for ≥ 10 years (UAE FDL No. 10/2025; duty formerly FDL 26/2021 Art. 23).
 
 > Copy the section below into a new dated file or advisory comment, e.g.
 > `PIR-2026-001`.

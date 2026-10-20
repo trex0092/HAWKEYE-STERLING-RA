@@ -35,12 +35,46 @@ export function retryDelayMs(attempt, retryAfter) {
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 const MAX_ATTEMPTS = 3;
 
+/* All remote Asana reads and writes need bounded execution time. Without an
+   AbortSignal, a stalled HTTP socket can consume the entire daily-screen
+   delivery window, leaving cases unconfirmed. An aborted non-replayable POST
+   has an UNKNOWN outcome and must never be retried automatically. */
+export const ASANA_TIMEOUT_DEFAULT_MS = 30000;
+export function resolveAsanaTimeoutMs(value = ASANA_TIMEOUT_DEFAULT_MS) {
+  const n = Number(value);
+  return Number.isFinite(n)
+    ? Math.max(1000, Math.min(60000, Math.trunc(n)))
+    : ASANA_TIMEOUT_DEFAULT_MS;
+}
+
+
+/* External response bodies and transport exceptions can echo case names,
+   subject identifiers, headers or tokens. Only bounded numeric status and a
+   fixed, recognised oversize classification may cross into Actions logs.
+   The HTML-size fallback needs that classification, not any raw provider text. */
+export function publicAsanaRejection(status, payload) {
+  const valid = Number.isInteger(status) && status >= 100 && status <= 599;
+  const code = valid ? String(status) : 'invalid-status';
+  const oversized = status === 400 && Array.isArray(payload?.errors) &&
+    payload.errors.some(row => typeof row?.message === 'string' &&
+      /(?:rich text value is too large|html_notes.{0,80}too large)/i.test(row.message.slice(0,500)));
+  return 'Asana ' + code + (oversized
+    ? ': Rich text value is too large'
+    : ': request rejected (provider details redacted)');
+}
+
+
 export async function asana(path, opts = {}) {
+  const { noRetryOnUnknownOutcome = false, ...requestOptions } = opts;
   for (let attempt = 0; ; attempt++) {
     let r;
     try {
+      const deadline = globalThis.AbortSignal.timeout(resolveAsanaTimeoutMs(process.env.ASANA_HTTP_TIMEOUT_MS));
+      const signal = requestOptions.signal
+        ? globalThis.AbortSignal.any([requestOptions.signal, deadline]) : deadline;
       r = await fetch('https://app.asana.com/api/1.0' + path, {
-        ...opts,
+        ...requestOptions,
+        signal,
         headers: {
           Authorization: 'Bearer ' + process.env.ASANA_ACCESS_TOKEN,
           'Content-Type': 'application/json',
@@ -51,27 +85,127 @@ export async function asana(path, opts = {}) {
     } catch (e) {
       /* Network-level failure (reset, DNS, TLS) — as transient as a 503; retry
          with the same bounded backoff instead of dying on the first blip. */
-      if (attempt < MAX_ATTEMPTS - 1) {
+      if (!noRetryOnUnknownOutcome && attempt < MAX_ATTEMPTS - 1) {
         const delay = retryDelayMs(attempt);
-        console.warn('asana-notify: network error (' + (e && e.message || e) + ') — retry ' + (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
+        console.warn('asana-notify: transport failure (details redacted) — retry ' +
+          (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
         await sleep(delay);
         continue;
       }
-      throw e;
+      throw new Error('Asana transport failure; remote outcome not confirmed');
     }
     const d = await r.json().catch(() => ({}));
     if (r.ok) return d;
     if (r.status === 401) {
       throw new Error('Asana 401 Unauthorized — ASANA_ACCESS_TOKEN may have expired or been revoked. Rotate it in GitHub Settings → Secrets → ASANA_ACCESS_TOKEN.');
     }
-    if (attempt < MAX_ATTEMPTS - 1 && isRetryable(r.status)) {
+    // A confirmed HTTP 429 is a definite refusal, so even a non-replayable
+    // task/story mutation can retry after the requested cooldown. In contrast,
+    // a network exception or 5xx may have committed remotely: do NOT repeat
+    // that mutation without first reading the task/story history.
+    if ((!noRetryOnUnknownOutcome || r.status === 429) &&
+        attempt < MAX_ATTEMPTS - 1 && isRetryable(r.status)) {
       const delay = retryDelayMs(attempt, r.headers && r.headers.get && r.headers.get('retry-after'));
       console.warn('asana-notify: Asana ' + r.status + ' — retry ' + (attempt + 1) + '/' + (MAX_ATTEMPTS - 1) + ' in ' + delay + 'ms');
       await sleep(delay);
       continue;
     }
-    throw new Error('Asana ' + r.status + ': ' + JSON.stringify(d.errors || d).slice(0, 300));
+    throw new Error(publicAsanaRejection(r.status, d));
   }
+}
+
+/* Fail-closed lookup for an existing operational alert. A repeated/invalid
+   Asana offset or incomplete page scan must never cause an accidental duplicate
+   compliance alert. Network dependencies are injected for offline tests. */
+export const OPEN_ALERT_PAGE_CAP = 500;
+export async function findOpenMonitoringAlert(call, projectGid, title, { maxPages = OPEN_ALERT_PAGE_CAP } = {}) {
+  const project = String(projectGid || '');
+  if (!/^\d+$/.test(project) || !Number.isSafeInteger(maxPages) || maxPages < 1) {
+    throw new Error('Invalid Asana monitoring project or page budget');
+  }
+  const base = '/tasks?project=' + project + '&completed_since=now'
+    + '&opt_fields=gid,name,permalink_url&limit=100';
+  const offsets = new Set();
+  let offset = '';
+  for (let page = 0; page < maxPages; page++) {
+    const res = await call(base + (offset ? '&offset=' + encodeURIComponent(offset) : ''));
+    if (!Array.isArray(res?.data)) throw new Error('Asana alert lookup returned incomplete task data');
+    const found = res.data.find(item => item && item.name === title);
+    if (found) {
+      if (!/^\d+$/.test(String(found.gid || ''))) {
+        throw new Error('Existing Asana alert has no verifiable task identifier');
+      }
+      return found;
+    }
+    if (!res.next_page) return null;
+    offset = res.next_page.offset;
+    if (typeof offset !== 'string' || !offset || offsets.has(offset)) {
+      throw new Error('Asana alert lookup pagination is incomplete or looping');
+    }
+    offsets.add(offset);
+  }
+  throw new Error('Asana alert lookup reached the page cap; cannot safely create duplicate');
+}
+
+/* A 2xx Asana POST is insufficient as delivery proof when its body lacks a GID
+   or the task was misfiled. Confirm the created task and its actual project /
+   section membership before reporting that compliance received the alert. */
+export async function verifyNewMonitoringAlert(call, taskGid, { title, projectGid, sectionGid = '' } = {}) {
+  const id = String(taskGid || '');
+  const project = String(projectGid || '');
+  const section = String(sectionGid || '');
+  if (!/^\d+$/.test(id) || !/^\d+$/.test(project) || (section && !/^\d+$/.test(section))) {
+    throw new Error('Asana monitoring alert lacks a valid task or section identifier');
+  }
+  const task = (await call('/tasks/' + id
+    + '?opt_fields=gid,name,memberships.project.gid,memberships.section.gid,permalink_url'))?.data;
+  if (!task || String(task.gid) !== id || task.name !== title) {
+    throw new Error('Asana monitoring alert could not be confirmed by read-back');
+  }
+  if (!Array.isArray(task.memberships) ||
+      !task.memberships.some(m => String(m?.project?.gid) === project &&
+        (!section || String(m?.section?.gid) === section))) {
+    throw new Error('Asana monitoring alert was not confirmed in the approved destination');
+  }
+  return task;
+}
+
+/* Refresh the evidence on an existing, HUMAN-owned operational alert without
+   creating a second task or changing its name, assignee, notes or disposition.
+   The last failed GitHub run must be discoverable in Asana: on 13 Oct 2026 the
+   ongoing screening assurance task still linked a 29 Sep run because the
+   duplicate guard suppressed every later occurrence without updating proof.
+   Read stories first for re-run idempotency; an incomplete page scan refuses
+   to post an unverified duplicate. No retries on an ambiguous story-write
+   outcome (the caller can re-check the story list on its next run). */
+export async function appendOpenAlertEvidence(call, taskGid, note) {
+  const id = String(taskGid || '');
+  const text = String(note == null ? '' : note).trim();
+  if (!/^\d{8,20}$/.test(id)) throw new Error('existing Asana alert task ID is missing or invalid');
+  if (!text || asanaTextSize(text) > 4000) throw new Error('ongoing alert evidence is absent or oversized');
+  let offset = '', more = false;
+  const seen = new Set();
+  for (let page = 0; page < 10; page++) {
+    const r = await call('/tasks/' + id + '/stories?limit=100&opt_fields=gid,text'
+      + (offset ? '&offset=' + encodeURIComponent(offset) : ''));
+    if (!Array.isArray(r?.data)) throw new Error('existing alert comments could not be verified');
+    if (r.data.some(s => s?.text === text)) return { posted: false, alreadyRecorded: true };
+    offset = r?.next_page?.offset || '';
+    more = !!offset;
+    if (!more) break;
+    if (seen.has(offset)) throw new Error('existing alert comment pagination loop');
+    seen.add(offset);
+  }
+  if (more) throw new Error('existing alert comment history incomplete; refusing unverified duplicate');
+  const receipt = await call('/tasks/' + id + '/stories', {
+    method: 'POST',
+    body: JSON.stringify({ data: { text } }),
+    noRetryOnUnknownOutcome: true,
+  });
+  if (!/^\d+$/.test(String(receipt?.data?.gid || ''))) {
+    throw new Error('Asana did not confirm the new screening assurance evidence comment');
+  }
+  return { posted: true, storyGid: String(receipt.data.gid) };
 }
 
 /* ── Re-run idempotency ──────────────────────────────────────────────────────
@@ -102,6 +236,16 @@ export function findRecentDuplicate(tasks, name, nowMs, windowHours = 6, dedupPr
   }) || null;
 }
 
+/* A dated daily digest remains unique across the entire UTC day, not 6h. */
+export function findDateScopedDailyDuplicates(tasks, prefix) {
+  const m = /^🛡️ Sanctions Screen — (\d{4}-\d\d-\d\d)$/u.exec(String(prefix || ''));
+  if (!m || !Number.isFinite(Date.parse(m[1] + 'T00:00:00Z')) ||
+      new Date(m[1] + 'T00:00:00Z').toISOString().slice(0, 10) !== m[1]) {
+    throw new Error('Invalid daily screening digest date prefix');
+  }
+  return (tasks || []).filter(t => String(t?.name || '').startsWith(prefix + ' — '));
+}
+
 /* Resolve a section GID by name within a project, creating it if absent —
    idempotent (an existing name is reused), shared by the schedulers that file
    under a named column. */
@@ -129,7 +273,7 @@ export async function ensureSection(projectGid, name) {
    the partial. Nothing that decides coverage reads through this helper. */
 export const ASANA_PAGE_CAP = Number(process.env.ASANA_PAGE_CAP) || 500;
 
-async function asanaPages(base, what) {
+async function asanaPages(base, what, { requireComplete = false } = {}) {
   const out = [];
   let path = base, pages = 0;
   while (path) {
@@ -137,6 +281,7 @@ async function asanaPages(base, what) {
     out.push(...(d.data || []));
     path = d.next_page ? base + '&offset=' + d.next_page.offset : null;
     if (path && ++pages >= ASANA_PAGE_CAP) {
+      if (requireComplete) throw new Error('Incomplete project task scan for daily digest');
       console.error('asana-notify: ' + what + ' — read ' + out.length + ' record(s) over ' + pages
         + ' pages and Asana still reports more; the page cap (' + ASANA_PAGE_CAP
         + ') was hit. Continuing on the PARTIAL read — raise ASANA_PAGE_CAP.');
@@ -147,9 +292,9 @@ async function asanaPages(base, what) {
 }
 
 /* All tasks in a project (name, created_at, permalink) — for the dedup guard. */
-export async function listProjectTasks(projectGid) {
+export async function listProjectTasks(projectGid, { requireComplete = false } = {}) {
   return asanaPages('/projects/' + projectGid + '/tasks?limit=100&opt_fields=name,created_at,permalink_url',
-    'task scan of project ' + projectGid);
+    'task scan of project ' + projectGid, { requireComplete });
 }
 
 /* Create one alert card in the Ongoing Monitoring project.
@@ -191,10 +336,45 @@ export async function notifyAsana(name, notes, opts = {}) {
       ...mirror.map(m => (m.section ? { project: m.project, section: m.section } : { project: m.project })),
     ];
   }
+  /* Date-scoped screening digests require a complete read of existing cards.
+   * On a same-day rerun update/read-back the ONE existing digest. Do not
+   * silently choose between duplicate audit records or post a third card. */
+  if (opts.dateScopedDigest === true) {
+    if (typeof opts.html !== 'string' || !opts.html.startsWith('<body>')) {
+      throw new Error('Complete HTML evidence required for screening digest');
+    }
+    const matches = findDateScopedDailyDuplicates(
+      await listProjectTasks(project, { requireComplete: true }), opts.dedupPrefix);
+    if (matches.length > 1) {
+      throw new Error('Existing duplicate daily screening digests require human reconciliation');
+    }
+    if (matches.length === 1) {
+      const existing = matches[0];
+      const id = String(existing.gid || '');
+      if (!/^\d+$/.test(id)) throw new Error('Invalid Asana daily screening task id');
+      await asana('/tasks/' + id, { method: 'PUT', body: JSON.stringify({ data: {
+        name: data.name, html_notes: fitAsanaHtml(opts.html), due_on: due
+      } }) });
+      if (opts.section) await asana('/sections/' + opts.section + '/addTask', {
+        method: 'POST', body: JSON.stringify({ data: { task: id } }) });
+      const readBack = (await asana('/tasks/' + id
+        + '?opt_fields=name,notes,memberships.project.gid,memberships.section.gid,permalink_url'))?.data;
+      if (readBack?.name !== data.name ||
+          typeof readBack.notes !== 'string' ||
+          !readBack.notes.includes('Daily sanctions screening') ||
+          !(readBack.memberships || []).some(m =>
+            String(m.project?.gid) === String(project) &&
+            String(m.section?.gid) === String(opts.section))) {
+        throw new Error('Daily screening report update not verified by Asana');
+      }
+      console.log('asana-notify: existing UTC-day screening digest updated and verified');
+      return readBack.permalink_url || existing.permalink_url || null;
+    }
+  }
   /* Idempotency guard — never double-post the same card on a workflow re-run.
      Best-effort: if the check itself fails we still post (losing an alert is
      worse than a rare duplicate). */
-  try {
+  if (opts.dateScopedDigest !== true) try {
     const dup = findRecentDuplicate(await listProjectTasks(project), data.name, Date.now(), 6, opts.dedupPrefix || null);
     if (dup) {
       if (String(project) === MONITORING_PROJECT && opts.section) {
@@ -215,7 +395,8 @@ export async function notifyAsana(name, notes, opts = {}) {
   if (opts.assignee !== null) data.assignee = opts.assignee || 'me';
   let d;
   try {
-    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
+    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }),
+      noRetryOnUnknownOutcome: opts.dateScopedDigest === true });
   } catch (e) {
     /* Backstop (screen.py post_unified_task parity): should Asana's accounting
        ever outgrow asanaHtmlSize, refit once on a smaller budget rather than
@@ -226,9 +407,13 @@ export async function notifyAsana(name, notes, opts = {}) {
       + smaller + '-byte rich-text budget (truncation disclosed in the card)');
     data.html_notes = fitAsanaHtml(opts.html, smaller);
     if (data.html_notes === opts.html) throw e;   // nothing left to cut
-    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }) });
+    d = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data }),
+      noRetryOnUnknownOutcome: opts.dateScopedDigest === true });
   }
   const gid = d.data && d.data.gid;
+  if (opts.dateScopedDigest === true && !/^\d+$/.test(String(gid || ''))) {
+    throw new Error('Asana did not confirm the new daily digest identifier');
+  }
   /* Placement is part of delivery. A card in the wrong section is not a
      successful delivery, so fail loudly instead of leaving it in the default
      section. */

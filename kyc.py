@@ -35,6 +35,45 @@ def _warn(msg):
     library (no dependency on screen.log); the workflows capture stderr."""
     print(f"[kyc] WARN {msg}", file=sys.stderr, flush=True)
 
+
+# Geographic PEP screening QA samples requested by the operator. NOT country
+# risk tiers and NOT indications that a person is a PEP. Geography cannot
+# establish political exposure. The same basic PEP screening obligation applies
+# to all nationalities. These three records receive an extra coverage reminder.
+_PEP_QA_COUNTRY_ALIASES = {
+    "turkey": "Turkey", "turkiye": "Turkey", "turkish": "Turkey",
+    "india": "India", "indian": "India",
+    "papua new guinea": "Papua New Guinea", "papua new guinean": "Papua New Guinea",
+    "png": "Papua New Guinea",
+}
+
+
+def pep_country_qa_advisory(nationality):
+    """Optional QA-sample reminder; NOT a PEP match or risk-score input."""
+    import unicodedata
+    if not isinstance(nationality, str):
+        return None
+    normalized = unicodedata.normalize("NFKD", nationality.casefold())
+    normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    normalized = " ".join(re.sub(r"[^a-z ]", " ", normalized).split())
+    jurisdiction = _PEP_QA_COUNTRY_ALIASES.get(normalized)
+    if jurisdiction is None:
+        return None
+    return {
+        "code": "PEP_COVERAGE_SPOT_CHECK",
+        "jurisdiction": jurisdiction,
+        "scope": "operator_selected_quality_assurance",
+        "human_review_required": True,
+        "is_pep_finding": False,
+        "risk_score_adjustment": 0,
+        "note": (
+            "Recheck PEP/RCA screening coverage and retain independently sourced "
+            "review evidence. Nationality alone is not a PEP indicator, and a "
+            "negative public-source search is not proof of non-PEP status."
+        ),
+    }
+
+
 # ── Legal-arrangement role / entity vocabulary (R.25) ─────────────────────────
 # A party holding one of these roles, OR an entity whose name carries one of these
 # tokens, is treated as part of a legal arrangement (trust/foundation/partnership)
@@ -85,6 +124,18 @@ _JURISDICTION_ALIASES = {
     "bvi": "british virgin islands",
     "bolivarian republic of venezuela": "venezuela",
     "plurinational state of bolivia": "bolivia",
+    # ISO 3166 / UN short names, which put the qualifier after the name.
+    "iran, islamic republic of": "islamic republic of iran",
+    "iran (islamic republic of)": "islamic republic of iran",
+    "korea, democratic people's republic of": "north korea",
+    "korea (democratic people's republic of)": "north korea",
+    "congo, the democratic republic of the": "the democratic republic of congo",
+    "congo, democratic republic of the": "the democratic republic of congo",
+    "venezuela, bolivarian republic of": "venezuela",
+    "venezuela (bolivarian republic of)": "venezuela",
+    "bolivia, plurinational state of": "bolivia",
+    "bolivia (plurinational state of)": "bolivia",
+    "virgin islands, british": "british virgin islands",
 }
 
 
@@ -318,6 +369,140 @@ def jurisdiction_risk_for(country, nationalities, table=None):
     if worst:
         return worst, f"{who} on FATF/locally-designated {'higher-risk' if worst=='high' else 'increased-monitoring (grey)'} list"
     return None, ""
+
+
+# ── Public-source country indicators (context only, never scored) ─────────────
+# US INCSR major money-laundering jurisdictions, US TIP Tier 2 Watch List /
+# Tier 3, and the EU tax non-cooperative list (Annex I). Each value is sourced
+# in the file. They are shown next to a hit's jurisdiction so the analyst sees
+# them; they do NOT feed compute_risk_rating — the FATF list above stays the
+# only jurisdiction scoring input. Absent file ⇒ no context; present-but-broken
+# file ⇒ warned loudly.
+COUNTRY_INDICATORS_PATH = os.environ.get(
+    "COUNTRY_INDICATORS_PATH", "data/country-indicators.json")
+
+# TIP tiers shown as context; Tier 1 / Tier 2 are kept in the file only.
+_TIP_SHOWN = ("Tier 2 Watch List", "Tier 3")
+
+
+def load_country_indicators(path=None):
+    """Return {country_norm: [label, ...]} from the sourced indicator file, or {}
+    if absent. Never raises. Both the source's spelling and the app baseline
+    name are indexed, plus the _JURISDICTION_ALIASES short forms."""
+    p = path or COUNTRY_INDICATORS_PATH
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            ind = (json.load(f).get("indicators") or {})
+        out = {}
+
+        def add(entry, label):
+            for nm in {entry.get("published", ""), entry.get("app", "")}:
+                k = _norm(nm)
+                if k and label not in out.setdefault(k, []):
+                    out[k].append(label)
+
+        inc = ind.get("incsr_major_ml") or {}
+        for e in inc.get("jurisdictions", []) or []:
+            add(e, f"US INCSR major money-laundering jurisdiction ({inc.get('edition', '').split(' Volume')[0] or 'INCSR'})")
+        tip = ind.get("tip_tier") or {}
+        for tier in _TIP_SHOWN:
+            for e in (tip.get("tiers") or {}).get(tier, []) or []:
+                add(e, f"US {tip.get('edition', 'TIP Report')}: {tier}")
+        eu = ind.get("eu_tax_noncooperative") or {}
+        for e in eu.get("jurisdictions", []) or []:
+            add(e, f"EU tax non-cooperative list, Annex I ({eu.get('published', '')})")
+        for alias, target in _JURISDICTION_ALIASES.items():
+            if target in out and alias not in out:
+                out[alias] = list(out[target])
+        if not out:
+            _warn(f"country-indicators file '{p}' present but yielded 0 entries — "
+                  "country context is missing this run")
+        return out
+    except Exception as e:
+        _warn(f"country-indicators file '{p}' unreadable ({type(e).__name__}: {e}) — "
+              "country context is missing this run")
+        return {}
+
+
+def country_indicators_for(country, nationalities, table=None):
+    """Return ['<country>: <label>', ...] for the customer country and any
+    nationality; [] when none apply. Context only — never a score input."""
+    table = load_country_indicators() if table is None else table
+    out = []
+    for c in [country] + list(nationalities or []):
+        for label in table.get(_norm(c), []):
+            line = f"{c}: {label}"
+            if line not in out:
+                out.append(line)
+    return out
+
+
+# ── Suggested country score (DRAFT, pending MLRO approval, never scored) ──────
+# Generated by scripts/country-score.mjs from the FATF lists and the sourced
+# indicators above. Shown beside the app's current country score so the MLRO
+# can compare; compute_risk_rating never reads it. Absent file ⇒ nothing shown;
+# present-but-broken file ⇒ warned loudly.
+SUGGESTED_COUNTRY_SCORE_PATH = os.environ.get(
+    "SUGGESTED_COUNTRY_SCORE_PATH", "data/country-score-suggested.json")
+
+
+def load_suggested_country_scores(path=None, indicators_path=None):
+    """Return {country_norm: row} from the generated suggestion file, or {} if
+    absent. Never raises. Rows are keyed by the app baseline name, the
+    _JURISDICTION_ALIASES short forms, and the publishers' own spellings from
+    the indicator file (e.g. 'Türkiye')."""
+    p = path or SUGGESTED_COUNTRY_SCORE_PATH
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            rows = json.load(f).get("countries") or []
+        out = {_norm(r["country"]): r for r in rows if r.get("country")}
+        ip = indicators_path or COUNTRY_INDICATORS_PATH
+        if os.path.exists(ip):
+            try:
+                with open(ip, encoding="utf-8") as f:
+                    ind = json.load(f).get("indicators") or {}
+                for spec in ind.values():
+                    entries = list(spec.get("jurisdictions") or [])
+                    for tier in (spec.get("tiers") or {}).values():
+                        entries.extend(tier or [])
+                    for e in entries:
+                        pub, app = _norm(e.get("published")), _norm(e.get("app"))
+                        if pub and app in out and pub not in out:
+                            out[pub] = out[app]
+            except Exception as e:  # spellings are a convenience; the rows still load
+                _warn(f"country-indicators file '{ip}' unreadable ({type(e).__name__}: {e}) — "
+                      "suggested country scores load without publisher spellings")
+        for alias, target in _JURISDICTION_ALIASES.items():
+            if target in out and alias not in out:
+                out[alias] = out[target]
+        if not out:
+            _warn(f"suggested-country-score file '{p}' present but yielded 0 rows — "
+                  "suggested country scores are missing this run")
+        return out
+    except Exception as e:
+        _warn(f"suggested-country-score file '{p}' unreadable ({type(e).__name__}: {e}) — "
+              "suggested country scores are missing this run")
+        return {}
+
+
+def suggested_country_score_for(country, nationalities, table=None):
+    """Return ['<country>: suggested N vs current M (...)', ...] for the
+    customer country and any nationality that has a suggestion. Display only —
+    never a score input."""
+    table = load_suggested_country_scores() if table is None else table
+    out, seen = [], set()
+    for c in [country] + list(nationalities or []):
+        r = table.get(_norm(c))
+        if not r or r.get("suggested") is None or r["country"] in seen:
+            continue
+        seen.add(r["country"])
+        why = "; ".join(r.get("factors") or [])
+        out.append(f"{c}: suggested {r['suggested']} vs current {r['current']} ({why})")
+    return out
 
 
 def identity_dossier(individual):

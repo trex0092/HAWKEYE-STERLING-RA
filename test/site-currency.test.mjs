@@ -11,7 +11,8 @@
         site is not a current site, and that distinction is the whole point.
 
    Usage: node test/site-currency.test.mjs */
-import { decide, discoverServedAssets, firstDivergence, isDeployRelevantPath, sha256 } from '../scripts/site-currency.mjs';
+import { assessDeploymentIntegrity, decide, discoverServedAssets, firstDivergence,
+  isDeployRelevantPath, sha256, verifiedDeployComparison } from '../scripts/site-currency.mjs';
 
 let passed = 0, failed = 0;
 const check = (name, cond) => { if (cond) { passed++; console.log('  ok  ' + name); } else { failed++; console.log('FAIL  ' + name); } };
@@ -92,6 +93,154 @@ const opts = { graceSeconds: 86400, now: NOW };
   check('a site-wide outage is unverifiable, not current', d.verdict === 'unverifiable' && d.ok === false);
 }
 
+/* ---- complete deployment evidence must not be inferred from a marker ---- */
+{
+  const CURRENT = 'a'.repeat(40);
+  const OLDER = 'b'.repeat(40);
+  const match = decide([{name:'index.html',status:'match',changedAt:at(900000)}],opts);
+  const absent = decide([{name:'telemetry.js',status:'missing',changedAt:at(900000)}],opts);
+  const unavailable = decide([{name:'sw.js',status:'error',changedAt:at(900000)}],opts);
+  const recentlyModified = decide([{name:'app.js',status:'differ',changedAt:at(10)}],opts);
+
+  check('matching deploy SHA AND matching files are provably current',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:CURRENT,
+      assetDecision:match}).verdict==='current');
+  check('matching deploy SHA does NOT excuse missing telemetry.js',
+    !assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:CURRENT,
+      assetDecision:absent}).ok);
+  check('matching deploy SHA does NOT excuse unreadable root JavaScript',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:CURRENT,
+      assetDecision:unavailable}).verdict==='integrity_failure');
+  check('matching deploy SHA does NOT excuse mutated files as grace-window lag',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:CURRENT,
+      assetDecision:recentlyModified,graceSeconds:86400}).verdict==='integrity_failure');
+
+  check('stale deploy SHA and stale Netlify function fails despite matching root HTML',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[at(900000)],
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+  check('stale deploy SHA and RECENT changed function is classified only as lag',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[at(60)],
+      markerCommittedAt:at(300), assetDecision:match,
+      graceSeconds:86400,now:NOW}).verdict==='lag');
+
+  check('a fresh edit cannot launder a weeks-old stale deployed marker',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],
+      changedAtSeconds:[at(60)],markerCommittedAt:at(900000),
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+  check('unknown marker date is not enough to excuse a stale Function',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],
+      changedAtSeconds:[at(60)],assetDecision:match,
+      graceSeconds:86400,now:NOW}).ok===false);
+  check('known stale static files remain DRIFT even when GitHub compare is truncated',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:null,assetDecision:decide([
+        {name:'app.js',status:'differ',changedAt:at(900000)}],opts)
+    }).verdict==='drift');
+  check('zero lag budget cannot falsely call stale Function deployment current',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[at(1)],
+      assetDecision:match,graceSeconds:0,now:NOW}).ok===false);
+  check('a single old function amongst recent files defeats deploy lag',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['app.js','netlify/functions/brain-soul.js'],
+      changedAtSeconds:[at(60),at(900000)],
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+  check('unable to date a changed Function is NOT treated as harmless lag',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:['netlify/functions/brain-soul.js'],changedAtSeconds:[NaN],
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+  check('unavailable GitHub compare API is UNVERIFIABLE, not CURRENT',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:null,assetDecision:match}).verdict==='unverifiable');
+  check('docs-only commits require matching root assets before passing',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:[],assetDecision:match}).verdict==='current' &&
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:[],assetDecision:absent}).verdict==='integrity_failure' &&
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:[],assetDecision:recentlyModified}).verdict==='integrity_failure');
+  check('a missing deploy marker cannot verify even byte-identical static HTML',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:null,
+      assetDecision:match}).verdict==='unverifiable');
+  check('an invalid deploy marker cannot verify Netlify Function freshness',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:'not-sha',
+      assetDecision:match}).ok===false);
+  check('local asset-only probes remain usable when no expected commit is given',
+    assessDeploymentIntegrity({expectedCommit:'',markerCommit:null,
+      assetDecision:match}).verdict==='current');
+  check('no more than 100 path histories may be excused by the grace window',
+    assessDeploymentIntegrity({expectedCommit:CURRENT,markerCommit:OLDER,
+      changedPaths:Array(101).fill('netlify/functions/example.js'),
+      changedAtSeconds:Array(101).fill(at(1)),
+      assetDecision:match,graceSeconds:86400,now:NOW}).verdict==='drift');
+}
+
+
+/* ---- GitHub compare API must be complete before granting Netlify grace ---- */
+{
+  const BASE = 'a'.repeat(40);
+  const HEAD = 'b'.repeat(40);
+  const makeCompare = ({
+    files = [{filename:'netlify/functions/brain-soul.js'}],
+    totalCommits = 2,
+    commits = [
+      {sha:'c'.repeat(40),commit:{committer:{date:'2026-10-09T06:00:00Z'}}},
+      {sha:HEAD,commit:{committer:{date:'2026-10-10T07:00:00Z'}}},
+    ],
+    markerDate = '2026-10-08T07:00:00Z',
+    mergeBase = BASE, base = BASE, status='ahead'
+  } = {}) => ({
+    status,files,total_commits:totalCommits,commits,
+    base_commit:{sha:base,commit:{committer:{date:markerDate}}},
+    merge_base_commit:{sha:mergeBase},
+  });
+  const sound = verifiedDeployComparison(makeCompare(),BASE,HEAD);
+  check('complete compare returns every deploy-relevant path and marker age',
+    sound.changedPaths.length===1 &&
+    sound.changedPaths[0]==='netlify/functions/brain-soul.js' &&
+    Number.isFinite(sound.markerCommittedAt) &&
+    Number.isFinite(sound.oldestComparedCommitAt) &&
+    sound.oldestComparedCommitAt < Math.floor(Date.parse('2026-10-10T07:00:00Z')/1000));
+  check('any comparison at GitHub 300-file hard cap is INCOMPLETE, not current',
+    verifiedDeployComparison(makeCompare({files:Array(300).fill({filename:'README.md'})}),BASE,HEAD)===null);
+  check('finite sub-limit comparison can verify docs-only changes',
+    verifiedDeployComparison(makeCompare({files:Array(299).fill({filename:'README.md'})}),BASE,HEAD)
+      .changedPaths.length===0);
+  check('incomplete commit page must never justify a grace period',
+    verifiedDeployComparison(makeCompare({totalCommits:251}),BASE,HEAD)===null);
+  check('divergent merge base cannot establish ancestor-to-main history',
+    verifiedDeployComparison(makeCompare({mergeBase:'e'.repeat(40)}),BASE,HEAD)===null);
+  check('a comparison not ending at expected HEAD is untrustworthy',
+    verifiedDeployComparison(makeCompare({commits:[
+      {sha:'c'.repeat(40),commit:{committer:{date:'2026-10-09T06:00:00Z'}}},
+      {sha:'d'.repeat(40),commit:{committer:{date:'2026-10-10T07:00:00Z'}}},
+    ]}),BASE,HEAD)===null);
+  check('unknown commit or deploy marker timestamps fail closed',
+    verifiedDeployComparison(makeCompare({markerDate:'not-a-date'}),BASE,HEAD)===null &&
+    verifiedDeployComparison(makeCompare({commits:[
+      {sha:'c'.repeat(40),commit:{committer:{date:'not-a-date'}}},
+      {sha:HEAD,commit:{committer:{date:'2026-10-10T07:00:00Z'}}},
+    ]}),BASE,HEAD)===null);
+  check('file history cannot be forged by a diff that does not identify a filename',
+    verifiedDeployComparison(makeCompare({files:[{}]}),BASE,HEAD)===null);
+  const early = Math.floor(Date.parse('2026-10-09T06:00:00Z')/1000);
+  const recent = Math.floor(Date.parse('2026-10-10T07:00:00Z')/1000);
+  check('earliest intervening commit is used even after later same-file edits',
+    sound.oldestComparedCommitAt===early && recent>early);
+  check('oldest deploy commit cannot be excused by a recent rewrite of same Function',
+    assessDeploymentIntegrity({
+      expectedCommit:HEAD,markerCommit:BASE,
+      changedPaths:sound.changedPaths,changedAtSeconds:[recent],
+      markerCommittedAt:sound.markerCommittedAt,
+      assetDecision:decide([{name:'index.html',status:'match'}],opts),
+      graceSeconds:86400,now:recent,
+    }).verdict==='drift');
+}
+
 /* ---- the asset list is discovered, not hardcoded ---- */
 {
   const assets = discoverServedAssets();
@@ -101,7 +250,13 @@ const opts = { graceSeconds: 86400, now: NOW };
   /* The #338 lesson: a hardcoded list acquires a blind spot exactly where a new
      file hides. Every served root asset must come from disk. */
   check('discovery covers every root html/js/css file', assets.length >= 13);
-  check('discovery excludes non-served roots', !assets.includes('package.json') && !assets.includes('README.md'));
+  check('legal and missing-page assets are covered by exact-byte verification',
+    ['privacy-policy.html', 'terms.html', '404.html'].every(name => assets.includes(name)));
+  check('live site probe includes the browser-fetched country suggestions and robots.txt',
+    assets.includes('data/country-score-suggested.json') && assets.includes('robots.txt'));
+  check('discovery excludes non-served roots and ephemeral state',
+    !assets.includes('package.json') && !assets.includes('README.md') &&
+    !assets.includes('data/run-metrics.json') && !assets.includes('data/grc-metrics.json'));
 }
 
 /* ---- hashing is over raw bytes ---- */
@@ -117,6 +272,13 @@ const opts = { graceSeconds: 86400, now: NOW };
   check('Netlify config is deploy-relevant', isDeployRelevantPath('netlify.toml'));
   check('Netlify functions are deploy-relevant', isDeployRelevantPath('netlify/functions/brain-soul.js'));
   check('assets are deploy-relevant', isDeployRelevantPath('assets/logo.svg'));
+  check('browser-read country suggestions are deploy-relevant, but proposals do not become approvals',
+    isDeployRelevantPath('data/country-score-suggested.json'));
+  check('published robots.txt is deploy-relevant', isDeployRelevantPath('robots.txt'));
+  check('legal and 404 root pages remain deploy-relevant',
+    ['privacy-policy.html','terms.html','404.html'].every(isDeployRelevantPath));
+  check('unrelated transient JSON state is NOT deploy-relevant',
+    !isDeployRelevantPath('data/temporary-transaction-state.json'));
   check('workflow-only changes are not deploy-relevant', !isDeployRelevantPath('.github/workflows/ci.yml'));
   check('docs-only changes are not deploy-relevant', !isDeployRelevantPath('README.md'));
   check('screening data-only changes are not deploy-relevant', !isDeployRelevantPath('data/sanctions-country-coverage.json'));

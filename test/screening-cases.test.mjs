@@ -1,7 +1,7 @@
 /* Offline unit tests for the screening case lifecycle's pure logic
    (scripts/screening-cases.mjs). No network, no filesystem.
    Usage: node test/screening-cases.test.mjs */
-import { planCaseActions, newCaseStateEntry, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
+import { planCaseActions, canAutoClearCases, confirmedDispositionState, newCaseStateEntry, createVerifiedScreeningCase, unverifiedCaseCreationState, postVerifiedCaseAgingNotice, selectDispositionReadBatch, DEFAULT_CASE_DISPOSITION_READ_CAP, MAX_CASE_DISPOSITION_READ_CAP, applyVerifiedCaseDisposition, verifyScreeningCaseAuditStory, CASE_FALSE_POSITIVE_AUDIT, CASE_ESCALATE_AUDIT, caseTitle, caseHtml, addDays, ageInDays, CASE_SLA_DAYS, buildResultsDigestHtml, resultsDigestTitle, parseDisposition, whitelistablePairs } from '../scripts/screening-cases.mjs';
 import { caseSection, SECTIONS } from '../scripts/asana-sections.mjs';
 
 let passed = 0, failed = 0;
@@ -41,6 +41,134 @@ check('adverse-media cases route to Screening Adverse Media & PEP’s Update',
 check('mixed cases retain sanctions priority without creating another section',
   caseSection({ hits: [{ list: 'Adverse media (GDELT)' }, { list: 'UN Consolidated' }] }) === SECTIONS.sanctions.gid);
 
+/* New cases require a remote GID, approved section and read-back receipt.
+   Synthetic IDs and injected request functions, no live Asana writes. */
+{
+  const title = 'Synthetic Screening Case', project = '1216203370612914',
+    section = '1218451960830318', taskId = '1219451000000001';
+  const calls = [];
+  const request = async (path, options = {}) => {
+    calls.push({ path, method: options.method || 'GET',
+      nonReplayable: options.noRetryOnUnknownOutcome === true });
+    if (path === '/tasks' && options.method === 'POST') return { data: { gid: taskId } };
+    if (path === '/sections/' + section + '/addTask') return { data: {} };
+    if (path.startsWith('/tasks/' + taskId + '?')) return { data: {
+      gid: taskId, name: title, memberships: [{ project: { gid: project }, section: { gid: section } }]
+    } };
+    throw new Error('unexpected synthetic Asana request');
+  };
+  const task = await createVerifiedScreeningCase(request, {
+    title, htmlNotes: '<body>Synthetic case evidence</body>', projectGid: project,
+    sectionGid: section, assignee: '1213645083721304', dueOn: TODAY
+  });
+  check('case creation confirms the actual Asana task identity, section and project',
+    task === taskId && calls.length === 3 &&
+    calls[0].path === '/tasks' && calls[0].method === 'POST' && calls[0].nonReplayable &&
+    calls[1].path.endsWith('/addTask') && calls[2].path.includes('?opt_fields='));
+  let missing = false;
+  try {
+    await createVerifiedScreeningCase(async () => ({ data: {} }), {
+      title, htmlNotes: '<body>Synthetic case evidence</body>',
+      projectGid: project, sectionGid: section
+    });
+  } catch { missing = true; }
+  check('missing Asana case GID is never persisted as a successful case', missing);
+  let misplaced = false;
+  try {
+    await createVerifiedScreeningCase(async path => {
+      if (path === '/tasks') return { data: { gid: taskId } };
+      if (path.endsWith('/addTask')) return { data: {} };
+      return { data: { gid: taskId, name: title, memberships: [{
+        project: { gid: project }, section: { gid: '12345' }
+      }] } };
+    }, { title, htmlNotes: '<body>Synthetic</body>', projectGid: project, sectionGid: section });
+  } catch { misplaced = true; }
+  check('misfiled Asana screening case never reports verified delivery', misplaced);
+  let writes = 0, ambiguous = false;
+  try {
+    await createVerifiedScreeningCase(async () => {
+      writes++; throw new Error('synthetic lost receipt');
+    }, { title, htmlNotes: '<body>Synthetic</body>', projectGid: project, sectionGid: section });
+  } catch { ambiguous = true; }
+  check('uncertain case creation is not retried within the case publisher',
+    ambiguous && writes === 1);
+  const pending = unverifiedCaseCreationState(null, TODAY);
+  check('unconfirmed new case preserves a human recovery hold, not a phantom GID',
+    pending.requiresHumanRecovery === true && pending.taskGid === null &&
+    pending.cleared === false && pending.creationUnverifiedAt === TODAY);
+  check('an uncertain case cannot queue another automatic duplicate or invalid aging action',
+    planCaseActions({ k: subj() }, { k: pending }, TODAY).length === 0);
+  const prior = { taskGid: '999999', cleared: true, clearedAt: '2026-07-01' };
+  const uncertainReflag = unverifiedCaseCreationState(prior, TODAY);
+  check('uncertain reflag preserves prior disposition and blocks duplicate creation',
+    uncertainReflag.taskGid === prior.taskGid && uncertainReflag.cleared === true &&
+    uncertainReflag.clearedAt === prior.clearedAt &&
+    planCaseActions({ k: subj() }, { k: uncertainReflag }, TODAY).length === 0);
+}
+
+/* SLA aging alerts are audit evidence, not fire-and-forget comments. */
+{
+  const taskGid = '1219451000000001';
+  const storyGid = '1219451000000011';
+  const notice = '⏰ AGING — this screening case has been open 11 days (SLA: 5). Review and disposition required.';
+  const fake = ({ lostPost = false, unconfirmedRead = false, invalidHistory = false } = {}) => {
+    const state = { story: null, calls: [], writes: 0 };
+    const request = async (path, opts = {}) => {
+      const method = opts.method || 'GET';
+      state.calls.push({ path, method, retrySafe: opts.noRetryOnUnknownOutcome === true });
+      if (path.startsWith('/tasks/' + taskGid + '/stories?')) {
+        if (invalidHistory) return { data: null };
+        return { data: state.story ? [state.story] : [], next_page: null };
+      }
+      if (path === '/tasks/' + taskGid + '/stories' && method === 'POST') {
+        state.writes++;
+        state.story = { gid: storyGid, text: JSON.parse(opts.body).data.text };
+        if (lostPost) throw new Error('synthetic lost Asana story acknowledgement');
+        return { data: { gid: storyGid } };
+      }
+      if (path.startsWith('/stories/' + storyGid + '?')) {
+        return { data: unconfirmedRead ? {} : state.story };
+      }
+      throw new Error('unexpected synthetic Asana request');
+    };
+    return { request, state };
+  };
+  const normal = fake();
+  const result = await postVerifiedCaseAgingNotice(normal.request, taskGid, 11);
+  check('SLA aging requires confirmed exact audit comment read-back',
+    result.confirmed && !result.alreadyRecorded && normal.state.story.text === notice &&
+    normal.state.calls.some(x => x.path.includes('/stories/' + storyGid + '?')));
+  check('SLA aging story POST is non-replayable after an unknown remote outcome',
+    normal.state.calls.find(x => x.method === 'POST')?.retrySafe === true);
+  const prior = await postVerifiedCaseAgingNotice(normal.request, taskGid, 11);
+  check('rerun discovers existing SLA comment and cannot duplicate it',
+    prior.confirmed && prior.alreadyRecorded && normal.state.writes === 1);
+  const lost = fake({ lostPost: true });
+  let unknownRejected = false;
+  try { await postVerifiedCaseAgingNotice(lost.request, taskGid, 11); }
+  catch { unknownRejected = true; }
+  const recovery = await postVerifiedCaseAgingNotice(lost.request, taskGid, 11);
+  check('ambiguous story response fails first attempt but reconciles without double posting',
+    unknownRejected && recovery.alreadyRecorded && lost.state.writes === 1);
+  const unconfirmed = fake({ unconfirmedRead: true });
+  let readBlocked = false;
+  try { await postVerifiedCaseAgingNotice(unconfirmed.request, taskGid, 11); }
+  catch { readBlocked = true; }
+  check('a successful Asana POST without read-back never marks SLA evidence as confirmed',
+    readBlocked && unconfirmed.state.writes === 1);
+  const badHistory = fake({ invalidHistory: true });
+  let historyBlocked = false;
+  try { await postVerifiedCaseAgingNotice(badHistory.request, taskGid, 11); }
+  catch { historyBlocked = true; }
+  check('incomplete story history fails closed before creating an unverified SLA alert',
+    historyBlocked && badHistory.state.writes === 0);
+  let invalidBlocked = false;
+  try { await postVerifiedCaseAgingNotice(async () => { throw Error('should not call'); }, taskGid, 3); }
+  catch { invalidBlocked = true; }
+  check('SLA notice may only be sent once the genuine five-day limit is exceeded',
+    invalidBlocked);
+}
+
 /* ── planner ── */
 const KEY = 'john doe|ubo|1214107985842154';
 
@@ -62,15 +190,15 @@ check('case open past the SLA → exactly one aging action, never repeated', (()
   return first.length === 1 && first[0].type === 'age' && first[0].ageDays === 11 && again.length === 0;
 })());
 
-check('subject no longer flagged today → auto-clear', (() => {
+check('subject no longer flagged today remains open for human disposition', (() => {
   const gone = subj({ lastSeen: '2026-07-05' });
-  const a = planCaseActions({ [KEY]: gone }, { [KEY]: { taskGid: 't1', createdAt: '2026-06-27', agingAlerted: true, cleared: false } }, TODAY);
-  return a.length === 1 && a[0].type === 'clear' && a[0].caseGid === 't1';
+  const a = planCaseActions({ [KEY]: gone }, { [KEY]: { taskGid: 't1', createdAt: '2026-06-27', agingAlerted: true, cleared: false } }, TODAY, { allowAutoClear: true });
+  return a.length === 0;
 })());
 
-check('subject vanished from the registry entirely → auto-clear its case', (() => {
-  const a = planCaseActions({}, { [KEY]: { taskGid: 't1', createdAt: '2026-06-27', cleared: false } }, TODAY);
-  return a.length === 1 && a[0].type === 'clear';
+check('subject missing from the registry does not close its case', (() => {
+  const a = planCaseActions({}, { [KEY]: { taskGid: 't1', createdAt: '2026-06-27', cleared: false } }, TODAY, { allowAutoClear: true });
+  return a.length === 0;
 })());
 
 check('a cleared case never re-acts', (() => {
@@ -108,9 +236,9 @@ check('second clearance then THIRD re-flag runs the same reopen path against the
   /* re-flag #1 → fresh case t2 replaces t1's cleared entry */
   const a1 = planCaseActions({ [KEY]: subj() }, cases, TODAY)[0];
   cases[a1.key] = newCaseStateEntry('t2', TODAY, a1.priorCase);
-  /* subject drops off again → auto-clear t2 (simulated as the executor does) */
-  const a2 = planCaseActions({ [KEY]: subj({ lastSeen: TODAY }) }, cases, '2026-07-10');
-  if (!(a2.length === 1 && a2[0].type === 'clear' && a2[0].caseGid === 't2')) return false;
+  /* subject drops off again → preserve t2 open until an MLRO disposition */
+  const a2 = planCaseActions({ [KEY]: subj({ lastSeen: TODAY }) }, cases, '2026-07-10', { allowAutoClear: true });
+  if (a2.length !== 0) return false;
   cases[KEY] = { ...cases[KEY], cleared: true, clearedAt: '2026-07-10' };
   /* re-flag #2 → a third fresh case referencing t2, not t1 */
   const a3 = planCaseActions({ [KEY]: subj({ lastSeen: '2026-07-15' }) }, cases, '2026-07-15');
@@ -141,10 +269,191 @@ check('mixed registry plans each subject independently', (() => {
   const a = planCaseActions(
     { [KEY]: subj(), [k2]: subj({ name: 'Jane Roe', recommendation: 'review', lastSeen: '2026-07-01' }) },
     { [k2]: { taskGid: 't2', createdAt: '2026-06-27', cleared: false } },
-    TODAY);
+    TODAY, { allowAutoClear: true });
   const types = a.map(x => x.type).sort().join();
-  return types === 'clear,create';
+  return types === 'create';
 })());
+
+/* ── Complete coverage informs review but never grants clearance authority ── */
+const GOOD_COVERAGE = {
+  date: TODAY, screened: 2, degraded: false, failures: [],
+  lists: [{ id: 'sdn', count: 123, partial: false }],
+  enrichment: { amErrors: 0, amPartial: 0, skipped: 0, pepErrors: 0,
+    pepWorldwide: { active: true, partial: false, count: 200,
+      harvested: '2026-07-08T05:00:00Z' } }
+};
+check('full screening coverage still does not authorize automated case closure',
+  canAutoClearCases(GOOD_COVERAGE, TODAY) === true &&
+  canAutoClearCases({ ...GOOD_COVERAGE, degraded: true }, TODAY) === false &&
+  canAutoClearCases({ ...GOOD_COVERAGE, failures: ['source unreachable'] }, TODAY) === false);
+check('failed or partial sources and skipped adverse-media/PEP signals hold cases open',
+  [
+    { ...GOOD_COVERAGE, lists: [{ id: 'sdn', count: 123, partial: true }] },
+    { ...GOOD_COVERAGE, lists: [] },
+    { ...GOOD_COVERAGE, enrichment: { ...GOOD_COVERAGE.enrichment, amErrors: 1 } },
+    { ...GOOD_COVERAGE, enrichment: { ...GOOD_COVERAGE.enrichment, amPartial: 1 } },
+    { ...GOOD_COVERAGE, enrichment: { ...GOOD_COVERAGE.enrichment, skipped: 1 } },
+    { ...GOOD_COVERAGE, enrichment: { ...GOOD_COVERAGE.enrichment, pepErrors: 1 } },
+    { ...GOOD_COVERAGE, enrichment: { ...GOOD_COVERAGE.enrichment,
+      pepWorldwide: { ...GOOD_COVERAGE.enrichment.pepWorldwide, partial: true } } },
+    { ...GOOD_COVERAGE, enrichment: { ...GOOD_COVERAGE.enrichment,
+      pepWorldwide: { ...GOOD_COVERAGE.enrichment.pepWorldwide, active: false } } },
+    { ...GOOD_COVERAGE, date: '2026-07-07' }
+  ].every(r => !canAutoClearCases(r, TODAY)));
+const OPEN_CASE = { [KEY]: { taskGid: 'existing-case', createdAt: '2026-07-01', cleared: false } };
+check('no implicit permission to close missing or inactive cases',
+  planCaseActions({}, OPEN_CASE, TODAY).length === 0 &&
+  planCaseActions({ [KEY]: subj({ lastSeen: '2026-07-07' }) }, OPEN_CASE, TODAY).length === 0);
+check('whitelisted findings cannot auto-close without complete evidence but SLA aging remains possible',
+  (() => { const actions = planCaseActions({ [KEY]: subj({ whitelistedOnly: true }) }, OPEN_CASE, TODAY);
+    return actions.every(a => a.type !== 'clear') && actions.some(a => a.type === 'age');
+  })());
+check('incomplete coverage still creates genuinely new cases while withholding clearance',
+  (() => { const actions = planCaseActions({
+    [KEY]: subj(), inactive: subj({ lastSeen: '2026-07-06' })
+  }, { inactive: { taskGid: 'case2', cleared: false } }, TODAY);
+  return actions.length === 1 && actions[0].type === 'create' && actions[0].key === KEY;
+})());
+check('complete coverage cannot close an absent subject case without a human disposition',
+  canAutoClearCases(GOOD_COVERAGE, TODAY) &&
+  planCaseActions({}, OPEN_CASE, TODAY, {
+    allowAutoClear: canAutoClearCases(GOOD_COVERAGE, TODAY)
+  }).length === 0);
+
+/* ── Remote-first case disposition safety (no Asana or secrets needed) ── */
+const pendingCase = { taskGid: 't1', createdAt: TODAY, cleared: false, agingAlerted: false };
+check('an uncommitted disposition intent cannot mutate the active case',
+  (() => {
+    const original = { ...pendingCase };
+    const proposed = { type: 'disposition-clear', caseGid: pendingCase.taskGid };
+    return proposed.type === 'disposition-clear' && pendingCase.cleared === false &&
+      JSON.stringify(pendingCase) === JSON.stringify(original);
+  })());
+check('confirmed false-positive disposition creates whitelist evidence only after success',
+  (() => {
+    const result = confirmedDispositionState(pendingCase, 'disposition-clear', TODAY,
+      subj({ hits: [
+        { list: 'UK OFSI', hitName: 'Synthetic Match' },
+        { list: 'PEP (Wikidata)', hitName: 'Synthetic Person' }
+      ] }));
+    return result.cleared === true && result.clearedAt === TODAY &&
+      result.disposition.kind === 'false-positive' &&
+      result.disposition.hits.length === 1 && result.disposition.hits[0].hitName === 'Synthetic Match' &&
+      pendingCase.cleared === false;
+  })());
+check('confirmed escalation pins the case open without adding any clearance',
+  (() => {
+    const result = confirmedDispositionState(pendingCase, 'disposition-escalate-ack', TODAY);
+    return result.escalated === true && result.cleared === false && !result.disposition;
+  })());
+check('invalid remote confirmations cannot change case state',
+  (() => {
+    try { confirmedDispositionState(pendingCase, 'unknown-disposition', TODAY); return false; }
+    catch { return pendingCase.cleared === false; }
+  })());
+
+/* A remote 2xx write is not enough for a consequential MLRO disposition.
+   Simulate real Asana GET/POST/PUT semantics without touching live tasks. */
+{
+  const gid = '1219451000000001';
+  const fpNotes = '[x] false positive\n[ ] escalate\n[ ] under investigation';
+  const escNotes = '[ ] false positive\n[x] escalate\n[ ] under investigation';
+  const mockCase = (initialNotes = fpNotes, options = {}) => {
+    const state = { notes: initialNotes, completed: false, stories: [], calls: [],
+      nextStoryGid: 1219000000, ...options };
+    const request = async (path, opts = {}) => {
+      const method = opts.method || 'GET';
+      state.calls.push({ path, method, nonReplayable: !!opts.noRetryOnUnknownOutcome });
+      if (path.startsWith('/tasks/' + gid + '?')) {
+        const answer = { data: { gid, notes: state.notes, completed: state.completed } };
+        if (options.incompleteTask === true) delete answer.data.completed;
+        return answer;
+      }
+      if (path.startsWith('/tasks/' + gid + '/stories?')) {
+        if (options.invalidStoryHistory) return { data: null };
+        return { data: state.stories.map(s => ({ gid: s.gid, text: s.text })), next_page: null };
+      }
+      if (path === '/tasks/' + gid + '/stories' && method === 'POST') {
+        if (options.failWrite) throw new Error('synthetic uncertain response');
+        const entry = { gid: String(++state.nextStoryGid), text: JSON.parse(opts.body).data.text };
+        if (!options.missingStoryAfterPost) state.stories.push(entry);
+        return { data: { gid: entry.gid } };
+      }
+      if (path === '/tasks/' + gid && method === 'PUT') {
+        if (!options.ignoreCompletion) state.completed = JSON.parse(opts.body).data.completed;
+        if (options.changedApprovalOnCompletion) state.notes = escNotes;
+        return { data: { gid, completed: state.completed } };
+      }
+      throw new Error('Unexpected synthetic Asana call: ' + method + ' ' + path);
+    };
+    return { request, state };
+  };
+  const good = mockCase();
+  const receipt = await applyVerifiedCaseDisposition(good.request, gid, 'disposition-clear');
+  check('human false-positive clearance requires the audit story, completion and final read-back',
+    receipt.confirmed && receipt.completed === true && good.state.completed &&
+    good.state.stories.length === 1 && good.state.stories[0].text === CASE_FALSE_POSITIVE_AUDIT);
+  check('audit story creation and task completion are non-replayable after unknown response',
+    good.state.calls.filter(c => c.method === 'POST' || c.method === 'PUT')
+      .every(c => c.nonReplayable));
+  const repeated = await applyVerifiedCaseDisposition(good.request, gid, 'disposition-clear');
+  check('rerun reconciles a previously completed clearance without duplicate audit comments',
+    repeated.confirmed && good.state.stories.length === 1 &&
+    good.state.calls.filter(c => c.method === 'POST').length === 1);
+
+  const failStory = mockCase(fpNotes, { missingStoryAfterPost: true });
+  let unconfirmedStory = false;
+  try { await applyVerifiedCaseDisposition(failStory.request, gid, 'disposition-clear'); }
+  catch { unconfirmedStory = true; }
+  check('unconfirmed story read-back cannot trigger Asana completion',
+    unconfirmedStory && failStory.state.completed === false &&
+    !failStory.state.calls.some(c => c.method === 'PUT'));
+
+  const failPut = mockCase(fpNotes, { ignoreCompletion: true });
+  let unconfirmedCompletion = false;
+  try { await applyVerifiedCaseDisposition(failPut.request, gid, 'disposition-clear'); }
+  catch { unconfirmedCompletion = true; }
+  check('accepted task completion PUT cannot establish local clearance without a matching GET',
+    unconfirmedCompletion && failPut.state.completed === false);
+
+  const conflicting = mockCase('[x] false positive\n[x] escalate');
+  let conflictBlocked = false;
+  try { await applyVerifiedCaseDisposition(conflicting.request, gid, 'disposition-clear'); }
+  catch { conflictBlocked = true; }
+  check('conflicting MLRO marks fail closed and cannot post a false-positive clearance',
+    conflictBlocked && conflicting.state.calls.every(c => c.method === 'GET'));
+
+  const reversed = mockCase(fpNotes, { changedApprovalOnCompletion: true });
+  let revokedBlocked = false;
+  try { await applyVerifiedCaseDisposition(reversed.request, gid, 'disposition-clear'); }
+  catch { revokedBlocked = true; }
+  check('changing or escalating human decision before final read-back prevents local clearance',
+    revokedBlocked);
+
+  const escalate = mockCase(escNotes);
+  const escReceipt = await applyVerifiedCaseDisposition(escalate.request, gid, 'disposition-escalate-ack');
+  check('confirmed MLRO escalation preserves open task and its audit story',
+    escReceipt.confirmed && escReceipt.completed === false &&
+    escalate.state.stories[0].text === CASE_ESCALATE_AUDIT &&
+    !escalate.state.calls.some(c => c.method === 'PUT'));
+  const malformed = mockCase(fpNotes, { invalidStoryHistory: true });
+  let missingHistory = false;
+  try { await applyVerifiedCaseDisposition(malformed.request, gid, 'disposition-clear'); }
+  catch { missingHistory = true; }
+  check('failed audit-history scan cannot produce an unverified task completion',
+    missingHistory && !malformed.state.calls.some(c => c.method === 'PUT'));
+
+  const ambiguous = mockCase(fpNotes, { failWrite: true });
+  let uncertain = false;
+  try { await applyVerifiedCaseDisposition(ambiguous.request, gid, 'disposition-clear'); }
+  catch { uncertain = true; }
+  check('lost disposition-comment response cannot be replayed or clear case automatically',
+    uncertain && !ambiguous.state.calls.some(c => c.method === 'PUT') &&
+    ambiguous.state.calls.filter(c => c.method === 'POST').length === 1);
+  check('audit read-back helper confirms exact matching evidence only',
+    await verifyScreeningCaseAuditStory(good.request, gid, CASE_FALSE_POSITIVE_AUDIT) &&
+    !(await verifyScreeningCaseAuditStory(good.request, gid, CASE_ESCALATE_AUDIT)));
+}
 
 /* ── card body ── */
 const html = caseHtml(KEY, subj(), 'https://example/run');
@@ -219,13 +528,74 @@ check('digest: worldwide posture states the matrix size, rotation cycle and glob
     && world.includes('every edition swept within 22 run(s)')
     && world.includes('GDELT global index + Bing News on every subject, every run');
 })());
-check('digest: a clean day is affirmative, never silent', (() => {
-  const clean = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
-  return clean.includes('every subject screened clean') && !clean.includes('DEGRADED');
+check('digest: zero NEW matches never clears nine STANDING AML/PEP findings', (() => {
+  const standing = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0,
+    matchCount: 9, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
+  return standing.includes('9 standing match(es) remain') &&
+    standing.includes('ongoing MLRO review') &&
+    !standing.includes('every subject screened clean') &&
+    !standing.includes('all-clear');
+})());
+check('digest: genuinely zero new/standing matches remains explicit but never promises clearance', (() => {
+  const zero = buildResultsDigestHtml({ ...RESULTS, alerts: [], newMatches: 0,
+    matchCount: 0, clearedCount: 0, degraded: false, failures: [], enrichment: {} });
+  return zero.includes('No new or changed matches reported') &&
+    zero.includes('not an all-clear') && !zero.includes('every subject screened clean') &&
+    !zero.includes('DEGRADED');
+})());
+check('digest: absent match counts never masquerade as all-clear', (() => {
+  const noCount = { ...RESULTS, alerts: [], newMatches: 0 };
+  delete noCount.matchCount;
+  return buildResultsDigestHtml(noCount).includes('not an all-clear');
 })());
 check('digest title states the outcome and volume',
   resultsDigestTitle(RESULTS) === '🛡️ Sanctions Screen — ' + TODAY + ' — 1 new match(es) · 778 screened'
   && resultsDigestTitle({ ...RESULTS, newMatches: 0 }).includes('no new matches'));
+
+/* The 14 Oct live case ledger had 210 open cases; a fixed first-60 scan
+   could indefinitely miss human MLRO dispositions on 150 cases. */
+{
+  const ledger = Array.from({ length: 210 }, (_, i) => [
+    'case-' + String(i).padStart(4, '0'),
+    { taskGid: String(1210000000000000 + i), cleared: false }
+  ]);
+  const allToday = selectDispositionReadBatch(ledger, '2026-10-14');
+  check('default MLRO disposition read covers all 210 currently open cases in one run',
+    DEFAULT_CASE_DISPOSITION_READ_CAP >= 210 &&
+    allToday.total === 210 && allToday.selected.length === 210 &&
+    allToday.deferred === 0 &&
+    new Set(allToday.selected.map(entry => entry[0])).size === 210);
+  const bounded = selectDispositionReadBatch(ledger, '2026-10-14', 60);
+  check('explicit lower Asana read budget never silently claims all cases were scanned',
+    bounded.selected.length === 60 && bounded.deferred === 150);
+  const repeated = selectDispositionReadBatch(ledger, '2026-10-14', 60);
+  check('same-day MLRO read batch is deterministic and retry-safe',
+    JSON.stringify(bounded.selected) === JSON.stringify(repeated.selected));
+  const observed = new Set();
+  for (let day = 0; day < 4; day++) {
+    const selected = selectDispositionReadBatch(ledger,
+      addDays('2026-10-14', day), 60).selected;
+    for (const [key] of selected) observed.add(key);
+  }
+  check('over the next four UTC days the bounded 60-case scan reaches all 210 cases',
+    observed.size === 210);
+  const closed = [
+    ['closed', { taskGid: '111', cleared: true }],
+    ['escalated', { taskGid: '222', escalated: true }],
+    ['dispositioned', { taskGid: '333', disposition: { kind: 'false-positive' } }],
+    ['missing', { cleared: false }],
+    ['open', { taskGid: '444', cleared: false }]
+  ];
+  const active = selectDispositionReadBatch(closed, '2026-10-14');
+  check('disposition scanner never re-enters completed, escalated or phantom cases',
+    active.total === 1 && active.selected[0][0] === 'open');
+  let refusedCap = false, refusedDate = false;
+  try { selectDispositionReadBatch(ledger, '2026-10-14', MAX_CASE_DISPOSITION_READ_CAP + 1); }
+  catch { refusedCap = true; }
+  try { selectDispositionReadBatch(ledger, '2026-02-30', 60); }
+  catch { refusedDate = true; }
+  check('invalid read budgets and impossible calendar dates fail closed', refusedCap && refusedDate);
+}
 
 /* ── Disposition read-back (analyst feedback loop) ── */
 check('parseDisposition: untouched template parses as null (no false trigger)',
@@ -254,9 +624,9 @@ check('planner: whitelistedOnly subject opens NO case',
   planCaseActions({ k1: _s({ whitelistedOnly: true }) }, {}, TODAY).length === 0);
 check('planner: whitelistedOnly does not re-open a cleared case',
   planCaseActions({ k1: _s({ whitelistedOnly: true }) }, { k1: { taskGid: 't', cleared: true, clearedAt: '2026-07-01' } }, TODAY).length === 0);
-check('planner: whitelistedOnly closes an OPEN case with the registry reason',
-  (() => { const a = planCaseActions({ k1: _s({ whitelistedOnly: true }) }, { k1: { taskGid: 't', cleared: false } }, TODAY);
-    return a.length === 1 && a[0].type === 'clear' && a[0].reason === 'whitelist'; })());
+check('planner: whitelistedOnly keeps an OPEN case until human disposition',
+  (() => { const a = planCaseActions({ k1: _s({ whitelistedOnly: true }) }, { k1: { taskGid: 't', cleared: false } }, TODAY, { allowAutoClear: true });
+    return a.length === 0; })());
 check('planner: an escalated case is never auto-cleared — not by absence…',
   planCaseActions({}, { k1: { taskGid: 't', cleared: false, escalated: true } }, TODAY).length === 0);
 check('planner: …and not by the whitelist either',

@@ -56,6 +56,16 @@ ISO2_TO_JURISDICTION = {
     "VE": "venezuela", "VN": "vietnam", "YE": "yemen",
     "IR": "islamic republic of iran", "KP": "north korea", "MM": "myanmar",
 }
+# ISO 3166-1 alpha-3 codes for the same jurisdictions. A register or feed that
+# records "IRN" instead of "IR" missed the table: an Iranian originator raised
+# no HIGH_RISK_GEO. test/engine_test.py fails if an alpha-2 code above has none.
+ISO3_TO_ISO2 = {
+    "AGO": "AO", "BOL": "BO", "BIH": "BA", "VGB": "VG", "BGR": "BG", "CMR": "CM",
+    "CIV": "CI", "COD": "CD", "HTI": "HT", "IRQ": "IQ", "KEN": "KE", "KWT": "KW",
+    "LAO": "LA", "LBN": "LB", "MCO": "MC", "NPL": "NP", "PNG": "PG", "SSD": "SS",
+    "SYR": "SY", "VEN": "VE", "VNM": "VN", "YEM": "YE", "IRN": "IR", "PRK": "KP",
+    "MMR": "MM",
+}
 
 # Party roles. ORIGINATOR / BENEFICIARY are the R.16 mandatory pair.
 ORIGINATOR, BENEFICIARY = "originator", "beneficiary"
@@ -100,9 +110,17 @@ def bic_country(bic):
 
 def _party(role, name="", bic="", country="", source=""):
     bic = _clean(bic).upper()
-    country = _clean(country).upper()[:2] or bic_country(bic)
-    return {"role": role, "name": _clean(name), "bic": bic, "country": country,
-            "source": source}
+    raw = _clean(country)
+    # Only a 2-letter value is an ISO code. Truncating a name to its first two
+    # letters turned "Myanmar" into MY (Malaysia) and "North Korea" into NO
+    # (Norway), so call-for-action jurisdictions screened as NO MATCH. A name
+    # is kept as country_name, which _jurisdiction_tier resolves.
+    iso = raw.upper() if len(raw) == 2 and raw.isalpha() else ""
+    party = {"role": role, "name": _clean(name), "bic": bic,
+             "country": iso or bic_country(bic), "source": source}
+    if raw and not iso:
+        party["country_name"] = raw
+    return party
 
 
 # ── SWIFT MT103 ───────────────────────────────────────────────────────────────
@@ -280,7 +298,7 @@ def payment_from_feed(txn, xml_parser=None):
                 party["country_name"] = _clean(p["country_name"])
             parties.append(party)
     if not parties and (txn.get("counterparty") or txn.get("customer")):
-        inbound = str(txn.get("direction", "")).lower() == "in"
+        inbound = canonical_direction(txn.get("direction")) == "in"
         cust = _party(BENEFICIARY if inbound else ORIGINATOR, txn.get("customer", ""),
                       source="feed.customer")
         cpty = _party(ORIGINATOR if inbound else BENEFICIARY, txn.get("counterparty", ""),
@@ -296,6 +314,22 @@ def payment_from_feed(txn, xml_parser=None):
              "amount": txn.get("amount"), "parties": parties,
              "remittance": [_clean(rem)] if rem else [],
              "permalink": _clean(txn.get("permalink")), "customer": _clean(txn.get("customer"))}]
+
+
+_DIRECTION_SYNONYMS = {
+    "in": "in", "inbound": "in", "incoming": "in", "inward": "in", "received": "in",
+    "receipt": "in", "credit": "in", "cr": "in",
+    "out": "out", "outbound": "out", "outgoing": "out", "outward": "out", "sent": "out",
+    "paid": "out", "payment out": "out", "debit": "out", "dr": "out",
+}
+
+
+def canonical_direction(raw):
+    """'in' or 'out' for a recorded direction label ("Incoming", "IN (received)",
+    "Outward"), else "" — an unknown label is never guessed into a side."""
+    s = re.sub(r"\([^)]*\)", " ", str(raw or "")).lower()
+    s = " ".join(re.sub(r"[^a-z ]", " ", s).split())
+    return _DIRECTION_SYNONYMS.get(s, "")
 
 
 # ── ASANA "PAYMENTS REGISTER" ────────────────────────────────────────────────
@@ -348,6 +382,18 @@ def _yes_no(v):
     return None
 
 
+# An AED amount: digits with optional thousands commas (1,234,567 or the Indian
+# 12,34,567) and at most two decimals. "60.000,00" (a decimal comma) used to
+# read as 60, and "60.000" as 60 — a 1,000x understatement that cleared the
+# DPMSR threshold silently. Anything else is unreadable and alerts.
+_AMOUNT_RE = re.compile(r"-?(?:\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3}|\d+)(?:\.\d{1,2})?")
+
+
+def _amount(v):
+    s = str(v if v is not None else "").strip()
+    return float(s.replace(",", "")) if _AMOUNT_RE.fullmatch(s) else None
+
+
 def _first_num(v):
     m = re.search(r"\d[\d,]*(?:\.\d+)?", str(v or ""))
     return _num(m.group(0)) if m else None
@@ -363,6 +409,9 @@ REGISTER_MONITORING_FIELDS = (
     "Corporate paid from personal account (yes/no)", "Source of funds verified (yes/no)",
     "Payment completed (yes/no)", "Delivery confirmed (yes/no)",
     "Invoice mismatch (yes/no)", "Route mismatch (yes/no)",
+    "Gold trade (yes/no)", "Gold origin verified (yes/no)",
+    "Gold route changed after contract (yes/no)",
+    "Gold planned route (ISO2 comma separated)", "Gold actual route (ISO2 comma separated)",
     "Funding account", "Refund account", "Refund reason documented (yes/no)",
     "Red flags (codes, e.g. ML-11, TF-07)",
 )
@@ -387,10 +436,20 @@ def _register_monitoring_fields(fields):
                       ("delivery confirmed", "delivery_confirmed"),
                       ("invoice mismatch", "invoice_mismatch"),
                       ("route mismatch", "route_mismatch"),
+                      ("gold trade", "gold_trade"),
+                      ("gold origin verified", "gold_origin_verified"),
+                      ("gold route changed after contract", "gold_route_changed_after_contract"),
                       ("refund reason documented", "refund_reason_documented")):
         b = _yes_no(fields.get(key))
         if b is not None:
             out[dest] = b
+    for label, dest in (("gold planned route", "gold_route_planned"),
+                        ("gold actual route", "gold_route_actual")):
+        raw = fields.get(label)
+        if raw:
+            # Never infer a route; leave malformed codes intact for the
+            # transaction rule to flag as a processing error.
+            out[dest] = [token.strip().upper() for token in raw.split(",") if token.strip()]
     if "delivery_confirmed" in out:
         out["goods_transaction"] = True   # a delivery line means a goods trade
     for key, dest in (("third party relationship", "third_party_relationship"),
@@ -450,19 +509,22 @@ def parse_register_entry(name, notes):
                 party["name"] = val
             if len(ctry) == 2 and ctry.isalpha():
                 party["country"] = ctry.upper()
+            elif ctry.upper() in ISO3_TO_ISO2:
+                party["country"] = ISO3_TO_ISO2[ctry.upper()]
             elif ctry:
                 party["country_name"] = ctry
             out_parties.append(party)
     rec = {"transaction_id": _clean(name), "parties": out_parties,
            "date": fields.get("date", ""), "currency": fields.get("currency", "").upper(),
-           "direction": fields.get("direction", "").lower(),
+           "direction": (canonical_direction(fields.get("direction"))
+                         or fields.get("direction", "").lower()),
            "method": fields.get("method", "").lower(),
            "customer": fields.get("customer", ""),
            "remittance_info": fields.get("reference", "")}
-    amount = _num(fields.get("amount"))
+    amount = _amount(fields.get("amount"))
     if amount is not None:
         rec["amount"] = amount
-    emv = _num(fields.get("expected monthly volume"))
+    emv = _amount(fields.get("expected monthly volume"))
     if emv:
         rec["expected_monthly_volume"] = emv
     rec.update(_register_monitoring_fields(fields))

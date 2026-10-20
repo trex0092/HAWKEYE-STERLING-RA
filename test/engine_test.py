@@ -29,6 +29,9 @@ _req.get = lambda *a, **k: None; _req.post = lambda *a, **k: None
 sys.modules["requests"] = _req
 os.environ.setdefault("ASANA_TOKEN", "dummy")
 os.environ.pop("ANTHROPIC_API_KEY", None)
+# No test may write the AI triage cache into the working tree's data/.
+import tempfile as _tf_cache
+os.environ["AI_TRIAGE_CACHE_PATH"] = os.path.join(_tf_cache.mkdtemp(), "ai-triage-cache.json")
 
 def _load(name):
     spec = importlib.util.spec_from_file_location(name, os.path.join(ROOT, name + ".py"))
@@ -99,6 +102,59 @@ _pm_e, _clr_e = screen.screen_customers(
     [{"name": "Clean Trading DMCC", "individuals": [], "entity_owners": ["Rosneft Holding LLC"], "permalink": "x"}], _ec)
 check("a designated corporate owner flags the customer by control linkage",
       len(_pm_e) == 1 and any(h["subject_type"].startswith("ENTITY (owner)") and h["control_linkage"] for h in _pm_e[0]["hits"]))
+
+# Asana task pagination must never silently stop before all source pages arrive.
+for _label, _page, _expected in [
+    ("malformed collection", {"data": None}, "malformed"),
+    ("missing continuation cursor", {"data": [], "next_page": {}}, "continuation cursor"),
+    ("repeated continuation cursor", {"data": [], "next_page": {"offset": "page-2"}},
+     "continuation cursor"),
+    ("wrong continuation type", {"data": [], "next_page": "unexpected"}, "pagination"),
+]:
+    try:
+        screen._verified_asana_page(_page, {"page-2"}, "employee")
+        _rejected = False
+    except RuntimeError as _err:
+        _rejected = _expected in str(_err)
+    check("Asana employee pagination rejects " + _label, _rejected)
+check("well-formed last page completes only after verified task list",
+      screen._verified_asana_page({"data": [], "next_page": None}, set(), "customer") is None)
+check("well-formed next page continues source population read",
+      screen._verified_asana_page({"data": [], "next_page": {"offset": "page-3"}},
+                                  set(), "customer") == "page-3")
+
+# HR screening: source tasks are natural persons, never an extra company,
+# nor a corporate ownership/control link to their employer.
+_staff = {"name": "Maria Santos", "kind": "employee", "individuals": ["Maria Santos"],
+          "entity_owners": [], "permalink": "hr"}
+_firm = {"name": "Acme Trading LLC", "individuals": ["John Owner"],
+         "entity_owners": ["Parent Holding Ltd"], "permalink": "customer"}
+_hr_slots = screen.build_screening_subjects([_staff, _firm])
+check("HR staff produces one individual slot and no company slot",
+      sum(t == "INDIVIDUAL" and n == "Maria Santos" for t, n, _, _ in _hr_slots) == 1
+      and not any(t == "COMPANY" and n == "Maria Santos" for t, n, _, _ in _hr_slots))
+check("customer entity, director and corporate owner remain screenable",
+      {t for t, n, _, row in _hr_slots if row is _firm}
+      == {"COMPANY", "INDIVIDUAL", "ENTITY (owner)"})
+check("HR task name remains screenable when parsed names are absent",
+      screen.screening_individuals({**_staff, "individuals": []}) == ["Maria Santos"])
+try:
+    screen.screening_individuals({**_staff, "name": "", "individuals": []})
+    _missing_hr_rejected = False
+except ValueError:
+    _missing_hr_rejected = True
+check("blank HR name fails closed rather than disappearing", _missing_hr_rejected)
+_staff_lists = {"OFAC SDN": [(screen.normalize("MARIA SANTOS"), "MARIA SANTOS")]}
+_staff_hits, _staff_clear = screen.screen_customers([_staff], _staff_lists)
+check("designated employee flags an individual without corporate-control linkage",
+      len(_staff_hits) == 1 and len(_staff_hits[0]["hits"]) > 0
+      and all(h["subject_type"] == "INDIVIDUAL" and not h["control_linkage"]
+              for h in _staff_hits[0]["hits"]))
+_company_hits, _company_clear = screen.screen_customers(
+    [_firm], {"OFAC SDN": [(screen.normalize("PARENT HOLDING LTD"), "PARENT HOLDING LTD")]})
+check("customer corporate-owner sanctions match retains control linkage",
+      len(_company_hits) == 1 and any(h["subject_type"] == "ENTITY (owner)"
+      and h["control_linkage"] for h in _company_hits[0]["hits"]))
 
 # ── full-screening audit regressions: extraction & the unscreenable net ───────
 print("screen.py — extraction & unscreenable-net regressions")
@@ -741,6 +797,73 @@ try:
 finally:
     ai.LLM_TRIAGE, ai.llm_complete = _saved_triage
 
+# ── ai.py: triage verdict cache (cost control, never a coverage change) ──────
+print("ai.py — triage cache + credit-limit stop-loss")
+import tempfile as _tf
+_cache_dir = _tf.mkdtemp()
+_saved_cache = (ai.LLM_TRIAGE, ai.llm_complete, ai.AI_TRIAGE_CACHE_PATH, dict(ai._TRIAGE_CACHE),
+                ai.LLM_CALLS.get("cached", 0))
+try:
+    ai.LLM_TRIAGE = True
+    ai.AI_TRIAGE_CACHE_PATH = os.path.join(_cache_dir, "ai-triage-cache.json")
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    _calls = []
+    def _fake_llm(*a, **k):
+        _calls.append(1)
+        return '{"is_about_subject": true, "is_adverse": true, "severity": "LOW"}'
+    ai.llm_complete = _fake_llm
+    _art = {"title": "Cacheco gold smuggling probe", "source": "x", "date": "2026-10-01",
+            "categories": ["Fraud / Financial Crime"]}
+    _t1 = ai.triage_adverse("Cacheco", _art)
+    _t2 = ai.triage_adverse("Cacheco", dict(_art))
+    check("an identical headline is sent to the model once, then served from cache",
+          len(_calls) == 1 and _t1 == _t2 and _t2["ai"] is True)
+    _t3 = ai.triage_adverse("Othercorp", dict(_art))
+    check("a different subject is a different cache key (model asked again)", len(_calls) == 2)
+    _floor = ai.triage_adverse("Cacheco", dict(_art, categories=["Terrorism / CFT"]))
+    check("a cached LOW verdict never lowers this run's deterministic floor",
+          len(_calls) == 2 and _floor["severity"] == "CRITICAL")
+    ai.save_triage_cache()
+    _raw = open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8").read()
+    check("the persisted cache holds hashes and verdicts only (no names or headlines)",
+          "Cacheco" not in _raw and "smuggling" not in _raw and '"entries"' in _raw)
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    ai.triage_adverse("Cacheco", dict(_art))
+    check("a fresh run reloads the cache from disk", len(_calls) == 2)
+    _old = json.load(open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8"))
+    for _v in _old["entries"].values():
+        _v["d"] = "2000-01-01"
+    json.dump(_old, open(ai.AI_TRIAGE_CACHE_PATH, "w", encoding="utf-8"))
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=True)
+    ai._triage_cache_get("missing")  # forces the load
+    ai.save_triage_cache()
+    check("entries unused past AI_TRIAGE_CACHE_DAYS are pruned on save",
+          json.load(open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8"))["entries"] == {})
+    open(ai.AI_TRIAGE_CACHE_PATH, "w").write("{not json")
+    ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
+    ai.triage_adverse("Cacheco", dict(_art))
+    check("an unreadable cache starts empty and the model is still asked", len(_calls) == 3)
+finally:
+    (ai.LLM_TRIAGE, ai.llm_complete, ai.AI_TRIAGE_CACHE_PATH) = _saved_cache[:3]
+    ai._TRIAGE_CACHE.clear(); ai._TRIAGE_CACHE.update(_saved_cache[3])
+    ai.LLM_CALLS["cached"] = _saved_cache[4]
+
+class _Reply:
+    def __init__(self, code, text=""):
+        self.status_code, self.text = code, text
+    def json(self):
+        return {}
+check("a credit-balance 400 is a final refusal",
+      ai._llm_refusal_is_final(_Reply(400, '{"error":{"message":"Your credit balance is too low"}}')))
+check("a usage-limit 400 is a final refusal",
+      ai._llm_refusal_is_final(_Reply(400, "You have reached your specified API usage limits")))
+check("401/403 are final refusals", ai._llm_refusal_is_final(_Reply(401)) and ai._llm_refusal_is_final(_Reply(403)))
+check("a 429 (throttling) is NOT final", not ai._llm_refusal_is_final(_Reply(429, "rate limit")))
+check("a 500/529 is NOT final", not ai._llm_refusal_is_final(_Reply(529, "overloaded")))
+check("an ordinary 400 is NOT final", not ai._llm_refusal_is_final(_Reply(400, "max_tokens too large")))
+check("a billing quota 429 is a final refusal, unlike transient throttling",
+      ai._llm_refusal_is_final(_Reply(429, "Your credit balance is too low")))
+
 # ── ai.py: report stays deterministic even if a key were present ──────────────
 print("ai.py — no generative prose in reports")
 check("generative summaries off by default", ai._llm_in_reports() is False)
@@ -951,6 +1074,25 @@ _iso_names = set(payment_screen.ISO2_TO_JURISDICTION.values())
 _missing_iso = [c for c in _jr.get("grey", []) + _jr.get("high", []) if c.strip().lower() not in _iso_names]
 check("every FATF-listed jurisdiction has an ISO code for payment screening (add it to "
       "ISO2_TO_JURISDICTION): " + ", ".join(_missing_iso), not _missing_iso)
+_missing_iso3 = sorted(set(payment_screen.ISO2_TO_JURISDICTION) - set(payment_screen.ISO3_TO_ISO2.values()))
+check("every listed alpha-2 code has its alpha-3 code (add it to ISO3_TO_ISO2): "
+      + ", ".join(_missing_iso3), not _missing_iso3)
+def _ctry_reg(country):
+    return payment_screen.parse_register_entry("TX-C", (
+        "Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: 30,000\nCurrency: AED\n"
+        f"Direction: in\nMethod: wire\nOriginator: Some Person\nOriginator country: {country}\n"
+        "Beneficiary: Example Trading LLC\nBeneficiary country: AE\n"))
+check("register: an originator country of IRN / PRK / MMR raises HIGH_RISK_GEO like IR / KP / MM",
+      all("HIGH_RISK_GEO" in [a["rule"] for a in txn_monitor.evaluate([_ctry_reg(c)])["alerts"]]
+          for c in ("IRN", "PRK", "MMR")))
+check("register: ISO short names ('Iran, Islamic Republic of') raise HIGH_RISK_GEO",
+      all("HIGH_RISK_GEO" in [a["rule"] for a in txn_monitor.evaluate([_ctry_reg(c)])["alerts"]]
+          for c in ("Iran, Islamic Republic of", "Korea, Democratic People's Republic of")))
+check("counterparty_country 'IRN' on a feed record raises HIGH_RISK_GEO",
+      "HIGH_RISK_GEO" in [a["rule"] for a in txn_monitor.evaluate([{
+          "customer": "A", "date": "2026-10-01", "amount": 30000, "currency": "AED",
+          "direction": "in", "method": "wire", "counterparty": "X",
+          "counterparty_country": "IRN"}])["alerts"]])
 _ps_lists = {"OFAC SDN": [(screen.normalize(n), n) for n in
                           ("ACME GENERAL TRADING LLC", "SEA FALCON SHIPPING COMPANY", "ZED")]}
 _px = screen.safe_xml_fromstring
@@ -1383,6 +1525,10 @@ def _reg_rules(amount, currency):
     return _rules([payment_screen.parse_register_entry("TX-AMT", (
         f"Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: {amount}\nCurrency: {currency}\n"
         "Direction: in\nMethod: cash\nOriginator: Some Person\nBeneficiary: Example Trading LLC\n"))])
+check("register: a decimal-comma amount '60.000,00' or '60.000' is AMOUNT_UNREADABLE, never read as AED 60",
+      all("AMOUNT_UNREADABLE" in _reg_rules(v, "AED") for v in ("60.000,00", "60.000", "60,00", "1,2")))
+check("register: '60,000.00', '60000' and Indian grouping '1,05,000' still raise THRESHOLD",
+      all("THRESHOLD" in _reg_rules(v, "AED") for v in ("60,000.00", "60000", "1,05,000")))
 check("register: a USD cash amount is flagged NON_AED_AMOUNT, never compared to AED thresholds as-is",
       "NON_AED_AMOUNT" in _reg_rules("20000", "USD"))
 check("register: an amount the parser cannot read is AMOUNT_UNREADABLE, never silently dropped",
@@ -1394,6 +1540,73 @@ check("amount rule skips activity records and raw payment messages (no amount fi
       not {"NON_AED_AMOUNT", "AMOUNT_UNREADABLE"} & set(_rules([
           {"customer": "X", "date": "2026-10-01", "activity_only": True},
           {"transaction_id": "M", "payment_message": ":20:X"}])))
+def _dated_cash(dates):
+    return _rules([{"customer": "Acme", "method": "cash", "currency": "AED", "direction": "in",
+                    "amount": 52000, "date": d, "transaction_id": f"T{i}"}
+                   for i, d in enumerate(dates)])
+check("three AED 52,000 cash payments in 3 days with ISO dates raise STRUCTURING, no date alert",
+      "STRUCTURING" in _dated_cash(["2026-10-01", "2026-10-02", "2026-10-03"])
+      and "DATE_UNREADABLE" not in _dated_cash(["2026-10-01", "2026-10-02", "2026-10-03"]))
+check("the same payments dated DD/MM/YYYY are DATE_UNREADABLE, never a silent structuring miss",
+      "DATE_UNREADABLE" in _dated_cash(["01/10/2026", "02/10/2026", "03/10/2026"]))
+check("an undated payment is DATE_UNREADABLE",
+      "DATE_UNREADABLE" in _dated_cash([None]) and "DATE_UNREADABLE" in _dated_cash([""]))
+check("register: 'Date: 01/10/2026' on a Payments Register task is DATE_UNREADABLE",
+      "DATE_UNREADABLE" in _rules([payment_screen.parse_register_entry("TX-D", (
+          "Customer: Gold Buyer LLC\nDate: 01/10/2026\nAmount: 60,000\nCurrency: AED\n"
+          "Direction: in\nMethod: cash\nOriginator: Some Person\nBeneficiary: Example Trading LLC\n"))]))
+check("date rule skips activity records and raw payment messages",
+      "DATE_UNREADABLE" not in _rules([{"customer": "X", "activity_only": True},
+                                       {"transaction_id": "M", "payment_message": ":20:X"}]))
+def _method_pay(method, country=None):
+    t = {"customer": "Acme", "method": method, "currency": "AED", "direction": "in",
+         "amount": 60000, "date": "2026-10-01", "transaction_id": "TM"}
+    if country:
+        t["counterparty_country"] = country
+    return _rules([t])
+check("a 'cash deposit' of AED 60,000 is read as cash and raises THRESHOLD",
+      "THRESHOLD" in _method_pay("cash deposit") and "THRESHOLD" in _method_pay("Cash (AED notes)"))
+check("'bank transfer' / 'SWIFT' / 'TT' of AED 60,000 from Iran raise THRESHOLD",
+      all("THRESHOLD" in _method_pay(m, "Iran") for m in ("bank transfer", "SWIFT", "TT")))
+check("an unrecognised or missing method is METHOD_UNRECOGNISED, never a silent threshold miss",
+      all("METHOD_UNRECOGNISED" in _method_pay(m) for m in ("cheque", "", None)))
+check("canonical cash / wire / gold raise no METHOD_UNRECOGNISED",
+      not any("METHOD_UNRECOGNISED" in _method_pay(m) for m in ("cash", "wire", "gold")))
+check("method rule skips activity records and raw payment messages",
+      "METHOD_UNRECOGNISED" not in _rules([{"customer": "X", "activity_only": True},
+                                           {"transaction_id": "M", "payment_message": ":20:X"}]))
+check("register: 'Method: Cash deposit' on a Payments Register task raises THRESHOLD",
+      "THRESHOLD" in _rules([payment_screen.parse_register_entry("TX-M", (
+          "Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: 60,000\nCurrency: AED\n"
+          "Direction: in\nMethod: Cash deposit\nOriginator: Some Person\nBeneficiary: Example Trading LLC\n"))]))
+def _dir_reg(direction):
+    return payment_screen.parse_register_entry("TX-DIR", (
+        "Customer: Gold Buyer LLC\nDate: 2026-10-01\nAmount: 30,000\nCurrency: AED\n"
+        f"Direction: {direction}\nMethod: wire\nOriginator: Some Person\nOriginator country: IR\n"
+        "Beneficiary: Example Trading LLC\nBeneficiary country: AE\n"))
+check("register: 'Direction: Incoming' takes the Iranian originator as counterparty and raises HIGH_RISK_GEO",
+      all(_dir_reg(d)["direction"] == "in" and _dir_reg(d)["counterparty"] == "Some Person"
+          and "HIGH_RISK_GEO" in _rules([_dir_reg(d)])
+          for d in ("Incoming", "Inbound", "Received", "IN (received)")))
+check("register: 'Direction: Outgoing' is read as out",
+      _dir_reg("Outgoing")["direction"] == "out"
+      and _dir_reg("Outgoing")["counterparty"] == "Example Trading LLC")
+check("an unrecognised or missing direction is DIRECTION_UNRECOGNISED, never a silent miss",
+      "DIRECTION_UNRECOGNISED" in _rules([_dir_reg("sideways")])
+      and "DIRECTION_UNRECOGNISED" in _rules([_dir_reg("")]))
+check("in / out raise no DIRECTION_UNRECOGNISED",
+      not any("DIRECTION_UNRECOGNISED" in _rules([_dir_reg(d)]) for d in ("in", "out")))
+check("direction rule skips activity records and raw payment messages",
+      "DIRECTION_UNRECOGNISED" not in _rules([{"customer": "X", "activity_only": True},
+                                              {"transaction_id": "M", "payment_message": ":20:X"}]))
+check("structuring is caught across case / spacing / dot variants of one customer name",
+      "STRUCTURING" in _rules([{"customer": n, "method": "cash", "currency": "AED", "direction": "in",
+                                "amount": 52000, "date": f"2026-10-0{i + 1}", "transaction_id": f"TS{i}"}
+                               for i, n in enumerate(("Acme LLC", "ACME  LLC ", "Acme L.L.C."))]))
+check("three different customers are still evaluated apart (no STRUCTURING)",
+      "STRUCTURING" not in _rules([{"customer": n, "method": "cash", "currency": "AED", "direction": "in",
+                                    "amount": 52000, "date": f"2026-10-0{i + 1}", "transaction_id": f"TD{i}"}
+                                   for i, n in enumerate(("Acme LLC", "Beta LLC", "Gamma LLC"))]))
 _MT_REG = (":20:REF123\n:32A:261001AED200000,00\n:50K:/1\nACME GOLD TRADING LLC\n"
            ":52A:EBILAEAD\n:57A:HSBCHKHH\n:59:/2\nPEARL METALS LIMITED\n")
 def _msg_rules(msg):
@@ -1414,6 +1627,31 @@ _mr = payment_screen.monitoring_records(
     screen.safe_xml_fromstring)
 check("register: payment messages with no customer are keyed apart, never pooled into one profile",
       len({r["customer"] for r in _mr}) == 2 and not any("payment_message" in r for r in _mr))
+_pc = {c: payment_screen._party("beneficiary", "X", country=c) for c in ("Myanmar", "North Korea", "MM")}
+check("payment party: a country NAME is never truncated into a different ISO code",
+      _pc["Myanmar"]["country"] == "" and _pc["Myanmar"]["country_name"] == "Myanmar"
+      and _pc["North Korea"]["country"] != "NO" and _pc["MM"]["country"] == "MM")
+_jt = kyc.load_jurisdiction_risk()
+_wire = dict(transaction_id="W1", customer="Acme Gold LLC", date="2026-10-01", amount=200000,
+             currency="AED", direction="out", method="wire")
+def _tm_rules(t):
+    return {a["rule"] for a in txn_monitor.evaluate([t], _jt)["alerts"]}
+check("TM: a wire whose foreign party is only in parties[] (ISO code) raises THRESHOLD and HIGH_RISK_GEO",
+      {"THRESHOLD", "HIGH_RISK_GEO"} <= _tm_rules(dict(_wire, parties=[
+          {"role": "originator", "name": "Acme Gold LLC", "country": "AE"},
+          {"role": "beneficiary", "name": "Tehran Bullion Co", "country": "IR"}])))
+check("TM: counterparty_country given as an ISO code still hits the jurisdiction table",
+      "HIGH_RISK_GEO" in _tm_rules(dict(_wire, counterparty="T", counterparty_country="IR")))
+check("TM: a wire between two UAE parties in parties[] is not international",
+      "THRESHOLD" not in _tm_rules(dict(_wire, parties=[
+          {"role": "originator", "name": "Acme Gold LLC", "country": "AE"},
+          {"role": "beneficiary", "name": "Dubai Co", "country": "AE"}])))
+_lm = {"ofac": {"count": 18000, "date": "2026-07-01", "tier": "core"},
+       "un": {"count": 1000, "date": "2026-10-07", "tier": "core"},
+       "uk": {"count": 0, "date": "", "tier": "core"}}
+_dc = screen.degraded_core_lists(_lm, _dt.date(2026, 10, 8))
+check("payment screening treats a stale core list as degraded, not only an empty one",
+      "UK" in _dc and any(x.startswith("OFAC (stale") for x in _dc) and not any(x.startswith("UN") for x in _dc))
 _cl_n, _cl_b = payment_screen.build_tm_daily_report(
     "02 Oct 2026", {"n_payments": 0, "results": [], "errors": []},
     txn_monitor.evaluate([{**_rr[1], "date": "2026-10-01", "amount": 60000, "method": "cash"},
@@ -1607,6 +1845,84 @@ _route = txn_monitor.evaluate([{**_base_txn, "route_mismatch": True}])
 check("TXN surfaces an explicit payment/shipping route mismatch",
       any(a["rule"] == "ROUTE_MISMATCH" for a in _route["alerts"]))
 
+
+# Gold-route alerts require explicit shipment evidence. Neither nationality nor
+# a transit-country code alone is a criminal or PEP indicator.
+_gold_txn = {**_base_txn, "gold_trade": True,
+             "gold_route_planned": ["GH", "AE"],
+             "gold_route_actual": ["GH", "TR", "AE"]}
+_gold_diff = txn_monitor.evaluate([_gold_txn])
+check("GOLD: actual route differs from the documented planned route",
+      any(a["rule"] == "GOLD_ROUTE_DEVIATION" for a in _gold_diff["alerts"]))
+check("GOLD: alerts are human review only, not a filing instruction",
+      any(a["rule"] == "GOLD_ROUTE_DEVIATION" and a["severity"] == "HIGH"
+          for a in _gold_diff["alerts"]))
+_gold_same = txn_monitor.evaluate([{**_gold_txn, "gold_route_actual": ["gh", "ae"]}])
+check("GOLD: ISO2 route case is normalized without a false deviation",
+      not any(a["rule"] == "GOLD_ROUTE_DEVIATION" for a in _gold_same["alerts"]))
+_gold_missing = txn_monitor.evaluate([{**_base_txn, "gold_trade": True,
+                                       "gold_route_planned": ["GH", "AE"]}])
+check("GOLD: absent actual route cannot be presumed divergent",
+      not any(a["rule"] == "GOLD_ROUTE_DEVIATION" for a in _gold_missing["alerts"]))
+_gold_wrong_class = txn_monitor.evaluate([{**_gold_txn, "gold_trade": False,
+                                           "gold_origin_verified": False,
+                                           "gold_route_changed_after_contract": True}])
+check("GOLD: non-gold records do not trigger gold shipment flags",
+      not any(a["rule"].startswith("GOLD_") for a in _gold_wrong_class["alerts"]))
+_gold_change = txn_monitor.evaluate([{**_base_txn, "gold_trade": True,
+                                      "gold_route_changed_after_contract": True}])
+check("GOLD: explicit post-contract change requires review",
+      any(a["rule"] == "GOLD_ROUTE_CHANGE" for a in _gold_change["alerts"]))
+_gold_origin = txn_monitor.evaluate([{**_base_txn, "gold_trade": True,
+                                      "gold_origin_verified": False}])
+check("GOLD: explicitly unverified origin requires KYS review",
+      any(a["rule"] == "GOLD_ORIGIN_UNVERIFIED" for a in _gold_origin["alerts"]))
+_gold_unknown = txn_monitor.evaluate([{**_base_txn, "gold_trade": True}])
+check("GOLD: unknown origin and route are not inferred as factual alerts",
+      not any(a["rule"].startswith("GOLD_") for a in _gold_unknown["alerts"]))
+_gold_bad = txn_monitor.evaluate([{**_gold_txn, "gold_route_actual": ["NOT-ISO2"]},
+                                  _gold_txn])
+check("GOLD: malformed route is surfaced without hiding a valid deviation",
+      any(a["rule"] == "GOLD_ROUTE_UNREADABLE" for a in _gold_bad["alerts"])
+      and any(a["rule"] == "GOLD_ROUTE_DEVIATION" for a in _gold_bad["alerts"]))
+_gold_fields = payment_screen._register_monitoring_fields({
+    "gold trade": "yes", "gold origin verified": "no",
+    "gold planned route": "GH, AE", "gold actual route": "GH, TR, AE",
+    "gold route changed after contract": "yes",
+})
+check("GOLD: Payments Register parses routes and provenance without guessing",
+      _gold_fields["gold_route_planned"] == ["GH", "AE"]
+      and _gold_fields["gold_route_actual"] == ["GH", "TR", "AE"]
+      and _gold_fields["gold_trade"] is True
+      and _gold_fields["gold_origin_verified"] is False
+      and _gold_fields["gold_route_changed_after_contract"] is True)
+_gold_template = payment_screen.parse_register_entry("SYNTHETIC-001", (
+    "Customer: Example Trading\nDate: 2026-10-01\nDirection: out\n"
+    "Amount: 1000\nMethod: wire\nOriginator: Example Trading\nBeneficiary: Example Refiner\n"
+    "Gold trade: yes\nGold origin verified: no\n"
+    "Gold planned route (ISO2 comma separated): GH, AE\n"
+    "Gold actual route (ISO2 comma separated): GH, TR, AE\n"
+    "Gold route changed after contract (yes/no): yes\n"
+))
+check("GOLD: end-to-end register entry retains route and provenance evidence",
+      _gold_template is not None and _gold_template.get("gold_route_planned") == ["GH", "AE"]
+      and _gold_template.get("gold_route_actual") == ["GH", "TR", "AE"]
+      and _gold_template.get("gold_origin_verified") is False)
+
+for _nation, _expected in (("Turkey", "Turkey"), ("Türkiye", "Turkey"),
+                            ("India", "India"), ("Papua New Guinea", "Papua New Guinea")):
+    _warning = kyc.pep_country_qa_advisory(_nation)
+    check("PEP QA: " + _nation + " is a non-scoring coverage reminder",
+          _warning is not None and _warning["jurisdiction"] == _expected
+          and _warning["is_pep_finding"] is False
+          and _warning["risk_score_adjustment"] == 0
+          and _warning["human_review_required"])
+check("PEP QA: substring nationalities do not trigger false country warnings",
+      kyc.pep_country_qa_advisory("Indianapolis") is None
+      and kyc.pep_country_qa_advisory("Papuan community") is None)
+check("PEP QA: selected examples do not contaminate all nationality records",
+      kyc.pep_country_qa_advisory("French") is None)
+
 with open(os.path.join(ROOT, "data", "transaction-monitoring-rules.json"), encoding="utf-8") as _tmr_f:
     _tmr = json.load(_tmr_f)
 _tm_rules = _tmr.get("rules", [])
@@ -1616,7 +1932,8 @@ check("TXN engine rules are represented in the machine-readable registry",
       {r.get("engine_rule") for r in _tm_rules}.issuperset(
           {"THRESHOLD","STRUCTURING","VELOCITY","HIGH_RISK_GEO","PASSTHROUGH","ROUND_AMOUNT",
            "THIRD_PARTY_PAYMENT","REFUND_DIVERSION","PRICING_DEVIATION",
-           "PHANTOM_DELIVERY","INVOICE_MISMATCH","ROUTE_MISMATCH"}))
+           "PHANTOM_DELIVERY","INVOICE_MISMATCH","ROUTE_MISMATCH",
+           "GOLD_ROUTE_DEVIATION","GOLD_ROUTE_CHANGE","GOLD_ORIGIN_UNVERIFIED"}))
 
 # ── monitoring.py: runtime metrics + source-coverage drift ────────────────────
 print("monitoring.py — runtime metrics + coverage drift")
@@ -2756,14 +3073,15 @@ finally:
 # complete coverage over what was left.
 print("screen.py — un-screenable customer rows are attested, not dropped")
 _gac_orig = screen.asana_request
-# Employee screening pulls a SECOND project inside get_all_customers and has its
-# own (correct) fail-closed guard on an empty result; disable it so this block
-# exercises the customer path only.
+# HR screening is mandatory. Mock a valid staff row so customer denominator
+# checks isolate customer rows without disabling the employee source.
 _gac_emp = screen.ASANA_EMPLOYEE_DB_GID
 
 
 def _gac_stub(rows):
-    pages = [{"data": rows}, {"data": []}]
+    pages = [{"data": rows}, {"data": [
+        {"gid": "staff1", "name": "Test Staff", "notes": "",
+         "permalink_url": "https://app.asana.com/0/0/staff1"}]}]
 
     def _req(method, url, **kw):
         body = pages.pop(0) if pages else {"data": []}
@@ -2779,10 +3097,19 @@ _gac_rows = [
 ]
 try:
     screen.ASANA_EMPLOYEE_DB_GID = ""
+    try:
+        screen.get_all_customers()
+        _hr_disabled_rejected = False
+    except RuntimeError as exc:
+        _hr_disabled_rejected = "approved HR Employees" in str(exc)
+    check("Python screening rejects empty HR project instead of skipping staff",
+          _hr_disabled_rejected)
+    screen.ASANA_EMPLOYEE_DB_GID = _gac_emp
     screen.asana_request = _gac_stub(_gac_rows)
     _gac = screen.get_all_customers()
     check("screenable customer rows are still screened",
-          [c["name"] for c in _gac] == ["Alpha Trading LLC", "Beta Metals FZE"])
+          [c["name"] for c in _gac if c.get("kind") != "employee"]
+          == ["Alpha Trading LLC", "Beta Metals FZE"])
     check("a row missing its name is RECORDED, not silently dropped",
           any(r["gid"] == "2" and r["missing"] == "name" for r in screen.CUSTOMER_ROWS_SKIPPED))
     check("a row missing its gid is RECORDED too",
@@ -2790,9 +3117,10 @@ try:
     check("every skipped row carries a permalink so the MLRO can fix the record",
           all(r["permalink"] for r in screen.CUSTOMER_ROWS_SKIPPED))
     # The attestation's denominator must be the WHOLE book, not the survivors.
-    _true_total = len(_gac) + len(screen.CUSTOMER_ROWS_SKIPPED)
-    check("the true denominator exceeds the screened count when rows are skipped",
-          _true_total == 4 and len(_gac) == 2)
+    _screened_customers = sum(c.get("kind") != "employee" for c in _gac)
+    _true_total = _screened_customers + len(screen.CUSTOMER_ROWS_SKIPPED)
+    check("the true denominator exceeds the screened customer count when rows are skipped",
+          _true_total == 4 and _screened_customers == 2)
     _note = screen._skipped_rows_note()
     check("the attestation note names the un-screenable records",
           "https://app.asana.com/0/0/2" in _note and "NOT" in _note)
@@ -2824,9 +3152,7 @@ finally:
 # it claimed "same guards". A staff member whose Asana row lost its name simply
 # vanished: not screened, not counted, not reported.
 #
-# The block above could not have caught it: it sets ASANA_EMPLOYEE_DB_GID = ""
-# to keep the customer path isolated, so the untested path was the broken one.
-# This block drives BOTH projects in one call.
+# Exercise missing employee identities with both approved populations in one call.
 print("screen.py — un-screenable EMPLOYEE rows are attested too, not dropped")
 import re as _re_emp
 _emp_orig = screen.asana_request
@@ -2846,6 +3172,14 @@ def _two_project_stub(customer_rows, employee_rows):
 
 try:
     screen.ASANA_EMPLOYEE_DB_GID = "EMP123"
+    try:
+        screen.get_all_customers()
+        _redirected_hr_rejected = False
+    except RuntimeError as exc:
+        _redirected_hr_rejected = "approved HR Employees" in str(exc)
+    check("Python screening rejects redirected HR project before any Asana fetch",
+          _redirected_hr_rejected)
+    screen.ASANA_EMPLOYEE_DB_GID = _emp_gid
     screen.asana_request = _two_project_stub(
         [{"gid": "1", "name": "Alpha Trading LLC", "notes": "", "permalink_url": "https://app.asana.com/0/0/1"}],
         [
@@ -3076,6 +3410,18 @@ check("un parser captures DOB + nationality for the primary name",
 check("un alias names inherit the designated party's attributes",
       "TESTPARTY ALIASNAME" in _un_a_names
       and "1962-08-08" in screen.match_context_for("TESTPARTY ALIASNAME"))
+_un_orig_xml = ('<CONSOLIDATED_LIST dateGenerated="2026-10-08"><INDIVIDUALS><INDIVIDUAL>'
+                '<FIRST_NAME>TESTPARTY</FIRST_NAME><SECOND_NAME>ORIGSCRIPT</SECOND_NAME>'
+                '<NAME_ORIGINAL_SCRIPT>محمد عبد الله</NAME_ORIGINAL_SCRIPT>'
+                '<NATIONALITY><VALUE>Testland</VALUE></NATIONALITY>'
+                '</INDIVIDUAL></INDIVIDUALS><ENTITIES><ENTITY><FIRST_NAME>TEST ENTITY</FIRST_NAME>'
+                '<NAME_ORIGINAL_SCRIPT> </NAME_ORIGINAL_SCRIPT></ENTITY></ENTITIES></CONSOLIDATED_LIST>').encode("utf-8")
+_un_o_names, _, _ = screen.parse_un(_un_orig_xml)
+check("un parser indexes NAME_ORIGINAL_SCRIPT, so an Arabic-script customer can meet the designation",
+      "محمد عبد الله" in _un_o_names and "TESTPARTY ORIGSCRIPT" in _un_o_names)
+check("the original-script name inherits the party's attributes",
+      "Testland" in screen.match_context_for("محمد عبد الله"))
+check("a blank NAME_ORIGINAL_SCRIPT adds no name", _un_o_names == {"TESTPARTY ORIGSCRIPT", "محمد عبد الله", "TEST ENTITY"})
 _ofac_attrs_csv = ('1234,"OFAC TESTPARTY",individual,PROG,-0-,-0-,-0-,-0-,-0-,-0-,-0-,'
                    '"DOB 08 Aug 1962; POB Somewhere; nationality Testland; alt. DOB 1955"\n'
                    '5678,"PLAIN TESTPARTY",individual,PROG,-0-,-0-,-0-,-0-,-0-,-0-,-0-,-0-\n'
@@ -3763,6 +4109,119 @@ check("kyc: a valid jurisdiction file loads grey/high tiers",
       _jr.get("panama") == "grey" and _jr.get("iran") == "high")
 check("kyc: an alias never resurrects a jurisdiction the file no longer lists",
       "burma" not in _jr and "islamic republic of iran" not in _jr)
+
+print("kyc — public-source country indicators (context only, never scored)")
+import re as _re_ci
+check("kyc: an absent country-indicators file degrades to {} silently",
+      kyc.load_country_indicators(os.path.join(_hdir, "nope.json")) == {})
+_err = _io.StringIO()
+with _ctx.redirect_stderr(_err):
+    _ci_bad = kyc.load_country_indicators(_bad)
+check("kyc: a corrupt country-indicators file degrades to {} AND warns loudly",
+      _ci_bad == {} and "WARN" in _err.getvalue())
+_ci_path = os.path.join(ROOT, "data", "country-indicators.json")
+_ci_doc = json.load(open(_ci_path, encoding="utf-8"))
+_ci = kyc.load_country_indicators(_ci_path)
+check("country indicators: every indicator names its publisher, edition, date and https source",
+      all(v.get("publisher") and v.get("edition") and v.get("published") and v.get("source", "").startswith("https://")
+          for v in _ci_doc["indicators"].values()))
+_app_countries = {c["name"] for c in json.loads(
+    _re_ci.search(r"const COUNTRIES = (\[.*?\]);", open(os.path.join(ROOT, "app.js"), encoding="utf-8").read()).group(1))}
+_ci_entries = (_ci_doc["indicators"]["incsr_major_ml"]["jurisdictions"]
+               + [e for t in _ci_doc["indicators"]["tip_tier"]["tiers"].values() for e in t]
+               + _ci_doc["indicators"]["eu_tax_noncooperative"]["jurisdictions"])
+_ci_unmapped = sorted({e["app"] for e in _ci_entries} - _app_countries)
+check("country indicators: every `app` name is a COUNTRIES name in app.js: " + ", ".join(_ci_unmapped),
+      not _ci_unmapped)
+check("country indicators: no KnowYourCountry or OC Index content is stored",
+      not _re_ci.search(r"knowyourcountry|ocindex", json.dumps(_ci_doc["indicators"]), _re_ci.I))
+check("country indicators: source and app spellings and aliases both resolve (Türkiye / Turkey; Burma / Myanmar)",
+      _ci.get("türkiye") == _ci.get("turkey") and _ci.get("turkey")
+      and any("Tier 3" in x for x in _ci.get("burma", [])) and _ci.get("burma") == _ci.get("myanmar"))
+check("country indicators: Tier 1 and Tier 2 are not shown as context",
+      not any("TIP" in x or "Trafficking" in x for x in _ci.get("united kingdom", [])))
+_ci_lines = kyc.country_indicators_for("Papua New Guinea", ["Russian Federation"], _ci)
+check("country indicators: country and nationality both contribute labelled lines",
+      any(x.startswith("Papua New Guinea: ") and "Tier 3" in x for x in _ci_lines)
+      and any(x.startswith("Russian Federation: ") and "EU tax" in x for x in _ci_lines))
+check("country indicators: a jurisdiction on no list yields no context",
+      kyc.country_indicators_for("Iceland", [], _ci) == [])
+_rr_src = open(os.path.join(ROOT, "ai.py"), encoding="utf-8").read()
+check("country indicators never feed the risk rating (ai.py does not read them)",
+      "country_indicators" not in _rr_src and "country-indicators" not in _rr_src)
+_fe = _ci_doc["indicators"]["fatf_effectiveness"]
+_fe_bad = [e.get("published") for e in _fe["jurisdictions"]
+           if len(e["io"].split()) != 11 or set(e["io"].split()) - {"HE", "SE", "ME", "LE"}
+           or e["high_or_substantial"] != sum(x in ("HE", "SE") for x in e["io"].split())
+           or not _re_ci.match(r"^\d{4}-\d{2}$", e["date"])]
+check("FATF effectiveness: 11 HE/SE/ME/LE ratings per row and the HE+SE count matches: " + ", ".join(map(str, _fe_bad)),
+      not _fe_bad and len(_fe["jurisdictions"]) >= 190)
+_fe_unmapped = sorted({e["app"] for e in _fe["jurisdictions"]} - _app_countries)
+_fe_apps = [e["app"] for e in _fe["jurisdictions"]]
+check("FATF effectiveness: every `app` name is a COUNTRIES name, once: " + ", ".join(_fe_unmapped),
+      not _fe_unmapped and len(_fe_apps) == len(set(_fe_apps)))
+check("FATF effectiveness: carries the CC BY 4.0 citation and the FATF adaptation disclaimer",
+      "CC BY 4.0" in _fe["licence"] and "This is an adaptation of an original work by the Financial Action Task Force" in _fe["licence"])
+check("FATF effectiveness: Türkiye's September 2026 MER (2022 Methodology) supersedes the 2019 one",
+      any(e["app"] == "Turkey" and e["date"] == "2026-09" and e["methodology"] == "2022" for e in _fe["jurisdictions"]))
+
+print("kyc — suggested country score (DRAFT, pending MLRO approval, never scored)")
+check("kyc: an absent suggested-country-score file degrades to {} silently",
+      kyc.load_suggested_country_scores(os.path.join(_hdir, "nope.json")) == {})
+_err = _io.StringIO()
+with _ctx.redirect_stderr(_err):
+    _sc_bad = kyc.load_suggested_country_scores(_bad)
+check("kyc: a corrupt suggested-country-score file degrades to {} AND warns loudly",
+      _sc_bad == {} and "WARN" in _err.getvalue())
+_sc_path = os.path.join(ROOT, "data", "country-score-suggested.json")
+_sc_doc = json.load(open(_sc_path, encoding="utf-8"))
+_sc = kyc.load_suggested_country_scores(_sc_path, _ci_path)
+check("suggested score: one row per COUNTRIES name, each with the current app score",
+      sorted(r["country"] for r in _sc_doc["countries"]) == sorted(_app_countries)
+      and all(r["current"] == c["score"] for c in json.loads(_re_ci.search(r"const COUNTRIES = (\[.*?\]);",
+              open(os.path.join(ROOT, "app.js"), encoding="utf-8").read()).group(1))
+              for r in _sc_doc["countries"] if r["country"] == c["name"]))
+# Re-derive every row from the inputs in Python, so the Node generator and the
+# written method can never drift apart silently.
+_jr = json.load(open(os.path.join(ROOT, "data", "jurisdiction-risk.json"), encoding="utf-8"))
+_fe_by = {e["app"]: e["high_or_substantial"] for e in _fe["jurisdictions"]}
+_inc = {e["app"] for e in _ci_doc["indicators"]["incsr_major_ml"]["jurisdictions"]}
+_tip = {e["app"]: t for t, l in _ci_doc["indicators"]["tip_tier"]["tiers"].items() for e in l}
+_eut = {e["app"] for e in _ci_doc["indicators"]["eu_tax_noncooperative"]["jurisdictions"]}
+
+
+def _sc_expect(name):
+    if name in _jr["high"] or name in _jr["grey"]:
+        return 3
+    if name not in _fe_by:
+        return None
+    n = _fe_by[name]
+    pts = (3 if n <= 1 else 2 if n <= 3 else 1 if n <= 6 else 0) + (2 if name in _inc else 0) \
+        + {"Tier 3": 2, "Tier 2 Watch List": 1}.get(_tip.get(name), 0) + (1 if name in _eut else 0)
+    return 1 if pts <= 2 else 2 if pts <= 5 else 3
+
+
+_sc_wrong = [r["country"] for r in _sc_doc["countries"] if r["suggested"] != _sc_expect(r["country"])]
+check("suggested score: every row matches the written method re-derived in Python: " + ", ".join(_sc_wrong[:10]),
+      not _sc_wrong)
+check("suggested score: every FATF call-for-action or grey-list country is suggested 3",
+      all(_sc[kyc._norm(n)]["suggested"] == 3 for n in _jr["high"] + _jr["grey"]))
+check("suggested score: Turkey 2, India 2, Papua New Guinea 3 (grey list)",
+      _sc["turkey"]["suggested"] == 2 and _sc["india"]["suggested"] == 2
+      and _sc["papua new guinea"]["suggested"] == 3 and _sc["papua new guinea"]["basis"] == "fatf-grey-list")
+check("suggested score: the publisher spelling resolves to the app row (Türkiye / Turkey)",
+      _sc.get("türkiye") is _sc.get("turkey"))
+check("suggested score: a jurisdiction FATF has not rated gets no suggestion and no report line",
+      _sc["greenland"]["suggested"] is None and kyc.suggested_country_score_for("Greenland", [], _sc) == [])
+_sc_lines = kyc.suggested_country_score_for("Turkey", ["India", "Türkiye"], _sc)
+check("suggested score: country and nationality lines show suggested vs current with the reasons, once per country",
+      len(_sc_lines) == 2 and _sc_lines[0].startswith("Turkey: suggested 2 vs current 2 (FATF effectiveness")
+      and _sc_lines[1].startswith("India: suggested 2 vs current 2"))
+check("suggested score: the method is marked DRAFT pending MLRO approval and names no CPI or commercial report input",
+      "DRAFT" in _sc_doc["method"]["status"] and "MLRO" in _sc_doc["method"]["status"]
+      and not _re_ci.search(r"knowyourcountry|ocindex|transparency\.org", json.dumps(_sc_doc), _re_ci.I))
+check("suggested score never feeds the risk rating (ai.py does not read it)",
+      "suggested_country" not in _rr_src and "country-score-suggested" not in _rr_src)
 
 print("screen — EOCN review-age gate (manual-review currency on the TFS list)")
 import datetime as _dt_rev
@@ -4687,20 +5146,88 @@ check("article mentioning the associated entity is identity-corroborated",
 check("name-only article is labelled, NEVER suppressed (still flagged)",
       _ic_arts[1]["identity_corroborated"] is False and _ic_arts[1]["flagged"] is True)
 
-# ── Follow-Ups card attestation (clean day completes, action day stays open) ──
+# Daily report must disclose HR provenance and stale mandatory EOCN review.
+import inspect as _screen_inspect
+_report_source = _screen_inspect.getsource(screen.build_unified_narrative)
+_daily_source = _screen_inspect.getsource(screen.screen_subject_set)
+check("overdue EOCN official review downgrades the report's sanctions header",
+      'if EOCN_REVIEW_ALERT.get("overdue"):' in _report_source
+      and 'DEGRADED (EOCN official review overdue)' in _report_source)
+check("daily report exposes separate customer and completed employee source counts",
+      "Approved source records:" in _report_source
+      and '"customer_records": sum(' in _daily_source
+      and '"employee_records": sum(' in _daily_source)
+check("employees are represented as natural persons in report denominators",
+      "natural-person screening slots, including employees" in _report_source)
+
+# ── Follow-Ups cards always require human attestation, even on zero-new days ──
 print("\nscreen.py — Follow-Ups attestation")
 check("gate is OFF by default (no FOLLOWUP_PROJECT_GID)", screen.FOLLOWUP_PROJECT_GID == "")
-check("clean day → complete", screen.followup_disposition({"sanctions": 0, "adverse": 0, "pep": 0}) == "complete")
-check("any finding → comment only, card stays open",
+check("zero new findings never auto-complete the compliance reminder",
+      screen.followup_disposition({"sanctions": 0, "adverse": 0, "pep": 0}) == "comment")
+check("any new finding still leaves the reminder open",
       screen.followup_disposition({"sanctions": 0, "adverse": 2, "pep": 0}) == "comment"
       and screen.followup_disposition({"sanctions": 1}) == "comment")
-check("missing delta counts as clean (zero findings), never as a block",
-      screen.followup_disposition({}) == "complete" and screen.followup_disposition(None) == "complete")
+check("missing or partial deltas never count as assurance",
+      screen.followup_disposition({}) == "comment"
+      and screen.followup_disposition(None) == "comment")
 _fc = screen.followup_comment_text("2026-08-05", {"sanctions": 1, "adverse": 0, "pep": 0}, "999")
-check("action-day comment demands the human acts and cites the report",
-      "require review" in _fc and "https://app.asana.com/0/0/999" in _fc)
-check("clean-day comment states the auto-completion as the attestation record",
-      "completed automatically" in screen.followup_comment_text("2026-08-05", {}, "999"))
+check("new-finding comment calls for MLRO review and references the report",
+      "require MLRO review" in _fc and "https://app.asana.com/0/0/999" in _fc)
+_fc_zero = screen.followup_comment_text(
+    "2026-08-05", {"sanctions": 0, "adverse": 0, "pep": 0}, "999")
+check("zero new findings never asserts clearance or automatic completion",
+      "not screening clearance" in _fc_zero and "manually" in _fc_zero
+      and "completed automatically" not in _fc_zero)
+check("a missing delta is explicitly UNKNOWN, not zero",
+      "UNKNOWN" in screen.followup_comment_text("2026-08-05", {}, "999"))
+
+# Isolated Asana mock: a checked report must never turn into a task completion,
+# even when there are no new findings. Verify remote story success before
+# logging a completed evidence write.
+_followup_project_before = screen.FOLLOWUP_PROJECT_GID
+_followup_request_before = screen.asana_request
+_followup_log_before = screen.log
+_followup_calls, _followup_logs = [], []
+_followup_story_http = [201]
+class _FollowupMockResponse:
+    def __init__(self, status, data=None):
+        self.status_code = status
+        self._data = data
+    def json(self):
+        return self._data
+def _followup_request(method, url, **kwargs):
+    _followup_calls.append((method, url))
+    if method == "GET":
+        return _FollowupMockResponse(200, {"data": [{
+            "gid": "test-reminder", "notes": "SYSTEM|daily-screening|2026-08-05",
+            "completed": False
+        }]})
+    if method == "POST":
+        return _FollowupMockResponse(_followup_story_http[0], {"data": {"gid": "test-story"}})
+    raise AssertionError("unexpected mutation of human-owned reminder")
+try:
+    screen.FOLLOWUP_PROJECT_GID = "test-project"
+    screen.asana_request = _followup_request
+    screen.log = _followup_logs.append
+    screen.attest_followup_card(
+        "2026-08-05", {"sanctions": 0, "adverse": 0, "pep": 0}, "999")
+    check("Asana zero-finding attestation only reads and comments, never PUTs a completion",
+          [c[0] for c in _followup_calls] == ["GET", "POST"])
+    check("successful remote comment reports open pending human review",
+          any("reminder remains open for human review" in s for s in _followup_logs))
+    _followup_calls.clear()
+    _followup_logs.clear()
+    _followup_story_http[0] = 503
+    screen.attest_followup_card("2026-08-05", {}, "999")
+    check("failed Asana story write does not claim confirmed attestation or complete the reminder",
+          [c[0] for c in _followup_calls] == ["GET", "POST"]
+          and any("not remotely confirmed" in s for s in _followup_logs)
+          and not any("reference posted" in s for s in _followup_logs))
+finally:
+    screen.FOLLOWUP_PROJECT_GID = _followup_project_before
+    screen.asana_request = _followup_request_before
+    screen.log = _followup_log_before
 
 # ── TFS FFR/PNMR draft dossiers (draft-only, MLRO acts) ───────────────────────
 print("\ntfs_dossier.py — FFR/PNMR drafts")
@@ -4916,7 +5443,7 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 ai.AI_ENABLED = True
 
 def _reset_llm():
-    ai._LLM_STATE.update(consecutive_failures=0, open=False)
+    ai._LLM_STATE.update(consecutive_failures=0, open=False, rate_limit_until=0.0)
     for _k in ai.LLM_CALLS:
         ai.LLM_CALLS[_k] = 0
 
@@ -4937,26 +5464,73 @@ check("refused calls count as skipped, never as attempted or failed",
       ai.LLM_CALLS["skipped"] == 4
       and ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER
       and ai.LLM_CALLS["attempted"] == ai.LLM_BREAKER_AFTER)
+check("open circuit skip count is independent of 429 cooldown deferrals",
+      ai.LLM_CALLS["circuit_skipped"] == 4
+      and ai.LLM_CALLS["rate_limited_skipped"] == 0)
 
-# A REPLY IS NOT AN OUTAGE — the rule the concurrent triage pass depends on.
-# The breaker exists to stop paying the 30s timeout; an HTTP reply of any status
-# arrives in milliseconds and costs nothing, so it must not accumulate toward
-# "unreachable". Concurrency earns 429s, and tripping on a burst of them would
-# disable triage for the whole run while saving no time whatsoever.
+# A REPLY IS NOT AN OUTAGE — a rate-limited model must pause, NOT be
+# misclassified as a transport outage. No repeated billed attempts during the
+# cooldown; conservative deterministic triage remains available.
 _reset_llm()
-_req.post = lambda *a, **k: _Resp(429)
+_hits429 = {"n": 0}
+def _rate_limited(*a, **k):
+    _hits429["n"] += 1
+    return _Resp(429)
+_req.post = _rate_limited
 for _ in range(ai.LLM_BREAKER_AFTER * 3):
     ai.llm_complete("x")
-check("a burst of 429s never trips the breaker — throttling is not an outage",
+check("429 throttling does not trip the unreachable circuit",
       not ai.llm_circuit_open())
-check("but those 429s are still counted as failed, for disclosure",
-      ai.LLM_CALLS["failed"] == ai.LLM_BREAKER_AFTER * 3)
+check("429 pauses further API attempts rather than flooding provider",
+      _hits429["n"] == 1 and ai.LLM_CALLS["attempted"] == 1
+      and ai.LLM_CALLS["failed"] == 1
+      and ai.LLM_CALLS["skipped"] == ai.LLM_BREAKER_AFTER * 3 - 1)
+check("429 backoff skips never count as an open circuit",
+      ai.LLM_CALLS["rate_limited_skipped"] == ai.LLM_BREAKER_AFTER * 3 - 1
+      and ai.LLM_CALLS["circuit_skipped"] == 0)
+_prev_triage_mode, ai.LLM_TRIAGE = ai.LLM_TRIAGE, True
+_cooldown_footer = ai.governance_footer()
+check("429 cooldown footer names temporary degradation without a breaker trip",
+      "DEGRADED THIS RUN" in _cooldown_footer
+      and "HTTP 429 rate-limit cooldown" in _cooldown_footer
+      and "AI circuit remained CLOSED" in _cooldown_footer
+      and "AI circuit OPENED" not in _cooldown_footer)
+ai.LLM_TRIAGE = _prev_triage_mode
+# Simulate passage of the advertised retry window without sleeping.
+ai._LLM_STATE["rate_limit_until"] = 0.0
+_req.post = lambda *a, **k: _Resp(200, "recovered")
+check("429 cooldown expires and allows a new model attempt",
+      ai.llm_complete("x") == "recovered" and ai.LLM_CALLS["ok"] == 1)
+check("Retry-After seconds are clamped to prevent unlimited upstream backoff",
+      1 <= ai._llm_cooldown_seconds(_Resp(429)) <= 300)
 _reset_llm()
 _req.post = lambda *a, **k: _Resp(500)
 for _ in range(ai.LLM_BREAKER_AFTER * 2):
     ai.llm_complete("x")
 check("a fast 500 likewise does not trip it (reachable, and cheap)",
       not ai.llm_circuit_open())
+
+# A CREDIT/USAGE-LIMIT refusal is final for the run: stop at the first one
+# rather than repeat it for every article (557 of 557 on 21 Sep 2026).
+_reset_llm()
+_hits = {"n": 0}
+def _capped(*a, **k):
+    _hits["n"] += 1
+    return _Reply(400, '{"type":"error","error":{"type":"invalid_request_error",'
+                       '"message":"Your credit balance is too low to access the Anthropic API."}}')
+_req.post = _capped
+for _ in range(20):
+    ai.llm_complete("x")
+check("a credit-limit refusal opens the circuit after ONE call", ai.llm_circuit_open() and _hits["n"] == 1)
+check("the remaining calls are skipped and disclosed",
+      ai.LLM_CALLS["skipped"] == 19 and ai.LLM_CALLS["failed"] == 1)
+check("a rejected billing key skips through the OPEN circuit, never via 429 pause",
+      ai.LLM_CALLS["circuit_skipped"] == 19 and ai.LLM_CALLS["rate_limited_skipped"] == 0)
+_lt, ai.LLM_TRIAGE = ai.LLM_TRIAGE, True
+check("the footer names the refusal, not an outage",
+      "refused the key" in ai.governance_footer() and "HTTP 400" in ai.governance_footer())
+ai.LLM_TRIAGE = _lt
+ai._LLM_STATE["reason"] = ""
 
 # An INTERMITTENT outage must never trip it: a reply in between re-arms.
 _reset_llm()
@@ -4972,6 +5546,25 @@ for _ in range(30):
 check("an intermittent outage never trips the breaker — a reply re-arms it",
       not ai.llm_circuit_open())
 check("the healthy calls in that run still returned their text", ai.LLM_CALLS["ok"] == 10)
+
+# SPEND MEASUREMENT. Each successful reply's billed `usage` is summed into
+# ai.LLM_USAGE (counts only); a malformed usage field is ignored, never raised.
+_reset_llm()
+for _k in ai.LLM_USAGE:
+    ai.LLM_USAGE[_k] = 0
+class _UsageResp:
+    def __init__(self, usage):
+        self.status_code, self._usage = 200, usage
+    def json(self):
+        return {"content": [{"type": "text", "text": "fine"}], "usage": self._usage}
+_req.post = lambda *a, **k: _UsageResp({"input_tokens": 120, "output_tokens": 30,
+                                        "cache_read_input_tokens": 400, "cache_creation_input_tokens": 0})
+ai.llm_complete("x"); ai.llm_complete("y")
+_req.post = lambda *a, **k: _UsageResp({"input_tokens": "lots", "output_tokens": -5})
+ai.llm_complete("z")
+check("billed tokens are summed per run from each response's usage object",
+      ai.LLM_USAGE == {"input_tokens": 240, "output_tokens": 60,
+                       "cache_read_input_tokens": 800, "cache_creation_input_tokens": 0})
 
 # THREAD SAFETY. The triage pass is now a fan-out, so the counters are shared.
 # `+=` is not atomic and these numbers are reported — an undercount would
@@ -5018,9 +5611,36 @@ def _mon_section(llm_calls):
                       "error_rate": 0.0, "llm_calls": llm_calls},
          "anomalies": [], "baseline": {}}, {})
 
-_mon = _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 12})
+_mon = _mon_section({"attempted": 5, "ok": 0, "failed": 5, "skipped": 12,
+                     "circuit_skipped": 12, "rate_limited_skipped": 0})
 check("the report discloses the open AI circuit and the skipped count",
       "AI circuit OPEN" in _mon and "12 model call(s) skipped" in _mon)
+_cooldown_monitor = _mon_section({"attempted": 1, "ok": 0, "failed": 1, "skipped": 12,
+                                 "circuit_skipped": 0, "rate_limited_skipped": 12})
+check("the report discloses 429 cooldown without falsely claiming an open AI circuit",
+      "LLM rate-limit cooldown (HTTP 429)" in _cooldown_monitor
+      and "12 model call(s) deferred" in _cooldown_monitor
+      and "AI circuit OPEN" not in _cooldown_monitor
+      and "AI circuit remained CLOSED" in _cooldown_monitor)
+_mixed_monitor = _mon_section({"attempted": 6, "ok": 1, "failed": 5, "skipped": 8,
+                               "circuit_skipped": 3, "rate_limited_skipped": 5})
+check("the monitoring report separates mixed circuit and cooldown skips",
+      "3 model call(s) skipped" in _mixed_monitor
+      and "5 model call(s) deferred" in _mixed_monitor
+      and "429 cooldown did not itself trip the circuit" in _mixed_monitor
+      and "AI circuit remained CLOSED" not in _mixed_monitor
+      and "reason unavailable" not in _mixed_monitor)
+_legacy_monitor = _mon_section({"attempted": 2, "ok": 1, "failed": 1, "skipped": 5})
+check("legacy aggregate skips do not get a fabricated circuit-open diagnosis",
+      "5 model call(s) skipped" in _legacy_monitor
+      and "reason unavailable" in _legacy_monitor
+      and "AI circuit OPEN" not in _legacy_monitor)
+check("zero skips do not create artificial monitoring warnings",
+      "LLM rate-limit cooldown" not in _mon_section({
+          "attempted": 2, "ok": 2, "failed": 0, "skipped": 0,
+          "circuit_skipped": 0, "rate_limited_skipped": 0}))
+check("the report shows how many verdicts were reused from the cache",
+      "7 reused from cache" in _mon_section({"attempted": 3, "ok": 3, "failed": 0, "skipped": 0, "cached": 7}))
 check("a run that never tripped the breaker carries no circuit warning",
       "AI circuit OPEN" not in _mon_section({"attempted": 5, "ok": 5, "failed": 0, "skipped": 0}))
 
@@ -5033,6 +5653,34 @@ for _k in ai.LLM_CALLS:
     ai.LLM_CALLS[_k] = 0      # a healthy run starts from fresh counters
 check("and makes no degraded claim on a healthy run",
       "DEGRADED THIS RUN" not in ai.governance_footer())
+
+# ── ai.py: egress PII masking (UAE PDPL data minimisation) ───────────────────
+# Every prompt is masked inside llm_complete itself, so no caller can skip it.
+# Checksums gate the numeric types: a date, an amount or a list reference must
+# reach the model untouched, or triage would be judging mangled evidence.
+print("\nai.py — egress PII masking")
+_red = ai.redact_identifiers(
+    "Mail a.b@example.ae, EID 784-1990-1234567-1, IBAN AE07 0331 2345 6789 0123 456, "
+    "card 4111 1111 1111 1111, call +971 50 123 4567 or 050 123 4567.")
+for _tok in ("[EMAIL]", "[EMIRATES_ID]", "[IBAN]", "[CARD]", "[PHONE]"):
+    check(f"redact_identifiers masks {_tok}", _tok in _red)
+check("no raw identifier survives masking",
+      not any(x in _red for x in ("a.b@example.ae", "1234567-1", "AE07", "4111", "123 4567")))
+_keep = "Gold dealer fined AED 1,250,000 on 2026-10-08; SDN ref 12345; IBAN AE00 1234 5678 9012 3456 789"
+check("dates, amounts, references and checksum-invalid IBANs pass through unchanged",
+      ai.redact_identifiers(_keep) == _keep)
+check("names are never masked (grounded triage needs the subject)",
+      ai.redact_identifiers("Subject: Mohammed Al Hashimi") == "Subject: Mohammed Al Hashimi")
+_reset_llm()
+_sent = {}
+def _capture(*a, **k):
+    _sent.update(k.get("json") or {})
+    return _Resp(200, "ok")
+_req.post = _capture
+ai.llm_complete("Headline: contact fraud@example.com", system="IBAN AE07 0331 2345 6789 0123 456")
+check("llm_complete masks the prompt before it leaves the runner",
+      "fraud@example.com" not in json.dumps(_sent) and "[EMAIL]" in json.dumps(_sent))
+check("llm_complete masks the system prompt too", "[IBAN]" in _sent.get("system", ""))
 
 _req.post, ai.AI_ENABLED, ai.LLM_TRIAGE = _saved
 os.environ.pop("ANTHROPIC_API_KEY", None)
@@ -5823,6 +6471,46 @@ with tempfile.TemporaryDirectory() as d:
           lambda: txn_feed.validate_batch([{**sample[0], "amount": float("nan")}], manifest)))
     check("out-of-window transaction rejected", _txnfeed_error(
           lambda: txn_feed.validate_batch([{**sample[0], "date": "2026-10-02"}], manifest)))
+
+    # JSON parsers usually use the last occurrence of a duplicate key. The
+    # completeness manifest and the AML amount must have a single meaning.
+    dup_feed = raw.replace(b'"amount": 100.0', b'"amount": 0, "amount": 100.0')
+    with open(feed_file, "wb") as f:
+        f.write(dup_feed)
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        json.dump({**manifest, "sha256": hashlib.sha256(dup_feed).hexdigest()}, f)
+    check("duplicate amount key rejected even when the manifest digest matches",
+          dup_feed != raw and _txnfeed_error(
+              lambda: txn_feed.read_validated_feed(feed_file, manifest_file)))
+
+    with open(feed_file, "wb") as f:
+        f.write(raw)
+    ambiguous_manifest = json.dumps(manifest).replace(
+        '"complete": true', '"complete": false, "complete": true')
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        f.write(ambiguous_manifest)
+    check("duplicate manifest complete flag is rejected, regardless of last value",
+          ambiguous_manifest != json.dumps(manifest) and _txnfeed_error(
+              lambda: txn_feed.read_validated_feed(feed_file, manifest_file)))
+
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        json.dump(manifest, f)
+
+    _original_read = txn_feed._json_bytes
+    _manifest_reads = []
+    def _audit_json_read(path, limit):
+        _manifest_reads.append(path)
+        return _original_read(path, limit)
+    try:
+        txn_feed._json_bytes = _audit_json_read
+        _summary = txn_feed.validation_summary(feed_file, manifest_file)
+        check("transaction preflight metadata comes from the single validated manifest snapshot",
+              _manifest_reads == [feed_file, manifest_file]
+              and _summary["sha256"] == manifest["sha256"]
+              and _summary["source_id"] == manifest["source_id"])
+    finally:
+        txn_feed._json_bytes = _original_read
+
     with open(feed_file, "wb") as f:
         f.write(raw + b" ")
     check("tampered raw export rejected by SHA-256 digest", _txnfeed_error(
@@ -5907,6 +6595,29 @@ check("plan lacking independently verified role is held before any tool call",
       agent_plan.run_review_plan(
           _proposed, authorized_tools=set(_handlers),
           tool_handlers=_handlers)["status"] == "HOLD")
+check("malformed human roles are held instead of crashing trusted plan execution",
+      all(agent_plan.run_review_plan(
+          _proposed, verified_role=bad, authorized_tools=set(_handlers),
+          tool_handlers=_handlers)["status"] == "HOLD"
+          for bad in ([], {}, 42, True)))
+check("noncallable and nonfinite timing sources cannot authorize read-only execution",
+      agent_plan.run_review_plan(
+          _proposed, verified_role="Analyst", authorized_tools=set(_handlers),
+          tool_handlers=_handlers, clock="not a clock")["status"] == "HOLD"
+      and agent_plan.run_review_plan(
+          _proposed, verified_role="Analyst", authorized_tools=set(_handlers),
+          tool_handlers=_handlers, clock=lambda: float("nan"))["status"] == "HOLD")
+_backward_time = iter((30.0, 29.0))
+_clock_calls = []
+def _must_not_run(args, state):
+    _clock_calls.append(1)
+    return {"ok": True}
+_clock_out = agent_plan.run_review_plan(
+    _proposed, verified_role="Admin", authorized_tools=set(_handlers),
+    tool_handlers={k: _must_not_run for k in _handlers}, clock=lambda: next(_backward_time))
+check("backwards clock fails closed before invoking any read-only callback",
+      _clock_out["status"] == "DEGRADED" and _clock_calls == [])
+
 check("plan lacking a trusted tool registry is held",
       agent_plan.run_review_plan(
           _proposed, verified_role="Analyst", authorized_tools=set(),
@@ -5954,6 +6665,64 @@ check("oversized tool result degrades instead of silently truncating evidence",
       agent_plan.run_review_plan(
           _retry_plan, verified_role="Admin", authorized_tools={"normalize_name"},
           tool_handlers={"normalize_name": lambda *_: "X" * 10000})["status"] == "DEGRADED")
+import hashlib as _hplan
+_audit_source = {"items": ["original"]}
+def _audit_first(args, state):
+    return _audit_source
+def _audit_second(args, state):
+    _audit_source["items"].append("later mutation")
+    # The next callback can read earlier evidence but must not be able to
+    # mutate the actual stored results by editing nested objects in state.
+    state["first"]["items"].append("unauthorized nested edit")
+    return {"done": True}
+_audit_plan = {**_proposed, "steps": [
+    {"id": "first", "tool": "normalize_name", "args": {"name": "SYNTHETIC"}, "retries": 0},
+    {"id": "second", "tool": "jurisdiction_risk", "args": {"country": "Testland"}, "retries": 0},
+]}
+_audit_out = agent_plan.run_review_plan(
+    _audit_plan, verified_role="Analyst",
+    authorized_tools={"normalize_name", "jurisdiction_risk"},
+    tool_handlers={"normalize_name": _audit_first, "jurisdiction_risk": _audit_second})
+check("read-only agent evidence is snapshotted and isolated against later mutations",
+      _audit_out["status"] == "REVIEW_REQUIRED" and
+      _audit_out["results"]["first"]["items"] == ["original"] and
+      _audit_source["items"] == ["original", "later mutation"])
+_first_hash = _hplan.sha256(json.dumps({"items": ["original"]}, sort_keys=True,
+    ensure_ascii=False, separators=(",", ":")).encode("utf8")).hexdigest()
+check("the audit evidence hash binds the frozen result actually returned",
+      _audit_out["events"][0]["result_sha256"] == _first_hash)
+_mutating_plan = {**_proposed, "steps": [
+    {"id": "first", "tool": "normalize_name", "args": {"name": "SYNTHETIC"}, "retries": 0},
+    {"id": "second", "tool": "jurisdiction_risk", "args": {"country": "Testland"}, "retries": 0},
+]}
+_observed_tools = []
+def _change_later_step(args, state):
+    _observed_tools.append("normalize_name")
+    _mutating_plan["steps"][1]["tool"] = "file_str"
+    _mutating_plan["steps"][1]["args"]["country"] = "Alteredland"
+    return {"ok": True}
+def _read_original_step(args, state):
+    _observed_tools.append("jurisdiction_risk")
+    return {"country": args["country"]}
+_mutating_out = agent_plan.run_review_plan(
+    _mutating_plan, verified_role="Admin",
+    authorized_tools={"normalize_name", "jurisdiction_risk"},
+    tool_handlers={"normalize_name": _change_later_step, "jurisdiction_risk": _read_original_step})
+check("callbacks cannot rewrite already authorized subsequent plan steps",
+      _mutating_out["status"] == "REVIEW_REQUIRED" and
+      _mutating_out["results"]["second"]["country"] == "Testland" and
+      _observed_tools == ["normalize_name", "jurisdiction_risk"])
+check("read-only agent rejects nonfinite JSON evidence, never clears",
+      agent_plan.run_review_plan(
+          _retry_plan, verified_role="Admin", authorized_tools={"normalize_name"},
+          tool_handlers={"normalize_name": lambda *_: {"score": float("nan")}})["status"] == "DEGRADED")
+check("read-only agent enforces a cumulative evidence budget across steps",
+      agent_plan.run_review_plan(
+          {**_proposed, "steps": [
+              {"id": "e" + str(i), "tool": "normalize_name",
+               "args": {"name": "SYNTHETIC"}, "retries": 0} for i in range(6)]},
+          verified_role="Admin", authorized_tools={"normalize_name"},
+          tool_handlers={"normalize_name": lambda *_: {"data": "x" * 7000}})["status"] == "DEGRADED")
 
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

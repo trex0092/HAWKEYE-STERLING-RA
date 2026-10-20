@@ -29,6 +29,7 @@ import os, re, json, math, datetime
 from collections import defaultdict
 
 import txn_feed  # stdlib-only validation; never fetches or stores customer data
+import payment_screen  # stdlib-only; label and country-code tables
 
 CASH_REPORT_THRESHOLD = float(os.environ.get("DPMS_CASH_THRESHOLD", "55000"))
 CDD_TRIGGER_THRESHOLD = float(os.environ.get("CDD_TRIGGER_THRESHOLD", "15000"))
@@ -395,6 +396,71 @@ def rule_route_mismatch(txns):
             for t in txns if t.get("route_mismatch") is True]
 
 
+
+def _gold_route_countries(value):
+    """Validate a recorded, ordered route of ISO 3166-1 alpha-2 codes.
+
+    Do not infer the journey from counterparties or payment messages. An
+    invalid explicit route is a RULE ERROR, not a silent no-discrepancy.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list) or len(value) > 32:
+        raise ValueError("gold route must be a list of at most 32 ISO2 country codes")
+    countries = []
+    for item in value:
+        if not isinstance(item, str) or not re.fullmatch(r"[A-Za-z]{2}", item):
+            raise ValueError("gold route contains an invalid ISO2 country code")
+        countries.append(item.upper())
+    return tuple(countries)
+
+
+def rule_gold_route_deviation(txns):
+    """Alert on documented-vs-observed gold transit discrepancies.
+
+    Requires explicit gold_trade=True plus BOTH ordered routes; a missing
+    route must not manufacture a mismatch or imply a clean supply chain.
+    Any difference is a review trigger only, not evidence of illicit gold.
+    """
+    out = []
+    for t in txns:
+        if t.get("gold_trade") is not True:
+            continue
+        try:
+            planned = _gold_route_countries(t.get("gold_route_planned"))
+            actual = _gold_route_countries(t.get("gold_route_actual"))
+        except ValueError:
+            # One malformed route must not hide legitimate findings on the
+            # customer's other payments. Report processing failure as review.
+            out.append(_alert("GOLD_ROUTE_UNREADABLE", "HIGH", t,
+                "gold route fields malformed; manually verify source and "
+                "destination against approved transport evidence"))
+            continue
+        if planned and actual and planned != actual:
+            out.append(_alert("GOLD_ROUTE_DEVIATION", "HIGH", t,
+                "recorded gold route differs from the documented planned route; "
+                "review chain of custody, transport and commercial rationale"))
+    return out
+
+
+def rule_gold_route_change(txns):
+    """Post-contract route or consignee change, explicitly documented as true."""
+    return [_alert("GOLD_ROUTE_CHANGE", "HIGH", t,
+            "gold shipment route/consignee changed after contract; "
+            "verify amendment, carrier and chain-of-custody evidence")
+            for t in txns if t.get("gold_trade") is True
+            and t.get("gold_route_changed_after_contract") is True]
+
+
+def rule_gold_origin_unverified(txns):
+    """Gold origin explicitly recorded unverified, never inferred from missing."""
+    return [_alert("GOLD_ORIGIN_UNVERIFIED", "HIGH", t,
+            "gold origin verification explicitly failed or remains unverified; "
+            "obtain mine/refinery traceability evidence and escalate for KYS review")
+            for t in txns if t.get("gold_trade") is True
+            and t.get("gold_origin_verified") is False]
+
+
 def rule_profile_deviation(txns):
     """Activity inconsistent with the customer's declared profile: a calendar
     month's total above PROFILE_DEVIATION_FACTOR × the declared expected monthly
@@ -623,6 +689,50 @@ def rule_amount_not_comparable(txns):
     return out
 
 
+def rule_date_unreadable(txns):
+    """A payment whose date the time-window rules cannot read. STRUCTURING,
+    LINKED_THRESHOLD, VELOCITY, rapid pass-through, circular flow, funnel and
+    rapid resale silently skip a record without an ISO date, so three AED
+    52,000 cash payments in three days dated "01/10/2026" raised no
+    STRUCTURING at all. The date is never guessed (day/month order is
+    ambiguous); the payment is flagged so the MLRO sees what was not
+    evaluated. Activity records and raw payment messages are not judged."""
+    return [_alert("DATE_UNREADABLE", "HIGH", t,
+            f"date {str(t.get('date') or '').strip() or 'not recorded'!r} is not YYYY-MM-DD — "
+            "structuring, linked-threshold, velocity and other time-window rules could not "
+            "evaluate this payment; record the date as YYYY-MM-DD")
+            for t in txns
+            if not (t.get("activity_only") or t.get("payment_message")) and not _d(t.get("date"))]
+
+
+def rule_direction_unrecognised(txns):
+    """A payment whose direction is missing or is not a known label for in or
+    out. Pass-through, round-trip and funnel rules key on the direction, and the
+    register picks the counterparty (whose country the geography rules read)
+    by it. Activity records and raw payment messages are not judged."""
+    return [_alert("DIRECTION_UNRECOGNISED", "HIGH", t,
+            f"direction {str(t.get('direction') or '').strip() or 'not recorded'!r} is not in or "
+            "out — pass-through, round-trip and funnel rules could not evaluate this payment and "
+            "the counterparty may be the wrong party; record Direction: in | out")
+            for t in txns
+            if not (t.get("activity_only") or t.get("payment_message"))
+            and _norm(t.get("direction")) not in ("in", "out")]
+
+
+def rule_method_unrecognised(txns):
+    """A payment whose method is missing or is not a known label for cash,
+    wire or gold. The DPMSR threshold, structuring and cash rules key on the
+    method, so such a payment is never assessed for them. Activity records and
+    raw payment messages are not judged."""
+    return [_alert("METHOD_UNRECOGNISED", "HIGH", t,
+            f"method {str(t.get('method') or '').strip() or 'not recorded'!r} is not cash, wire "
+            "or gold — the DPMSR threshold, structuring and cash rules could not evaluate this "
+            "payment; record Method: cash | wire | gold")
+            for t in txns
+            if not (t.get("activity_only") or t.get("payment_message"))
+            and _norm(t.get("method")) not in KNOWN_METHODS]
+
+
 def rule_customer_not_in_db(txns):
     """A payment or activity task whose customer matches no Customer Database
     record (set by the daily run's resolver). No CDD file means no profile to
@@ -694,11 +804,13 @@ _RULES = [rule_threshold, rule_structuring, rule_velocity,
           rule_third_party_payment, rule_refund_diversion,
           rule_pricing_deviation, rule_phantom_delivery,
           rule_invoice_mismatch, rule_route_mismatch,
+          rule_gold_route_deviation, rule_gold_route_change, rule_gold_origin_unverified,
           rule_profile_deviation, rule_circular_flow, rule_new_geography,
           rule_rapid_resale, rule_funnel, rule_multi_jurisdiction,
           rule_reference_keyword, rule_personal_account, rule_linked_threshold,
           rule_cash_no_source_of_funds, rule_red_flag_recorded, rule_customer_not_in_db,
-          rule_amount_not_comparable]
+          rule_amount_not_comparable, rule_date_unreadable,
+          rule_method_unrecognised, rule_direction_unrecognised]
 
 
 def _any_customer(txns):
@@ -716,12 +828,99 @@ def _alert(rule, severity, t, detail):
             "transaction_id": t.get("transaction_id", ""), "permalink": t.get("permalink", "")}
 
 
+_AGENT_ROLES = {"ordering_institution", "senders_correspondent", "receivers_correspondent",
+                "intermediary", "account_with_institution"}
+
+
+# Payment-method labels people actually type on a Payments Register task or a
+# feed export, mapped to the three values the rules key on. Only unambiguous
+# synonyms: anything else stays as recorded and raises METHOD_UNRECOGNISED,
+# because "cash deposit" or "bank transfer" falling outside the exact words
+# "cash" / "wire" silently dropped the DPMSR THRESHOLD, STRUCTURING and the
+# cash rules for an AED 60,000 payment.
+_METHOD_SYNONYMS = {
+    "cash": "cash", "cash deposit": "cash", "cash payment": "cash",
+    "cash deposited": "cash", "banknotes": "cash", "bank notes": "cash",
+    "currency notes": "cash",
+    "wire": "wire", "wire transfer": "wire", "bank transfer": "wire",
+    "bank wire": "wire", "swift": "wire", "swift transfer": "wire",
+    "tt": "wire", "telegraphic transfer": "wire", "international transfer": "wire",
+    "remittance": "wire", "transfer": "wire",
+    "gold": "gold",
+}
+KNOWN_METHODS = frozenset(_METHOD_SYNONYMS.values())
+
+
+def _canonical_method(raw):
+    """'Cash (AED notes)' -> 'cash'; 'Bank transfer' -> 'wire'; else ''."""
+    s = re.sub(r"\([^)]*\)", " ", str(raw or "")).lower()
+    s = " ".join(re.sub(r"[^a-z ]", " ", s).split())
+    return _METHOD_SYNONYMS.get(s, "")
+
+
+def _with_canonical_method(t):
+    """Copy of t whose method is cash/wire/gold when the recorded label is a
+    known synonym. The recorded label is kept in method_recorded."""
+    if not isinstance(t, dict):
+        return t
+    m = _canonical_method(t.get("method"))
+    if not m or m == t.get("method"):
+        return t
+    return dict(t, method=m, method_recorded=t.get("method"))
+
+
+def _with_canonical_direction(t):
+    """Copy of t whose direction is in/out when the recorded label is a known
+    synonym. The recorded label is kept in direction_recorded."""
+    if not isinstance(t, dict):
+        return t
+    d = payment_screen.canonical_direction(t.get("direction"))
+    if not d or d == t.get("direction"):
+        return t
+    return dict(t, direction=d, direction_recorded=t.get("direction"))
+
+
+def _with_counterparty_country(t):
+    """The rules read counterparty_country as a jurisdiction NAME. The feed
+    schema also allows parties[] with ISO alpha-2 countries, which no rule
+    read: an AED 200,000 wire to an Iranian beneficiary in parties[] raised no
+    DPMSR THRESHOLD and no HIGH_RISK_GEO, and counterparty_country "IR" missed
+    the jurisdiction table. Fill the field from parties[] when absent and map
+    an ISO code to the table's name. Returns a copy; the input is untouched."""
+    if not isinstance(t, dict):
+        return t
+    c = str(t.get("counterparty_country") or "").strip()
+    cp = t.get("counterparty")
+    if not c:
+        parties = [p for p in (t.get("parties") or []) if isinstance(p, dict)]
+        foreign = sorted((p for p in parties
+                          if _norm(p.get("country_name") or p.get("country"))
+                          and _norm(p.get("country_name") or p.get("country")) not in HOME_COUNTRIES),
+                         key=lambda p: p.get("role") in _AGENT_ROLES)
+        if not foreign:
+            return t
+        c = str(foreign[0].get("country_name") or foreign[0].get("country")).strip()
+        cp = cp or foreign[0].get("name") or foreign[0].get("bic")
+    if len(c) == 3 and c.isalpha():
+        c = payment_screen.ISO3_TO_ISO2.get(c.upper(), c)
+    if len(c) == 2 and c.isalpha():
+        c = payment_screen.ISO2_TO_JURISDICTION.get(c.upper(), c.upper())
+    if c == t.get("counterparty_country") and cp == t.get("counterparty"):
+        return t
+    out = dict(t, counterparty_country=c)
+    if cp:
+        out["counterparty"] = cp
+    return out
+
+
 def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):
     """Run all rules over ONE customer's transactions. Returns a list of alerts.
     A crashing rule never blocks the others, but its failure is COUNTED (via the
     optional rule_errors dict) so a rule that silently produces no alerts because
     it crashes on every customer is visible, not a silent all-clear."""
     alerts = []
+    txns = [_with_canonical_direction(_with_canonical_method(_with_counterparty_country(t)))
+            for t in txns]
     for rule in _RULES:
         try:
             if rule is rule_high_risk_counterparty:
@@ -735,6 +934,13 @@ def evaluate_customer(txns, jurisdiction_table=None, rule_errors=None):
     return alerts
 
 
+def _customer_key(name):
+    """Grouping key for a customer name: case, dots, commas and spacing ignored,
+    so "Acme LLC", "ACME LLC " and "Acme L.L.C." are one customer. Grouping on
+    the raw string split their payments and hid structuring across them."""
+    return " ".join(re.sub(r"[.,]", "", str(name or "?")).lower().split()) or "?"
+
+
 def evaluate(transactions, jurisdiction_table=None):
     """Group by customer and evaluate. Returns {configured, n_txns, n_customers,
     alerts:[...], by_severity:{...}, rule_errors:{...}}. With no feed:
@@ -742,7 +948,7 @@ def evaluate(transactions, jurisdiction_table=None):
     txns = transactions or []
     by_customer = defaultdict(list)
     for t in txns:
-        by_customer[t.get("customer", "?")].append(t)
+        by_customer[_customer_key(t.get("customer"))].append(t)
     alerts = []
     rule_errors = {}
     for cust, ctx in by_customer.items():

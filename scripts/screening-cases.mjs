@@ -23,8 +23,9 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { asana, asanaEnabled, esc, runUrl, notifyAsana,
-  fitAsanaHtml, fitAsanaName } from './asana-notify.mjs';
+  fitAsanaHtml, fitAsanaName, verifyNewMonitoringAlert, appendOpenAlertEvidence } from './asana-notify.mjs';
 import { enrichScreeningResults } from './openai-screening-enrichment.mjs';
+import { appendApiCostUsage } from './api-cost-dashboard.mjs';
 import { SECTIONS, caseSection } from './asana-sections.mjs';
 
 export const SCREEN_STATE_FILE = 'data/sanctions-screen-state.json';
@@ -46,6 +47,70 @@ export function ageInDays(fromDay, today) {
   return Math.round((b - a) / 86400000);
 }
 
+/* An aging comment is an AML review-escalation artifact. Unknown POST
+   outcomes must never be replayed blindly, and a 2xx reply without a
+   verifiable comment must not suppress future SLA escalation. Reuse the
+   existing bounded story-history dedupe and require remote read-back. */
+export async function postVerifiedCaseAgingNotice(request, caseGid, ageDays,
+  { slaDays = CASE_SLA_DAYS } = {}) {
+  const id = String(caseGid || '');
+  if (typeof request !== 'function' || !/^\d{8,20}$/.test(id) ||
+      !Number.isSafeInteger(ageDays) || ageDays <= slaDays ||
+      !Number.isSafeInteger(slaDays) || slaDays < 1) {
+    throw new Error('Invalid AML case SLA alert request');
+  }
+  const message = '⏰ AGING — this screening case has been open ' + ageDays +
+    ' days (SLA: ' + slaDays + '). Review and disposition required.';
+  const result = await appendOpenAlertEvidence(request, id, message);
+  if (result.posted) {
+    const gid = String(result.storyGid || '');
+    if (!/^\d+$/.test(gid)) throw new Error('Asana case SLA audit comment identifier invalid');
+    const receipt = (await request('/stories/' + gid + '?opt_fields=gid,text'))?.data;
+    if (String(receipt?.gid || '') !== gid || receipt?.text !== message) {
+      throw new Error('Asana case SLA audit comment not independently verified');
+    }
+  } else if (!result.alreadyRecorded) {
+    throw new Error('Asana case SLA comment result not confirmed');
+  }
+  return { confirmed: true, alreadyRecorded: result.alreadyRecorded === true };
+}
+
+/* The live AML queue exceeded the historical 60-case read cap: the 14 Oct
+   screening job read only the FIRST 60 of 210 open cases every day, so newer
+   human MLRO dispositions after position 60 could be ignored indefinitely.
+   Normally verify up to 250 human decisions each run (210 currently).
+   If the queue grows beyond a bounded API budget, rotate deterministically
+   by UTC day to avoid permanently starving later keys. This changes READ-ONLY
+   preflight coverage; all disposition writes still require independent Asana
+   story, task-state and human-mark verification before ledger updates. */
+export const DEFAULT_CASE_DISPOSITION_READ_CAP = 250;
+export const MAX_CASE_DISPOSITION_READ_CAP = 500;
+export function selectDispositionReadBatch(entries, day, cap = DEFAULT_CASE_DISPOSITION_READ_CAP) {
+  if (!Array.isArray(entries) || !Number.isSafeInteger(cap) ||
+      cap < 1 || cap > MAX_CASE_DISPOSITION_READ_CAP ||
+      typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    throw new Error('Invalid bounded Asana MLRO disposition read parameters');
+  }
+  const utc = Date.parse(day + 'T00:00:00Z');
+  if (!Number.isFinite(utc) || new Date(utc).toISOString().slice(0, 10) !== day) {
+    throw new Error('Invalid Asana disposition UTC day');
+  }
+  const eligible = entries.filter((row) =>
+    Array.isArray(row) && row.length === 2 && row[1] &&
+    row[1].taskGid && !row[1].cleared &&
+    !row[1].disposition && !row[1].escalated);
+  // Do not depend on insertion order or expose customer names/keys to Actions.
+  eligible.sort((a, b) => String(a[0]) < String(b[0]) ? -1 :
+    String(a[0]) > String(b[0]) ? 1 : 0);
+  const total = eligible.length;
+  if (!total) return { selected: [], total: 0, deferred: 0 };
+  const count = Math.min(cap, total);
+  const dayNumber = Math.floor(utc / 86400000);
+  const offset = (dayNumber * cap) % total;
+  const selected = Array.from({ length: count }, (_, i) => eligible[(offset + i) % total]);
+  return { selected, total, deferred: total - selected.length };
+}
+
 export function caseTitle(key, s) {
   /* UBO keys carry the customer gid as their third segment; LEGAL-ENTITY keys
      have no '|' at all, so every company case used to be titled CASE-XXXXXX.
@@ -53,6 +118,32 @@ export function caseTitle(key, s) {
      fallback so entity cases get a real, stable case id too. */
   const gidTail = (String(key).split('|')[2] || String((s && s.gid) || '')).slice(-6);
   return '🧾 CASE-' + (gidTail || 'XXXXXX') + ' — ' + (s.name || 'unknown subject') + ' — ' + (s.recommendation || 'review');
+}
+
+/* Auto-closure requires fresh evidence for ALL three domains. A missing
+ * result, incomplete source, skipped subject, partial news sweep, stale PEP
+ * harvest or failed supplementary lookup cannot establish a negative result
+ * sufficient to close an existing human-review case. Conservative holds are
+ * intentional: they do not stop new match creation, escalation or SLA aging. */
+export function canAutoClearCases(results, today) {
+  if (!results || typeof results !== 'object' || Array.isArray(results) ||
+      results.date !== today || !Number.isSafeInteger(results.screened) ||
+      results.screened <= 0 || results.degraded !== false ||
+      !Array.isArray(results.failures) || results.failures.length !== 0 ||
+      !Array.isArray(results.lists) || results.lists.length === 0 ||
+      !results.lists.every(row => row && typeof row === 'object' &&
+        Number.isSafeInteger(row.count) && row.count > 0 && row.partial === false)) {
+    return false;
+  }
+  const e = results.enrichment;
+  if (!e || typeof e !== 'object' || Array.isArray(e) ||
+      !['amErrors', 'amPartial', 'skipped', 'pepErrors'].every(key =>
+        Number.isSafeInteger(e[key]) && e[key] === 0)) return false;
+  const pep = e.pepWorldwide;
+  return !!pep && typeof pep === 'object' && !Array.isArray(pep) &&
+    pep.active === true && pep.partial === false &&
+    Number.isSafeInteger(pep.count) && pep.count > 0 &&
+    typeof pep.harvested === 'string' && Number.isFinite(Date.parse(pep.harvested));
 }
 
 /* Pure planner: decide every case action from plain data.
@@ -78,6 +169,10 @@ export function planCaseActions(subjects, casesState, today) {
        the disposition executor — the registry demotes the subject from the
        NEXT screen run onward, so without this guard the re-flag branch below
        would immediately re-open the case the MLRO just closed. */
+    // An uncertain remote create is NOT a missing case. Until an MLRO/IT
+    // operator reconciles its task GID and section, another automatic create
+    // could open duplicate investigations or lose prior clearance history.
+    if (cs?.requiresHumanRecovery) continue;
     if (cs && cs.disposition && cs.clearedAt === today) continue;
     if (active && !cs) {
       /* whitelistedOnly rows are report-only: every remaining hit is an
@@ -95,26 +190,39 @@ export function planCaseActions(subjects, casesState, today) {
           priorCase: { taskGid: cs.taskGid || null, clearedAt: cs.clearedAt || null } });
       }
     } else if (active && cs && !cs.cleared) {
-      if (s.whitelistedOnly && !cs.escalated) {
-        /* The registry now covers every hit on this open case — close it with
-           its own audit note (distinct from the not-flagged auto-clear). */
-        actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid, reason: 'whitelist' });
-      } else {
-        const age = ageInDays(s.firstSeen || cs.createdAt, today);
-        if (!cs.agingAlerted && age > CASE_SLA_DAYS) {
-          actions.push({ type: 'age', key, subject: s, caseGid: cs.taskGid, ageDays: age });
-        }
+      // Existing cases remain open until an explicit human disposition is
+      // confirmed remotely. Full screening coverage can inform review but
+      // never grants the system authority to clear a sanctions case.
+      const age = ageInDays(s.firstSeen || cs.createdAt, today);
+      if (!cs.agingAlerted && age > CASE_SLA_DAYS) {
+        actions.push({ type: 'age', key, subject: s, caseGid: cs.taskGid, ageDays: age });
       }
-    } else if (!active && cs && !cs.cleared) {
-      /* An escalated case is a human's: never auto-clear it, even when the
-         subject drops off the day's flags. */
-      if (!cs.escalated) actions.push({ type: 'clear', key, subject: s, caseGid: cs.taskGid });
     }
-  }
-  for (const [key, cs] of Object.entries(casesState || {})) {
-    if (!seen.has(key) && !cs.cleared && !cs.escalated) actions.push({ type: 'clear', key, subject: null, caseGid: cs.taskGid });
+    // Missing or inactive subjects do not close existing investigations.
+    // Their cases remain open for human review and preserve their audit trail.
   }
   return actions;
+}
+
+/* A human-ticked disposition is NOT committed to local cleared-FP state
+ * until Asana confirms the corresponding audit comment and task completion.
+ * This pure transition runs ONLY after successful network writes. */
+export function confirmedDispositionState(existing, actionType, today, subject = null) {
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing) ||
+      typeof existing.taskGid !== 'string' || !existing.taskGid ||
+      !/^\d{4}-\d\d-\d\d$/.test(today)) {
+    throw new Error('Invalid existing case or disposition date');
+  }
+  if (actionType === 'disposition-clear') {
+    return { ...existing, cleared: true, clearedAt: today,
+      clearedBy: 'disposition:false-positive',
+      disposition: { kind: 'false-positive', at: today, caseGid: existing.taskGid,
+        hits: whitelistablePairs(subject?.hits) } };
+  }
+  if (actionType === 'disposition-escalate-ack') {
+    return { ...existing, escalated: true, escalatedAt: today };
+  }
+  throw new Error('Unrecognized case disposition');
 }
 
 /* Parse the MLRO's ticked disposition back out of a case task's notes. Only a
@@ -148,6 +256,146 @@ export function newCaseStateEntry(gid, today, priorCase) {
   const entry = { taskGid: gid, createdAt: today, agingAlerted: false, cleared: false };
   if (priorCase && priorCase.taskGid) { entry.reopenedFrom = priorCase.taskGid; entry.reopenedAt = today; }
   return entry;
+}
+
+/* Remote Asana task creation is not idempotent across ambiguous failures.
+   Confirm the task's identity, project and actual section before linking it
+   into the persisted AML case ledger. Keep the payload injectable for synthetic
+   offline verification and preserve the shared client retry/429 semantics. */
+export async function createVerifiedScreeningCase(request, {
+  title, htmlNotes, dueOn, assignee, projectGid, sectionGid
+} = {}) {
+  if (typeof request !== 'function' ||
+      !/^[0-9]+$/.test(String(projectGid || '')) ||
+      !/^[0-9]+$/.test(String(sectionGid || '')) ||
+      !String(title || '').trim() || !String(htmlNotes || '').trim()) {
+    throw new Error('Screening case creation context incomplete');
+  }
+  const created = await request('/tasks', {
+    method: 'POST', noRetryOnUnknownOutcome: true,
+    body: JSON.stringify({ data: {
+      name: title, html_notes: htmlNotes, due_on: dueOn, assignee,
+      projects: [projectGid],
+      memberships: [{ project: projectGid, section: sectionGid }]
+    } })
+  });
+  const taskId = String(created?.data?.gid || '');
+  if (!/^[0-9]+$/.test(taskId)) {
+    throw new Error('Asana case create did not return a verified task identifier');
+  }
+  // Explicit membership update is safe to repeat for the *same* task ID.
+  // Creation itself must NEVER be blindly replayed after a lost response.
+  await request('/sections/' + sectionGid + '/addTask', {
+    method: 'POST', body: JSON.stringify({ data: { task: taskId } })
+  });
+  await verifyNewMonitoringAlert(request, taskId, {
+    title, projectGid, sectionGid
+  });
+  return taskId;
+}
+
+/* If a create response or read-back is uncertain, preserve the prior ledger
+   entry, never clear it and require a human to reconcile the possible Asana
+   task before any other automatic creation for this subject. */
+export function unverifiedCaseCreationState(existing, today) {
+  if (!/^\d{4}-\d\d-\d\d$/.test(String(today || ''))) {
+    throw new Error('Unverified case creation date is invalid');
+  }
+  const prior = existing && typeof existing === 'object' && !Array.isArray(existing)
+    ? existing : {};
+  return {
+    ...prior,
+    taskGid: prior.taskGid || null,
+    createdAt: prior.createdAt || today,
+    cleared: prior.cleared === true,
+    requiresHumanRecovery: true,
+    creationUnverifiedAt: today
+  };
+}
+
+/* An MLRO tick in notes is only an INTENT. Before recording a consequential
+   disposition, independently verify that the task still carries that tick,
+   that its exact audit story exists remotely, and that Asana's final task
+   completion state matches the disposition. Never use a successful POST/PUT
+   response alone as proof of clearance. */
+export const CASE_FALSE_POSITIVE_AUDIT =
+  '🏷️ DISPOSITIONED — FALSE POSITIVE (ticked on this card). Case cleared; the matched designated-name pair(s) join the cleared-FP registry from the next screening run: identical hits are demoted with this clearance cited, and a NEW or CHANGED designated name re-opens normally.';
+export const CASE_ESCALATE_AUDIT =
+  '🔺 ESCALATED (ticked on this card) — moved to Escalated; auto-clear is disabled for this case until a human closes it. TFS obligations (freeze / report without delay) are the MLRO’s call — see the sanctions decision tree.';
+
+export async function verifyScreeningCaseAuditStory(request, taskGid, auditText) {
+  const id = String(taskGid || '');
+  if (typeof request !== 'function' || !/^\d{8,20}$/.test(id) || !auditText) {
+    throw new Error('Invalid screening disposition audit identity');
+  }
+  let offset = '';
+  const visited = new Set();
+  for (let page = 0; page < 10; page++) {
+    const path = '/tasks/' + id + '/stories?limit=100&opt_fields=gid,text'
+      + (offset ? '&offset=' + encodeURIComponent(offset) : '');
+    const result = await request(path);
+    if (!Array.isArray(result?.data)) {
+      throw new Error('Asana case audit history cannot be verified');
+    }
+    if (result.data.some(story => /^\d+$/.test(String(story?.gid || ''))
+      && story?.text === auditText)) return true;
+    if (!result?.next_page) return false;
+    offset = result.next_page.offset;
+    if (typeof offset !== 'string' || !offset || visited.has(offset)) {
+      throw new Error('Asana case audit history pagination invalid');
+    }
+    visited.add(offset);
+  }
+  throw new Error('Asana case audit history incomplete at page cap');
+}
+
+export async function applyVerifiedCaseDisposition(request, taskGid, actionType) {
+  const id = String(taskGid || '');
+  const clear = actionType === 'disposition-clear';
+  if (typeof request !== 'function' || !/^\d{8,20}$/.test(id) ||
+      (!clear && actionType !== 'disposition-escalate-ack')) {
+    throw new Error('Invalid case disposition request');
+  }
+  const expected = clear ? 'false-positive' : 'escalate';
+  const text = clear ? CASE_FALSE_POSITIVE_AUDIT : CASE_ESCALATE_AUDIT;
+  const taskPath = '/tasks/' + id + '?opt_fields=gid,notes,completed';
+  const load = async () => {
+    const task = (await request(taskPath))?.data;
+    if (String(task?.gid || '') !== id || typeof task.notes !== 'string' ||
+        typeof task.completed !== 'boolean') {
+      throw new Error('Asana case read-back incomplete or wrong task');
+    }
+    if (parseDisposition(task.notes) !== expected) {
+      throw new Error('Asana human disposition is missing, changed or conflicted');
+    }
+    return task;
+  };
+  const current = await load();
+  // A completed task with NO corresponding audit story is not evidence that
+  // this MLRO disposition completed. Refuse to invent local FP approval.
+  if (current.completed && (!clear ||
+      !(await verifyScreeningCaseAuditStory(request, id, text)))) {
+    throw new Error('Asana task completion not supported by this disposition evidence');
+  }
+  // Shared writer scans the entire bounded story history before posting.
+  // An ambiguous POST is not replayed. A later run will re-read the stories.
+  await appendOpenAlertEvidence(request, id, text);
+  if (!(await verifyScreeningCaseAuditStory(request, id, text))) {
+    throw new Error('Asana disposition audit story was not independently confirmed');
+  }
+  const afterStory = await load();
+  if (clear && !afterStory.completed) {
+    await request('/tasks/' + id, {
+      method: 'PUT', noRetryOnUnknownOutcome: true,
+      body: JSON.stringify({ data: { completed: true } }),
+    });
+  }
+  const final = await load();
+  if (final.completed !== clear ||
+      !(await verifyScreeningCaseAuditStory(request, id, text))) {
+    throw new Error('Asana disposition final task state or evidence is unverified');
+  }
+  return { confirmed: true, actionType, taskGid: id, completed: final.completed };
 }
 
 export function caseHtml(key, s, runLink, priorCase) {
@@ -277,7 +525,17 @@ export function buildResultsDigestHtml(results, caseGidFor = () => null) {
   h.push('<h2>New matches</h2>');
   const alerts = Array.isArray(r.alerts) ? r.alerts : [];
   if (!alerts.length) {
-    h.push('No new or changed matches — every subject screened clean against the loaded lists today.');
+    // "No NEW matches" is not "no ACTIVE matches". The previous wording
+    // falsely described every subject as clean even when matchCount > 0:
+    // unchanged sanctions/PEP matches may still require an MLRO decision.
+    if (Number.isSafeInteger(r.matchCount) && r.matchCount > 0) {
+      h.push('No new or changed matches. ' + esc(String(r.matchCount))
+        + ' standing match(es) remain in the screening registry and require ongoing MLRO review. '
+        + 'Do not interpret this update as a clearance.');
+    } else {
+      h.push('No new or changed matches reported. This is not an all-clear: '
+        + 'confirm complete current-run sources, retained cases and analyst decisions before any clearance.');
+    }
   } else {
     h.push('<ul>');
     for (const a of alerts) {
@@ -372,18 +630,31 @@ async function main() {
     process.exit(3);
   }
   const screen = readJson(SCREEN_STATE_FILE);
-  if (!screen || !screen.subjects) {
-    console.log('screening-cases: no screening state — nothing to manage.');
-    return;
+  if (!screen || !screen.subjects || typeof screen.subjects !== 'object' ||
+      Array.isArray(screen.subjects)) {
+    throw new Error('Screening registry missing or malformed; refusing Asana case actions');
   }
   if (screen.updated !== today) {
-    /* Never clear (or age) cases off stale data: if today's screen did not
-       run, skip cleanly. The workflow ordering makes this unusual. */
-    console.log('screening-cases: screen state is from ' + screen.updated + ', not today — skipping (no action on stale data).');
-    return;
+    // A stale registry must FAIL the workflow, not return a misleading green
+    // success while mandatory Asana cases and daily digest remain unchanged.
+    throw new Error('Screening registry is not current; refusing Asana case actions');
+  }
+  const results = readJson(RESULTS_FILE);
+  if (!results || results.date !== today || !Number.isSafeInteger(results.screened) ||
+      results.screened <= 0 || !Array.isArray(results.lists)) {
+    throw new Error('Current screening result missing or malformed; refusing Asana case actions');
   }
 
-  const casesState = readJson(CASES_FILE) || {};
+  // A missing or corrupt case ledger is NOT an empty first-run registry.
+  // Rebuilding blind could duplicate active AML investigations in Asana.
+  const casesState = readJson(CASES_FILE);
+  if (!casesState || typeof casesState !== 'object' || Array.isArray(casesState)) {
+    throw new Error('Existing Asana case state missing or corrupt; refusing duplicate-prone actions');
+  }
+  const allowAutoClear = canAutoClearCases(results, today);
+  if (!allowAutoClear) {
+    console.warn('screening-cases: source completeness not proven; all automatic case closures are HELD for human review');
+  }
 
   /* DISPOSITION READ-BACK — the analyst feedback loop. For every open case,
      read the task notes and parse the ticked disposition block the card
@@ -393,41 +664,42 @@ async function main() {
      pins the case against every auto-clear. Read failures are logged and
      skipped — a case we could not read simply keeps its current lifecycle. */
   const dispositionActions = [];
-  const READ_CAP = Number(process.env.CASE_DISPOSITION_READ_CAP) || 60;
-  const openCases = Object.entries(casesState)
-    .filter(([, cs]) => cs && cs.taskGid && !cs.cleared && !cs.disposition && !cs.escalated);
-  if (openCases.length > READ_CAP) {
-    console.log('screening-cases: disposition read capped at ' + READ_CAP + ' of '
-      + openCases.length + ' open case(s) this run (CASE_DISPOSITION_READ_CAP)');
+  const READ_CAP = Number(process.env.CASE_DISPOSITION_READ_CAP ?? DEFAULT_CASE_DISPOSITION_READ_CAP);
+  const dispositionBatch = selectDispositionReadBatch(Object.entries(casesState), today, READ_CAP);
+  if (dispositionBatch.deferred) {
+    console.log('screening-cases: read-only MLRO disposition scan covers ' +
+      dispositionBatch.selected.length + ' of ' + dispositionBatch.total +
+      ' open cases; next UTC day rotates the bounded selection (' +
+      dispositionBatch.deferred + ' deferred)');
   }
-  for (const [key, cs] of openCases.slice(0, READ_CAP)) {
+  for (const [key, cs] of dispositionBatch.selected) {
     let dis = null;
     try {
       const d = await asana('/tasks/' + cs.taskGid + '?opt_fields=notes');
       dis = parseDisposition(d.data && d.data.notes);
     } catch (e) {
-      console.warn('screening-cases: disposition read failed for ' + key + ': '
-        + String(e && e.message || e).slice(0, 120));
+      // Public CI logs must not serialize customer keys or raw API errors.
+      console.warn('screening-cases: a case disposition could not be read; case remains open for human review');
       continue;
     }
     if (dis === 'false-positive') {
-      const subj = (screen.subjects || {})[key];
-      casesState[key] = { ...cs, cleared: true, clearedAt: today, clearedBy: 'disposition:false-positive',
-        disposition: { kind: 'false-positive', at: today, caseGid: cs.taskGid,
-          hits: whitelistablePairs(subj && subj.hits) } };
+      // Stage intent ONLY. No local clearance/whitelist entry until Asana's
+      // audit story and completed task have both succeeded.
       dispositionActions.push({ type: 'disposition-clear', key, caseGid: cs.taskGid });
     } else if (dis === 'escalate') {
-      casesState[key] = { ...cs, escalated: true, escalatedAt: today };
       dispositionActions.push({ type: 'disposition-escalate-ack', key, caseGid: cs.taskGid });
     }
     /* 'investigating' and null need no action — the normal lifecycle applies. */
   }
   if (dispositionActions.length) {
-    console.log('screening-cases: ' + dispositionActions.length + ' disposition(s) read back from case cards — '
-      + dispositionActions.map(a => a.type.replace('disposition-', '') + ':' + a.key).join(' '));
+    console.log('screening-cases: ' + dispositionActions.length
+      + ' disposition(s) staged; awaiting Asana write confirmation');
   }
 
-  const actions = [...dispositionActions, ...planCaseActions(screen.subjects, casesState, today)];
+  const pendingDispositionKeys = new Set(dispositionActions.map(a => a.key));
+  const actions = [...dispositionActions,
+    ...planCaseActions(screen.subjects, casesState, today, { allowAutoClear })
+      .filter(a => !pendingDispositionKeys.has(a.key))];
   console.log('screening-cases: ' + actions.length + ' action(s) — '
     + ['create', 'age', 'clear', 'disposition-clear', 'disposition-escalate-ack']
       .map(t => t + '=' + actions.filter(a => a.type === t).length).join(' '));
@@ -440,33 +712,25 @@ async function main() {
   for (const a of actions) {
     try {
       if (a.type === 'create') {
-        const d = await asana('/tasks', {
-          method: 'POST',
-          body: JSON.stringify({ data: {
-            /* Byte-capped, not character-capped: a case title is a designated
-               name verbatim, and Asana measures bytes. The html body is
-               tag-aware capped for the same reason (no-op under the limit). */
-            name: fitAsanaName(caseTitle(a.key, a.subject)),
-            html_notes: fitAsanaHtml(caseHtml(a.key, a.subject, link, a.priorCase)),
-            due_on: a.dueOn || addDays(today, CASE_SLA_DAYS),
-            assignee,
-            projects: [projectGid],
-            memberships: [{ project: projectGid, section: caseSection(a.subject) }]
-          } })
+        // A valid POST response is not proof the compliance task was actually
+        // filed in its approved Asana section. Reuse the central read-back
+        // verifier and avoid replaying a task POST with an unknown outcome.
+        const gid = await createVerifiedScreeningCase(asana, {
+          title: fitAsanaName(caseTitle(a.key, a.subject)),
+          htmlNotes: fitAsanaHtml(caseHtml(a.key, a.subject, link, a.priorCase)),
+          dueOn: a.dueOn || addDays(today, CASE_SLA_DAYS),
+          assignee, projectGid, sectionGid: caseSection(a.subject),
         });
-        const gid = d.data && d.data.gid;
-        /* REPLACES a cleared entry on a re-flag, so the digest's caseGidFor
-           resolves to this new open case and the SLA/aging restart cleanly. */
+        /* REPLACES a cleared entry on a re-flag only after confirmed placement,
+           so a missing Asana response cannot produce a phantom case GID. */
         casesState[a.key] = newCaseStateEntry(gid, today, a.priorCase);
-        console.log('  ' + (a.priorCase ? 're-opened (fresh case after clearance — prior ' + a.priorCase.taskGid + ') ' : 'created case ')
-          + caseTitle(a.key, a.subject) + (d.data && d.data.permalink_url ? ' — ' + d.data.permalink_url : ''));
+        console.log(a.priorCase
+          ? 'screening-cases: re-opened an existing case under human review'
+          : 'screening-cases: created a new case requiring human review');
       } else if (a.type === 'age') {
-        await asana('/tasks/' + a.caseGid + '/stories', {
-          method: 'POST',
-          body: JSON.stringify({ data: { text: '⏰ AGING — this screening case has been open ' + a.ageDays + ' days (SLA: ' + CASE_SLA_DAYS + '). Review and disposition required.' } })
-        });
+        await postVerifiedCaseAgingNotice(asana, a.caseGid, a.ageDays);
         casesState[a.key] = { ...casesState[a.key], agingAlerted: true };
-        console.log('  aging comment on case ' + a.key + ' (' + a.ageDays + 'd)');
+        console.log('screening-cases: SLA aging alert remotely verified (' + a.ageDays + 'd)');
       } else if (a.type === 'clear') {
         const clearText = a.reason === 'whitelist'
           ? '✅ AUTO-CLEARED (cleared-FP registry) — every hit on this case is a designated-name pair an analyst already dispositioned as a false positive. The ' + today + ' screen keeps the subject on the report, annotated and demoted; a NEW or CHANGED designated name re-opens a fresh case.'
@@ -478,33 +742,34 @@ async function main() {
         await asana('/tasks/' + a.caseGid, { method: 'PUT', body: JSON.stringify({ data: { completed: true } }) });
         casesState[a.key] = { ...casesState[a.key], cleared: true, clearedAt: today,
           ...(a.reason === 'whitelist' ? { clearedBy: 'cleared-FP registry' } : {}) };
-        console.log('  auto-cleared case ' + a.key + (a.reason === 'whitelist' ? ' (cleared-FP registry)' : ''));
+        console.log('screening-cases: automatic disposition recorded after verified case update');
       } else if (a.type === 'disposition-clear') {
-        /* State already records the disposition. Keep the task in its approved
-           screening section, add the audit note, and complete it. */
-        await asana('/tasks/' + a.caseGid + '/stories', {
-          method: 'POST',
-          body: JSON.stringify({ data: { text: '🏷️ DISPOSITIONED — FALSE POSITIVE (ticked on this card). Case cleared; the matched designated-name pair(s) join the cleared-FP registry from the next screening run: identical hits are demoted with this clearance cited, and a NEW or CHANGED designated name re-opens normally.' } })
-        });
-        await asana('/tasks/' + a.caseGid, { method: 'PUT', body: JSON.stringify({ data: { completed: true } }) });
-        console.log('  dispositioned FALSE POSITIVE — case ' + a.key + ' cleared, pairs registered');
+        // Never commit a whitelist/clearance until the MLRO tick, exact audit
+        // story and completed task have all been independently read back.
+        await applyVerifiedCaseDisposition(asana, a.caseGid, a.type);
+        casesState[a.key] = confirmedDispositionState(casesState[a.key], a.type, today, screen.subjects[a.key]);
+        console.log('screening-cases: human false-positive disposition independently verified');
       } else if (a.type === 'disposition-escalate-ack') {
-        await asana('/tasks/' + a.caseGid + '/stories', {
-          method: 'POST',
-          body: JSON.stringify({ data: { text: '🔺 ESCALATED (ticked on this card) — moved to Escalated; auto-clear is disabled for this case until a human closes it. TFS obligations (freeze / report without delay) are the MLRO’s call — see the sanctions decision tree.' } })
-        });
-        console.log('  dispositioned ESCALATE — case ' + a.key + ' pinned open, moved to Escalated');
+        await applyVerifiedCaseDisposition(asana, a.caseGid, a.type);
+        casesState[a.key] = confirmedDispositionState(casesState[a.key], a.type, today, screen.subjects[a.key]);
+        console.log('screening-cases: escalation verified, case remains open');
       }
     } catch (e) {
       failed++;
       const msg = String(e && e.message || e);
-      /* A 404 means the human deleted the case task — record it cleared so we
-         stop acting on it, and say so. Anything else is a real failure. */
-      if (a.caseGid && /404/.test(msg)) {
-        casesState[a.key] = { ...casesState[a.key], cleared: true, clearedAt: today, note: 'task deleted in Asana' };
-        console.warn('  case task for ' + a.key + ' no longer exists in Asana — marked closed in state.');
+      // Deleting an Asana task is NOT an MLRO false-positive decision. Never
+      // convert 404 into local cleared=true: that would silently whitelist a
+      // missing investigation, and future runs would stop retrying.
+      if (a.type === 'create') {
+        casesState[a.key] = unverifiedCaseCreationState(casesState[a.key], today);
+        console.error('screening-cases: new case delivery not verified; automatic retry HELD until human Asana reconciliation');
+      } else if (a.caseGid && /\b404\b/.test(msg)) {
+        casesState[a.key] = { ...casesState[a.key],
+          missingFromAsanaAt: today, requiresHumanRecovery: true };
+        console.error('screening-cases: a tracked Asana case is missing (404); NOT cleared; manual recovery required');
       } else {
-        console.error('  action ' + a.type + ' failed for ' + a.key + ': ' + msg.slice(0, 200));
+        // The exception may contain screened names or provider response text.
+        console.error('screening-cases: ' + a.type + ' failed; retained the last confirmed case state');
       }
     }
   }
@@ -521,17 +786,55 @@ async function main() {
      creation so each match links to its case; notifyAsana dedups the title
      within 6h so a same-day re-run cannot double-post. Failure to deliver
      the digest fails the step loudly. */
-  const results = readJson(RESULTS_FILE);
   if (results && results.date === today) {
     try {
       /* Optional, fail-open enrichment. This never mutates the screening state,
          match decisions, scores, case lifecycle, or results artifact on disk.
          It only appends analyst-assistance text to the Asana digest. */
       const ai = await enrichScreeningResults(results);
+      // Separate priced estimates and unknown provider billing; never log
+      // the subject name, match evidence, prompt or model response.
+      // Only a successful raw-provider quote certifies these token counters.
+      // A missing/unknown-usage response is NOT recorded as a zero-dollar call.
+      if (process.env.API_COST_TELEMETRY_ENABLED === '1' &&
+          ai.cost_estimate?.status === 'priced_estimate' && ai.model && ai.usage) {
+        const recorded = appendApiCostUsage({
+          provider: 'openai', model: ai.model, workflow: 'screening-digest',
+          usage: {
+            input_tokens: ai.usage.input_tokens,
+            cached_input_tokens: ai.usage.cached_input_tokens,
+            output_tokens: ai.usage.output_tokens,
+          }
+        });
+        if (!recorded.ok) console.warn('screening-cases: cost metadata unavailable');
+      }
       const digestResults = { ...results, ai_enrichment: ai };
-      if (ai.text) console.log('screening-cases: OpenAI analyst enhancement appended (' + (ai.model || 'configured model') + ')');
-      else if (ai.enabled && ai.error) console.warn('screening-cases: OpenAI enhancement unavailable — ' + ai.error + '; original digest will still post');
-      const html = buildResultsDigestHtml(digestResults, a => (casesState[a.key] || {}).taskGid || null);
+      if (ai.text) {
+        // Usage-only accounting: no customer names, sampled prompts or raw
+        // provider responses enter public CI logs.
+        const u = ai.usage || {};
+        const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
+        console.log('screening-cases: OpenAI analyst enhancement appended (' +
+          (ai.model || 'configured model') + '); tokens input=' + count(u.input_tokens) +
+          ' output=' + count(u.output_tokens) + ' cached_input=' +
+          count(u.cached_input_tokens) + ' reasoning_output=' +
+          count(u.reasoning_output_tokens) + ' output_budget=' +
+          count(ai.output_token_budget));
+      } else if (ai.enabled && ai.skipped === 'healthy_clean_run') {
+        console.log('screening-cases: optional OpenAI skipped; clean and fully covered run needs no paid summary');
+      } else if (ai.enabled && ai.error) {
+        console.warn('screening-cases: OpenAI enhancement unavailable — ' +
+          ai.error + '; original digest will still post');
+        if (ai.usage) console.warn('screening-cases: unsuccessful OpenAI output still used ' +
+          (Number.isSafeInteger(ai.usage.total_tokens) ? ai.usage.total_tokens : 0) +
+          ' billed tokens; no AI note was published');
+      }
+      // An uncertain case cannot be represented as a confirmed open case
+      // link, especially when re-flagging after a previously cleared task.
+      const html = buildResultsDigestHtml(digestResults, a => {
+        const entry = casesState[a.key];
+        return entry && !entry.requiresHumanRecovery ? entry.taskGid || null : null;
+      });
       const sectionGid = process.env.ASANA_SCREEN_RESULTS_SECTION_GID || SECTIONS.sanctions.gid;
       /* Mirror the daily case digest into the queue the MLRO actually works
          (see the MIRROR note in asana-notify). One task, two memberships. */
@@ -543,7 +846,8 @@ async function main() {
          with different counts is still TODAY's digest — dedup on the stable
          date-scoped prefix, not the exact title. */
       const url = await notifyAsana(resultsDigestTitle(results), '', { project: projectGid, section: sectionGid, html, assignee: assignee, mirror,
-        dedupPrefix: '🛡️ Sanctions Screen — ' + today });
+        dedupPrefix: '🛡️ Sanctions Screen — ' + today,
+        dateScopedDigest: true });
       console.log('screening-cases: daily results digest posted to Asana' + (url ? ' — ' + url : ''));
     } catch (e) {
       failed++;
@@ -557,5 +861,8 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(e => { console.error(e); process.exit(1); });
+  main().catch(() => {
+    console.error('screening-cases: fatal execution error; case delivery incomplete; operator review required');
+    process.exitCode = 1;
+  });
 }

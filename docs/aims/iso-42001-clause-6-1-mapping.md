@@ -58,25 +58,25 @@ is missing from this table or if the table cites a risk that no longer exists.
 | Risk | What it is | Annex A controls that treat it | Also 6.1.4? |
 |---|---|---|---|
 | R-01 | Hallucination | A.6.2.2 (system requirements) · A.6.2.4 (verification & validation) · A.9.2 (responsible use) | Yes — a fabricated fact in a report harms the subject of the report |
-| R-02 | Prompt injection | A.6.2.4 · A.6.2.8 (operation & monitoring) | Indirect |
-| R-03 | False negative | A.6.2.4 · A.6.2.8 · A.7.2–A.7.6 (data for AI systems) | Minimal — see §1 |
+| R-02 | Prompt injection | A.6.2.4 · A.6.2.6 (operation & monitoring) | Indirect |
+| R-03 | False negative | A.6.2.4 · A.6.2.6 · A.7.2–A.7.6 (data for AI systems) | Minimal — see §1 |
 | R-04 | False positive | A.5.4 (impacts on individuals) · A.6.2.4 · A.9.2 | **Yes — primary.** The most damaging thing the system can do to a person |
 | R-05 | Bias / under-matching non-Latin names | **A.5.4** · A.7.2–A.7.6 | **Yes — primary.** The discriminatory-outcome case |
 | R-06 | Data egress / privacy | A.7.2–A.7.6 · A.10.2–A.10.4 (third parties) | Yes |
 | R-07 | Secret leakage | A.4.4 (tooling resources) · A.10.2–A.10.4 | Yes — exposure of screening data affects the people in it |
-| R-08 | Silent control failure | A.6.2.8 · A.8.3 (reporting of concerns) | Indirect |
-| R-09 | Source unavailability / silent shrink | A.4.3 (data resources) · A.6.2.8 | Indirect |
+| R-08 | Silent control failure | A.6.2.6 · A.3.3 (reporting of concerns) | Indirect |
+| R-09 | Source unavailability / silent shrink | A.4.3 (data resources) · A.6.2.6 | Indirect |
 | R-10 | Over-reliance / automation bias | **A.9.2** · A.9.3 (objectives for responsible use) | **Yes.** Human oversight is what stands between an AI signal and a person |
-| R-11 | Model / provider drift | A.4.2 (resource documentation) · A.6.2.6 (deployment) · A.10.2–A.10.4 | Indirect |
-| R-12 | Job timeout / capacity | A.4.4 · A.6.2.8 | Indirect |
+| R-11 | Model / provider drift | A.4.2 (resource documentation) · A.6.2.5 (deployment) · A.10.2–A.10.4 | Indirect |
+| R-12 | Job timeout / capacity | A.4.4 · A.6.2.6 | Indirect |
 | R-13 | Transaction-layer blind spot | A.6.2.2 · A.9.4 (intended use documented) | Indirect |
-| R-14 | Silent degradation unactioned | A.6.2.8 · A.8.3 | Indirect |
+| R-14 | Silent degradation unactioned | A.6.2.6 · A.3.3 | Indirect |
 | R-15 | Vendor / dependency failure | **A.10.2–A.10.4** · A.4.4 | Indirect |
 | R-16 | Regulatory non-compliance | A.2.3 (alignment with org policies) · A.9.3 | Yes — a drifted methodology treats people by an unapproved rule |
 | R-17 | Key-person dependency | A.3.2 (roles & responsibilities) · A.4.4 | Indirect |
 | R-18 | Lack of explainability | **A.8.2 (information to interested parties)** · A.9.4 | **Yes — primary.** An unexplainable adverse outcome is one that cannot be contested |
 | R-19 | Unauthorized AI access | A.4.4 · A.10.2–A.10.4 | Yes — unauthorised access to screening data is a harm to its subjects |
-| R-20 | AI incident response gap | **A.8.3** · A.6.2.8 | Yes — a slow response extends whatever harm is underway |
+| R-20 | AI incident response gap | **A.3.3** · A.6.2.6 | Yes — a slow response extends whatever harm is underway |
 | R-21 | Shadow AI — confidential data into an unapproved public AI tool | **A.9.2 (responsible use)** · A.4.4 · A.10.2–A.10.4 | **Yes — primary.** The data disclosed is the customer's, to a processor they were never told about and the firm has no contract with |
 
 **Reading the last column.** *Primary* means the risk's dominant consequence is
@@ -103,11 +103,11 @@ evidence?"*
 | A.5.4 Assessing impacts on individuals | R-04, R-05 | 🟡 SIA ratified 2026-07-02 and cross-script parity is a hard CI gate; the **bias-review cycle** is what remains |
 | A.6.2.2 AI system requirements | R-01, R-13 | ✅ |
 | A.6.2.4 Verification & validation | R-01, R-02, R-03, R-04 | ✅ |
-| A.6.2.6 AI system deployment | R-11 | ✅ |
-| A.6.2.8 Operation & monitoring | R-02, R-03, R-08, R-09, R-12, R-14, R-20 | ✅ |
+| A.6.2.5 AI system deployment | R-11 | ✅ |
+| A.6.2.6 Operation & monitoring | R-02, R-03, R-08, R-09, R-12, R-14, R-20 | ✅ |
 | A.7.2–A.7.6 Data for AI systems | R-03, R-05, R-06 | ✅ |
 | A.8.2 Information to interested parties | R-18 | ✅ |
-| A.8.3 Reporting of concerns | R-08, R-14, R-20 | ✅ |
+| A.3.3 Reporting of concerns | R-08, R-14, R-20 | ✅ |
 | A.9.2 Responsible use of AI systems | R-01, R-04, R-10, R-21 | 🟡 AUP in force (extended 2026-08 to third-party AI tools); acknowledgement records are open-actions item 7, and R-21 has no technical enforcement behind the policy |
 | A.9.3 Objectives for responsible use | R-10, R-16 | ✅ |
 | A.9.4 Intended use documented | R-13, R-18 | ✅ |

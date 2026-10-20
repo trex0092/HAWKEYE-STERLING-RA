@@ -16,6 +16,12 @@ documented-information items (+ the 2026-focus additions) to their evidence in
 this repo, including the AIMS objectives, communication process and
 document-control procedure.
 
+For the complete nine-group Annex A view, use the
+[provisional 38-control evidence crosswalk](../../data/iso42001-annex-a-evidence.json)
+and `node scripts/iso-annex-a-evidence.mjs --report`. Its risk and evidence
+references are CI-checked, but the MLRO/Board must still decide applicability,
+approve any justified exclusions, and obtain actual operational evidence.
+
 | # | Document | ISO 42001 ref | File |
 |---|---|---|---|
 | 1 | AI System Inventory | A.4.2 | [ai-system-inventory.md](ai-system-inventory.md) |
@@ -30,7 +36,7 @@ document-control procedure.
 | 10 | Business Continuity & Resilience Plan | A.6 | [bcp.md](bcp.md) |
 | 11 | Corrective Actions / CAPA Log | 10.2 | [corrective-actions.md](corrective-actions.md) |
 | 12 | Bias & Fairness Testing | A.5.4 | [bias-fairness-testing.md](bias-fairness-testing.md) |
-| 13 | Prompt-Injection Red-Team Procedure | A.5.5 | [red-team-procedure.md](red-team-procedure.md) |
+| 13 | Prompt-Injection Red-Team Procedure | A.6.2.4 (verification & validation) | [red-team-procedure.md](red-team-procedure.md) |
 | 14 | Runtime Monitoring & Drift Detection | 9.1 / A.6.2 | [runtime-monitoring.md](runtime-monitoring.md) |
 | 15 | PDPL Data-Processing Assessment & ROPA | A.7 | [pdpl-data-processing-assessment.md](pdpl-data-processing-assessment.md) |
 | 16 | In-Domain AML Coverage (FATF R.10/R.16/R.25) | A.4.2 | [in-domain-aml-coverage.md](in-domain-aml-coverage.md) |
@@ -40,13 +46,15 @@ document-control procedure.
 | 20 | Internal Audit Programme | 9.2 | [internal-audit.md](internal-audit.md) |
 | 21 | Decommissioning & Retirement | A.6 | [decommissioning.md](decommissioning.md) |
 | 22 | Population-Stability Monitoring (PSI) | 9.1 / A.6.2 | [population-stability-monitoring.md](population-stability-monitoring.md) |
-| 23 | Red-Team Log (campaigns & corpus growth) | A.5.5 | [red-team-log.md](red-team-log.md) |
+| 23 | Red-Team Log (campaigns & corpus growth) | A.6.2.4 (verification & validation) | [red-team-log.md](red-team-log.md) |
 | 24 | Transaction-Feed Compensating Control (interim — **adopted 2026-07-29**) | A.6 | [transaction-feed-compensating-control.md](transaction-feed-compensating-control.md) |
 | 25 | TFS Name-Match Procedure (PNMR / CNMR / FFR) — registered instrument **POL-07** | A.6 / FATF R.6 | [tfs-name-match-procedure.md](tfs-name-match-procedure.md) |
 | 26 | Curated Sanctions List Update SOP (UAE EOCN) — registered instrument **POL-09** | A.6 | [eocn-list-update-sop.md](eocn-list-update-sop.md) |
 | 27 | Transaction-Feed Scoping Note (R-13 / FATF R.16 — scoping only, nothing connected) | A.6 | [transaction-feed-scoping.md](transaction-feed-scoping.md) |
 | 28 | Advisor Citation Migration Worklist (160 rows, with counsel) | A.8.2 | [advisor-citation-migration-worklist.md](advisor-citation-migration-worklist.md) |
 | 29 | **Clause 6.1 Mapping Index** — which artefact answers 6.1.2 / 6.1.3 / 6.1.4, and bidirectional R-nn ↔ Annex A traceability | 6.1.2 / 6.1.3 / 6.1.4 | [iso-42001-clause-6-1-mapping.md](iso-42001-clause-6-1-mapping.md) |
+| 30 | **Full Annex A crosswalk (provisional)** — all 38 control numbers with mapped risk, owner, evidence gaps, and closure actions | Annex A, A.2–A.10 | [iso42001-annex-a-evidence.json](../../data/iso42001-annex-a-evidence.json) |
+| 31 | **Impacts on society and the public** — impact evaluation and resulting stakeholder safeguards, not adversarial red teaming | A.5.5 (societal impacts) | [stakeholder-impact-assessment-2026.md](../governance/stakeholder-impact-assessment-2026.md) |
 
 > Rows 25–28 existed on disk but were absent from this index until 2026-07-29 —
 > including two **in-force registered instruments** (POL-07 and POL-09). This page
@@ -54,5 +62,5 @@ document-control procedure.
 > a document an auditor does not know to ask for.
 
 **Owner:** MLRO / Compliance. **Review cadence:** at least annually and on any
-material change to the AI system. **Retention:** 10 years (UAE FDL No. 26 of 2021,
-Art. 23).
+material change to the AI system. **Retention:** 10 years (UAE FDL No. 10 of 2025;
+duty formerly FDL 26/2021 Art. 23).

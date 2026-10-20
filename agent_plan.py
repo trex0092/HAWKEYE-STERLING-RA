@@ -12,13 +12,16 @@ LLM directly to this library.
 """
 import hashlib
 import json
+import math
 import time
+from copy import deepcopy
 from types import MappingProxyType
 
 MAX_STEPS = 6
 MAX_TOTAL_CALLS = 8
 MAX_SECONDS = 5.0
-MAX_RESULT_CHARS = 8192
+MAX_RESULT_CHARS = 8192  # Kept for callers; limit enforced on UTF-8 bytes.
+MAX_TOTAL_RESULT_BYTES = 32768
 READ_ONLY_TOOLS = frozenset(("normalize_name", "jurisdiction_risk", "name_variants"))
 HUMAN_ROLES = frozenset(("Analyst", "Reviewer-MLRO", "Admin"))
 ARGS_ALLOWED = {
@@ -70,7 +73,12 @@ def _validated_steps(plan, allowed_tools):
         total_calls += retries + 1
     if total_calls > MAX_TOTAL_CALLS:
         raise PlanDenied("total planned calls exceed fixed budget")
-    return steps
+    # Copy the validated plan before dispatch: a callback that still holds a
+    # reference to the caller's plan must not alter later authorized steps.
+    # All argument values are already validated strings, so shallow arg copies
+    # are sufficient and do not change their meaning.
+    return [{"id": s["id"], "tool": s["tool"], "args": dict(s["args"]),
+             "retries": s["retries"]} for s in steps]
 
 
 def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
@@ -83,9 +91,10 @@ def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
     remain only in the returned in-memory map.
     """
     safe_base = {"authorized_for_action": False, "events": [], "results": {}}
-    if verified_role not in HUMAN_ROLES or not isinstance(authorized_tools, (set, frozenset)) \
+    if type(verified_role) is not str or verified_role not in HUMAN_ROLES \
+            or not isinstance(authorized_tools, (set, frozenset)) \
             or not isinstance(tool_handlers, dict) or type(max_seconds) not in (int, float) \
-            or not 0 < max_seconds <= MAX_SECONDS:
+            or not 0 < max_seconds <= MAX_SECONDS or not callable(clock):
         return {"status": "HOLD", "reason": "missing trusted execution context", **safe_base}
     try:
         steps = _validated_steps(plan, authorized_tools)
@@ -98,33 +107,58 @@ def run_review_plan(plan, *, verified_role=None, authorized_tools=None,
     events = []
     results = {}
     calls = 0
-    start = clock()
+    total_result_bytes = 0
+
+    def safe_clock():
+        # Although supplied by trusted code, the timing source must not be
+        # able to silently return NaN, infinity, decreasing time, or throw.
+        try:
+            value = clock()
+            return value if type(value) in (int, float) and math.isfinite(value) else None
+        except Exception:
+            return None
+
+    start = safe_clock()
+    if start is None:
+        return {"status": "HOLD", "reason": "invalid trusted timing source", **safe_base}
+
+    def time_unreliable_or_expired():
+        now = safe_clock()
+        return now is None or now < start or now - start >= max_seconds
+
     for step in steps:
         for attempt in range(step["retries"] + 1):
-            if calls >= MAX_TOTAL_CALLS or clock() - start >= max_seconds:
-                return {"status": "DEGRADED", "reason": "execution budget exhausted",
+            if calls >= MAX_TOTAL_CALLS or time_unreliable_or_expired():
+                return {"status": "DEGRADED", "reason": "execution budget exhausted or timing source degraded",
                         "authorized_for_action": False, "events": events, "results": results}
             calls += 1
             try:
                 # Handlers come only from trusted server configuration, never
                 # from a model-selected executable name or arbitrary import.
                 result = tool_handlers[step["tool"]](
-                    dict(step["args"]), MappingProxyType(results.copy()))
-                text = json.dumps(result, sort_keys=True, allow_nan=False)
-                if len(text) > MAX_RESULT_CHARS:
+                    dict(step["args"]), MappingProxyType(deepcopy(results)))
+                # Store exactly the JSON bytes that were size-checked and
+                # hashed. Otherwise later callbacks may mutate prior results
+                # and leave the signed-off audit hash inconsistent with output.
+                raw = json.dumps(result, sort_keys=True, ensure_ascii=False,
+                                 allow_nan=False, separators=(",", ":")).encode("utf8")
+                if len(raw) > MAX_RESULT_CHARS:
                     raise ValueError("tool result exceeded bounded size")
-                if clock() - start >= max_seconds:
-                    raise TimeoutError("step exceeded total budget")
-                results[step["id"]] = result
+                if total_result_bytes + len(raw) > MAX_TOTAL_RESULT_BYTES:
+                    raise ValueError("cumulative tool evidence budget exceeded")
+                snapshot = json.loads(raw.decode("utf8"))
+                if time_unreliable_or_expired():
+                    raise TimeoutError("step exceeded budget or timing source degraded")
+                total_result_bytes += len(raw)
+                results[step["id"]] = snapshot
                 events.append({"step": step["id"], "tool": step["tool"],
                                "attempt": attempt + 1, "outcome": "OK",
-                               "result_sha256": hashlib.sha256(
-                                   text.encode("utf-8")).hexdigest()})
+                               "result_sha256": hashlib.sha256(raw).hexdigest()})
                 break
             except Exception:
                 events.append({"step": step["id"], "tool": step["tool"],
                                "attempt": attempt + 1, "outcome": "DEGRADED"})
-                if attempt >= step["retries"] or clock() - start >= max_seconds:
+                if attempt >= step["retries"] or time_unreliable_or_expired():
                     return {"status": "DEGRADED",
                             "reason": "read-only step failed, MLRO follow-up required",
                             "authorized_for_action": False, "events": events,

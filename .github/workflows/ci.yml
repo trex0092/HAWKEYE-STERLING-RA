@@ -22,7 +22,7 @@ jobs:
       - name: Harden the runner (egress block)
         # Tests run fully offline; the only egress is the toolchain download
         # (setup-node from nodejs.org, setup-python from the github release mirror).
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -36,15 +36,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      # Cheap module-interface gate FIRST. Previously a missing API export
+      # reached the screening-case suite after dozens of successful steps.
+      - name: Verify optional-provider module imports before costly CI suites
+        run: node test/api-integration-contracts.test.mjs
       - name: Run scoring-engine tests
         run: node test/app.test.js
       - name: Run brand guardrail (former entity name must never reappear)
         run: node test/brand-guard.test.mjs
       - name: Run workflow-hardening ratchet (SHA pins, harden-runner, timeouts, egress rationale)
         run: node test/workflow-hardening.test.mjs
+      - name: Guard bounded Chrome smoke commands and mandatory DOM assertions
+        run: node test/browser-smoke-bounds.test.mjs
       - name: Run scoring model-validation golden set
         run: node test/scoring-golden.test.js
       - name: Run CSP regression guardrail
@@ -83,6 +89,8 @@ jobs:
         run: node test/weekly-summary.test.mjs
       - name: Run screening-cases unit tests
         run: node test/screening-cases.test.mjs
+      - name: Guard optional OpenAI enrichment privacy and input/output token budget
+        run: node test/openai-screening-enrichment.test.mjs
       - name: Run asana-notify unit tests (retry policy + re-run dedup)
         run: node test/asana-notify.test.mjs
       - name: Run quarterly-review unit tests
@@ -93,6 +101,8 @@ jobs:
         run: node test/compliance-calendar.test.mjs
       - name: Run regulatory-watch unit tests
         run: node test/reg-watch.test.mjs
+      - name: Guard Regulatory Watch AI request and token budgets (offline)
+        run: node test/reg-draft-budget.test.mjs
       - name: Run sanctions-watch unit tests
         run: node test/sanctions-watch.test.mjs
       - name: Run immediate re-screen trigger guard
@@ -173,12 +183,20 @@ jobs:
         run: node scripts/coverage-figures.mjs --check
       - name: Check the country coverage gap report is in sync with the screening configuration
         run: node scripts/country-coverage-report.mjs --check
+      - name: Check the draft suggested country scores are in sync with their inputs
+        run: node scripts/country-score.mjs --check
       - name: Run console + advisor screen smoke tests
         run: node test/screens.test.js
       - name: Run advisor full-surface smoke tests (every Q&A subject + tool + ask phase)
         run: node test/advisor-smoke.test.js
       - name: Run Advisor assurance tests (charter integrity + tipping-off red-team + routing)
         run: node test/advisor-assurance.test.js
+      - name: Verify Advisor live-eval quota handling and error-log privacy (offline)
+        run: node test/advisor-eval-http.test.mjs
+      - name: Guard Netlify deploy hook logging and publication provenance (offline)
+        run: node test/netlify-deploy-workflow-privacy.test.mjs
+      - name: Test read-only Netlify API deployment diagnostics and early failure classifications
+        run: node test/netlify-deploy-preflight.test.mjs
       - name: Run Advisor bias-eval parser tests (level extraction incl. negated clauses)
         run: node test/advisor-bias-eval.test.mjs
       - name: Run AI asset register schema test
@@ -247,8 +265,12 @@ jobs:
         # floors compare each engine to ITSELF and are blind to drift between the
         # two — this is the only check that compares them to EACH OTHER.
         run: node test/matcher-parity.test.mjs
+      - name: Verify both mandatory Asana source projects in the manual sanctions workflow
+        run: python test/manual-screen-source-test.py
       - name: Run Python engine unit tests (screen + ai + agents + kyc + txn + monitoring)
         run: python test/engine_test.py
+      - name: Guard HR natural-person classification in the screening engine
+        run: python test/hr-employee-classification-regression.py
       - name: Run MCP server + tool-layer unit tests (protocol + engine wrappers)
         run: python test/mcp_tools_test.py
       - name: Run formal bias / fairness evaluation (R-05 — cross-script recall parity)
@@ -265,7 +287,7 @@ jobs:
           # Reduced motion skips the gauge draw-in animation, whose mid-flight
           # rewind raced the DOM dump under virtual time (flaky runs 38/39).
           # Chrome's own exit code is tolerated; the greps are the assertions.
-          google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
+          timeout --signal=TERM --kill-after=5s 75s google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/index.html" > /tmp/dom.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom.html
@@ -277,7 +299,7 @@ jobs:
         run: |
           # Second run without prefers-reduced-motion exercises the gauge draw-in
           # and count-up animation code paths that the stable run skips.
-          google-chrome --headless=new --no-sandbox --disable-gpu \
+          timeout --signal=TERM --kill-after=5s 75s google-chrome --headless=new --no-sandbox --disable-gpu \
             --virtual-time-budget=8000 \
             --dump-dom "file://$PWD/index.html" > /tmp/dom-motion.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-motion.html
@@ -287,7 +309,7 @@ jobs:
           echo "motion smoke ok — animation code paths exercised"
       - name: Browser smoke test (AI Operations Console)
         run: |
-          google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
+          timeout --signal=TERM --kill-after=5s 75s google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/console.html" > /tmp/dom-console.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-console.html
@@ -303,7 +325,7 @@ jobs:
           echo "console smoke ok — HUD + panels render, zero mock data on a fresh app"
       - name: Browser smoke test (Hawkeye Sterling Advisor)
         run: |
-          google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
+          timeout --signal=TERM --kill-after=5s 75s google-chrome --headless=new --no-sandbox --disable-gpu --force-prefers-reduced-motion \
             --virtual-time-budget=5000 \
             --dump-dom "file://$PWD/advisor.html" > /tmp/dom-advisor.html || echo "chrome exit tolerated; asserting content"
           test -s /tmp/dom-advisor.html
@@ -311,6 +333,41 @@ jobs:
             grep -q "$s" /tmp/dom-advisor.html || { echo "MISSING (advisor): $s"; exit 1; }
           done
           echo "advisor smoke ok — composer, persona picker and hero render"
+
+  # Independent, always-reporting policy/approval/source-integrity check.
+  # This is a REQUIRED context in .github/settings.yml. Never paths-gate the
+  # containing CI workflow on pull_request or the policy-guard will deadlock PRs.
+  policy-guard:
+    name: policy-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden policy runner (egress block)
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Protect CODEOWNERS, required checks and fail-closed Asana screening
+        run: node test/code-workflow-protection.test.mjs
+      - name: Verify required checks cannot be skipped by path or renamed
+        run: node test/protection-contexts.test.mjs
+      - name: Check both approved Asana screening populations
+        run: node test/employee-screening-wiring.test.mjs
+      - name: Verify failed screening still escalates and delivers evidence
+        run: node --test test/screening-delivery-workflow.test.mjs
 
   # Property-based fuzzing runs in its own job: unlike the stub-based suites in
   # the blocked-egress `test` job above, it imports the real engine, so it
@@ -325,7 +382,7 @@ jobs:
         # (checkout), nodejs.org for setup-node on a toolchain-cache miss,
         # PyPI for the hash-locked hypothesis install, and the npm registry
         # for the lockfile-pinned fast-check toolchain.
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -350,7 +407,7 @@ jobs:
         run: python test/fuzz_properties.py
       - name: Run screening accuracy benchmark — Python rapidfuzz backend (authoritative floors)
         run: python test/benchmark_eval.py
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: Install the lockfile-pinned npm toolchain (fast-check)

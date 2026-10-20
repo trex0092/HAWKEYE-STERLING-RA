@@ -225,6 +225,11 @@ const repetEntidades = JSON.stringify([
 const repetEnt = parseUnJson(repetEntidades);
 check('parseUnJson keeps the entity whole-name (FIRST_NAME) + ENTITY_ALIAS[].ALIAS_NAME',
   repetEnt.includes('ABDALLAH AZZAM BRIGADES (AAB)') && repetEnt.includes('Abdullah Azzam Brigades'));
+const repetOrig = parseUnJson(JSON.stringify([
+  { DATAID: '3', FIRST_NAME: 'TESTPARTY', SECOND_NAME: 'ORIGSCRIPT', NAME_ORIGINAL_SCRIPT: 'محمد عبد الله' },
+]));
+check('parseUnJson also indexes NAME_ORIGINAL_SCRIPT (Arabic-script designation, recall-only)',
+  repetOrig.includes('TESTPARTY ORIGSCRIPT') && repetOrig.includes('محمد عبد الله'));
 check('parseList routes the unjson parser', parseList({ id: 'ar-repet', parser: 'unjson' }, repetPersonas).includes('YUN HO-JIN'));
 /* A non-UN JSON body routed to unjson must degrade to the generic walker, never
    below it — so mis-routing a source can only lose the extra UN parts, not names. */

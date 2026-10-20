@@ -558,8 +558,11 @@ export const LOCALES = [
        de-LU (-> DE:de); is-IS, en-MT, en-NP, en-MM, en-KH (-> US:en); el-CY (-> GR:el);
        ar-DZ, ar-LY, ar-SY, ar-YE, ar-SD, ar-PS (-> EG:ar); es-GT, es-BO, es-PY (-> US:es-419);
        pt-MZ (-> PT:pt-150).
-     Not yet tested: es-HN, es-SV, es-NI, es-PR, en-JM, en-TT, en-ZM, en-RW, en-MW, en-BN,
-       en-FJ, en-PG, pt-CV. Do not re-add a rejected id without new evidence. */
+     Second pass the same day, all REJECTED (Google answered every request with another
+     edition's feed): es-HN, es-SV, es-NI, es-PR (-> US:es-419, query "lavado de dinero");
+       en-JM, en-TT, en-ZM, en-RW, en-MW, en-BN, en-FJ, en-PG (-> US:en, query "money
+       laundering"); pt-CV (-> PT:pt-150, 92/100 titles identical to PT:pt-150).
+     Do not re-add a rejected id without new evidence. */
   { id: 'fr-CH', hl: 'fr', gl: 'CH', ceid: 'CH:fr', lang: 'fr' },
   { id: 'te-IN', hl: 'te', gl: 'IN', ceid: 'IN:te', lang: 'te' },
   { id: 'ml-IN', hl: 'ml', gl: 'IN', ceid: 'IN:ml', lang: 'ml' },

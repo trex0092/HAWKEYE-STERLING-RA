@@ -332,8 +332,6 @@ GNEWS_LOCALES = [
     ("ko",    "KR", "KR:ko", "ko"),
     ("hi",    "IN", "IN:hi", "hi"),
     ("id",    "ID", "ID:id", "id"),
-    ("fa",    "IR", "IR:fa", "fa"),
-    ("ur",    "PK", "PK:ur", "ur"),
     ("nl",    "NL", "NL:nl", "nl"),
     # ── Extended worldwide coverage (weaponised global sweep) ──
     # More MENA / Gulf markets (local Arabic press differs by state)
@@ -345,7 +343,6 @@ GNEWS_LOCALES = [
     ("ar",    "LB", "LB:ar", "ar"),
     ("ar",    "IQ", "IQ:ar", "ar"),
     ("ar",    "MA", "MA:ar", "ar"),
-    ("ar",    "DZ", "DZ:ar", "ar"),
     ("he",    "IL", "IL:he", "he"),
     # More Asia
     ("th",    "TH", "TH:th", "th"),
@@ -379,30 +376,24 @@ GNEWS_LOCALES = [
     ("bg",    "BG", "BG:bg", "bg"),
     ("sr",    "RS", "RS:sr", "sr"),
     # South & Southeast Asia + Sub-Saharan Africa
-    ("tl",    "PH", "PH:tl", "tl"),
-    ("sw",    "KE", "KE:sw", "sw"),
-    ("sw",    "TZ", "TZ:sw", "sw"),
     ("ta",    "IN", "IN:ta", "ta"),
     # ("en-NG", "UG", "UG:en") removed 2026-09-28, with TZ:en above: both keep
     # their ceid but serve one generic international-English feed (0-1/100
     # local sources, 82-94/100 identical to each other; adverse-media.mjs
     # audit). Every removed entry duplicated content another edition already
     # sweeps, so recall is unchanged; the ledger simply stops claiming those
-    # markets. The Swahili KE:sw / TZ:sw editions are untouched.
+    # markets.
+    # Removed 2026-10-08 to match adverse-media.mjs LOCALES, which dropped them on
+    # 2026-09-26 (fa-IR, ur-PK, tl-PH, sw-KE, sw-TZ, az-AZ, kk-KZ, ka-GE, hy-AM,
+    # ne-NP, si-LK, my-MM, km-KH, af-ZA, sq-AL, hr-HR: each silently served a
+    # different edition, with no working hl/gl combination) and ar-DZ on
+    # 2026-10-08 (served EG:ar). Each duplicated a feed another edition already
+    # sweeps, so recall is unchanged; the rotation ledger stops counting them as
+    # markets. Those languages stay covered by the multilingual red-flag terms
+    # and the GDELT sweep.
     # High-risk-region editions (2026-08-05, edition-confirmed languages — mirrors adverse-media.mjs)
-    ("az", "AZ", "AZ:az", "az"),
-    ("kk", "KZ", "KZ:kk", "kk"),
-    ("ka", "GE", "GE:ka", "ka"),
-    ("hy", "AM", "AM:hy", "hy"),
-    ("ne", "NP", "NP:ne", "ne"),
-    ("si", "LK", "LK:si", "si"),
     ("pa", "IN", "IN:pa", "pa"),
     ("mr", "IN", "IN:mr", "mr"),
-    ("my", "MM", "MM:my", "my"),
-    ("km", "KH", "KH:km", "km"),
-    ("af", "ZA", "ZA:af", "af"),
-    ("sq", "AL", "AL:sq", "sq"),
-    ("hr", "HR", "HR:hr", "hr"),
     ("sl", "SI", "SI:sl", "sl"),
     ("lt", "LT", "LT:lt", "lt"),
     ("lv", "LV", "LV:lv", "lv"),
@@ -3904,6 +3895,14 @@ def parse_un(data):
                     el = entry.find(field)
                     if el is not None and el.text: parts.append(el.text.strip())
                 if parts: entry_names.append(" ".join(parts))
+                # The UN publishes the party's name in its original script
+                # (Arabic, Cyrillic, ...) as NAME_ORIGINAL_SCRIPT. It was never
+                # read, so a customer recorded in that script could not meet the
+                # designation: normalize() keeps Arabic in Arabic and romanize()
+                # deliberately does not guess it. Recall-only: it adds a name.
+                orig = entry.find("NAME_ORIGINAL_SCRIPT")
+                if orig is not None and orig.text and orig.text.strip():
+                    entry_names.append(orig.text.strip())
                 # Designated a.k.a. names are real designations the party operates
                 # under — capture them too (EU/UK parsers already do). Missing these
                 # was a false-negative gap: a UN alias-only match would screen clear.
@@ -4446,7 +4445,7 @@ def get_payment_register():
         if r is None or r.status_code not in (200, 201):
             raise RuntimeError(f"Asana payments register fetch failed: "
                                f"{getattr(r, 'status_code', 'network')}")
-        data = r.json() if isinstance(r.json(), dict) else {}
+        data = r.json()
         for t in (data.get("data") or []):
             if payment_screen.is_tm_report_task(t.get("name")):
                 continue   # our own daily report card, filed in the same section
@@ -4467,8 +4466,29 @@ def get_payment_register():
     return records, unreadable
 
 
+def _verified_asana_page(data, seen_offsets, population):
+    """Fail closed on truncated, repeated or malformed Asana task pagination."""
+    if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+        raise RuntimeError(f"FATAL: malformed {population} task collection")
+    next_page = data.get("next_page")
+    if next_page is None:
+        return None
+    if not isinstance(next_page, dict):
+        raise RuntimeError(f"FATAL: malformed {population} pagination")
+    offset = next_page.get("offset")
+    if not isinstance(offset, str) or not offset or offset in seen_offsets:
+        raise RuntimeError(f"FATAL: missing or repeated {population} continuation cursor")
+    seen_offsets.add(offset)
+    return offset
+
+
 def get_all_customers():
+    # Validate both authoritative populations before any remote read.
+    # An unset or redirected HR source cannot silently turn the run customer-only.
+    if ASANA_EMPLOYEE_DB_GID != "1216239131596624":
+        raise RuntimeError("FATAL: approved HR Employees project is required for screening")
     customers = []
+    customer_offsets = set()
     CUSTOMER_ROWS_SKIPPED.clear()
     params = {
         "project": ASANA_CUSTOMER_DB_GID,
@@ -4480,8 +4500,9 @@ def get_all_customers():
         if r is None or r.status_code not in (200, 201):
             raise RuntimeError(f"Asana customer fetch failed: "
                                f"{getattr(r,'status_code','network')} {getattr(r,'text','')[:200]}")
-        data = r.json() if isinstance(r.json(), dict) else {}
-        for t in (data.get("data") or []):
+        data = r.json()
+        customer_next_offset = _verified_asana_page(data, customer_offsets, "customer")
+        for t in data["data"]:
             if not t.get("gid") or not t.get("name"):
                 # Keep the run alive (never crash the whole book on one bad row)
                 # but NEVER drop it silently — it is a customer we did not screen.
@@ -4516,10 +4537,9 @@ def get_all_customers():
                 "email": extract_customer_email(notes),
                 "has_assessment": len(notes.strip()) > 100,
             })
-        next_page = data.get("next_page") or None
-        if not next_page or not next_page.get("offset"):
+        if customer_next_offset is None:
             break
-        params["offset"] = next_page["offset"]
+        params["offset"] = customer_next_offset
     masked = mask_population(customers)
     log(f"Loaded {len(customers)} customers")
     progress("customers-loaded", customers=len(customers))
@@ -4542,6 +4562,7 @@ def get_all_customers():
     # that silently drops out of screening is a silent clear for everyone in it.
     if ASANA_EMPLOYEE_DB_GID:
         employees = []
+        employee_offsets = set()
         eparams = {
             "project": ASANA_EMPLOYEE_DB_GID,
             "opt_fields": "gid,name,notes,permalink_url,created_at",
@@ -4555,8 +4576,9 @@ def get_all_customers():
                     f"({getattr(r,'status_code','network')}) — refusing to screen a "
                     f"population that silently dropped out. Check ASANA_EMPLOYEE_DB_GID "
                     f"or set it empty to disable employee screening explicitly.")
-            data = r.json() if isinstance(r.json(), dict) else {}
-            for t in (data.get("data") or []):
+            data = r.json()
+            employee_next_offset = _verified_asana_page(data, employee_offsets, "employee")
+            for t in data["data"]:
                 if not t.get("gid") or not t.get("name"):
                     # Same guard as the customer loop above — an employee row
                     # without a usable identity is a person we did not screen,
@@ -4580,10 +4602,9 @@ def get_all_customers():
                     "has_assessment": len(notes.strip()) > 100,
                     "kind": "employee",
                 })
-            next_page = data.get("next_page") or None
-            if not next_page or not next_page.get("offset"):
+            if employee_next_offset is None:
                 break
-            eparams["offset"] = next_page["offset"]
+            eparams["offset"] = employee_next_offset
         if not employees:
             raise RuntimeError(
                 "FATAL: 0 employees read from the HR – Employees project while employee "
@@ -5145,34 +5166,46 @@ def _manual_review_hit(subject_type, subject_name, control_linkage):
             "matched_entry": "name not auto-screenable (non-Latin script or too short) — screen this subject manually against all lists",
             "score": 0, "name_score": 0, "core_score": 0, "confidence": "REVIEW"}
 
+def screening_individuals(customer):
+    """Return screened human names, retaining an employee when notes omit names."""
+    names = list(customer.get("individuals") or [])
+    if customer.get("kind") == "employee":
+        name = str(customer.get("name") or "").strip()
+        if not name:
+            raise ValueError("Employee screening record has no name")
+        if name not in names:
+            names.insert(0, name)
+    return list(dict.fromkeys(n for n in names if str(n).strip()))
+
+
+def build_screening_subjects(customers):
+    """Use natural-person slots for employees, never fictitious company ownership."""
+    subjects = []
+    for c in customers:
+        employee = c.get("kind") == "employee"
+        if not employee:
+            subjects.append(("COMPANY", c["name"], None, c))
+        for person in screening_individuals(c):
+            subjects.append(("INDIVIDUAL", person, None if employee else c["name"], c))
+        if not employee:
+            for owner in c.get("entity_owners", []):
+                subjects.append(("ENTITY (owner)", owner, c["name"], c))
+    return subjects
+
+
 def screen_customers(customers, all_lists):
     possible_matches, clear = [], []
     for c in customers:
         hits = []
-        if _unscreenable(c["name"]):
-            hits.append(_manual_review_hit("ENTITY", c["name"], False))
-        for h in screen_name(c["name"], all_lists):
-            hits.append({"subject_type":"ENTITY","subject_name":c["name"],
-                         "control_linkage": False, **h})
-        for ind in c["individuals"]:
-            if _unscreenable(ind):
-                hits.append(_manual_review_hit("INDIVIDUAL", ind, True))
-            for h in screen_name(ind, all_lists):
-                # An owner / director / UBO matching a designation flags the
-                # COMPANY by ownership/control linkage (the 50%/control rule),
-                # even though the company name itself did not match.
-                hits.append({"subject_type":"INDIVIDUAL","subject_name":ind,
-                             "control_linkage": True, **h})
-        for ent in c.get("entity_owners", []):
-            if _unscreenable(ent):
-                hits.append(_manual_review_hit("ENTITY (owner)", ent, True))
-            for h in screen_name(ent, all_lists):
-                # A DESIGNATED corporate owner/parent flags the customer by the
-                # 50%/control rule just like a natural-person owner.
-                hits.append({"subject_type":"ENTITY (owner)","subject_name":ent,
-                             "control_linkage": True, **h})
+        for subject_type, name, parent, _ in build_screening_subjects([c]):
+            linkage = bool(parent) and subject_type != "COMPANY"
+            if _unscreenable(name):
+                hits.append(_manual_review_hit(subject_type, name, linkage))
+            for h in screen_name(name, all_lists):
+                hits.append({"subject_type": subject_type, "subject_name": name,
+                             "control_linkage": linkage, **h})
         if hits:
-            possible_matches.append({**c,"hits":hits})
+            possible_matches.append({**c, "hits": hits})
         else:
             clear.append(c)
     return possible_matches, clear
@@ -6195,6 +6228,15 @@ def stale_core_lists(list_meta, today=None, max_age=None):
             out.append((k, age))
     return sorted(out)
 
+def degraded_core_lists(list_meta, today=None):
+    """Core lists payment screening must treat as degraded: not loaded, or
+    loaded but older than the age limit. Counting only empty lists let a
+    99-day-old OFAC file clear every payment as NO MATCH while the main report
+    flagged the same list as stale."""
+    down = [k.upper() for k, v in (list_meta or {}).items()
+            if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
+    return down + [f"{k.upper()} (stale {a}d)" for k, a in stale_core_lists(list_meta, today)]
+
 # EU FSF is the one core list whose PRIMARY is the OpenSanctions host (webgate's
 # exports drift formats; the mirror's simple shape is what every parser here
 # shares) — so its fallback runs the OTHER way: official webgate XML, with the
@@ -6654,6 +6696,8 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
     sanc_status = "OK" if sanc_ok else ("DEGRADED" if any(core_loaded) else "FAILED")
     if sanc_ok and _stale:
         sanc_status = "DEGRADED (stale: " + ", ".join(f"{k.upper()} {a}d" for k, a in _stale) + ")"
+    if EOCN_REVIEW_ALERT.get("overdue"):
+        sanc_status = "DEGRADED (EOCN official review overdue)"
     pep_status = ("DEGRADED" if pep_degraded
                   else ("OK (worldwide PEP/RCA net)" if pep_mirror else "OK"))
     am_status = ("DEGRADED" if am_blackout
@@ -6678,7 +6722,9 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             pass   # unparseable target = no delivery line, never a crash
     A(f"Population screened: {stats['subjects_total']} subjects "
       f"({stats['companies_screened']} legal entities; "
-      f"{stats['individuals_screened']} shareholders, directors and UBOs)")
+      f"{stats['individuals_screened']} natural-person screening slots, including employees)")
+    A(f"Approved source records: {stats.get('customer_records', stats.get('customers_total', 0))} Customer Database tasks; "
+      f"{stats.get('employee_records', 0)} HR employee tasks (completed HR records included)")
     A(f"Control status:  Sanctions {sanc_status}  ·  Adverse media {am_status}  ·  PEP {pep_status}")
     if delta:
         A(f"New findings since the previous report:  {delta.get('sanctions',0)} sanctions  ·  "
@@ -6739,6 +6785,11 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             jur = m.get("jurisdiction") or {}
             if jur.get("reason"):
                 A(f"   Jurisdiction (R.10): {jur['reason']}")
+            if m.get("country_indicators"):
+                A(f"   Country context (not scored): {'; '.join(m['country_indicators'])}")
+            if m.get("suggested_country_score"):
+                A("   Suggested country score (draft method, pending MLRO approval; "
+                  f"not applied): {'; '.join(m['suggested_country_score'])}")
             if m.get("arrangement"):
                 A(f"   Legal arrangement (R.25): {m['arrangement']} — every party screened; "
                   "a sanctioned/PEP party flags the arrangement.")
@@ -8010,16 +8061,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 
     # Subject set first — the watchlist pass below screens it before the
     # network-bound enrichment starts.
-    subjects_all = []
-    for c in customers:
-        subjects_all.append(("COMPANY", c["name"], None, c))
-        for ind in c.get("individuals", []):
-            subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
-        # Corporate owners/parents are sanctions-screened (50%/control rule) —
-        # sweep their adverse media too, or a designated parent's coverage is
-        # never seen. No PEP check: PEP status is a natural-person concept.
-        for ent in c.get("entity_owners", []):
-            subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
+    subjects_all = build_screening_subjects(customers)
 
     # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual — the
     # network-bound sweep runs in PARALLEL (bounded pool), and it STARTS HERE,
@@ -8367,10 +8409,13 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
                     log(f"  WARN triage failed for an article ({safe_err(e)}) — deterministic verdict stands")
                     _art["triage"] = {"severity": "LOW", "relevance": "LOW",
                                       "confidence": "LOW", "ai": False}
+    ai.save_triage_cache()  # persisted via the encrypted screen-delta-state branch
     injection_blocked = sum(1 for _n, _a in _triage_work
                             if (_a.get("triage") or {}).get("injection_suspected"))
     pep_links = {p.get("permalink", "") for p in pep_findings}
     jtable = kyc.load_jurisdiction_risk()   # FATF R.10 jurisdiction-risk (maintained list)
+    ctable = kyc.load_country_indicators()  # sourced public indicators (context only, not scored)
+    stable = kyc.load_suggested_country_scores()  # DRAFT suggested country score (display only, pending MLRO)
     _summary_work = []
     for m in possible_matches:
         link = m.get("permalink", "")
@@ -8396,6 +8441,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         nationalities = [i.get("nationality", "") for i in kyc_data.get("individuals", [])]
         jtier, jreason = kyc.jurisdiction_risk_for(m.get("country", ""), nationalities, jtable)
         m["jurisdiction"] = {"tier": jtier, "reason": jreason}
+        m["country_indicators"] = kyc.country_indicators_for(m.get("country", ""), nationalities, ctable)
+        m["suggested_country_score"] = kyc.suggested_country_score_for(m.get("country", ""), nationalities, stable)
         # R.25 — legal-arrangement (trust/foundation/partnership) flag
         m["arrangement"] = kyc_data.get("arrangement_type", "") if kyc_data.get("is_arrangement") else ""
         cdd_gap_count = sum(len(i.get("cdd_gaps", [])) for i in kyc_data.get("individuals", []))
@@ -8430,6 +8477,11 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         mode_lbl += f" → DEGRADED (0 of {ai.LLM_CALLS['attempted']} LLM calls succeeded; deterministic triage stands)"
     log(f"AI: risk-rated {len(possible_matches)} flagged · {len(related)} related-party cluster(s) · "
         f"mode={mode_lbl}")
+    if ai.LLM_CALLS.get("ok", 0):
+        _u = ai.LLM_USAGE
+        log(f"AI: billed tokens this run — input {_u['input_tokens']} · output {_u['output_tokens']} · "
+            f"cache read {_u['cache_read_input_tokens']} · cache write {_u['cache_creation_input_tokens']} "
+            f"(model {ai.AI_MODEL})")
     progress("ai-triage-done", flagged=len(possible_matches), clusters=len(related))
 
     _t_ai = time.time()
@@ -8530,8 +8582,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         _pay_cfg = _file_cfg or bool(ASANA_PAYMENTS_SECTION_GID)
         _pay_res = None
         if _pay_cfg:
-            _core_down = [k.upper() for k, v in list_meta.items()
-                          if v.get("tier", "core") == "core" and v.get("count", 0) == 0]
+            _core_down = degraded_core_lists(list_meta, run_time)
             _pay_res = payment_screen.screen_feed(
                 _pay_records, all_lists,
                 jurisdiction_table=kyc.load_jurisdiction_risk(), lists_degraded=_core_down,
@@ -8558,6 +8609,8 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     arrangements = sum(1 for m in possible_matches if m.get("arrangement"))
 
     stats = {"customers_total": len(customers),
+             "customer_records": sum(1 for c in customers if c.get("kind") != "employee"),
+             "employee_records": sum(1 for c in customers if c.get("kind") == "employee"),
              "customer_rows_skipped": len(CUSTOMER_ROWS_SKIPPED),
              "companies_screened": companies,
              "individuals_screened": individuals, "subjects_total": subjects_total,
@@ -8646,24 +8699,26 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 FOLLOWUP_PROJECT_GID = os.environ.get("FOLLOWUP_PROJECT_GID", "")
 
 def followup_disposition(delta):
-    """'complete' on a clean day, 'comment' when findings need a human. Pure."""
-    clean = all(int((delta or {}).get(k, 0) or 0) == 0 for k in ("sanctions", "adverse", "pep"))
-    return "complete" if clean else "comment"
+    """A report is evidence for review, never authority to close a human reminder."""
+    return "comment"
+
 
 def followup_comment_text(today, delta, report_gid):
-    d = delta or {}
-    clean = followup_disposition(delta) == "complete"
-    lines = [f"Daily AML/CFT screening completed and delivered for {today}.",
-             f"Report: https://app.asana.com/0/0/{report_gid}",
-             f"New findings: {d.get('sanctions', 0)} sanctions · {d.get('adverse', 0)} adverse media · {d.get('pep', 0)} PEP."]
-    if clean:
-        lines.append("No new findings — this reminder has been completed automatically "
-                     "with this comment as the attestation record.")
-    else:
-        lines.append("Findings require review: see the report and the screening case board. "
-                     "Record screening evidence on the affected customer assessments, then "
-                     "complete this task as the attestation record.")
-    return "\n".join(lines)
+    keys = ("sanctions", "adverse", "pep")
+    complete = (isinstance(delta, dict) and
+                all(k in delta and isinstance(delta[k], int) and
+                    not isinstance(delta[k], bool) and delta[k] >= 0
+                    for k in keys))
+    counts = (" · ".join(f"{k}: {delta[k]}" for k in keys)
+              if complete else "UNKNOWN (missing or partial screening deltas)")
+    return "\n".join([
+        f"Daily AML/CFT screening report submitted for {today}.",
+        f"Report: https://app.asana.com/0/0/{report_gid}",
+        f"New findings: {counts}.",
+        "Findings require MLRO review where applicable. Zero new findings is not screening clearance.",
+        "This reminder remains open and must be attested and completed manually after evidence review.",
+    ])
+
 
 def attest_followup_card(today, delta, report_gid):
     if not FOLLOWUP_PROJECT_GID:
@@ -8672,24 +8727,23 @@ def attest_followup_card(today, delta, report_gid):
         r = asana_request("GET", f"https://app.asana.com/api/1.0/projects/{FOLLOWUP_PROJECT_GID}/tasks",
                           params={"opt_fields": "name,notes,completed", "limit": 100})
         if r is None or r.status_code not in (200, 201):
-            log(f"  follow-ups: card lookup failed (http {getattr(r, 'status_code', 'none')}) — attestation skipped (non-fatal)")
+            log("  follow-ups: reminder lookup not remotely confirmed")
             return
         key = f"SYSTEM|daily-screening|{today}"
         card = next((t for t in (r.json().get("data") or [])
                      if key in (t.get("notes") or "") and not t.get("completed")), None)
         if not card:
-            log("  follow-ups: no open reminder card for today — nothing to attest")
+            log("  follow-ups: no open reminder card for today")
             return
-        asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
-                      json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
-        if followup_disposition(delta) == "complete":
-            asana_request("PUT", f"https://app.asana.com/api/1.0/tasks/{card['gid']}",
-                          json={"data": {"completed": True}})
-            log("  follow-ups: clean day — reminder card attested and completed")
-        else:
-            log("  follow-ups: findings present — proof comment posted, card left open for the analyst")
+        response = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
+                                 json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
+        if response is None or response.status_code not in (200, 201):
+            log("  follow-ups: reference not remotely confirmed; reminder remains open for human review")
+            return
+        log("  follow-ups: report reference posted; reminder remains open for human review")
     except Exception as e:
-        log(f"  follow-ups: attestation failed ({str(e)[:100]}) — non-fatal, card untouched")
+        log(f"  follow-ups: attestation not remotely confirmed ({str(e)[:100]})")
+
 
 def run_unified(run_time):
     if AM_COVERAGE_RETRY:

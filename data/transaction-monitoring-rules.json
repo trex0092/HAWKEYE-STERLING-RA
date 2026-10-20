@@ -252,6 +252,75 @@
         "route_mismatch"
       ],
       "automatic_filing": false
+    },
+    {
+      "id": "TXN-GOLD-ROUTE-001",
+      "engine_rule": "GOLD_ROUTE_DEVIATION",
+      "typology": "trade_based_money_laundering_gold_route",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-172",
+        "RFC-184"
+      ],
+      "description": "Ordered evidenced gold transport route differs from documented planned route. An alert prompts chain-of-custody review, not a finding of criminality.",
+      "required_fields": [
+        "gold_trade",
+        "gold_route_planned",
+        "gold_route_actual"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-GOLD-CHANGE-001",
+      "engine_rule": "GOLD_ROUTE_CHANGE",
+      "typology": "gold_logistics_post_contract_change",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-173",
+        "RFC-175"
+      ],
+      "description": "Explicit post-contract route/consignee change in a recorded gold trade. Requires contractual and transport-document review.",
+      "required_fields": [
+        "gold_trade",
+        "gold_route_changed_after_contract"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-GOLD-ORIGIN-001",
+      "engine_rule": "GOLD_ORIGIN_UNVERIFIED",
+      "typology": "gold_origin_traceability_gap",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-135",
+        "RFC-143"
+      ],
+      "description": "Gold origin explicitly recorded as not verified. No alert is inferred from an absent field; escalate for KYS/MLRO provenance review.",
+      "required_fields": [
+        "gold_trade",
+        "gold_origin_verified"
+      ],
+      "automatic_filing": false
+    },
+    {
+      "id": "TXN-GOLD-UNREADABLE-001",
+      "engine_rule": "GOLD_ROUTE_UNREADABLE",
+      "typology": "gold_transport_evidence_quality_gap",
+      "severity": "HIGH",
+      "detection": "automated",
+      "source_red_flags": [
+        "RFC-183"
+      ],
+      "description": "Gold route fields are malformed. Explicit manual validation is required; a malformed route on one payment does not suppress valid alerts on other payments.",
+      "required_fields": [
+        "gold_trade",
+        "gold_route_planned",
+        "gold_route_actual"
+      ],
+      "automatic_filing": false
     }
   ]
 }

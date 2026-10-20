@@ -38,6 +38,8 @@ All 12 capabilities are implemented without adding a runtime dependency. The mai
 5. Sanctions hits carry configured source provenance where available.
 6. CDD principal parsing preserves nationality, DOB and passport fields for screening.
 7. The yente comparison remains shadow/benchmark-only; it is not the operative matcher.
+8. opensanctions/rigour (MIT) is benchmark-only too: `.github/workflows/arabic-name-bench.yml` measures its cross-script name symbols on UN Latin/Arabic gold pairs. It is installed only in that CI job (its dependency python-stdnum is LGPL-2.1, used unmodified as a library) and is never imported by the engine.
+9. moov-io/watchman (Apache-2.0) is a second shadow benchmark engine beside yente: `.github/workflows/watchman-bench.yml` scores it on the repo's own fixtures with no government list loaded. It is not the operative matcher.
 
 ## Licensing and supply-chain boundary
 

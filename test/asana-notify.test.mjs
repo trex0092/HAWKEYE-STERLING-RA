@@ -2,9 +2,11 @@
    shared transient-failure policy (retry classification + backoff) and the
    re-run duplicate guard used by every monitoring delivery stream. */
 import {
-  isRetryable, retryDelayMs, findRecentDuplicate, esc, buildHtmlBody, notifyAsana,
+  asana, isRetryable, retryDelayMs, resolveAsanaTimeoutMs, ASANA_TIMEOUT_DEFAULT_MS, publicAsanaRejection, findRecentDuplicate, findDateScopedDailyDuplicates,
+  esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
-  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize
+  listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize, appendOpenAlertEvidence,
+  findOpenMonitoringAlert, verifyNewMonitoringAlert, OPEN_ALERT_PAGE_CAP
 } from '../scripts/asana-notify.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +31,289 @@ check('backoff is capped at 8s', retryDelayMs(10) === 8000);
 check('Retry-After header wins when present', retryDelayMs(0, '5') === 5000);
 check('Retry-After is capped at 30s', retryDelayMs(0, '900') === 30000);
 check('garbage Retry-After falls back to backoff', retryDelayMs(1, 'soon') === 2000);
+
+/* Abort-signal deadline is enforced by the shared Asana fetch boundary,
+   including non-replayable writes; synthetic transport only. */
+{
+  check('Asana fetch timeout has a bounded default and no unlimited zero timeout',
+    ASANA_TIMEOUT_DEFAULT_MS === 30000 &&
+    resolveAsanaTimeoutMs(undefined) === 30000 &&
+    resolveAsanaTimeoutMs('0') === 1000 &&
+    resolveAsanaTimeoutMs('500') === 1000 &&
+    resolveAsanaTimeoutMs('120000') === 60000 &&
+    resolveAsanaTimeoutMs('invalid') === 30000);
+  const old = globalThis.fetch;
+  const token = process.env.ASANA_ACCESS_TOKEN;
+  const env = process.env.ASANA_HTTP_TIMEOUT_MS;
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-not-live';
+  process.env.ASANA_HTTP_TIMEOUT_MS = '2500';
+  try {
+    let observed = null, attempts = 0;
+    globalThis.fetch = async (_url, options = {}) => {
+      observed = options.signal;
+      attempts++;
+      throw new Error('synthetic ambiguous Asana network termination');
+    };
+    let failed = false;
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'synthetic case' } }) });
+    } catch (e) {
+      failed = e.message === 'Asana transport failure; remote outcome not confirmed';
+    }
+    check('every non-replayable Asana POST receives an AbortSignal and cannot retry after an unknown outcome',
+      failed && attempts === 1 && observed instanceof globalThis.AbortSignal);
+
+    const external = new AbortController();
+    let compositeSignal = null;
+    globalThis.fetch = (_url, options = {}) => new Promise((_resolve, reject) => {
+      compositeSignal = options.signal;
+      if (!compositeSignal) return reject(Error('missing deadline signal'));
+      if (compositeSignal.aborted) return reject(Error('synthetic aborted'));
+      compositeSignal.addEventListener('abort', () => reject(Error('synthetic aborted')), { once: true });
+    });
+    const pending = asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+      signal: external.signal, body: JSON.stringify({ data: { name: 'synthetic case' } }) });
+    external.abort();
+    let aborted = false;
+    try { await pending; }
+    catch (e) { aborted = e.message === 'Asana transport failure; remote outcome not confirmed'; }
+    check('caller cancellation remains effective alongside the bounded Asana network deadline',
+      aborted && compositeSignal instanceof globalThis.AbortSignal && compositeSignal.aborted);
+  } finally {
+    globalThis.fetch = old;
+    if (token === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = token;
+    if (env === undefined) delete process.env.ASANA_HTTP_TIMEOUT_MS;
+    else process.env.ASANA_HTTP_TIMEOUT_MS = env;
+  }
+}
+
+/* Asana task creation is non-replayable after an ambiguous response.
+   On 429 the service explicitly did NOT accept the mutation, and bounded
+   Retry-After remains safe. All requests here are synthetic mocked fetches. */
+{
+  const old = globalThis.fetch;
+  const originalToken = process.env.ASANA_ACCESS_TOKEN;
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-test-only';
+  try {
+    let attempts = 0, failed = false;
+    globalThis.fetch = async () => { attempts++; throw new Error('synthetic lost response'); };
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'synthetic alert' } }) });
+    } catch { failed = true; }
+    check('ambiguous network outcome never replays a compliance task creation',
+      failed && attempts === 1);
+
+    attempts = 0; failed = false;
+    globalThis.fetch = async () => {
+      attempts++;
+      return { ok: false, status: 503,
+        headers: { get: () => null }, json: async () => ({ errors: [{ message: 'synthetic' }] }) };
+    };
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'synthetic alert' } }) });
+    } catch { failed = true; }
+    check('ambiguous server-500 class response does not create duplicate tasks on retry',
+      failed && attempts === 1);
+
+    attempts = 0;
+    globalThis.fetch = async () => {
+      attempts++;
+      return attempts === 1
+        ? { ok: false, status: 429, headers: { get: () => '0.001' },
+          json: async () => ({ errors: [{ message: 'rate limited' }] }) }
+        : { ok: true, status: 200, headers: { get: () => null },
+          json: async () => ({ data: { gid: '1219451234567890' } }) };
+    };
+    const delivered = await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+      body: JSON.stringify({ data: { name: 'synthetic alert' } }) });
+    check('definite 429 refusal still honors bounded retry without losing an Asana alert',
+      attempts === 2 && delivered.data.gid === '1219451234567890');
+    const source = readFileSync(new URL('../scripts/asana-alert.mjs', import.meta.url), 'utf8');
+    check('new compliance task creation opts out of replay on unknown Asana outcomes',
+      /const d = await asana\('\/tasks', \{[\s\S]*?method: 'POST',[\s\S]*?noRetryOnUnknownOutcome: true/.test(source));
+  } finally {
+    globalThis.fetch = old;
+    if (originalToken === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = originalToken;
+  }
+}
+
+/* Every newly issued compliance alert requires read-back proof that the
+   actual task exists in its approved destination. Offline mocks only. */
+{
+  const project = '1216203370612914', section = '1218451960830318';
+  const name = 'SCREENING ASSURANCE DEGRADED: synthetic test';
+  const seenPaths = [];
+  const found = await findOpenMonitoringAlert(async path => {
+    seenPaths.push(path);
+    return seenPaths.length === 1
+      ? { data: [{ gid: '100', name: 'Unrelated alert' }], next_page: { offset: 'token+/=' } }
+      : { data: [{ gid: '1218981120144411', name }], next_page: null };
+  }, project, name);
+  check('open monitoring alert lookup scans later pages and escapes cursor data',
+    found?.gid === '1218981120144411' && seenPaths.length === 2
+    && seenPaths[1].includes('offset=token%2B%2F%3D'));
+  const missing = await findOpenMonitoringAlert(async () => ({ data: [], next_page: null }), project, name);
+  check('complete empty task search safely identifies a genuinely new alert', missing === null);
+  let loopRefused = false;
+  try {
+    await findOpenMonitoringAlert(async () => ({ data: [], next_page: { offset: 'repeat' } }), project, name);
+  } catch { loopRefused = true; }
+  check('repeated Asana task page cursor fails closed rather than creating another alert', loopRefused);
+  let incompleteRefused = false;
+  try { await findOpenMonitoringAlert(async () => ({ data: null }), project, name); }
+  catch { incompleteRefused = true; }
+  check('malformed task list fails closed, not mistaken for no duplicate', incompleteRefused);
+  let capRefused = false;
+  try {
+    await findOpenMonitoringAlert(async () => ({ data: [], next_page: { offset: 'later' } }),
+      project, name, { maxPages: 1 });
+  } catch { capRefused = true; }
+  check('bounded task scan refuses to declare no existing alert when pagination is incomplete',
+    capRefused && OPEN_ALERT_PAGE_CAP >= 100);
+
+  const id = '1219451234567890';
+  const correct = { data: { gid: id, name,
+    permalink_url: 'https://app.asana.com/0/0/' + id,
+    memberships: [{ project: { gid: project }, section: { gid: section } }] } };
+  const verified = await verifyNewMonitoringAlert(async () => correct, id,
+    { title: name, projectGid: project, sectionGid: section });
+  check('new monitoring alert is verified against its destination section and exact task identity',
+    verified.gid === id && verified.permalink_url.endsWith(id));
+  let missingGidRefused = false;
+  try { await verifyNewMonitoringAlert(async () => correct, '',
+    { title: name, projectGid: project, sectionGid: section }); }
+  catch { missingGidRefused = true; }
+  check('missing task receipt fails closed before false delivery success', missingGidRefused);
+  let wrongSectionRefused = false;
+  try { await verifyNewMonitoringAlert(async () => ({
+    data: { ...correct.data, memberships: [{ project: { gid: project }, section: { gid: '123456' } }] }
+  }), id, { title: name, projectGid: project, sectionGid: section }); }
+  catch { wrongSectionRefused = true; }
+  check('task delivered outside the MLRO section cannot be reported as successful',
+    wrongSectionRefused);
+  let staleTitleRefused = false;
+  try { await verifyNewMonitoringAlert(async () => ({ data: { ...correct.data, name: 'Other' } }),
+    id, { title: name, projectGid: project, sectionGid: section }); }
+  catch { staleTitleRefused = true; }
+  check('task with an unconfirmed or changed title is not a valid delivery receipt',
+    staleTitleRefused);
+  const source = readFileSync(new URL('../scripts/asana-alert.mjs', import.meta.url), 'utf8');
+  check('operational alert publisher refuses missing created GIDs and verifies remote placement',
+    /if \(!\/\^\\d\+\$\/\.test\(String\(gid \|\| ''\)\)\)/.test(source)
+    && /verifyNewMonitoringAlert\(asana, gid/.test(source)
+    && /findOpenMonitoringAlert\(asana, PROJECT_GID, title\)/.test(source));
+}
+
+/* Asana responses are untrusted, potentially containing confidential case
+   names, document IDs or tokens. Only fixed error categories reach CI logs. */
+{
+  const privateText = 'SYNTHETIC_PERSON_DO_NOT_LOG__PASSPORT_ABC123';
+  const fakeResponse = (code, message) => ({
+    ok: false, status: code, headers: { get: () => null },
+    json: async () => ({ errors: [{ message }] })
+  });
+  check('provider 4xx details never pass into a returned/logged screening error',
+    publicAsanaRejection(400, { errors: [{ message: 'invalid subject ' + privateText }] })
+      === 'Asana 400: request rejected (provider details redacted)');
+  check('recognised html_notes oversize is safely classified without reflecting provider details',
+    publicAsanaRejection(400, { errors: [{
+      message: '.html_notes : Rich text value is too large. ' + privateText
+    }] }) === 'Asana 400: Rich text value is too large');
+  const oldFetch = globalThis.fetch, oldToken = process.env.ASANA_ACCESS_TOKEN;
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-not-live';
+  try {
+    globalThis.fetch = async () => fakeResponse(403, 'Private client ' + privateText);
+    let reject = '';
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'Synthetic' } }) });
+    } catch (e) { reject = e.message; }
+    check('Asana 403 preserves status but never logs a private response body',
+      reject.startsWith('Asana 403:') && !reject.includes(privateText));
+
+    globalThis.fetch = async () => { throw new Error('network: ' + privateText); };
+    let transport = '';
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'Synthetic' } }) });
+    } catch (e) { transport = e.message; }
+    check('a lost Asana response never propagates a raw network exception or private identifiers',
+      transport === 'Asana transport failure; remote outcome not confirmed'
+      && !transport.includes(privateText));
+
+    globalThis.fetch = async () => fakeResponse(400,
+      '.html_notes : Rich text value is too large. ' + privateText);
+    let sizeError = '';
+    try {
+      await asana('/tasks', { method: 'POST', noRetryOnUnknownOutcome: true,
+        body: JSON.stringify({ data: { name: 'Synthetic' } }) });
+    } catch (e) { sizeError = e.message; }
+    check('Asana rich-text size fallback can still detect the safe fixed refusal',
+      /too large/i.test(sizeError) && !sizeError.includes(privateText));
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldToken === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = oldToken;
+  }
+}
+
+/* An existing screening-assurance alert must receive each new failed-run link.
+   Synthetic story IDs only; no actual Asana mutations in this test. */
+{
+  const evidence = 'Screening assurance FAILED. Run: https://github.com/example/repo/actions/runs/123';
+  const calls = [];
+  const mock = async (path, opts = {}) => {
+    calls.push({ path, opts });
+    if (opts.method === 'POST') return { data: { gid: '99123568' } };
+    return { data: [], next_page: null };
+  };
+  const added = await appendOpenAlertEvidence(mock, '1218981120144411', evidence);
+  check('existing alert gets remotely confirmed failure evidence without updating or completing the task',
+    added.posted === true && calls.length === 2
+    && calls[0].path.includes('/stories?')
+    && calls[1].path === '/tasks/1218981120144411/stories'
+    && calls[1].opts.method === 'POST'
+    && calls[1].opts.noRetryOnUnknownOutcome === true
+    && JSON.parse(calls[1].opts.body).data.text === evidence);
+  const duplicates = [];
+  const duplicate = await appendOpenAlertEvidence(async (path, opts = {}) => {
+    duplicates.push([path, opts.method]);
+    return { data: [{ gid: '99123568', text: evidence }], next_page: null };
+  }, '1218981120144411', evidence);
+  check('re-running a failed assurance job does not duplicate an existing story or task',
+    duplicate.alreadyRecorded === true && duplicate.posted === false
+    && duplicates.length === 1 && !duplicates[0][1]);
+  let refusedUnconfirmed = false;
+  try {
+    await appendOpenAlertEvidence(async (path, opts = {}) =>
+      opts.method === 'POST' ? { data: {} } : { data: [], next_page: null },
+    '1218981120144411', evidence);
+  } catch { refusedUnconfirmed = true; }
+  check('unconfirmed Asana story response fails loudly, never claims an alert update',
+    refusedUnconfirmed);
+  let refusedBadHistory = false;
+  try {
+    await appendOpenAlertEvidence(async () => ({ data: null }),
+      '1218981120144411', evidence);
+  } catch { refusedBadHistory = true; }
+  check('missing Asana comment history fails closed rather than duplicate-posting',
+    refusedBadHistory);
+  let malformedGidBlocked = false;
+  try { await appendOpenAlertEvidence(mock, 'bogus', evidence); }
+  catch { malformedGidBlocked = true; }
+  check('invalid alert GID cannot reach an Asana write', malformedGidBlocked);
+  const wf = readFileSync(new URL('../.github/workflows/screening-assurance.yml', import.meta.url), 'utf8');
+  const alerts = readFileSync(new URL('../scripts/asana-alert.mjs', import.meta.url), 'utf8');
+  check('only Screening Assurance opts in to updating existing alert evidence',
+    /ASANA_ALERT_REFRESH_OPEN: '1'/.test(wf)
+    && /process\.env\.ASANA_ALERT_REFRESH_OPEN === '1'/.test(alerts)
+    && /appendOpenAlertEvidence\(asana, existing\.gid, notes\)/.test(alerts));
+}
 
 /* ── re-run duplicate guard ── */
 const NOW = Date.parse('2026-07-02T08:00:00Z');
@@ -87,6 +372,87 @@ check('dedupPrefix: outside the window the same-prefix card is not a duplicate',
     '🛡️ Sanctions Screen — 2026-07-02 — y', NOW, 6, '🛡️ Sanctions Screen — 2026-07-02') === null);
 check('without dedupPrefix exact-match semantics are unchanged',
   findRecentDuplicate(digestTasks, '🛡️ Sanctions Screen — 2026-07-02 — 3 new match(es) · 326 screened', NOW) === null);
+
+/* ── whole-day screening digest idempotency (offline Asana mock) ── */
+const dateKey = '🛡️ Sanctions Screen — 2026-07-02';
+const lateTask = { gid: '9001', name: dateKey + ' — 2 new match(es) · 325 screened',
+  created_at: hoursAgo(13), permalink_url: 'https://asana.example/9001' };
+check('same-day digest created thirteen hours earlier is still the authoritative card',
+  findDateScopedDailyDuplicates([lateTask], dateKey).length === 1 &&
+  findRecentDuplicate([lateTask], lateTask.name, NOW) === null);
+check('date-scoped digest never matches the previous UTC screening date',
+  findDateScopedDailyDuplicates([lateTask], '🛡️ Sanctions Screen — 2026-07-03').length === 0);
+check('multiple existing same-day summaries are visible as an ambiguity',
+  findDateScopedDailyDuplicates([lateTask, { ...lateTask, gid: '9002' }], dateKey).length === 2);
+check('invalid date or arbitrary prefix is refused by the daily-only guard',
+  (() => {
+    try { findDateScopedDailyDuplicates([], 'Sanctions Watch'); return false; }
+    catch { return true; }
+  })() && (() => {
+    try { findDateScopedDailyDuplicates([], '🛡️ Sanctions Screen — 2026-02-30'); return false; }
+    catch { return true; }
+  })());
+
+{
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.ASANA_ACCESS_TOKEN;
+  const project = '1216203370612914', section = '1218451960830318';
+  process.env.ASANA_ACCESS_TOKEN = 'synthetic-test-credential';
+  let rows = [lateTask];
+  let title = lateTask.name;
+  let puts = 0, posts = 0;
+  const response = data => ({
+    ok: true, status: 200, headers: { get: () => null }, json: async () => ({ data })
+  });
+  globalThis.fetch = async (url, opts = {}) => {
+    const path = String(url).replace('https://app.asana.com/api/1.0', '');
+    if (path.startsWith('/sections/') && !path.endsWith('/addTask'))
+      return response({ gid: section, name: 'Screening Sanctions Update',
+        project: { gid: project } });
+    if (path.startsWith('/projects/' + project + '/tasks?')) {
+      return { ...response(rows), json: async () => ({ data: rows, next_page: null }) };
+    }
+    if (path === '/sections/' + section + '/addTask') return response({});
+    if (path === '/tasks/9001' && opts.method === 'PUT') {
+      puts++;
+      title = JSON.parse(opts.body).data.name;
+      return response({ gid: '9001' });
+    }
+    if (path.startsWith('/tasks/9001?'))
+      return response({ name: title, notes: 'Daily sanctions screening — updated',
+        permalink_url: 'https://asana.example/9001',
+        memberships: [{ project: { gid: project }, section: { gid: section } }] });
+    if (path === '/tasks' && opts.method === 'POST') {
+      posts++;
+      return response({ gid: '9003' });
+    }
+    throw new Error('Unknown synthetic Asana endpoint');
+  };
+  try {
+    await notifyAsana(dateKey + ' — 3 new match(es) · 326 screened', '', {
+      project, section, assignee: null,
+      html: '<body><h1>Daily sanctions screening — synthetic</h1></body>',
+      dateScopedDigest: true, dedupPrefix: dateKey
+    });
+    check('late screening rerun updates + readback-verifies one existing card instead of posting another',
+      puts === 1 && posts === 0 && title.includes('3 new match(es) · 326 screened'));
+    rows = [lateTask, { ...lateTask, gid: '9002' }];
+    let refused = false;
+    try {
+      await notifyAsana(dateKey + ' — changed', '', {
+        project, section, assignee: null,
+        html: '<body><h1>Daily sanctions screening — synthetic</h1></body>',
+        dateScopedDigest: true, dedupPrefix: dateKey
+      });
+    } catch { refused = true; }
+    check('two same-day cards require human reconciliation; no third digest is created',
+      refused && puts === 1 && posts === 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.ASANA_ACCESS_TOKEN;
+    else process.env.ASANA_ACCESS_TOKEN = originalToken;
+  }
+}
 
 /* ── existing helpers still hold ── */
 check('esc escapes all five XML-sensitive characters',
@@ -456,8 +822,11 @@ check('a sectionless mirror still joins the project',
     /name:\s*fitAsanaName\(name\)/.test(notify) && /data\.notes = fitAsanaText\(notes\)/.test(notify));
   check('wiring: the Adverse Media & PEP audit card caps by bytes',
     /name:\s*fitAsanaName\(name\),\s*notes:\s*fitAsanaText\(notes\)/.test(screen));
-  check('wiring: the screening-case card caps title and body by bytes',
-    /name:\s*fitAsanaName\(caseTitle\(/.test(cases) && /html_notes:\s*fitAsanaHtml\(caseHtml\(/.test(cases));
+  check('wiring: the screening-case card caps title and body by bytes before verified creation',
+    /createVerifiedScreeningCase\(asana,\s*\{/.test(cases) &&
+    /title:\s*fitAsanaName\(caseTitle\(/.test(cases) &&
+    /htmlNotes:\s*fitAsanaHtml\(caseHtml\(/.test(cases) &&
+    /name:\s*title,\s*html_notes:\s*htmlNotes/.test(cases));
   /* The regression that started all this: a character slice on an Asana field.
      Any new one is a bug waiting for the next multilingual card. */
   for (const [file, text] of [['scripts/asana-notify.mjs', notify],

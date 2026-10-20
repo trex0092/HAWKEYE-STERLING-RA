@@ -70,7 +70,7 @@ jobs:
       makeup: ${{ steps.decide.outputs.makeup }}
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           egress-policy: block
@@ -119,7 +119,7 @@ jobs:
 
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           # This job holds contents:write and fetches external content while handling
@@ -271,11 +271,11 @@ jobs:
               echo "::error::screen-delta-state exists but could not be fetched — refusing to run with state amnesia (the commit step force-pushes, so this run would destroy the accumulated delta-state)"
               exit 1
             fi
-            for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
+            for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json data/ai-triage-cache.json; do
               git checkout FETCH_HEAD -- "$f" 2>/dev/null || true
               git checkout FETCH_HEAD -- "$f.enc" 2>/dev/null || true
             done
-            node scripts/state-crypto.mjs decrypt data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json
+            node scripts/state-crypto.mjs decrypt data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json data/ai-triage-cache.json
             echo "delta-state overlaid from screen-delta-state"
           else
             echo "no screen-delta-state branch yet — using state from main"
@@ -383,11 +383,10 @@ jobs:
           EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
-          # HR - Employees screening population (MLRO-directed 2026-07-29,
-          # see screen.py). Never forwarded here before, so screen.py always
-          # fell back to its own hardcoded default (1216139945846994), which
-          # does not exist in Asana, and that FATAL guard aborted the run.
-          ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID || '1216239131596624' }}
+          # Both approved Asana projects are mandatory screening populations.
+          # Pin HR here: a non-empty stale repository variable would otherwise
+          # redirect the Python engine to an unapproved or missing project.
+          ASANA_EMPLOYEE_DB_GID: '1216239131596624'
           ASANA_DELIVERY_SECTION_GID: '1218979441933783'
           ASANA_SANCTIONS_SECTION_GID: '1218451960830318'
           ASANA_MEDIA_SECTION_GID: '1218979441933783'
@@ -435,6 +434,10 @@ jobs:
           # is real, so raise them only for supervised off-schedule runs.
           ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
           SCREEN_CONCURRENCY: ${{ vars.SCREEN_CONCURRENCY || '8' }}
+          # The 2026-10-13 live sweep read 65/192 GDELT GKG files with the old 6-worker/900s defaults.
+          # Raise the bounded bulk-scan budget while keeping both values operator-tunable.
+          GKG_WORKERS: ${{ vars.GKG_WORKERS || '12' }}
+          GKG_DEADLINE_SEC: ${{ vars.GKG_DEADLINE_SEC || '2400' }}
           # DAILY DELIVERY TARGET: 09:00 UAE (05:00 UTC). GitHub's 2-4h schedule
           # delay means the run can't control its start, so it controls its
           # finish: news enrichment budgets itself against the target, trimmed
@@ -512,7 +515,7 @@ jobs:
           # so CURRENT subject data never lands on the public branch (P30,
           # encrypt-forward).
           state_files=()
-          for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
+          for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json data/ai-triage-cache.json; do
             [ -f "$f" ] && state_files+=("$f")
           done
           if [ "${#state_files[@]}" -gt 0 ] && [ -n "$(git status --porcelain -- "${state_files[@]}")" ]; then

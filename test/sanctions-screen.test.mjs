@@ -859,6 +859,26 @@ check('yente: report renders the threshold table and per-mechanism recall',
 check('yente: report frames adoption as governed by the recall-monotone invariant',
   _ybMd.includes('recall-monotone') && _ybMd.includes('baseline.json'));
 
+/* ── watchman benchmark (experimental, shadow-only — pure functions) ── */
+const wb = await import('./../scripts/watchman-bench.mjs');
+const _wbCsv = wb.buildCsv(new Map([['Acme "Gold" LLC', 'r1'], ['Jane Doe', 'r2']]));
+check('watchman: CSV has the mapped header and one row per listed name',
+  _wbCsv.split('\n')[0] === 'name,source_id' && _wbCsv.trim().split('\n').length === 3);
+check('watchman: CSV escapes embedded quotes',
+  _wbCsv.includes('"Acme ""Gold"" LLC","r1"'));
+const _wbCfg = wb.buildConfig();
+check('watchman: config loads no government list',
+  _wbCfg.includes('IncludedLists: []'));
+check('watchman: config declares a person and a business ingest type mapped to the CSV',
+  _wbCfg.includes(wb.SOURCES.person + ':') && _wbCfg.includes(wb.SOURCES.business + ':')
+  && _wbCfg.includes('default: "person"') && _wbCfg.includes('default: "business"')
+  && (_wbCfg.match(/column: name/g) || []).length === 4);
+check('watchman: thresholds include the documented screening line (0.80)',
+  wb.THRESHOLDS.includes(0.8));
+const _wbMd = wb.report([yb.evaluate(_ybPairs, _ybNegs, _ybRes, 0.7)]);
+check('watchman: report frames adoption as governed by the recall-monotone invariant',
+  _wbMd.includes('recall-monotone') && _wbMd.includes('No sanctions data downloaded'));
+
 /* ── worldwide expansion: CSL parser, ODS parser, FBI Wanted signal ── */
 const wm = await import('./../scripts/sanctions-match.mjs');
 const _csl = wm.parseCslCsv(

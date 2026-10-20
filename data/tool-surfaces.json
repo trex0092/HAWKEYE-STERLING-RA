@@ -403,7 +403,7 @@
     {
       "id": "composio",
       "vendor": "Composio",
-      "purpose": "Optional outer orchestration layer for authenticated business-app actions and event triggers across Asana, Gmail, Google Drive, Slack and GitHub. It is excluded from sanctions, adverse-media, PEP, risk scoring and runtime-assurance decisions.",
+      "purpose": "Optional, default-disabled Composio business-app orchestration, gated to individually reviewed read-tool slugs across Asana, Gmail, Google Drive, Slack and GitHub; pure offline Composio reference coverage can be assessed by composio_engine.py over local MCP without credentials or network. No screening/PEP/CDD decisions.",
       "hosts": [
         "backend.composio.dev"
       ],
@@ -414,12 +414,17 @@
       "callers": [
         "netlify/functions/_composio.js"
       ],
-      "data_out": "Only when explicitly enabled and invoked: the tool arguments required for the selected connected app action can leave Hawkeye for Composio and the destination provider. Depending on the chosen tool this can include email content, document/file metadata or content, Slack messages, Asana task data, or GitHub repository data. COMPOSIO_ENABLED=0 is the default and no screening decision depends on this connector.",
+      "data_out": "ONLY when COMPOSIO_ENABLED=1 after vendor/go-live approval and a named tool slug is separately approved: bounded read-only arguments and provider results may traverse Composio and the connected business app. The local Python evidence checker consumes exclusively operator-normalized existence/status/date metadata; it has no egress or raw provider content. Hosted MCP, mutating operations, proxy and presigned links remain disabled by default.",
       "kill_switches": [
         "COMPOSIO_ENABLED=0",
         "unset COMPOSIO_API_KEY",
         "revoke connected accounts in Composio",
-        "COMPOSIO_ALLOW_PROXY=0 keeps raw proxy execution disabled"
+        "COMPOSIO_ALLOW_PROXY=0 keeps raw proxy execution disabled",
+        "COMPOSIO_READ_TOOL_SLUGS unset/empty denies named tool execution",
+        "COMPOSIO_ALLOW_HOSTED_MCP=0 disables hosted MCP sessions",
+        "COMPOSIO_ALLOW_ADMIN_MUTATIONS=0 gates triggers, mounts and webhook changes",
+        "COMPOSIO_ALLOW_PRESIGNED_URLS=0 denies ephemeral file download links",
+        "COMPOSIO_ALLOW_ADVANCED_SESSION=0 denies session attach"
       ]
     }
   ],

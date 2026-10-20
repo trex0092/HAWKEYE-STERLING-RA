@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Harden the runner (egress block)
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
           disable-sudo: true
           # This job holds contents:write and fetches external content while handling
@@ -149,11 +149,11 @@ jobs:
               echo "::error::screen-delta-state exists but could not be fetched — refusing to run with state amnesia (the commit step force-pushes, so this run would destroy the accumulated delta-state)"
               exit 1
             fi
-            for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
+            for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json data/ai-triage-cache.json; do
               git checkout FETCH_HEAD -- "$f" 2>/dev/null || true
               git checkout FETCH_HEAD -- "$f.enc" 2>/dev/null || true
             done
-            node scripts/state-crypto.mjs decrypt data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json
+            node scripts/state-crypto.mjs decrypt data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json data/ai-triage-cache.json
             echo "delta-state overlaid from screen-delta-state"
           else
             echo "no screen-delta-state branch yet — using state from main"
@@ -196,17 +196,10 @@ jobs:
           # OFF unless the repository variable is set — CC-BY-NC data, see
           # docs/aims/third-party-register.md before enabling.
           ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}
-          # HR - Employees screening population (MLRO-directed 2026-07-29,
-          # see screen.py). Never forwarded here before, so screen.py always
-          # fell back to its own hardcoded default (1216139945846994), which
-          # does not exist in Asana, and that FATAL guard aborted the run
-          # (confirmed: run 35391973300, 2026-09-18, 'Asana employee fetch
-          # failed (404)'). Falls back to the live HR - Employees project, as
-          # the unified daily screen does: an UNSET repo variable expands to an
-          # empty string, and screen.py reads an empty value as "employee
-          # screening disabled", so the onboarding screen would silently skip
-          # the whole employee population.
-          ASANA_EMPLOYEE_DB_GID: ${{ vars.ASANA_EMPLOYEE_DB_GID || '1216239131596624' }}
+          # Both approved Asana projects are mandatory screening populations.
+          # Pin HR here: a non-empty stale repository variable would otherwise
+          # redirect the Python engine to an unapproved or missing project.
+          ASANA_EMPLOYEE_DB_GID: '1216239131596624'
           ONBOARDING_WINDOW_HOURS: ${{ github.event.inputs.window_hours || '26' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # PDPL GATE: code defaults OFF; enabling requires explicit repo variable LLM_TRIAGE=1.
@@ -243,7 +236,7 @@ jobs:
           # content so CURRENT subject data never lands on the public branch
           # (P30, encrypt-forward; same pattern as the daily sweep).
           state_files=()
-          for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json; do
+          for f in data/screen-delta-state.json data/adverse-media-evidence.json data/run-metrics.json data/source-coverage-state.json data/ai-triage-cache.json; do
             [ -f "$f" ] && state_files+=("$f")
           done
           if [ "${#state_files[@]}" -gt 0 ] && [ -n "$(git status --porcelain -- "${state_files[@]}")" ]; then

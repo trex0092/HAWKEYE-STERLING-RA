@@ -1,4 +1,4 @@
-# Prompt-Injection Red-Team Procedure (AIMS A.5.5 / risk R-02)
+# Prompt-Injection Red-Team Procedure (AIMS A.6.2.4 / risk R-02)
 
 **Owner:** MLRO (accountable) · system maintainer (operational)
 **Review cadence:** quarterly, with the manual campaign round.

@@ -9,7 +9,7 @@
 const APP_VERSION = '4.0.0';
 const TOAST_DURATION_MS = 2600; /* keeps toasts readable per accessibility guidelines */
 
-const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":1},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":1},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":1},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":1},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":1},{"name":"Isle of Man","score":1},{"name":"Belgium","score":1},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":1},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":1},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":1},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":2},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":2},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":1},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":2},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":2},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":2},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":3},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":1},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":2},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3,"cfa":true},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3,"cfa":true},{"name":"Islamic Republic of Iran","score":3,"cfa":true}];
+const COUNTRIES = [{"name":"Åland Islands","score":1},{"name":"Svalbard and Jan Mayen","score":1},{"name":"Tokelau","score":1},{"name":"Finland","score":1},{"name":"Faroe Islands","score":1},{"name":"Iceland","score":2},{"name":"Norway","score":1},{"name":"Denmark","score":1},{"name":"Greenland","score":1},{"name":"San Marino","score":1},{"name":"Sweden","score":1},{"name":"Estonia","score":1},{"name":"Vatican City State (Holy See)","score":1},{"name":"Lithuania","score":2},{"name":"Andorra","score":1},{"name":"Bermuda","score":1},{"name":"New Zealand","score":1},{"name":"Liechtenstein","score":1},{"name":"Christmas Island","score":1},{"name":"Cocos (Keeling) Islands","score":1},{"name":"Norfolk Island","score":1},{"name":"French Polynesia","score":1},{"name":"Mayotte","score":1},{"name":"New Caledonia","score":1},{"name":"Saint Barthélemy","score":1},{"name":"Saint Martin (French part)","score":1},{"name":"Saint Pierre and Miquelon","score":1},{"name":"Wallis and Futuna","score":1},{"name":"Brunei Darussalam","score":1},{"name":"British Indian Ocean Territory","score":1},{"name":"Falkland Islands (Malvinas)","score":1},{"name":"French Guiana","score":1},{"name":"Pitcairn","score":1},{"name":"Saint Helena, Ascension and Tristan da Cunha","score":1},{"name":"Guadeloupe","score":1},{"name":"Martinique","score":1},{"name":"Réunion","score":1},{"name":"Latvia","score":1},{"name":"Portugal","score":1},{"name":"Singapore","score":1},{"name":"Bonaire, Sint Eustatius and Saba","score":1},{"name":"South Korea","score":1},{"name":"Uruguay","score":2},{"name":"Puerto Rico","score":1},{"name":"Oman","score":1},{"name":"Australia","score":1},{"name":"Guernsey","score":1},{"name":"Namibia","score":3},{"name":"Austria","score":1},{"name":"Japan","score":1},{"name":"Bhutan","score":2},{"name":"Czech Republic","score":1},{"name":"Malawi","score":2},{"name":"Mongolia","score":2},{"name":"Macau","score":2},{"name":"Isle of Man","score":1},{"name":"Belgium","score":2},{"name":"Poland","score":1},{"name":"Luxembourg","score":1},{"name":"Jersey","score":1},{"name":"Ireland","score":1},{"name":"Germany","score":2},{"name":"American Samoa","score":1},{"name":"Botswana","score":3},{"name":"France","score":1},{"name":"Northern Mariana Islands","score":1},{"name":"Hungary","score":2},{"name":"Mauritius","score":2},{"name":"Switzerland","score":1},{"name":"Fiji","score":2},{"name":"Malta","score":2},{"name":"Zambia","score":3},{"name":"Cook Islands","score":1},{"name":"Guam","score":1},{"name":"Georgia","score":2},{"name":"Slovakia","score":2},{"name":"Spain","score":1},{"name":"Taiwan","score":1},{"name":"Solomon Islands","score":2},{"name":"Canada","score":2},{"name":"Monaco","score":3},{"name":"Mauritania","score":2},{"name":"United States Virgin Islands","score":1},{"name":"Kuwait","score":3},{"name":"Netherlands","score":1},{"name":"Slovenia","score":1},{"name":"Gambia","score":2},{"name":"Aruba","score":2},{"name":"Marshall Islands","score":2},{"name":"Cape Verde","score":3},{"name":"Qatar","score":1},{"name":"Niue","score":2},{"name":"Rwanda","score":3},{"name":"Tonga","score":2},{"name":"Romania","score":2},{"name":"Saudi Arabia","score":1},{"name":"United Kingdom","score":1},{"name":"Greece","score":2},{"name":"Costa Rica","score":2},{"name":"Italy","score":1},{"name":"Chile","score":1},{"name":"Nauru","score":2},{"name":"Lesotho","score":2},{"name":"Montserrat","score":2},{"name":"Bulgaria","score":3},{"name":"Ghana","score":2},{"name":"Timor-Leste","score":2},{"name":"Dominican Republic","score":2},{"name":"Kazakhstan","score":2},{"name":"United States","score":1},{"name":"Anguilla","score":2},{"name":"Hong Kong","score":2},{"name":"Uzbekistan","score":2},{"name":"Antigua and Barbuda","score":2},{"name":"Grenada","score":2},{"name":"Togo","score":3},{"name":"Micronesia","score":2},{"name":"South Africa","score":3},{"name":"Sri Lanka","score":2},{"name":"Eswatini","score":3},{"name":"Maldives","score":2},{"name":"Cyprus","score":2},{"name":"Samoa","score":2},{"name":"Bahrain","score":1},{"name":"Tuvalu","score":2},{"name":"Kyrgyzstan","score":3},{"name":"Argentina","score":2},{"name":"Madagascar","score":3},{"name":"Guatemala","score":3},{"name":"Papua New Guinea","score":3},{"name":"Palau","score":2},{"name":"Suriname","score":2},{"name":"Congo (Brazzaville)","score":2},{"name":"Croatia","score":2},{"name":"St Kitts & Nevis","score":2},{"name":"Gabon","score":3},{"name":"São Tomé & Príncipe","score":2},{"name":"El Salvador","score":2},{"name":"Bangladesh","score":3},{"name":"Equatorial Guinea","score":3},{"name":"Honduras","score":3},{"name":"St Vincent & Gren","score":2},{"name":"Belize","score":2},{"name":"Kiribati","score":2},{"name":"Curacao","score":2},{"name":"Angola","score":3},{"name":"Bahamas","score":2},{"name":"Turkmenistan","score":3},{"name":"Turks & Caicos","score":2},{"name":"Paraguay","score":3},{"name":"Armenia","score":2},{"name":"Malaysia","score":2},{"name":"Moldova","score":2},{"name":"Seychelles","score":2},{"name":"Peru","score":2},{"name":"Egypt","score":2},{"name":"British Virgin Islands","score":3},{"name":"Guyana","score":2},{"name":"Sierra Leone","score":3},{"name":"St Lucia","score":3},{"name":"Algeria","score":3},{"name":"Mexico","score":3},{"name":"Bolivia","score":3},{"name":"North Macedonia","score":2},{"name":"Serbia","score":2},{"name":"Comoros","score":2},{"name":"Ethiopia","score":3},{"name":"Montenegro","score":2},{"name":"Djibouti","score":2},{"name":"Indonesia","score":2},{"name":"Benin","score":3},{"name":"Niger","score":3},{"name":"Tajikistan","score":3},{"name":"Azerbaijan","score":2},{"name":"Vietnam","score":3},{"name":"Ecuador","score":2},{"name":"Belarus","score":2},{"name":"Dominica","score":2},{"name":"India","score":2},{"name":"Nepal","score":3},{"name":"Colombia","score":3},{"name":"Cameroon","score":3},{"name":"Cote D'Ivoire","score":3},{"name":"Thailand","score":2},{"name":"Lao People's Democratic Republic","score":3},{"name":"Tunisia","score":2},{"name":"China","score":3},{"name":"Israel","score":2},{"name":"Brazil","score":2},{"name":"St Maarten","score":3},{"name":"Chad","score":3},{"name":"Gibraltar","score":2},{"name":"Bosnia-Herzegovina","score":3},{"name":"Liberia","score":3},{"name":"Cayman Islands","score":2},{"name":"Vanuatu","score":2},{"name":"Nigeria","score":3},{"name":"Trinidad & Tobago","score":2},{"name":"Guinea","score":3},{"name":"Sudan","score":3},{"name":"United Arab Emirates","score":2},{"name":"Cambodia","score":3},{"name":"Kenya","score":3},{"name":"Ukraine","score":3},{"name":"Eritrea","score":3},{"name":"Senegal","score":3},{"name":"Barbados","score":3},{"name":"Jordan","score":2},{"name":"Kosovo","score":3},{"name":"Cuba","score":3},{"name":"Jamaica","score":2},{"name":"Uganda","score":3},{"name":"Burkina Faso","score":3},{"name":"Morocco","score":2},{"name":"Western Sahara","score":2},{"name":"Guinea Bissau","score":3},{"name":"Central African Republic","score":3},{"name":"Albania","score":2},{"name":"Pakistan","score":3},{"name":"Venezuela","score":3},{"name":"West Bank (Palestinian Territory, Occupied)","score":3},{"name":"Gaza Strip","score":3},{"name":"Panama","score":2},{"name":"Zimbabwe","score":3},{"name":"Tanzania","score":2},{"name":"Lebanon","score":3},{"name":"Burundi","score":3},{"name":"Iraq","score":3},{"name":"Nicaragua","score":3},{"name":"Philippines","score":3},{"name":"Russian Federation","score":3},{"name":"Mozambique","score":3},{"name":"Turkey","score":2},{"name":"Libya","score":3},{"name":"Haiti","score":3},{"name":"South Sudan","score":3},{"name":"Somalia","score":3},{"name":"Mali","score":3},{"name":"Yemen","score":3},{"name":"The Democratic Republic Of Congo","score":3},{"name":"Syria","score":3},{"name":"Myanmar","score":3,"cfa":true},{"name":"Afghanistan","score":3},{"name":"North Korea","score":3,"cfa":true},{"name":"Islamic Republic of Iran","score":3,"cfa":true}];
 
 const RECYCLED = [{"name":"N/A","score":0},{"name":"LBMA GD Bullion/DGD Good Delivery","score":1},{"name":"Rudimentary Bars","score":2},{"name":"Gold & Silver Coins","score":1},{"name":"Industrial Waste","score":1},{"name":"Gold Jewellery","score":2},{"name":"Collected waste","score":2},{"name":"Silver/Gold Grains","score":1},{"name":"Broken jewellery","score":2},{"name":"Gold-Processing Chemicals","score":3},{"name":"Others","score":0}];
 const MINED = [{"name":"N/A","score":0},{"name":"LSM — Large Scale Mining","score":2},{"name":"MSM — Medium Scale Mining","score":2},{"name":"ASM — Artisanal Mining","score":3}];
@@ -1295,15 +1295,93 @@ function countryIntelUrl(name) {
   const s = kycSlug(name);
   return s ? KYC_INTEL_BASE + 'country/' + s + '/' : KYC_INTEL_BASE;
 }
+/* Analyst reference only: the jurisdiction's Global Organized Crime Index
+   profile (Global Initiative Against Transnational Organized Crime). No OC
+   Index scores or text are copied into this app or repo - the report is "all
+   rights reserved" and the downloadable dataset states no reuse licence - and
+   the link never feeds the score. The Index covers the 193 UN member states
+   only; for any other jurisdiction the link is hidden. Page slugs follow the
+   kycSlug folding of the COUNTRIES name; the 17 that differ are mapped here
+   (test/country-intel-links.test.mjs proves all 193 profiles are reached once). */
+const OC_INDEX_BASE = 'https://ocindex.net/country/';
+const OC_SLUG_OVERRIDES = {
+  'Bosnia-Herzegovina': 'bosnia-and-herzegovina',
+  'Brunei Darussalam': 'brunei',
+  'Cape Verde': 'cabo-verde',
+  'Central African Republic': 'central-african-republic',
+  'The Democratic Republic Of Congo': 'congo-dem-rep',
+  'Congo (Brazzaville)': 'congo-rep',
+  'Islamic Republic of Iran': 'iran',
+  'North Korea': 'korea-dpr',
+  'South Korea': 'korea-rep',
+  "Lao People's Democratic Republic": 'laos',
+  'Micronesia': 'micronesia-federated-states-of',
+  'Russian Federation': 'russia',
+  'São Tomé & Príncipe': 'sao-tome-and-principe',
+  'St Kitts & Nevis': 'st-kitts-and-nevis',
+  'St Vincent & Gren': 'st-vincent-and-the-grenadines',
+  'Trinidad & Tobago': 'trinidad-and-tobago',
+  'Turkey': 'turkiye'
+};
+const OC_INDEX_SLUGS = new Set(('afghanistan albania algeria andorra angola antigua-and-barbuda argentina armenia australia austria azerbaijan bahamas bahrain bangladesh barbados belarus belgium belize benin bhutan bolivia bosnia-and-herzegovina botswana brazil brunei bulgaria burkina-faso burundi cabo-verde cambodia cameroon canada central-african-republic chad chile china colombia comoros congo-dem-rep congo-rep costa-rica cote-divoire croatia cuba cyprus czech-republic denmark djibouti dominica dominican-republic ecuador egypt el-salvador equatorial-guinea eritrea estonia eswatini ethiopia fiji finland france gabon gambia georgia germany ghana greece grenada guatemala guinea guinea-bissau guyana haiti honduras hungary iceland india indonesia iran iraq ireland israel italy jamaica japan jordan kazakhstan kenya kiribati korea-dpr korea-rep kuwait kyrgyzstan laos latvia lebanon lesotho liberia libya liechtenstein lithuania luxembourg madagascar malawi malaysia maldives mali malta marshall-islands mauritania mauritius mexico micronesia-federated-states-of moldova monaco mongolia montenegro morocco mozambique myanmar namibia nauru nepal netherlands new-zealand nicaragua niger nigeria north-macedonia norway oman pakistan palau panama papua-new-guinea paraguay peru philippines poland portugal qatar romania russia rwanda samoa san-marino sao-tome-and-principe saudi-arabia senegal serbia seychelles sierra-leone singapore slovakia slovenia solomon-islands somalia south-africa south-sudan spain sri-lanka st-kitts-and-nevis st-lucia st-vincent-and-the-grenadines sudan suriname sweden switzerland syria tajikistan tanzania thailand timor-leste togo tonga trinidad-and-tobago tunisia turkiye turkmenistan tuvalu uganda ukraine united-arab-emirates united-kingdom united-states uruguay uzbekistan vanuatu venezuela vietnam yemen zambia zimbabwe').split(' '));
+function ocIndexUrl(name) {
+  const s = Object.prototype.hasOwnProperty.call(OC_SLUG_OVERRIDES, name) ? OC_SLUG_OVERRIDES[name] : kycSlug(name);
+  return OC_INDEX_SLUGS.has(s) ? OC_INDEX_BASE + s : '';
+}
+/* DRAFT suggested country score (data/country-score-suggested.json, generated
+   by scripts/country-score.mjs from FATF ratings and public US/EU lists). It is
+   shown under the jurisdiction for the MLRO to compare with the current score;
+   it never feeds the assessment score, and a load failure says so instead of
+   showing nothing. null = still loading; {} = could not load. Off http(s)
+   (file://) the browser blocks the fetch and logs a CORS error, so it is not
+   attempted there, the same guard the other fetches in this file use. */
+let suggestedScores = null;
+function loadSuggestedScores() {
+  if (typeof fetch !== 'function' || typeof location === 'undefined' || location.protocol.indexOf('http') !== 0) {
+    suggestedScores = {}; paintSuggestedScore(); return;
+  }
+  fetch('data/country-score-suggested.json', { credentials: 'same-origin' })
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    .then(d => {
+      const m = {};
+      (d.countries || []).forEach(r => { if (r && r.country) m[r.country] = r; });
+      suggestedScores = m;
+    })
+    .catch(() => { suggestedScores = {}; })
+    .then(paintSuggestedScore);
+}
+function paintSuggestedScore() {
+  const el = $('jurisdictionSuggested');
+  if (!el || suggestedScores === null) return;
+  if (!Object.keys(suggestedScores).length) {
+    el.textContent = 'Suggested score (draft): unavailable, the suggestion file could not be loaded.';
+    return;
+  }
+  const r = suggestedScores[state.entity.jurisdiction];
+  if (!r || r.suggested == null) {
+    el.textContent = 'Suggested score (draft): none, this jurisdiction has no FATF rating.';
+    return;
+  }
+  el.textContent = 'Suggested score (draft, pending MLRO approval, not applied): ' + r.suggested + ' · ' + ratingLabel(r.suggested)
+    + (r.compare === 'lower' ? ' (lower than current; not a recommendation to lower)' : '')
+    + '. Basis: ' + (r.factors || []).join('; ') + '.';
+}
 function paintJurisdiction() {
   const intel = $('jurisdictionIntel');
   if (intel) intel.href = countryIntelUrl(state.entity.jurisdiction);
+  const oc = $('jurisdictionOcIndex');
+  if (oc) {
+    const u = ocIndexUrl(state.entity.jurisdiction);
+    oc.hidden = !u;
+    if (u) oc.href = u;
+  }
   const c = effCountry(state.entity.jurisdiction);
   const score = c ? c.score : 1;
   const tag = $('jurisdictionScore');
   tag.className = 'score-tag '+scoreTagClass(score);
   tag.textContent = 'Score: '+score+' · '+ratingLabel(score)+(c && c.overridden ? ' ✱' : '');
   tag.title = ovTitle(c);
+  paintSuggestedScore();
 }
 function paintActivity() {
   const a = effOf('activities', state.profile.activity);
@@ -2246,6 +2324,30 @@ function batchParseCsv(text){
 }
 function batchPick(o, keys){ for(const k of keys){ if(o[k]!=null && o[k]!=='') return o[k]; } return ''; }
 function batchYes(v){ return /^(y|yes|true|1)$/i.test(String(v==null?'':v).trim()); }
+/* Screening flags are tri-state. A blank or absent column, or a value that is
+   neither yes nor no ("Potential match", "unknown"), used to score as a clean
+   "No" with no note — an unscreened row read as screened. Absent is still
+   scored No but named in the notes; an unrecognised value is treated as Yes. */
+const BATCH_FLAGS = [
+  ['sanctions_entity', ['sanctions','sanctioned'], 'sanctions'],
+  ['pep', ['pep'], 'PEP'],
+  ['adverse', ['adverse','adverse media'], 'adverse media'],
+  ['tf', ['tf','terrorist','terrorism'], 'TF'],
+  ['pf', ['pf','proliferation'], 'PF'],
+];
+function batchNo(v){ return /^(n|no|false|0|none|nil|clear|negative)$/i.test(String(v==null?'':v).trim()); }
+function batchFlags(o){
+  const flags = {}, flagNotes = [], missing = [];
+  BATCH_FLAGS.forEach(([key, cols, label]) => {
+    const raw = batchPick(o, cols);
+    if(batchYes(raw)) flags[key] = 'Yes';
+    else if(batchNo(raw)) flags[key] = 'No';
+    else if(String(raw).trim()===''){ flags[key] = 'No'; missing.push(label); }
+    else { flags[key] = 'Yes'; flagNotes.push(label + ' value "' + String(raw).trim() + '" not recognised — treated as Yes; confirm'); }
+  });
+  if(missing.length) flagNotes.unshift(missing.join(', ') + ' not supplied — scored as No, not screened');
+  return { flags, flagNotes };
+}
 /* Map a raw CSV row (lower-cased keys) to the engine's input factors. */
 function mapBatchRow(o){
   o = o || {};
@@ -2257,13 +2359,7 @@ function mapBatchRow(o){
     onboard: /^(y|yes|true|1|remote|non.?face)/i.test(String(onboardRaw).trim()) ? 'Yes' : 'No',
     entityYears: batchPick(o, ['entityyears','entity years','years trading','operational history']),
     relYears: batchPick(o, ['relyears','relationship years','relationship duration']),
-    flags: {
-      sanctions_entity: batchYes(batchPick(o, ['sanctions','sanctioned'])) ? 'Yes' : 'No',
-      pep: batchYes(batchPick(o, ['pep'])) ? 'Yes' : 'No',
-      adverse: batchYes(batchPick(o, ['adverse','adverse media'])) ? 'Yes' : 'No',
-      tf: batchYes(batchPick(o, ['tf','terrorist','terrorism'])) ? 'Yes' : 'No',
-      pf: batchYes(batchPick(o, ['pf','proliferation'])) ? 'Yes' : 'No',
-    }
+    ...batchFlags(o)
   };
 }
 /* Score one mapped row through computeAssessment by temporarily swapping the
@@ -2281,6 +2377,7 @@ function scoreBatchRow(m){
     if(m.activity){ s.profile.activity = m.activity; if(!effOf('activities', m.activity)) notes.push('activity not in risk data — scored low'); }
     else notes.push('no activity provided — scored on the default');
     s.profile.onboard = m.onboard;
+    (m.flagNotes || []).forEach(n => notes.push(n));
     const ey = parseInt(m.entityYears, 10); if(!isNaN(ey)) s.profile.entityYears = ey;
     const ry = parseInt(m.relYears, 10); if(!isNaN(ry)) s.profile.relYears = ry;
     if(m.flags){ Object.keys(m.flags).forEach(k => { if(s.questions[k]!==undefined && m.flags[k]==='Yes') s.questions[k]='Yes'; }); }
@@ -2325,7 +2422,8 @@ function renderBatchResults(results){
   const body = results.map(r => {
     const label = r.prohibited ? 'PROHIBITED' : (r.outcome + ' · ' + r.total);
     const cls = batchOutcomeClass(r.prohibited ? 'PROHIBITED' : r.outcome);
-    const note = (r.notes && r.notes.length) ? r.notes.join('; ') : (r.escalations && r.escalations.length ? r.escalations.join('; ') : '');
+    /* Escalations first: a data-quality note must never hide why a row escalated. */
+    const note = (r.escalations || []).concat(r.notes || []).join('; ');
     return '<div class="batch-row">'
       + '<span class="batch-name">'+esc(r.name||'—')+'</span>'
       + '<span class="batch-jur">'+esc(r.jurisdiction||'—')+'</span>'
@@ -2432,6 +2530,7 @@ const I18N = {
   'fld.principals': {en:'Principals — Beneficial Owners / Controllers / Directors', ar:'الأطراف الرئيسية — المالكون المستفيدون / المسيطرون / المديرون'},
   'fld.jurisdiction': {en:'Jurisdiction & Incorporation', ar:'الولاية القضائية والتأسيس'},
   'fld.countryIntel': {en:'Country AML profile (KnowYourCountry) ↗', ar:'ملف مخاطر غسل الأموال للدولة (KnowYourCountry) ↗'},
+  'fld.ocIndex': {en:'Organized crime profile (OC Index) ↗', ar:'ملف الجريمة المنظمة للدولة (OC Index) ↗'},
   'fld.activity':     {en:'Business Activity', ar:'النشاط التجاري'},
   'fld.onboard':      {en:'Onboarding Channel', ar:'قناة الإلحاق'},
   'fld.opHistory':    {en:'Operational History — Entity', ar:'السجل التشغيلي — الكيان'},
@@ -2916,6 +3015,7 @@ refreshSelectLabels(); /* add override marks (✱) to the now-built selects */
 initRiskDataPanel();
 initRegisterPanel();
 initLang();
+loadSuggestedScores();
 
 /* (Re)load persisted risk data + draft into the UI. Safe to re-run after the
    device is unlocked, when the encrypted store first becomes readable. */
