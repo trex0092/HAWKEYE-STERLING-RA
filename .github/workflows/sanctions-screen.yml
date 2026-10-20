@@ -309,6 +309,25 @@ jobs:
           ASANA_CASE_ASSIGNEE_GID: ${{ vars.ASANA_CASE_ASSIGNEE_GID || '1213645083721304' }}
         run: node scripts/screening-delivery.mjs
 
+      - name: API cost summary (metadata only)
+        # Optional observability. Never assume absent receipts mean zero spend.
+        if: always() && !cancelled()
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          API_USD_RATES_JSON: ${{ vars.API_USD_RATES_JSON }}
+        run: |
+          umask 077
+          PRICE_FILE="${RUNNER_TEMP}/hawkeye-screen-verified-prices.json"
+          trap 'rm -f "$PRICE_FILE"' EXIT
+          if [ ! -s api-cost-ledger.jsonl ] || [ -z "$API_USD_RATES_JSON" ]; then
+            echo "INCOMPLETE: No verified pricing table and sanitized paid-usage receipts"
+            echo "Missing evidence is not zero spending"
+          else
+            printf '%s' "$API_USD_RATES_JSON" > "$PRICE_FILE"
+            node scripts/api-cost-dashboard.mjs --ledger api-cost-ledger.jsonl --prices "$PRICE_FILE"
+          fi
+
       - name: Persist screening + case state (screen-state branch)
         id: persist
         # always() preserves case GIDs even if case delivery fails after a
