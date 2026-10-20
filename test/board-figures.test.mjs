@@ -106,11 +106,11 @@ console.log('\n— runtime worldwide screening assurance —\n');
     domains: {
       sanctions: {
         sources: [
-          { id: 'un-consolidated', required: true },
-          { id: 'ofac-sdn', required: true },
-          { id: 'ofac-consolidated', required: true },
-          { id: 'uk-ofsi', required: true },
-          { id: 'eu-fsf', required: true, fallbackSourceId: 'fr-dgt' },
+          { id: 'un-consolidated', required: true, minNames: 500 },
+          { id: 'ofac-sdn', required: true, minNames: 9000 },
+          { id: 'ofac-consolidated', required: true, minNames: 100 },
+          { id: 'uk-ofsi', required: true, minNames: 9000 },
+          { id: 'eu-fsf', required: true, minNames: 20000, fallbackSourceId: 'fr-dgt', fallbackMinNames: 9800 },
         ],
       },
     },
