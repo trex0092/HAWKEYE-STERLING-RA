@@ -114,6 +114,8 @@ jobs:
         run: node test/state-branch-isolation.test.mjs
       - name: Run sanctions-screen unit tests
         run: node test/sanctions-screen.test.mjs
+      - name: Verify independent screening source quality and list-count floors
+        run: node test/screening-source-quality.test.mjs
       - name: Verify supplied EOCN PDF active and delisted designations
         run: node test/eocn-pdf-source-integrity.test.mjs
       - name: Run structured entity-resolution tests
