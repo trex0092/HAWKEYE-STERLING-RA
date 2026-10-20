@@ -283,7 +283,7 @@ export function writeAssurance(assurance) {
   writeFileSync(BADGE_FILES.pep, badgeSvg('PEP runtime', assurance.domains.pep));
 }
 
-export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAULT_ASSURANCE_MAX_AGE_HOURS } = {}) {
+export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAULT_ASSURANCE_MAX_AGE_HOURS, expectedCommit = '' } = {}) {
   const reasons = [];
   if (!assurance || assurance.version !== 1) reasons.push('assurance artifact missing or invalid');
   const age = ageHours(assurance?.generatedAt, nowMs);
@@ -291,6 +291,14 @@ export function checkStored(assurance, { nowMs = Date.now(), maxAgeHours = DEFAU
   else if (age > maxAgeHours) reasons.push('assurance evidence is stale: ' + Math.round(age) + 'h > ' + maxAgeHours + 'h');
   for (const key of ['sanctions','adverseMedia','pep']) {
     if (assurance?.domains?.[key]?.operational !== true) reasons.push(key + ' is not operational');
+  }
+  // A clean prior run is not assurance for a newly deployed screening engine.
+  // The workflow provides the commit it is evaluating; avoid green stale badges.
+  if (expectedCommit) {
+    const screenedCommit = String(assurance?.run?.commit || '').trim();
+    if (!screenedCommit || screenedCommit !== expectedCommit) {
+      reasons.push('runtime evidence was produced by a different screening commit');
+    }
   }
   return { ok: reasons.length === 0, reasons, ageHours: Number.isFinite(age) ? age : null };
 }
@@ -304,7 +312,9 @@ function main() {
   if (mode === '--check') {
     let stored = null;
     try { stored = loadJson(ASSURANCE_FILE); } catch {}
-    const checked = checkStored(stored);
+    const checked = checkStored(stored, {
+      expectedCommit: process.env.SCREENING_ASSURANCE_EXPECTED_COMMIT || '',
+    });
     if (!checked.ok) {
       console.error('screening-assurance: FAILED');
       for (const r of checked.reasons) console.error('- ' + r);
