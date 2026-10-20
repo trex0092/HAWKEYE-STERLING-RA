@@ -121,6 +121,7 @@ const passingArtifact = {
   version: 1,
   generatedAt: '2026-10-20T12:00:00Z',
   run: { commit: 'screening-version-a' },
+  sourceQuality: { assured: true, reasons: [] },
   domains: {
     sanctions: { operational: true },
     adverseMedia: { operational: true },
