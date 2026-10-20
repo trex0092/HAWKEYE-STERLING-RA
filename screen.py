@@ -4445,8 +4445,9 @@ def get_payment_register():
         if r is None or r.status_code not in (200, 201):
             raise RuntimeError(f"Asana payments register fetch failed: "
                                f"{getattr(r, 'status_code', 'network')}")
-        data = r.json() if isinstance(r.json(), dict) else {}
-        for t in (data.get("data") or []):
+        data = r.json()
+        customer_next_offset = _verified_asana_page(data, customer_offsets, "customer")
+        for t in data["data"]:
             if payment_screen.is_tm_report_task(t.get("name")):
                 continue   # our own daily report card, filed in the same section
             try:
@@ -4466,12 +4467,29 @@ def get_payment_register():
     return records, unreadable
 
 
+def _verified_asana_page(data, seen_offsets, population):
+    """Fail closed on truncated, repeated or malformed Asana task pagination."""
+    if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+        raise RuntimeError(f"FATAL: malformed {population} task collection")
+    next_page = data.get("next_page")
+    if next_page is None:
+        return None
+    if not isinstance(next_page, dict):
+        raise RuntimeError(f"FATAL: malformed {population} pagination")
+    offset = next_page.get("offset")
+    if not isinstance(offset, str) or not offset or offset in seen_offsets:
+        raise RuntimeError(f"FATAL: missing or repeated {population} continuation cursor")
+    seen_offsets.add(offset)
+    return offset
+
+
 def get_all_customers():
     # Validate both authoritative populations before any remote read.
     # An unset or redirected HR source cannot silently turn the run customer-only.
     if ASANA_EMPLOYEE_DB_GID != "1216239131596624":
         raise RuntimeError("FATAL: approved HR Employees project is required for screening")
     customers = []
+    customer_offsets = set()
     CUSTOMER_ROWS_SKIPPED.clear()
     params = {
         "project": ASANA_CUSTOMER_DB_GID,
@@ -4519,10 +4537,9 @@ def get_all_customers():
                 "email": extract_customer_email(notes),
                 "has_assessment": len(notes.strip()) > 100,
             })
-        next_page = data.get("next_page") or None
-        if not next_page or not next_page.get("offset"):
+        if customer_next_offset is None:
             break
-        params["offset"] = next_page["offset"]
+        params["offset"] = customer_next_offset
     masked = mask_population(customers)
     log(f"Loaded {len(customers)} customers")
     progress("customers-loaded", customers=len(customers))
@@ -4545,6 +4562,7 @@ def get_all_customers():
     # that silently drops out of screening is a silent clear for everyone in it.
     if ASANA_EMPLOYEE_DB_GID:
         employees = []
+        employee_offsets = set()
         eparams = {
             "project": ASANA_EMPLOYEE_DB_GID,
             "opt_fields": "gid,name,notes,permalink_url,created_at",
@@ -4558,8 +4576,9 @@ def get_all_customers():
                     f"({getattr(r,'status_code','network')}) — refusing to screen a "
                     f"population that silently dropped out. Check ASANA_EMPLOYEE_DB_GID "
                     f"or set it empty to disable employee screening explicitly.")
-            data = r.json() if isinstance(r.json(), dict) else {}
-            for t in (data.get("data") or []):
+            data = r.json()
+            employee_next_offset = _verified_asana_page(data, employee_offsets, "employee")
+            for t in data["data"]:
                 if not t.get("gid") or not t.get("name"):
                     # Same guard as the customer loop above — an employee row
                     # without a usable identity is a person we did not screen,
@@ -4583,10 +4602,9 @@ def get_all_customers():
                     "has_assessment": len(notes.strip()) > 100,
                     "kind": "employee",
                 })
-            next_page = data.get("next_page") or None
-            if not next_page or not next_page.get("offset"):
+            if employee_next_offset is None:
                 break
-            eparams["offset"] = next_page["offset"]
+            eparams["offset"] = employee_next_offset
         if not employees:
             raise RuntimeError(
                 "FATAL: 0 employees read from the HR – Employees project while employee "
