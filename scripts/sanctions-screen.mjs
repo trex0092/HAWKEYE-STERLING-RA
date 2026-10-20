@@ -2368,21 +2368,21 @@ async function main() {
   try { subjects = await fetchAsanaSubjects(CUSTOMER_PROJECT_GID, asanaToken); }
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
-  const customerScreenCount = subjects.length;
-  let employeeScreenCount = 0;
   const onRunner = process.env.GITHUB_ACTIONS === 'true';
   let maskedCount = onRunner ? maskSubjectNames(subjects) : 0;
+  const customerScreenCount = subjects.length;
+  let employeeScreenCount = 0;
 
   if (EMPLOYEE_PROJECT_GID) {
     let employees;
     try { employees = await fetchAsanaEmployeeSubjects(EMPLOYEE_PROJECT_GID, asanaToken); }
     catch (e) { return bailUnscreened('could not read the HR – Employees project (' + (e && e.message || e) + ') — employee screening is configured, so the run must not proceed without it', today); }
     if (!employees.length) return bailUnscreened('the HR – Employees project returned 0 subjects while employee screening is configured — set ASANA_EMPLOYEE_PROJECT_GID empty to disable it explicitly', today);
+    if (onRunner) maskedCount += maskSubjectNames(employees);
     try { requireDistinctSourceKeys(subjects, employees); }
     catch (e) { return bailUnscreened('cannot reconcile customer and employee screening identities: ' + e.message, today); }
     employeeScreenCount = employees.length;
     console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
-    if (onRunner) maskedCount += maskSubjectNames(employees);
     subjects = subjects.concat(employees);
   }
   if (onRunner) console.log('sanctions-screen: ' + maskedCount + ' subject identifier(s) masked in this public run log — names are disclosed in Asana only');
