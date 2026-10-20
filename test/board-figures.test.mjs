@@ -118,6 +118,10 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const results = {
     date: '2026-09-28',
     screened: 12,
+    sourcePopulation: {
+      customer: { projectGid: '1214107620220121', screenedSubjects: 10 },
+      employee: { projectGid: '1216239131596624', screenedSubjects: 2 },
+    },
     degraded: false,
     failures: [],
     lists: [

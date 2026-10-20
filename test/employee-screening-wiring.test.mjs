@@ -17,6 +17,7 @@
    Usage: node test/employee-screening-wiring.test.mjs */
 import { readFileSync } from 'node:fs';
 import { approvedSourcePopulationIssue, checkStored } from '../scripts/screening-assurance.mjs';
+import { requireDistinctSourceKeys } from '../scripts/sanctions-screen.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -136,6 +137,20 @@ check('missing run commit never proves a deployed engine',
   !checkStored({ ...passingArtifact, run: {} }, {
     nowMs: receiptTime, expectedCommit: 'screening-version-b',
   }).ok);
+
+check('distinct customer and HR subject keys remain independently screenable',
+  requireDistinctSourceKeys([{ key: 'corporate:one', name: 'Synthetic Customer' }],
+    [{ key: 'employee:one', name: 'Synthetic Employee' }]) === true);
+check('cross-population identity key collision is fatal, not silently deduplicated',
+  (() => { try {
+    requireDistinctSourceKeys([{ key: 'same-key', name: 'Synthetic Customer' }],
+      [{ key: 'same-key', name: 'Synthetic Employee' }]); return false;
+  } catch { return true; } })());
+check('missing employee identity is fatal even when source count is positive',
+  (() => { try {
+    requireDistinctSourceKeys([{ key: 'a', name: 'Customer' }], [{ key: '', name: '' }]);
+    return false;
+  } catch { return true; } })());
 
 console.log(`${passed} passed, ${failed} failed`);
 

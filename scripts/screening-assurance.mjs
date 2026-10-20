@@ -128,6 +128,8 @@ export function assessRuntime({
   const invalidRequiredFloors = requiredEntries.filter(x =>
     !Number.isSafeInteger(x.minNames) || x.minNames <= 0).map(x => String(x.id));
   const sanctionsReasons = [];
+  const sourcePopulationIssue = approvedSourcePopulationIssue(results?.sourcePopulation, results?.screened);
+  if (sourcePopulationIssue) sanctionsReasons.push('approved screening population: ' + sourcePopulationIssue);
   const sanctionsWarnings = servedByFallback.map(x => 'required sanctions source ' + x.id
     + ' did not meet its full-source floor - screened via declared fallback ' + x.fallback
     + ' (' + x.fallbackCount + '/' + x.fallbackMinNames + ' minimum names)');
@@ -149,6 +151,7 @@ export function assessRuntime({
     screenedSubjects: num(results?.screened),
     loadedSources: loaded.map(x => ({ id: x?.id || '', name: x?.name || '', count: num(x?.count), partial: !!x?.partial })),
     requiredSourceIds: requiredSanctions,
+    sourcePopulation: results?.sourcePopulation || null,
     servedByFallback,
     notes: arr(results?.failures),
   }, sanctionsWarnings);
@@ -265,6 +268,7 @@ export function assessRuntime({
   // A fallback keeps screening running, but reduced global backbones, truncated
   // primary sanctions lists and unidentifiable PEP records cannot count as 100%.
   const sourceQualityReasons = [];
+  if (sourcePopulationIssue) sourceQualityReasons.push('approved population not reconciled: ' + sourcePopulationIssue);
   for (const [label, d] of [['sanctions', sanctions], ['adverse media', adverseMedia], ['PEP', pep]]) {
     if (!d.operational) sourceQualityReasons.push(label + ' runtime is degraded');
   }

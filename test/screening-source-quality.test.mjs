@@ -13,6 +13,10 @@ const harvested = new Date(nowMs - 3600000).toISOString();
 const pepCount = PEP_FLOOR + 1000;
 const makeResults = () => ({
   screened: 359,
+  sourcePopulation: {
+    customer: { projectGid: '1214107620220121', screenedSubjects: 339 },
+    employee: { projectGid: '1216239131596624', screenedSubjects: 20 },
+  },
   degraded: false,
   lists: contract.domains.sanctions.sources.map(source => ({
     id: source.id, name: source.name, count: source.minNames + 500, partial: false,
@@ -36,6 +40,24 @@ let checked = assess();
 assert.equal(checked.operational, true, 'baseline must be operational');
 assert.equal(checked.sourceQuality.assured, true, 'all sources at floor and all backbones healthy');
 assert.equal(checkStored(checked, { nowMs }).ok, true, 'fresh, complete quality can pass');
+
+// The source receipt must identify BOTH approved Asana populations.
+const missingPopulation = makeResults();
+delete missingPopulation.sourcePopulation;
+checked = assess(missingPopulation);
+assert.equal(checked.operational, false);
+assert.equal(checked.sourceQuality.assured, false);
+assert(checked.domains.sanctions.reasons.some(x => x.includes('approved screening population')));
+
+const truncatedPopulation = makeResults();
+truncatedPopulation.sourcePopulation.employee.screenedSubjects = 19;
+checked = assess(truncatedPopulation);
+assert.equal(checked.operational, false, 'an omitted employee blocks assurance');
+
+const redirectedPopulation = makeResults();
+redirectedPopulation.sourcePopulation.employee.projectGid = 'wrong-project';
+checked = assess(redirectedPopulation);
+assert.equal(checked.operational, false, 'unapproved HR source blocks assurance');
 
 const truncated = makeResults();
 truncated.lists.find(x => x.id === 'ofac-sdn').count = 1;
