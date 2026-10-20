@@ -5902,7 +5902,8 @@ def enforce_delivery_gate():
     nothing. Runs before the other gates: an undelivered run is the more
     fundamental failure."""
     if UNIFIED_DELIVERY_FAILED["failed"]:
-        log("DELIVERY GATE: the unified screening task was never created — "
+        log("DELIVERY GATE: current screening evidence was not delivered, or "
+            "a same-day rerun disagrees with the existing report population — "
             "failing the run so the freshness alarm and Actions email fire")
         if DELIVERY_HARD_FAIL:
             sys.exit(5)
@@ -7426,6 +7427,43 @@ def has_full_results(names):
     return (any(re.match(r"^full-screening-report-\d{4}-\d{2}-\d{2}\.txt$", n or "") for n in names)
             and any(re.match(r"^screening-results-register-\d{4}-\d{2}-\d{2}\.csv$", n or "") for n in names))
 
+def _report_population_counts(notes):
+    """Three aggregate screening denominators, never identities or case details.
+
+    Older and current report headers label the entity count 'legal entities'.
+    The individual descriptor varies, so match only its numeric value.
+    """
+    m = re.search(
+        r"(?m)^Population screened:\s*(\d+)\s+subjects\s*"
+        r"\(\s*(\d+)\s+legal entities;\s*(\d+)\b",
+        str(notes or ""))
+    return tuple(map(int, m.groups())) if m else None
+
+
+def same_day_report_population_issue(existing_gid, current_narrative):
+    """A duplicate date does not prove that the same population was screened."""
+    current = _report_population_counts(current_narrative)
+    if current is None:
+        return "current screening report has no verifiable population receipt"
+    r = asana_request(
+        "GET", f"https://app.asana.com/api/1.0/tasks/{existing_gid}",
+        params={"opt_fields": "notes"})
+    if r is None or r.status_code != 200:
+        return "could not verify the earlier Asana report population"
+    try:
+        previous = _report_population_counts((r.json().get("data") or {}).get("notes"))
+    except (ValueError, TypeError, AttributeError):
+        previous = None
+    if previous is None:
+        return "earlier Asana report has no verifiable population receipt"
+    if previous != current:
+        return (f"existing report attests {previous[0]} subjects "
+                f"({previous[1]} entities, {previous[2]} individuals) but the "
+                f"new run attests {current[0]} subjects "
+                f"({current[1]} entities, {current[2]} individuals)")
+    return None
+
+
 def heal_full_results(existing_gid, narrative, rebuild, register, run_time,
                       possible_matches, adverse_findings, pep_findings):
     """A re-run that finds today's report already delivered must still deliver
@@ -7458,6 +7496,15 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
         log(f"SKIP: a {mode} report for {dt} was already delivered as "
             f"{existing_gid} (dedup check added 2026-09-24 after the 17 Sep "
             f"duplicate-posting incident) — not posting a duplicate")
+        if mode in ("daily", "makeup"):
+            issue = same_day_report_population_issue(existing_gid, narrative)
+            if issue:
+                # Keep original evidence immutable; a changed denominator
+                # requires an explicit human-reviewed amendment, not a silent
+                # reuse of earlier attachments or a second identical card.
+                log(f"FAIL same-day screening report population reconciliation: {issue}. "
+                    "Existing report retained; request a reviewed amendment.")
+                UNIFIED_DELIVERY_FAILED["failed"] = True
         heal_full_results(existing_gid, narrative, rebuild, register, run_time,
                           possible_matches, adverse_findings, pep_findings)
         progress("delivered", task_gid=existing_gid)
