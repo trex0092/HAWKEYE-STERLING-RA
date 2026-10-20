@@ -6,12 +6,25 @@ import { test } from 'node:test';
 const source = readFileSync(new URL('./data-schema.test.js', import.meta.url), 'utf8');
 const row = { name: 'Synthetic', band: 'medium', topScore: 85, lists: ['Synthetic'],
   firstSeen: '2026-09-30', lastSeen: '2026-09-30' };
+const cabinet63Names = [
+  'Ali Mohammed Karneeb', 'Nasser Hassan Nasr',
+  'Hassan Shehadeh Osman', 'Samer Hassan Fawaz',
+  'Ahmed Mohammed Yazbek', 'Isa Hussein Qasir', 'Ibrahim Ali Daher',
+  'Abbas Hassan Ghareeb', 'Emad Mohammed Bazzi', 'Ezzat Yousef Akr',
+  'Wahid Mahmud Sbeiti', 'Mustafa Habib Harb',
+  'Mohammed Suleiman Badir', 'Adel Mohammad Mansour',
+  'Ali Ahmed Krisht', 'Nima Ahmad Jamil', 'Bayt Al-Mal ALMuslimeen',
+  'AL-Qard AL-Hassan Association', 'AL Tasheelat Company',
+  'The Auditors for Accounting and Auditing',
+  'AL-Khobara For Accounting, Auditing, and studies'
+];
+
 function run(state) {
   const data = {
     'sanctions-screen-state.json': state,
     'sanctions-state.json': { updated: '2026-09-30', sources: { synthetic: { hash: 'a'.repeat(64), bytes: 10, checkedAt: '2026-09-30' } } },
     'sanctions-sources.json': { sources: ['ofac-sdn', 'un-consolidated', 'uk-ofsi', 'eu-fsf'].map(id => ({ id, name: id, url: 'https://example.invalid', parser: 'csv', type: 'csv' })) },
-    'eocn-local-terrorist-list.json': { lastReviewed: '2026-09-30', populated: true, entries: ['Synthetic'], count: 1 },
+    'eocn-local-terrorist-list.json': { lastReviewed: '2026-09-30', populated: true, entries: cabinet63Names, count: cabinet63Names.length },
     'internal-watchlist.json': { lastReviewed: '2026-09-30', populated: false, entries: [], count: 0 },
     'sanctions-extra.json': { sources: [{ id: 'internal-watchlist', enabled: true, file: 'data/internal-watchlist.json', parser: 'curated', optional: true }] },
   };
