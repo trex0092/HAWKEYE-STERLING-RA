@@ -5146,6 +5146,20 @@ check("article mentioning the associated entity is identity-corroborated",
 check("name-only article is labelled, NEVER suppressed (still flagged)",
       _ic_arts[1]["identity_corroborated"] is False and _ic_arts[1]["flagged"] is True)
 
+# Daily report must disclose HR provenance and stale mandatory EOCN review.
+import inspect as _screen_inspect
+_report_source = _screen_inspect.getsource(screen.build_unified_narrative)
+_daily_source = _screen_inspect.getsource(screen.screen_subject_set)
+check("overdue EOCN official review downgrades the report's sanctions header",
+      'if EOCN_REVIEW_ALERT.get("overdue"):' in _report_source
+      and 'DEGRADED (EOCN official review overdue)' in _report_source)
+check("daily report exposes separate customer and completed employee source counts",
+      "Approved source records:" in _report_source
+      and '"customer_records": sum(' in _daily_source
+      and '"employee_records": sum(' in _daily_source)
+check("employees are represented as natural persons in report denominators",
+      "natural-person screening slots, including employees" in _report_source)
+
 # ── Follow-Ups cards always require human attestation, even on zero-new days ──
 print("\nscreen.py — Follow-Ups attestation")
 check("gate is OFF by default (no FOLLOWUP_PROJECT_GID)", screen.FOLLOWUP_PROJECT_GID == "")

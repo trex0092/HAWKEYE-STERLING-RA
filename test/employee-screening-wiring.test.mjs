@@ -16,6 +16,7 @@
 
    Usage: node test/employee-screening-wiring.test.mjs */
 import { readFileSync } from 'node:fs';
+import { approvedSourcePopulationIssue, checkStored } from '../scripts/screening-assurance.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -114,5 +115,52 @@ check('manual sanctions workflow screens completed employees from the approved H
 check('the Python-engine workflows agree on the same employee variable name',
   WORKFLOWS.filter(w => w.engine.startsWith('Python')).every(w => w.varName === 'ASANA_EMPLOYEE_DB_GID'));
 
+/* An old successful run cannot attest a newer deployed screening engine. */
+const receiptTime = Date.parse('2026-10-20T12:00:00Z');
+const passingArtifact = {
+  version: 1,
+  generatedAt: '2026-10-20T12:00:00Z',
+  run: { commit: 'screening-version-a' },
+  domains: {
+    sanctions: { operational: true },
+    adverseMedia: { operational: true },
+    pep: { operational: true },
+  },
+};
+check('fresh assurance for the exact deployed commit is accepted',
+  checkStored(passingArtifact, { nowMs: receiptTime, expectedCommit: 'screening-version-a' }).ok);
+check('old green assurance cannot attest a different screening commit',
+  !checkStored(passingArtifact, { nowMs: receiptTime, expectedCommit: 'screening-version-b' }).ok);
+check('missing run commit never proves a deployed engine',
+  !checkStored({ ...passingArtifact, run: {} }, {
+    nowMs: receiptTime, expectedCommit: 'screening-version-b',
+  }).ok);
+
 console.log(`${passed} passed, ${failed} failed`);
+
+/* A sanctioned-runtime probe must prove the approved customer and HR receipt
+   matches the actual rows screened; a valid total alone is not enough. */
+const validReceipt = {
+  customer: { projectGid: '1214107620220121', screenedSubjects: 3 },
+  employee: { projectGid: '1216239131596624', screenedSubjects: 2 },
+};
+check('approved two-source screening receipt matches all five screened subjects',
+  approvedSourcePopulationIssue(validReceipt, 5) === null);
+check('a customer-only sanctions probe never passes runtime assurance',
+  !!approvedSourcePopulationIssue({ customer: validReceipt.customer }, 3));
+check('a redirected employee project never passes runtime assurance',
+  !!approvedSourcePopulationIssue({ ...validReceipt, employee: {
+    projectGid: 'unapproved', screenedSubjects: 2,
+  } }, 5));
+check('zero completed HR employees cannot be a complete screening',
+  !!approvedSourcePopulationIssue({ ...validReceipt, employee: {
+    projectGid: '1216239131596624', screenedSubjects: 0,
+  } }, 3));
+check('truncated source receipts never pass on positive subject totals',
+  !!approvedSourcePopulationIssue(validReceipt, 4));
+check('non-integer population counts never pass assurance',
+  !!approvedSourcePopulationIssue({ ...validReceipt, employee: {
+    projectGid: '1216239131596624', screenedSubjects: 2.5,
+  } }, 5));
+
 if (failed) process.exit(1);
