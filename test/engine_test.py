@@ -4625,6 +4625,69 @@ check("stale Asana section fails closed instead of claiming delivery",
       _gid is None and screen.UNIFIED_DELIVERY_FAILED["failed"] and bool(_section_calls))
 screen.UNIFIED_DELIVERY_FAILED["failed"] = _prev_failed
 
+# Same-day report dedup prevents duplicate cards, but must never silently
+# replace a new 12-subject outcome with yesterday's 13-subject evidence.
+print("screen.py — same-day report population integrity")
+_r_now = ("DAILY AML/CFT SCREENING REPORT\n"
+          "Population screened: 12 subjects (9 legal entities; "
+          "3 natural-person screening slots, including employees)\n")
+_r_old = ("DAILY AML/CFT SCREENING REPORT\n"
+          "Population screened: 13 subjects (9 legal entities; "
+          "4 shareholders, directors and UBOs)\n")
+check("population header extracts compatible new and historical numerical receipts",
+      screen._report_population_counts(_r_now) == (12, 9, 3)
+      and screen._report_population_counts(_r_old) == (13, 9, 4))
+check("malformed or missing population header cannot be read as matching evidence",
+      screen._report_population_counts("No population header") is None)
+
+def _rerun_report_stub(previous_notes, *, previous_status=200):
+    calls = []
+    def _stub(method, url, **kw):
+        calls.append((method, url))
+        if method != "GET":
+            raise AssertionError("same-day evidence comparison must not create a new task")
+        if url.endswith("/api/1.0/tasks"):
+            data = {"data": [{"gid": "prior-1",
+                              "name": "Daily AML/CFT Screening Report — ACTION REQUIRED — "
+                                      "Sanctions 1 · Adverse Media 2 · PEP 0 — 20 Oct 2026"}],
+                    "next_page": None}
+            return types.SimpleNamespace(status_code=200, json=lambda: data)
+        if url.endswith("/tasks/prior-1"):
+            return types.SimpleNamespace(
+                status_code=previous_status,
+                json=lambda: {"data": {"notes": previous_notes}})
+        if url.endswith("/api/1.0/attachments"):
+            return types.SimpleNamespace(
+                status_code=200,
+                json=lambda: {"data": [
+                    {"name": "full-screening-report-2026-10-20.txt"},
+                    {"name": "screening-results-register-2026-10-20.csv"}]})
+        raise AssertionError(f"unexpected simulated Asana call {url}")
+    return _stub, calls
+
+_old_asana_rerun = screen.asana_request
+_old_delivery_gate = screen.UNIFIED_DELIVERY_FAILED["failed"]
+try:
+    for _old_notes, _http_status, _expect_red in [
+        (_r_now, 200, False),
+        (_r_old, 200, True),
+        ("missing population receipt", 200, True),
+        (_r_now, 503, True),
+    ]:
+        _stub, _calls = _rerun_report_stub(_old_notes, previous_status=_http_status)
+        screen.asana_request = _stub
+        screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+        _dedup_gid = screen.post_unified_task(
+            _r_now, _dt.datetime(2026, 10, 20, 12), [], [], [], mode="daily")
+        check("same-day rerun preserves original card; red only on unverifiable or changed population"
+              + f" (prior HTTP {_http_status}, expected red {_expect_red})",
+              _dedup_gid == "prior-1"
+              and screen.UNIFIED_DELIVERY_FAILED["failed"] == _expect_red
+              and not any(method == "POST" for method, url in _calls))
+finally:
+    screen.asana_request = _old_asana_rerun
+    screen.UNIFIED_DELIVERY_FAILED["failed"] = _old_delivery_gate
+
 _pj1, _mb1 = screen._mlro_queue_targets()
 check("queue targets are exactly one project and the approved media section",
       _pj1 == [screen.ASANA_ONGOING_MON_GID]
