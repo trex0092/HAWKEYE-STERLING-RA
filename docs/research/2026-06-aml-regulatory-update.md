@@ -90,7 +90,7 @@ e) The 03/2026 MoET Supplemental Guidance for DPMS (single source). [19]
 28. UAE FIU, goAML report types v1.2 (29/04/2024): https://uaefiu.gov.ae/media/adperv4o/different-types-of-reports-on-goaml-v1-2-29-apr-2024.pdf
 29. JCA UAE Audit, funds freeze and partial name match reports: https://jcauaeaudit.com/aml-in-uae-a-guide-to-filing-funds-freeze-report-partial-name-match-report/
 30. AML UAE, Confirmed Name Match Report (CNMR): https://amluae.com/confirmed-name-match-report-cnmr/
-31. Farahat & Co, goAML registration fines: https://www.farahatco.net/blog/goaml-registration-in-uae/
+31. Farahat & Co, goAML registration fines: original source URL returned HTTP 404 during the 2026-10-19 link audit. Reference withdrawn pending verification of a replacement; do not rely on this citation.
 
 Disclaimer: research summary for internal compliance use; confirm the open items in section 5 with the supervisory authority or legal counsel before relying on them.
 
