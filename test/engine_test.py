@@ -122,6 +122,14 @@ check("well-formed last page completes only after verified task list",
 check("well-formed next page continues source population read",
       screen._verified_asana_page({"data": [], "next_page": {"offset": "page-3"}},
                                   set(), "customer") == "page-3")
+try:
+    screen._verified_asana_page({"data": [], "next_page": {"offset": "page-101"}},
+                                {f"page-{i}" for i in range(1, 100)}, "customer")
+    _page_cap_rejected = False
+except RuntimeError as _err:
+    _page_cap_rejected = "100-page cap" in str(_err) and "incomplete" in str(_err)
+check("Python source reader rejects an unbounded 101st page rather than looping",
+      _page_cap_rejected)
 
 # HR screening: source tasks are natural persons, never an extra company,
 # nor a corporate ownership/control link to their employer.
