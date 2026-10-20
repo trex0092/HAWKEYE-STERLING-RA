@@ -1940,6 +1940,32 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   check('asana paging: every page is read to the end (no next_page left behind)',
     walked.length === 6);
 
+  // A valid 200 is not enough: malformed JSON or cursors cannot certify an
+  // enumerated customer book. All fixtures are synthetic, no account data.
+  const malformedCases = [
+    { label: 'missing data array', body: { next_page: null } },
+    { label: 'missing next_page field', body: { data: [{ gid: '1', name: 'A' }] } },
+    { label: 'empty continuation token', body: { data: [{ gid: '1', name: 'A' }], next_page: { offset: '' } } },
+    { label: 'malformed continuation', body: { data: [{ gid: '1', name: 'A' }], next_page: 'missing' } },
+  ];
+  for (const { label, body } of malformedCases) {
+    globalThis.fetch = async () => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => body });
+    let err = null;
+    try { await scr.asanaPaged('1', '/tasks', 'name', 't', 'Customer Database'); }
+    catch (e) { err = String(e?.message || e); }
+    check('asana paging: ' + label + ' fails closed', !!err && /malformed|cursor/.test(err));
+  }
+
+  let repeatedCursorCalls = 0;
+  globalThis.fetch = async () => ({ ok: true, status: 200, headers: { get: () => null },
+    json: async () => ({ data: [{ gid: String(repeatedCursorCalls++), name: 'A' }],
+      next_page: { offset: 'identical-token' } }) });
+  let repeatedCursorError = null;
+  try { await scr.asanaPaged('1', '/tasks', 'name', 't', 'Customer Database'); }
+  catch (e) { repeatedCursorError = String(e?.message || e); }
+  check('asana paging: repeated continuation token aborts without looping',
+    !!repeatedCursorError && /repeated/.test(repeatedCursorError) && repeatedCursorCalls === 2);
+
   /* More pages than the cap, and the API still says there is more. */
   let threw = null;
   globalThis.fetch = async () => page(2, true);
@@ -1964,6 +1990,33 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     /const sections = await asanaPaged\(projectGid, '\/sections'/.test(src));
   check('asana paging: soft mode is used ONLY by the dedup scan',
     (src.match(/soft: true/g) || []).length === 1 && /dedup scan[^\n]*\{ soft: true \}/.test(src));
+}
+
+/* Approved project inventories are checked before deduplication and screening.
+   Distinct source tasks must never vanish into a successful aggregate count. */
+{
+  const valid = [
+    { gid: 'synthetic-1', name: 'Example Trader A' },
+    { gid: 'synthetic-2', name: 'Example Trader B' },
+  ];
+  check('source inventory: distinct named tasks are accepted',
+    scr.requireCompleteSourceTaskInventory(valid).length === 2);
+  const rejected = [
+    ['missing GID', [{ name: 'A' }]],
+    ['missing subject name', [{ gid: '1', name: '' }]],
+    ['duplicate task GID', [{ gid: '1', name: 'Alpha' }, { gid: '1', name: 'Beta' }]],
+    ['duplicate normalized entity identity', [{ gid: '1', name: 'A B Ltd' }, { gid: '2', name: 'A-B LTD' }]],
+    ['empty source', []],
+  ];
+  for (const [label, tasks] of rejected) {
+    let error = null;
+    try { scr.requireCompleteSourceTaskInventory(tasks); }
+    catch (e) { error = String(e?.message || e); }
+    check('source inventory: ' + label + ' fails closed', !!error);
+  }
+  check('source fetches enforce complete inventories before both subject parsers',
+    /parseSubjects\(requireCompleteSourceTaskInventory\(/.test(readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8'))
+    && /parseEmployeeSubjects\(requireCompleteSourceTaskInventory\(/.test(readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8')));
 }
 
 /* Dated-file link discovery (Czechia MFA publishes each edition under a new
