@@ -36,6 +36,40 @@ export const BADGE_FILES = {
 const num = v => Number.isFinite(Number(v)) ? Number(v) : 0;
 const arr = v => Array.isArray(v) ? v : [];
 
+/**
+ * Authoritative receipt for the sanctions-only runtime probe. A positive
+ * number of screened rows is not enough: HR employees must be present as an
+ * independently identified source, with no mismatched or missing subjects.
+ * Does not emit identities or other confidential record content.
+ * Returns an error string, or null for a verified receipt.
+ */
+export function approvedSourcePopulationIssue(population, screenedSubjects) {
+  const expected = {
+    customer: '1214107620220121',
+    employee: '1216239131596624',
+  };
+  if (!population || typeof population !== 'object') {
+    return 'both approved Asana screening source receipts are required';
+  }
+  let total = 0;
+  for (const [key, projectGid] of Object.entries(expected)) {
+    const receipt = population[key];
+    if (!receipt || String(receipt.projectGid || '') !== projectGid) {
+      return 'screening source receipt missing or redirected: ' + key;
+    }
+    const count = receipt.screenedSubjects;
+    if (!Number.isSafeInteger(count) || count <= 0) {
+      return 'screening source receipt empty or invalid: ' + key;
+    }
+    total += count;
+  }
+  if (!Number.isSafeInteger(screenedSubjects) || screenedSubjects <= 0 ||
+      total !== screenedSubjects) {
+    return 'screening source receipt count mismatch: two populations must equal screened subjects';
+  }
+  return null;
+}
+
 function ageHours(iso, nowMs) {
   const t = Date.parse(String(iso || ''));
   return Number.isFinite(t) ? Math.max(0, (nowMs - t) / 3600000) : Infinity;
