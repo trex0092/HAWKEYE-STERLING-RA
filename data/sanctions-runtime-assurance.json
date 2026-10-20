@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-19T10:45:22.699Z",
-  "githubRunId": "39239534047",
-  "commit": "b78fce72090e5664bc676c7f060a954eae1e96af",
+  "generatedAt": "2026-10-20T13:32:59.852Z",
+  "githubRunId": "39431164926",
+  "commit": "70caf65fdfc23961bb9b521cff24d411eb300ce1",
   "screenedSubjects": 991,
   "sourceProjects": {
     "customer": {
@@ -34,15 +34,15 @@
         "partial": false
       },
       {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3773,
+        "id": "ofac-consolidated",
+        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
+        "count": 1674,
         "partial": false
       },
       {
-        "id": "ofac-consolidated",
-        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
-        "count": 1664,
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3773,
         "partial": false
       },
       {
@@ -60,7 +60,7 @@
       {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
-        "count": 21484,
+        "count": 21810,
         "partial": false
       }
     ],
@@ -71,32 +71,16 @@
       "uk-ofsi",
       "eu-fsf"
     ],
-    "sourceFloors": [
-      {
-        "id": "un-consolidated",
-        "minNames": 500
+    "sourcePopulation": {
+      "customer": {
+        "projectGid": "1214107620220121",
+        "screenedSubjects": 971
       },
-      {
-        "id": "ofac-sdn",
-        "minNames": 9000
-      },
-      {
-        "id": "ofac-consolidated",
-        "minNames": 100
-      },
-      {
-        "id": "uk-ofsi",
-        "minNames": 9000
-      },
-      {
-        "id": "eu-fsf",
-        "minNames": 20000
-      },
-      {
-        "id": "fr-dgt",
-        "minNames": 9800
+      "employee": {
+        "projectGid": "1216239131596624",
+        "screenedSubjects": 20
       }
-    ],
+    },
     "servedByFallback": [],
     "notes": []
   }
