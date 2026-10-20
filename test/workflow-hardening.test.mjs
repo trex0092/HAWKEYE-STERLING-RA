@@ -416,7 +416,7 @@ check('Dockerfile lint is blocking, not a no-fail badge',
   /failure-threshold:\s*warning/.test(dockerLint) &&
   /no-fail:\s*false/.test(dockerLint));
 check('source SBOM uses reviewed pinned Node24-compatible Anchore action',
-  /anchore\/sbom-action@e22c389904149dbc22b58101806040fa8d37a610/.test(sbom));
+  /anchore\/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c/.test(sbom));
 check('source SBOM uses supported modern artifact upload and 14-day retention',
   /format:\s*spdx-json/.test(sbom) &&
   /artifact-name:\s*hawkeye-source-sbom\s*$/m.test(sbom) &&
