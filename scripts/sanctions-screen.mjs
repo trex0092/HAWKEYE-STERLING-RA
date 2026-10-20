@@ -1328,6 +1328,29 @@ export async function fetchAsanaEmployeeSubjects(projectGid, token) {
   return parseEmployeeSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
 }
 
+/* All subjects need distinct, screenable state keys. Otherwise a namesake
+   across the customer and completed-HR populations can inherit another
+   person's screening disposition. Never merge two identities by name alone. */
+export function requireDistinctSourceKeys(customers, employees) {
+  if (!Array.isArray(customers) || !customers.length || !Array.isArray(employees) || !employees.length) {
+    throw new Error('Both approved screening populations must contain subjects');
+  }
+  const seen = new Set();
+  for (const source of [customers, employees]) {
+    for (const subject of source) {
+      const key = String(subject?.key || '').trim();
+      if (!key || !String(subject?.name || '').trim()) {
+        throw new Error('Approved population includes a subject without screenable identity');
+      }
+      if (seen.has(key)) {
+        throw new Error('Screening subject key collision across approved populations; manual identity reconciliation required');
+      }
+      seen.add(key);
+    }
+  }
+  return true;
+}
+
 /* ── Ongoing Monitoring — Asana writers (runner only) ─────────────────────── */
 
 async function asanaPost(path, body, token, timeoutMs = 30000) {
@@ -2345,6 +2368,8 @@ async function main() {
   try { subjects = await fetchAsanaSubjects(CUSTOMER_PROJECT_GID, asanaToken); }
   catch (e) { return bailUnscreened('could not read the Customer Database (' + (e && e.message || e) + ')', today); }
   if (!subjects.length) return bailUnscreened('the Customer Database returned 0 active customers', today);
+  const customerScreenCount = subjects.length;
+  let employeeScreenCount = 0;
   const onRunner = process.env.GITHUB_ACTIONS === 'true';
   let maskedCount = onRunner ? maskSubjectNames(subjects) : 0;
 
@@ -2353,6 +2378,9 @@ async function main() {
     try { employees = await fetchAsanaEmployeeSubjects(EMPLOYEE_PROJECT_GID, asanaToken); }
     catch (e) { return bailUnscreened('could not read the HR – Employees project (' + (e && e.message || e) + ') — employee screening is configured, so the run must not proceed without it', today); }
     if (!employees.length) return bailUnscreened('the HR – Employees project returned 0 subjects while employee screening is configured — set ASANA_EMPLOYEE_PROJECT_GID empty to disable it explicitly', today);
+    try { requireDistinctSourceKeys(subjects, employees); }
+    catch (e) { return bailUnscreened('cannot reconcile customer and employee screening identities: ' + e.message, today); }
+    employeeScreenCount = employees.length;
     console.log('sanctions-screen: + ' + employees.length + ' employees from the HR – Employees project (staff screening)');
     if (onRunner) maskedCount += maskSubjectNames(employees);
     subjects = subjects.concat(employees);
@@ -2365,6 +2393,9 @@ async function main() {
     + (cfg.adverseMedia ? ' + adverse media' : '') + (cfg.pep ? ' + PEP' : ''));
   const screen = await screenLocally(subjects, cfg);
   if (!screen.anyOk) return bailUnscreened('no sanctions list could be loaded — ' + ((screen.notes || []).join('; ') || 'all sources failed'), today);
+  if (!Array.isArray(screen.results) || screen.results.length !== subjects.length) {
+    return bailUnscreened('screening results do not reconcile to the complete approved subject population', today);
+  }
 
   const prevState = loadState();
   /* Lists fully re-verified this run. A `partial` list (its a.k.a. file failed
@@ -2448,6 +2479,10 @@ async function main() {
   writeFileSync(RESULTS_FILE, JSON.stringify({
     date: today,
     screened: subjects.length, entities, individuals,
+    sourcePopulation: {
+      customer: { projectGid: CUSTOMER_PROJECT_GID, screenedSubjects: customerScreenCount },
+      employee: { projectGid: EMPLOYEE_PROJECT_GID, screenedSubjects: employeeScreenCount },
+    },
     newMatches: alerts.length, matchCount, clearedCount: cleared.length,
     degraded: screen.degraded,
     lists: ((screen.coverage && screen.coverage.lists) || []).map(L => ({
