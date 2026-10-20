@@ -73,7 +73,7 @@ export const CUSTOMER_PROJECT_GID =
 export const EMPLOYEE_PROJECT_GID =
   process.env.ASANA_EMPLOYEE_PROJECT_GID !== undefined
     ? process.env.ASANA_EMPLOYEE_PROJECT_GID
-    : '1216239131596624';
+    : EMPLOYEE_PROJECT;
 
 /* Reject redirected screening sources and delivery destinations before any Asana read.
    Approval is tied to the project identity, not to a repository variable. */
