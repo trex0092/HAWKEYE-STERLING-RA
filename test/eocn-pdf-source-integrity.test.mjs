@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 const manifest = JSON.parse(readFileSync('data/eocn-user-pdf-source-evidence.json', 'utf8'));
 const list = JSON.parse(readFileSync('data/eocn-local-terrorist-list.json', 'utf8'));
 const fold = value => String(value || '').normalize('NFKD').toLocaleUpperCase('en')
-  .replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim();
+  .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const names = new Set(list.entries.flatMap(entry => typeof entry === 'string'
   ? [entry] : [entry.name, ...(entry.aliases || [])]).map(fold));
 
