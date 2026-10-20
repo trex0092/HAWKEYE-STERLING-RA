@@ -29,7 +29,7 @@ export async function loadApprovedRuntimePopulation(token, {
 } = {}) {
   // A blank/redirected HR source may NOT turn a 2-project screen into a
   // seemingly successful customer-only probe. Validate BEFORE any network.
-  requireApprovedScreeningRoute({ customer: customerProject, employee: employeeProject });
+  requireApprovedScreeningRoute(customerProject, employeeProject);
   if (!token) throw new Error('ASANA_ACCESS_TOKEN is required');
   const customers = await fetchCustomers(customerProject, token);
   if (!Array.isArray(customers) || !customers.length) {
