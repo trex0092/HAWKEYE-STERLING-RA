@@ -5144,34 +5144,46 @@ def _manual_review_hit(subject_type, subject_name, control_linkage):
             "matched_entry": "name not auto-screenable (non-Latin script or too short) — screen this subject manually against all lists",
             "score": 0, "name_score": 0, "core_score": 0, "confidence": "REVIEW"}
 
+def screening_individuals(customer):
+    """Return screened human names, retaining an employee when notes omit names."""
+    names = list(customer.get("individuals") or [])
+    if customer.get("kind") == "employee":
+        name = str(customer.get("name") or "").strip()
+        if not name:
+            raise ValueError("Employee screening record has no name")
+        if name not in names:
+            names.insert(0, name)
+    return list(dict.fromkeys(n for n in names if str(n).strip()))
+
+
+def build_screening_subjects(customers):
+    """Use natural-person slots for employees, never fictitious company ownership."""
+    subjects = []
+    for c in customers:
+        employee = c.get("kind") == "employee"
+        if not employee:
+            subjects.append(("COMPANY", c["name"], None, c))
+        for person in screening_individuals(c):
+            subjects.append(("INDIVIDUAL", person, None if employee else c["name"], c))
+        if not employee:
+            for owner in c.get("entity_owners", []):
+                subjects.append(("ENTITY (owner)", owner, c["name"], c))
+    return subjects
+
+
 def screen_customers(customers, all_lists):
     possible_matches, clear = [], []
     for c in customers:
         hits = []
-        if _unscreenable(c["name"]):
-            hits.append(_manual_review_hit("ENTITY", c["name"], False))
-        for h in screen_name(c["name"], all_lists):
-            hits.append({"subject_type":"ENTITY","subject_name":c["name"],
-                         "control_linkage": False, **h})
-        for ind in c["individuals"]:
-            if _unscreenable(ind):
-                hits.append(_manual_review_hit("INDIVIDUAL", ind, True))
-            for h in screen_name(ind, all_lists):
-                # An owner / director / UBO matching a designation flags the
-                # COMPANY by ownership/control linkage (the 50%/control rule),
-                # even though the company name itself did not match.
-                hits.append({"subject_type":"INDIVIDUAL","subject_name":ind,
-                             "control_linkage": True, **h})
-        for ent in c.get("entity_owners", []):
-            if _unscreenable(ent):
-                hits.append(_manual_review_hit("ENTITY (owner)", ent, True))
-            for h in screen_name(ent, all_lists):
-                # A DESIGNATED corporate owner/parent flags the customer by the
-                # 50%/control rule just like a natural-person owner.
-                hits.append({"subject_type":"ENTITY (owner)","subject_name":ent,
-                             "control_linkage": True, **h})
+        for subject_type, name, parent, _ in build_screening_subjects([c]):
+            linkage = bool(parent) and subject_type != "COMPANY"
+            if _unscreenable(name):
+                hits.append(_manual_review_hit(subject_type, name, linkage))
+            for h in screen_name(name, all_lists):
+                hits.append({"subject_type": subject_type, "subject_name": name,
+                             "control_linkage": linkage, **h})
         if hits:
-            possible_matches.append({**c,"hits":hits})
+            possible_matches.append({**c, "hits": hits})
         else:
             clear.append(c)
     return possible_matches, clear
@@ -8023,16 +8035,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 
     # Subject set first — the watchlist pass below screens it before the
     # network-bound enrichment starts.
-    subjects_all = []
-    for c in customers:
-        subjects_all.append(("COMPANY", c["name"], None, c))
-        for ind in c.get("individuals", []):
-            subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
-        # Corporate owners/parents are sanctions-screened (50%/control rule) —
-        # sweep their adverse media too, or a designated parent's coverage is
-        # never seen. No PEP check: PEP status is a natural-person concept.
-        for ent in c.get("entity_owners", []):
-            subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
+    subjects_all = build_screening_subjects(customers)
 
     # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual — the
     # network-bound sweep runs in PARALLEL (bounded pool), and it STARTS HERE,
