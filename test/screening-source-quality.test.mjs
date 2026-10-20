@@ -13,6 +13,10 @@ const harvested = new Date(nowMs - 3600000).toISOString();
 const pepCount = PEP_FLOOR + 1000;
 const makeResults = () => ({
   screened: 359,
+  sourcePopulation: {
+    customer: { projectGid: '1214107620220121', screenedSubjects: 339 },
+    employee: { projectGid: '1216239131596624', screenedSubjects: 20 },
+  },
   degraded: false,
   lists: contract.domains.sanctions.sources.map(source => ({
     id: source.id, name: source.name, count: source.minNames + 500, partial: false,
