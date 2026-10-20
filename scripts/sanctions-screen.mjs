@@ -1272,6 +1272,7 @@ export const ASANA_PAGE_CAP = Number(process.env.ASANA_PAGE_CAP) || 500;
 
 export async function asanaPaged(projectGid, path, optFields, token, what, { soft = false } = {}) {
   const out = [];
+  const seenOffsets = new Set();
   let offset = null, pages = 0;
   for (;;) {
     const u = new URL('https://app.asana.com/api/1.0/projects/' + projectGid + path);
@@ -1279,9 +1280,20 @@ export async function asanaPaged(projectGid, path, optFields, token, what, { sof
     u.searchParams.set('limit', '100');
     if (offset) u.searchParams.set('offset', offset);
     const json = await asanaGet(u, token);
-    for (const t of (json.data || [])) out.push(t);
-    offset = json.next_page && json.next_page.offset;
-    if (!offset) return out;
+    if (!json || typeof json !== 'object' || !Array.isArray(json.data) ||
+        !Object.prototype.hasOwnProperty.call(json, 'next_page')) {
+      throw new Error(what + ': malformed Asana collection; refusing a partial screening source');
+    }
+    out.push(...json.data);
+    if (json.next_page === null) return out;
+    const next = json.next_page;
+    if (!next || typeof next !== 'object' ||
+        typeof next.offset !== 'string' || !next.offset.trim() ||
+        seenOffsets.has(next.offset)) {
+      throw new Error(what + ': missing, malformed or repeated Asana continuation cursor; refusing an incomplete project');
+    }
+    seenOffsets.add(next.offset);
+    offset = next.offset;
     if (++pages >= ASANA_PAGE_CAP) {
       const msg = what + ': read ' + out.length + ' record(s) over ' + pages
         + ' pages and Asana still reports more — the page cap (' + ASANA_PAGE_CAP
@@ -1295,8 +1307,39 @@ export async function asanaPaged(projectGid, path, optFields, token, what, { sof
   }
 }
 
+/* Every raw task must be represented before expanding entities and principals.
+   Positive screened-subject counts cannot certify a source whose malformed
+   rows or duplicate legal names were discarded by parseSubjects. The source
+   name and record counts are deliberately not logged, to protect identities. */
+export function requireCompleteSourceTaskInventory(tasks, what = 'Asana screening source') {
+  if (!Array.isArray(tasks) || !tasks.length) {
+    throw new Error(what + ': empty or malformed screening task inventory');
+  }
+  const gids = new Set();
+  const entityKeys = new Set();
+  for (const task of tasks) {
+    const gid = String(task?.gid || '').trim();
+    const name = String(task?.name || '').trim();
+    if (!gid || !name) {
+      throw new Error(what + ': task without GID or usable subject name; refusing to omit it');
+    }
+    if (gids.has(gid)) {
+      throw new Error(what + ': repeated task GID; project enumeration is not complete');
+    }
+    const key = normalizeName(name) || 'raw:' + name;
+    if (entityKeys.has(key)) {
+      throw new Error(what + ': duplicate normalized task name; distinct legal identities need separate reviewed keys');
+    }
+    gids.add(gid);
+    entityKeys.add(key);
+  }
+  return tasks;
+}
+
 export async function fetchAsanaSubjects(projectGid, token) {
-  return parseSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
+  const what = 'Asana customer source ' + projectGid;
+  return parseSubjects(requireCompleteSourceTaskInventory(
+    await asanaPaged(projectGid, '/tasks', 'gid,name,completed,notes', token, what), what));
 }
 
 /* HR – Employees: every task IS a natural person (the task name is the
@@ -1325,7 +1368,9 @@ export function parseEmployeeSubjects(tasks) {
 }
 
 export async function fetchAsanaEmployeeSubjects(projectGid, token) {
-  return parseEmployeeSubjects(await asanaPaged(projectGid, '/tasks', 'name,completed,notes', token, 'Asana project ' + projectGid));
+  const what = 'Asana employee source ' + projectGid;
+  return parseEmployeeSubjects(requireCompleteSourceTaskInventory(
+    await asanaPaged(projectGid, '/tasks', 'gid,name,completed,notes', token, what), what));
 }
 
 /* All subjects need distinct, screenable state keys. Otherwise a namesake
