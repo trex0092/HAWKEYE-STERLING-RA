@@ -35,6 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { notifyAsana, esc, REG_PROJECT_GID, asanaEnabled, isRetryable, retryDelayMs,
   fitAsanaText, fitAsanaName } from './asana-notify.mjs';
 import { loadSources } from './reg-watch.mjs';
+import { CUSTOMER_PROJECT, EMPLOYEE_PROJECT, MONITORING_PROJECT } from './asana-sections.mjs';
 import { normalizeName, parseList, buildIndex, screenName, MANUAL_REVIEW_LIST, isScreenableName } from './sanctions-match.mjs';
 import { checkAdverseMedia, budgetedLocales, activeLocales, rotationCycleDays, sourceTierFor, ALL_TERMS, LOCALES, LANG_TERMS } from './adverse-media.mjs';
 import { checkPep } from './pep-check.mjs';
@@ -73,6 +74,21 @@ export const EMPLOYEE_PROJECT_GID =
   process.env.ASANA_EMPLOYEE_PROJECT_GID !== undefined
     ? process.env.ASANA_EMPLOYEE_PROJECT_GID
     : '1216239131596624';
+
+/* Reject redirected screening sources and delivery destinations before any Asana read.
+   Approval is tied to the project identity, not to a repository variable. */
+export function requireApprovedScreeningRoute() {
+  const customer = CUSTOMER_PROJECT_GID;
+  const employee = EMPLOYEE_PROJECT_GID;
+  const results = REG_PROJECT_GID;
+  const monitoring = OM_PROJECT_GID;
+  if (String(customer || '') !== CUSTOMER_PROJECT ||
+      String(employee || '') !== EMPLOYEE_PROJECT ||
+      String(results || '') !== MONITORING_PROJECT ||
+      String(monitoring || '') !== MONITORING_PROJECT) {
+    throw new Error('Screening source or destination is not an approved Asana project');
+  }
+}
 
 /* Consolidated designation lists screened against (data/sanctions-sources.json).
    Override the file with SANCTIONS_SOURCES_FILE. */
@@ -2224,6 +2240,8 @@ function bailUnscreened(reason, today) {
 
 async function main() {
   const today = new Date().toISOString().slice(0, 10);
+  try { requireApprovedScreeningRoute(); }
+  catch (error) { return bailUnscreened('unapproved screening route: ' + error.message, today); }
   const cfg = {
     sourcesFile: SANCTIONS_SOURCES_FILE,
     extraFile: process.env.SANCTIONS_EXTRA_FILE || 'data/sanctions-extra.json',
