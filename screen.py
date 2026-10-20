@@ -4446,8 +4446,7 @@ def get_payment_register():
             raise RuntimeError(f"Asana payments register fetch failed: "
                                f"{getattr(r, 'status_code', 'network')}")
         data = r.json()
-        customer_next_offset = _verified_asana_page(data, customer_offsets, "customer")
-        for t in data["data"]:
+        for t in (data.get("data") or []):
             if payment_screen.is_tm_report_task(t.get("name")):
                 continue   # our own daily report card, filed in the same section
             try:
@@ -4501,8 +4500,9 @@ def get_all_customers():
         if r is None or r.status_code not in (200, 201):
             raise RuntimeError(f"Asana customer fetch failed: "
                                f"{getattr(r,'status_code','network')} {getattr(r,'text','')[:200]}")
-        data = r.json() if isinstance(r.json(), dict) else {}
-        for t in (data.get("data") or []):
+        data = r.json()
+        customer_next_offset = _verified_asana_page(data, customer_offsets, "customer")
+        for t in data["data"]:
             if not t.get("gid") or not t.get("name"):
                 # Keep the run alive (never crash the whole book on one bad row)
                 # but NEVER drop it silently — it is a customer we did not screen.
