@@ -93,7 +93,7 @@ check('parsePrincipals is empty for a record with no identifications section',
     'SECTION 5 - PF ASSESSMENT',
     'A paragraph mentioning Owner: Narrative Only must not create a subject.',
     'Shareholder: N/A',
-  ].join('\\n') };
+  ].join('\n') };
   const owners = parsePrincipals(ownerTask);
   const ownerSubjects = parseSubjects([ownerTask]);
   check('owner-line extraction screens corporate parent even without Section 4',
@@ -104,7 +104,7 @@ check('parsePrincipals is empty for a record with no identifications section',
     owners.some(p => p.name === 'Nadir Example' && p.corporate === false)
     && ownerSubjects.some(p => p.name === 'Nadir Example' && p.entityType === 'individual'));
   check('owner-line extraction refuses placeholders and narrative mentions',
-    owners.length === 2 && !owners.some(p => /Narrative Only|N\\/A/.test(p.name)));
+    owners.length === 2 && !owners.some(p => /Narrative Only|N\/A/.test(p.name)));
   const mixedOwnerTask = { gid: 'owner-2', name: 'Second Synthetic Co', notes: [
     'SECTION 4 - IDENTIFICATIONS',
     'Individual 1 - Director',
@@ -113,7 +113,7 @@ check('parsePrincipals is empty for a record with no identifications section',
     'SECTION 5 - REVIEW',
     'Shareholder: Meridian Holdings LLC',
     'Beneficial Owner: Alpha Example',
-  ].join('\\n') };
+  ].join('\n') };
   const combined = parsePrincipals(mixedOwnerTask);
   check('owner-line evidence adds corporate holders beside structured Section-4 identities',
     combined.length === 2 && combined.some(p => p.name === 'Meridian Holdings LLC' && p.corporate)
