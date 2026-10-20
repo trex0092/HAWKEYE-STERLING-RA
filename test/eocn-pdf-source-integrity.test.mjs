@@ -54,4 +54,31 @@ for (const name of [
   assert.ok(!names.has(fold(name)), 'delisted record incorrectly active: ' + name);
 }
 
+// Every numbered Latin-script designation from pages 1-10 must remain
+// screenable; every numbered removed record on pages 11-12 must stay absent.
+// This is a dated supplied-PDF fixture, not an official freshness assertion.
+const fixture = JSON.parse(readFileSync('test/fixtures/eocn-supplied-pdf-baseline.json', 'utf8'));
+assert.equal(fixture.fileSha256, manifest.fileSha256);
+const activeSections = { individuals: 171, organizations: 75, entities: 65 };
+for (const [type, count] of Object.entries(activeSections)) {
+  const rows = fixture.active[type];
+  assert.equal(rows.length, count, type + ' active count');
+  assert.deepEqual(rows.map(row => row.row), Array.from({ length: count }, (_, i) => i + 1),
+    type + ' row numbers are complete');
+  for (const row of rows) {
+    assert.ok(row.name && names.has(fold(row.name)),
+      'missing listed ' + type + ' # ' + row.row + ' (page ' + row.page + '): ' + row.name);
+  }
+}
+for (const [type, count] of Object.entries({ individuals: 19, entities: 8 })) {
+  const rows = fixture.removed[type];
+  assert.equal(rows.length, count, type + ' removed count');
+  assert.deepEqual(rows.map(row => row.row), Array.from({ length: count }, (_, i) => i + 1),
+    type + ' removed row numbers are complete');
+  for (const row of rows) {
+    assert.ok(row.name && !names.has(fold(row.name)),
+      'delisted ' + type + ' # ' + row.row + ' erroneously reactivated: ' + row.name);
+  }
+}
+
 console.log('PASS: supplied EOCN PDF baseline checked (311 active designations; 27 removed rows; MLRO review pending)');
