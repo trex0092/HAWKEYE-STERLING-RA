@@ -98,6 +98,44 @@ try {
   }
   check('eocn list: every entry is a name string or {name, aliases}', entriesOk);
 
+  // Cabinet Resolution 63/2026 is carried by the 12-page EOCN publication
+  // (sha256 83d46617a1f9cc8045fbec031a98aac568f5fd7e6f8d9670a5b53606dd87f858).
+  // The 20 Oct 2026 upload is byte-identical to the already reconciled
+  // September edition. A fresh filename alone is not evidence of a fresh list.
+  // Protect all 16 listed natural persons and five entities from regression.
+  const eocnNames = new Set((eocn.entries || []).flatMap(e =>
+    typeof e === 'string' ? [e] : [e.name, ...(e.aliases || [])])
+    .filter(x => typeof x === 'string').map(x => x.trim().toLowerCase()));
+  const cabinet63Persons = [
+    'Ali Mohammed Karneeb', 'Nasser Hassan Nasr',
+    'Hassan Shehadeh Osman', 'Samer Hassan Fawaz',
+    'Ahmed Mohammed Yazbek', 'Isa Hussein Qasir', 'Ibrahim Ali Daher',
+    'Abbas Hassan Ghareeb', 'Emad Mohammed Bazzi', 'Ezzat Yousef Akr',
+    'Wahid Mahmud Sbeiti', 'Mustafa Habib Harb',
+    'Mohammed Suleiman Badir', 'Adel Mohammad Mansour',
+    'Ali Ahmed Krisht', 'Nima Ahmad Jamil'
+  ];
+  const cabinet63Entities = [
+    'Bayt Al-Mal ALMuslimeen', 'AL-Qard AL-Hassan Association',
+    'AL Tasheelat Company', 'The Auditors for Accounting and Auditing',
+    'AL-Khobara For Accounting, Auditing, and studies'
+  ];
+  check('eocn list: all 16 Cabinet Resolution 63/2026 persons retained',
+    cabinet63Persons.every(name => eocnNames.has(name.toLowerCase())));
+  check('eocn list: all five Cabinet Resolution 63/2026 entities retained',
+    cabinet63Entities.every(name => eocnNames.has(name.toLowerCase())));
+  // Delisted parties (last PDF section) are NOT active TFS designations.
+  const delistedEntities = [
+    'CANVAS : CENTER FOR APPLIED NONVIOLENT ACTION AND STRATEGIES',
+    'QATAR VOLUNTEER CENTER', 'DOHA APPLE', 'QATAR CHARITY',
+    'EID  CHARITY',
+    'SHEIKH THANI BIN ABDULLAH FOUNDATION FOR HUMANITARIAN SERVICE',
+    'AL-BALAGH CHARITABLE FOUNDATION', 'AL-IHSAN CHARITABLE SOCIETY'
+  ];
+  check('eocn list: eight published delisted entities remain excluded',
+    delistedEntities.every(name => !eocnNames.has(name.trim().toLowerCase())));
+
+
   const sopPath = path.join(__dirname, '..', 'docs', 'aims', 'eocn-list-update-sop.md');
   check('eocn list: the written update SOP exists (docs/aims/eocn-list-update-sop.md)', fs.existsSync(sopPath));
   if (fs.existsSync(sopPath)) {
