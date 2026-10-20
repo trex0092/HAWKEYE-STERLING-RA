@@ -41,57 +41,66 @@ def extract_principals(notes):
             push(nm.group(1), 'Principal', '')
     return people
 
+APPROVED_CUSTOMER_PROJECT = "1214107620220121"
+APPROVED_EMPLOYEE_PROJECT = "1216239131596624"
+
 pat = os.environ["ASANA_PAT"]
-project_gid = os.environ["CUSTOMER_DB_GID"]
+customer = os.environ["CUSTOMER_DB_GID"]
+employee = os.environ["EMPLOYEE_DB_GID"]
+if customer != APPROVED_CUSTOMER_PROJECT or employee != APPROVED_EMPLOYEE_PROJECT:
+    raise SystemExit("FATAL: screening source does not match the approved Customer Database and HR Employees projects")
+
 headers = {"Authorization": f"Bearer {pat}"}
-customers = []
 url = "https://app.asana.com/api/1.0/tasks"
-params = {
-    "project": project_gid,
-    "opt_fields": "name,gid,permalink_url,notes",
-    "limit": 100
-}
 
-while True:
-    r = requests.get(url, headers=headers, params=params)
-    # Fail LOUDLY on an auth/rate error. Without this, a 401 (expired
-    # ASANA_PAT) / 403 / 429 returns a JSON error body that parses fine,
-    # data.get("data") is [], and the run posts an all-clear for a
-    # customer base it never actually read — a silent false negative.
-    if not r.ok:
-        raise SystemExit(f"FATAL: Asana customer fetch failed — HTTP {r.status_code}: {r.text[:300]}")
-    data = r.json()
-    for t in data.get("data", []):
-        if t.get("name","").strip():
-            cname = t["name"].strip()
-            customers.append({
-                "name": cname,
-                "gid": t["gid"],
-                "url": t.get("permalink_url",""),
-                "kind": "entity",
-                "parent": ""
-            })
-            # Screen every recorded principal / UBO / director too.
-            for pr in extract_principals(t.get("notes","")):
-                customers.append({
-                    "name": pr["name"],
-                    "gid": t["gid"],
-                    "url": t.get("permalink_url",""),
-                    "kind": "individual",
-                    "parent": cname,
-                    "role": pr.get("role",""),
-                    "nationality": pr.get("nationality","")
-                })
-    next_page = data.get("next_page")
-    if not next_page:
-        break
-    params["offset"] = next_page["offset"]
 
-# An empty customer base is never a valid "all clear" — it means the
-# project GID is wrong or the read was blocked. Fail rather than post a
-# vacuous clean screen.
-if not customers:
-    raise SystemExit("FATAL: 0 customers read from the Asana Customer Database — refusing to post an all-clear. Check ASANA_CUSTOMER_DB_GID and the token's access.")
+def fetch_source_tasks(token, project_gid, source_name):
+    """Retrieve every page of an approved screening population or fail closed."""
+    records = []
+    params = {"project": project_gid, "opt_fields": "name,gid,permalink_url,notes", "limit": 100}
+    while True:
+        r = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params, timeout=30)
+        if not r.ok:
+            raise SystemExit(f"FATAL: Asana {source_name} fetch failed - HTTP {r.status_code}")
+        data = r.json()
+        if not isinstance(data.get("data"), list):
+            raise SystemExit(f"FATAL: Asana {source_name} response has no task array")
+        records.extend(data["data"])
+        next_page = data.get("next_page")
+        if not next_page:
+            break
+        if not isinstance(next_page, dict) or not next_page.get("offset"):
+            raise SystemExit(f"FATAL: Asana {source_name} returned invalid pagination")
+        params["offset"] = next_page["offset"]
+    if not records:
+        raise SystemExit(f"FATAL: Asana {source_name} returned 0 tasks; refusing all-clear")
+    return records
+
+
+customers = []
+for t in fetch_source_tasks(pat, customer, "Customer Database"):
+    cname = str(t.get("name") or "").strip()
+    if not cname:
+        continue
+    customers.append({"name": cname, "gid": t["gid"],
+                      "url": t.get("permalink_url", ""), "kind": "entity", "parent": ""})
+    for pr in extract_principals(t.get("notes", "")):
+        customers.append({"name": pr["name"], "gid": t["gid"],
+                          "url": t.get("permalink_url", ""), "kind": "individual",
+                          "parent": cname, "role": pr.get("role", ""),
+                          "nationality": pr.get("nationality", "")})
+
+# The HR project's completed tasks remain in scope. Completion represents
+# training status, not termination of employment.
+for t in fetch_source_tasks(pat, employee, "HR Employees"):
+    name = str(t.get("name") or "").strip()
+    if not name:
+        continue
+    customers.append({"name": name, "gid": t["gid"],
+                      "url": t.get("permalink_url", ""), "kind": "employee", "parent": ""})
+
+if not any(c["kind"] == "entity" for c in customers) or not any(c["kind"] == "employee" for c in customers):
+    raise SystemExit("FATAL: customer or employee screening population is empty; refusing all-clear")
 
 with open("/tmp/customers.json","w") as f:
     json.dump(customers, f, ensure_ascii=False)
