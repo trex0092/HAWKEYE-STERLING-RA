@@ -41,6 +41,24 @@ assert.equal(checked.operational, true, 'baseline must be operational');
 assert.equal(checked.sourceQuality.assured, true, 'all sources at floor and all backbones healthy');
 assert.equal(checkStored(checked, { nowMs }).ok, true, 'fresh, complete quality can pass');
 
+// The source receipt must identify BOTH approved Asana populations.
+const missingPopulation = makeResults();
+delete missingPopulation.sourcePopulation;
+checked = assess(missingPopulation);
+assert.equal(checked.operational, false);
+assert.equal(checked.sourceQuality.assured, false);
+assert(checked.domains.sanctions.reasons.some(x => x.includes('approved screening population')));
+
+const truncatedPopulation = makeResults();
+truncatedPopulation.sourcePopulation.employee.screenedSubjects = 19;
+checked = assess(truncatedPopulation);
+assert.equal(checked.operational, false, 'an omitted employee blocks assurance');
+
+const redirectedPopulation = makeResults();
+redirectedPopulation.sourcePopulation.employee.projectGid = 'wrong-project';
+checked = assess(redirectedPopulation);
+assert.equal(checked.operational, false, 'unapproved HR source blocks assurance');
+
 const truncated = makeResults();
 truncated.lists.find(x => x.id === 'ofac-sdn').count = 1;
 checked = assess(truncated);
