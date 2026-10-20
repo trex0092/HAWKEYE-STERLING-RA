@@ -103,6 +103,26 @@ _pm_e, _clr_e = screen.screen_customers(
 check("a designated corporate owner flags the customer by control linkage",
       len(_pm_e) == 1 and any(h["subject_type"].startswith("ENTITY (owner)") and h["control_linkage"] for h in _pm_e[0]["hits"]))
 
+# Asana task pagination must never silently stop before all source pages arrive.
+for _label, _page, _expected in [
+    ("malformed collection", {"data": None}, "malformed"),
+    ("missing continuation cursor", {"data": [], "next_page": {}}, "continuation cursor"),
+    ("repeated continuation cursor", {"data": [], "next_page": {"offset": "page-2"}},
+     "continuation cursor"),
+    ("wrong continuation type", {"data": [], "next_page": "unexpected"}, "pagination"),
+]:
+    try:
+        screen._verified_asana_page(_page, {"page-2"}, "employee")
+        _rejected = False
+    except RuntimeError as _err:
+        _rejected = _expected in str(_err)
+    check("Asana employee pagination rejects " + _label, _rejected)
+check("well-formed last page completes only after verified task list",
+      screen._verified_asana_page({"data": [], "next_page": None}, set(), "customer") is None)
+check("well-formed next page continues source population read",
+      screen._verified_asana_page({"data": [], "next_page": {"offset": "page-3"}},
+                                  set(), "customer") == "page-3")
+
 # HR screening: source tasks are natural persons, never an extra company,
 # nor a corporate ownership/control link to their employer.
 _staff = {"name": "Maria Santos", "kind": "employee", "individuals": ["Maria Santos"],

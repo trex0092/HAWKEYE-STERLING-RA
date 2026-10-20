@@ -4445,7 +4445,7 @@ def get_payment_register():
         if r is None or r.status_code not in (200, 201):
             raise RuntimeError(f"Asana payments register fetch failed: "
                                f"{getattr(r, 'status_code', 'network')}")
-        data = r.json() if isinstance(r.json(), dict) else {}
+        data = r.json()
         for t in (data.get("data") or []):
             if payment_screen.is_tm_report_task(t.get("name")):
                 continue   # our own daily report card, filed in the same section
@@ -4466,8 +4466,29 @@ def get_payment_register():
     return records, unreadable
 
 
+def _verified_asana_page(data, seen_offsets, population):
+    """Fail closed on truncated, repeated or malformed Asana task pagination."""
+    if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+        raise RuntimeError(f"FATAL: malformed {population} task collection")
+    next_page = data.get("next_page")
+    if next_page is None:
+        return None
+    if not isinstance(next_page, dict):
+        raise RuntimeError(f"FATAL: malformed {population} pagination")
+    offset = next_page.get("offset")
+    if not isinstance(offset, str) or not offset or offset in seen_offsets:
+        raise RuntimeError(f"FATAL: missing or repeated {population} continuation cursor")
+    seen_offsets.add(offset)
+    return offset
+
+
 def get_all_customers():
+    # Validate both authoritative populations before any remote read.
+    # An unset or redirected HR source cannot silently turn the run customer-only.
+    if ASANA_EMPLOYEE_DB_GID != "1216239131596624":
+        raise RuntimeError("FATAL: approved HR Employees project is required for screening")
     customers = []
+    customer_offsets = set()
     CUSTOMER_ROWS_SKIPPED.clear()
     params = {
         "project": ASANA_CUSTOMER_DB_GID,
@@ -4479,8 +4500,9 @@ def get_all_customers():
         if r is None or r.status_code not in (200, 201):
             raise RuntimeError(f"Asana customer fetch failed: "
                                f"{getattr(r,'status_code','network')} {getattr(r,'text','')[:200]}")
-        data = r.json() if isinstance(r.json(), dict) else {}
-        for t in (data.get("data") or []):
+        data = r.json()
+        customer_next_offset = _verified_asana_page(data, customer_offsets, "customer")
+        for t in data["data"]:
             if not t.get("gid") or not t.get("name"):
                 # Keep the run alive (never crash the whole book on one bad row)
                 # but NEVER drop it silently — it is a customer we did not screen.
@@ -4515,10 +4537,9 @@ def get_all_customers():
                 "email": extract_customer_email(notes),
                 "has_assessment": len(notes.strip()) > 100,
             })
-        next_page = data.get("next_page") or None
-        if not next_page or not next_page.get("offset"):
+        if customer_next_offset is None:
             break
-        params["offset"] = next_page["offset"]
+        params["offset"] = customer_next_offset
     masked = mask_population(customers)
     log(f"Loaded {len(customers)} customers")
     progress("customers-loaded", customers=len(customers))
@@ -4541,6 +4562,7 @@ def get_all_customers():
     # that silently drops out of screening is a silent clear for everyone in it.
     if ASANA_EMPLOYEE_DB_GID:
         employees = []
+        employee_offsets = set()
         eparams = {
             "project": ASANA_EMPLOYEE_DB_GID,
             "opt_fields": "gid,name,notes,permalink_url,created_at",
@@ -4554,8 +4576,9 @@ def get_all_customers():
                     f"({getattr(r,'status_code','network')}) — refusing to screen a "
                     f"population that silently dropped out. Check ASANA_EMPLOYEE_DB_GID "
                     f"or set it empty to disable employee screening explicitly.")
-            data = r.json() if isinstance(r.json(), dict) else {}
-            for t in (data.get("data") or []):
+            data = r.json()
+            employee_next_offset = _verified_asana_page(data, employee_offsets, "employee")
+            for t in data["data"]:
                 if not t.get("gid") or not t.get("name"):
                     # Same guard as the customer loop above — an employee row
                     # without a usable identity is a person we did not screen,
@@ -4579,10 +4602,9 @@ def get_all_customers():
                     "has_assessment": len(notes.strip()) > 100,
                     "kind": "employee",
                 })
-            next_page = data.get("next_page") or None
-            if not next_page or not next_page.get("offset"):
+            if employee_next_offset is None:
                 break
-            eparams["offset"] = next_page["offset"]
+            eparams["offset"] = employee_next_offset
         if not employees:
             raise RuntimeError(
                 "FATAL: 0 employees read from the HR – Employees project while employee "
@@ -5144,34 +5166,46 @@ def _manual_review_hit(subject_type, subject_name, control_linkage):
             "matched_entry": "name not auto-screenable (non-Latin script or too short) — screen this subject manually against all lists",
             "score": 0, "name_score": 0, "core_score": 0, "confidence": "REVIEW"}
 
+def screening_individuals(customer):
+    """Return screened human names, retaining an employee when notes omit names."""
+    names = list(customer.get("individuals") or [])
+    if customer.get("kind") == "employee":
+        name = str(customer.get("name") or "").strip()
+        if not name:
+            raise ValueError("Employee screening record has no name")
+        if name not in names:
+            names.insert(0, name)
+    return list(dict.fromkeys(n for n in names if str(n).strip()))
+
+
+def build_screening_subjects(customers):
+    """Use natural-person slots for employees, never fictitious company ownership."""
+    subjects = []
+    for c in customers:
+        employee = c.get("kind") == "employee"
+        if not employee:
+            subjects.append(("COMPANY", c["name"], None, c))
+        for person in screening_individuals(c):
+            subjects.append(("INDIVIDUAL", person, None if employee else c["name"], c))
+        if not employee:
+            for owner in c.get("entity_owners", []):
+                subjects.append(("ENTITY (owner)", owner, c["name"], c))
+    return subjects
+
+
 def screen_customers(customers, all_lists):
     possible_matches, clear = [], []
     for c in customers:
         hits = []
-        if _unscreenable(c["name"]):
-            hits.append(_manual_review_hit("ENTITY", c["name"], False))
-        for h in screen_name(c["name"], all_lists):
-            hits.append({"subject_type":"ENTITY","subject_name":c["name"],
-                         "control_linkage": False, **h})
-        for ind in c["individuals"]:
-            if _unscreenable(ind):
-                hits.append(_manual_review_hit("INDIVIDUAL", ind, True))
-            for h in screen_name(ind, all_lists):
-                # An owner / director / UBO matching a designation flags the
-                # COMPANY by ownership/control linkage (the 50%/control rule),
-                # even though the company name itself did not match.
-                hits.append({"subject_type":"INDIVIDUAL","subject_name":ind,
-                             "control_linkage": True, **h})
-        for ent in c.get("entity_owners", []):
-            if _unscreenable(ent):
-                hits.append(_manual_review_hit("ENTITY (owner)", ent, True))
-            for h in screen_name(ent, all_lists):
-                # A DESIGNATED corporate owner/parent flags the customer by the
-                # 50%/control rule just like a natural-person owner.
-                hits.append({"subject_type":"ENTITY (owner)","subject_name":ent,
-                             "control_linkage": True, **h})
+        for subject_type, name, parent, _ in build_screening_subjects([c]):
+            linkage = bool(parent) and subject_type != "COMPANY"
+            if _unscreenable(name):
+                hits.append(_manual_review_hit(subject_type, name, linkage))
+            for h in screen_name(name, all_lists):
+                hits.append({"subject_type": subject_type, "subject_name": name,
+                             "control_linkage": linkage, **h})
         if hits:
-            possible_matches.append({**c,"hits":hits})
+            possible_matches.append({**c, "hits": hits})
         else:
             clear.append(c)
     return possible_matches, clear
@@ -8023,16 +8057,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 
     # Subject set first — the watchlist pass below screens it before the
     # network-bound enrichment starts.
-    subjects_all = []
-    for c in customers:
-        subjects_all.append(("COMPANY", c["name"], None, c))
-        for ind in c.get("individuals", []):
-            subjects_all.append(("INDIVIDUAL", ind, c["name"], c))
-        # Corporate owners/parents are sanctions-screened (50%/control rule) —
-        # sweep their adverse media too, or a designated parent's coverage is
-        # never seen. No PEP check: PEP status is a natural-person concept.
-        for ent in c.get("entity_owners", []):
-            subjects_all.append(("ENTITY (owner)", ent, c["name"], c))
+    subjects_all = build_screening_subjects(customers)
 
     # 2) ADVERSE MEDIA on every subject + 3) PEP on every individual — the
     # network-bound sweep runs in PARALLEL (bounded pool), and it STARTS HERE,
@@ -8668,24 +8693,26 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 FOLLOWUP_PROJECT_GID = os.environ.get("FOLLOWUP_PROJECT_GID", "")
 
 def followup_disposition(delta):
-    """'complete' on a clean day, 'comment' when findings need a human. Pure."""
-    clean = all(int((delta or {}).get(k, 0) or 0) == 0 for k in ("sanctions", "adverse", "pep"))
-    return "complete" if clean else "comment"
+    """A report is evidence for review, never authority to close a human reminder."""
+    return "comment"
+
 
 def followup_comment_text(today, delta, report_gid):
-    d = delta or {}
-    clean = followup_disposition(delta) == "complete"
-    lines = [f"Daily AML/CFT screening completed and delivered for {today}.",
-             f"Report: https://app.asana.com/0/0/{report_gid}",
-             f"New findings: {d.get('sanctions', 0)} sanctions · {d.get('adverse', 0)} adverse media · {d.get('pep', 0)} PEP."]
-    if clean:
-        lines.append("No new findings — this reminder has been completed automatically "
-                     "with this comment as the attestation record.")
-    else:
-        lines.append("Findings require review: see the report and the screening case board. "
-                     "Record screening evidence on the affected customer assessments, then "
-                     "complete this task as the attestation record.")
-    return "\n".join(lines)
+    keys = ("sanctions", "adverse", "pep")
+    complete = (isinstance(delta, dict) and
+                all(k in delta and isinstance(delta[k], int) and
+                    not isinstance(delta[k], bool) and delta[k] >= 0
+                    for k in keys))
+    counts = (" · ".join(f"{k}: {delta[k]}" for k in keys)
+              if complete else "UNKNOWN (missing or partial screening deltas)")
+    return "\n".join([
+        f"Daily AML/CFT screening report submitted for {today}.",
+        f"Report: https://app.asana.com/0/0/{report_gid}",
+        f"New findings: {counts}.",
+        "Findings require MLRO review where applicable. Zero new findings is not screening clearance.",
+        "This reminder remains open and must be attested and completed manually after evidence review.",
+    ])
+
 
 def attest_followup_card(today, delta, report_gid):
     if not FOLLOWUP_PROJECT_GID:
@@ -8694,24 +8721,23 @@ def attest_followup_card(today, delta, report_gid):
         r = asana_request("GET", f"https://app.asana.com/api/1.0/projects/{FOLLOWUP_PROJECT_GID}/tasks",
                           params={"opt_fields": "name,notes,completed", "limit": 100})
         if r is None or r.status_code not in (200, 201):
-            log(f"  follow-ups: card lookup failed (http {getattr(r, 'status_code', 'none')}) — attestation skipped (non-fatal)")
+            log("  follow-ups: reminder lookup not remotely confirmed")
             return
         key = f"SYSTEM|daily-screening|{today}"
         card = next((t for t in (r.json().get("data") or [])
                      if key in (t.get("notes") or "") and not t.get("completed")), None)
         if not card:
-            log("  follow-ups: no open reminder card for today — nothing to attest")
+            log("  follow-ups: no open reminder card for today")
             return
-        asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
-                      json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
-        if followup_disposition(delta) == "complete":
-            asana_request("PUT", f"https://app.asana.com/api/1.0/tasks/{card['gid']}",
-                          json={"data": {"completed": True}})
-            log("  follow-ups: clean day — reminder card attested and completed")
-        else:
-            log("  follow-ups: findings present — proof comment posted, card left open for the analyst")
+        response = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
+                                 json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
+        if response is None or response.status_code not in (200, 201):
+            log("  follow-ups: reference not remotely confirmed; reminder remains open for human review")
+            return
+        log("  follow-ups: report reference posted; reminder remains open for human review")
     except Exception as e:
-        log(f"  follow-ups: attestation failed ({str(e)[:100]}) — non-fatal, card untouched")
+        log(f"  follow-ups: attestation not remotely confirmed ({str(e)[:100]})")
+
 
 def run_unified(run_time):
     if AM_COVERAGE_RETRY:

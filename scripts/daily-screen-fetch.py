@@ -109,7 +109,7 @@ def compile_screening_subjects(customers, staff):
         if not name:
             raise RuntimeError("Unidentifiable employee name")
         notes = task.get("notes") or ""
-        nat_match = re.search(r"\\bNationality\\s*:\\s*([^\\n]+)", notes, re.I)
+        nat_match = re.search(r"\bNationality\s*:\s*([^\n]+)", notes, re.I)
         subjects.append({"name": name, "gid": task["gid"],
                          "url": task.get("permalink_url", ""),
                          "kind": "individual", "parent": "", "role": "Employee",
