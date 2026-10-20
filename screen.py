@@ -8683,7 +8683,7 @@ def followup_comment_text(today, delta, report_gid):
                     for k in keys))
     counts = (" · ".join(f"{k}: {delta[k]}" for k in keys)
               if complete else "UNKNOWN (missing or partial screening deltas)")
-    return "\\n".join([
+    return "\n".join([
         f"Daily AML/CFT screening report submitted for {today}.",
         f"Report: https://app.asana.com/0/0/{report_gid}",
         f"New findings: {counts}.",
