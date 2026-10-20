@@ -82,6 +82,44 @@ check('parsePrincipals does NOT capture names outside the identifications sectio
 check('parsePrincipals is empty for a record with no identifications section',
   parsePrincipals({ name: 'Co', notes: 'SECTION 1 — CUSTOMER INFORMATION\n    Company: CO' }).length === 0);
 
+/* A corporate owner or natural-person UBO named outside Section 4 is still
+   a sanctions screening subject. This follows the Python daily engine's
+   owner-line extraction, without turning arbitrary narrative into a party. */
+{
+  const ownerTask = { gid: 'owner-1', name: 'Synthetic Importer FZCO', notes: [
+    'SECTION 1 - CUSTOMER INFORMATION',
+    'Parent Company: Meridian Holdings LLC (51%)',
+    'Ultimate Beneficial Owner: Nadir Example',
+    'SECTION 5 - PF ASSESSMENT',
+    'A paragraph mentioning Owner: Narrative Only must not create a subject.',
+    'Shareholder: N/A',
+  ].join('\\n') };
+  const owners = parsePrincipals(ownerTask);
+  const ownerSubjects = parseSubjects([ownerTask]);
+  check('owner-line extraction screens corporate parent even without Section 4',
+    owners.some(p => p.name === 'Meridian Holdings LLC' && p.corporate === true)
+    && ownerSubjects.some(p => p.name === 'Meridian Holdings LLC'
+      && p.entityType === 'organisation' && p.parent === 'Synthetic Importer FZCO'));
+  check('owner-line extraction includes explicitly named natural-person UBO',
+    owners.some(p => p.name === 'Nadir Example' && p.corporate === false)
+    && ownerSubjects.some(p => p.name === 'Nadir Example' && p.entityType === 'individual'));
+  check('owner-line extraction refuses placeholders and narrative mentions',
+    owners.length === 2 && !owners.some(p => /Narrative Only|N\\/A/.test(p.name)));
+  const mixedOwnerTask = { gid: 'owner-2', name: 'Second Synthetic Co', notes: [
+    'SECTION 4 - IDENTIFICATIONS',
+    'Individual 1 - Director',
+    'Name: Alpha Example',
+    'Nationality: Testland',
+    'SECTION 5 - REVIEW',
+    'Shareholder: Meridian Holdings LLC',
+    'Beneficial Owner: Alpha Example',
+  ].join('\\n') };
+  const combined = parsePrincipals(mixedOwnerTask);
+  check('owner-line evidence adds corporate holders beside structured Section-4 identities',
+    combined.length === 2 && combined.some(p => p.name === 'Meridian Holdings LLC' && p.corporate)
+    && combined.some(p => p.name === 'Alpha Example'));
+}
+
 const withPpl = parseSubjects([cddTask]);
 check('parseSubjects emits the entity PLUS each principal as its own subject',
   withPpl.length === 3 &&
