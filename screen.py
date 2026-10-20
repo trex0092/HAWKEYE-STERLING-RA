@@ -8671,24 +8671,26 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
 FOLLOWUP_PROJECT_GID = os.environ.get("FOLLOWUP_PROJECT_GID", "")
 
 def followup_disposition(delta):
-    """'complete' on a clean day, 'comment' when findings need a human. Pure."""
-    clean = all(int((delta or {}).get(k, 0) or 0) == 0 for k in ("sanctions", "adverse", "pep"))
-    return "complete" if clean else "comment"
+    """A report is evidence for review, never authority to close a human reminder."""
+    return "comment"
+
 
 def followup_comment_text(today, delta, report_gid):
-    d = delta or {}
-    clean = followup_disposition(delta) == "complete"
-    lines = [f"Daily AML/CFT screening completed and delivered for {today}.",
-             f"Report: https://app.asana.com/0/0/{report_gid}",
-             f"New findings: {d.get('sanctions', 0)} sanctions · {d.get('adverse', 0)} adverse media · {d.get('pep', 0)} PEP."]
-    if clean:
-        lines.append("No new findings — this reminder has been completed automatically "
-                     "with this comment as the attestation record.")
-    else:
-        lines.append("Findings require review: see the report and the screening case board. "
-                     "Record screening evidence on the affected customer assessments, then "
-                     "complete this task as the attestation record.")
-    return "\n".join(lines)
+    keys = ("sanctions", "adverse", "pep")
+    complete = (isinstance(delta, dict) and
+                all(k in delta and isinstance(delta[k], int) and
+                    not isinstance(delta[k], bool) and delta[k] >= 0
+                    for k in keys))
+    counts = (" · ".join(f"{k}: {delta[k]}" for k in keys)
+              if complete else "UNKNOWN (missing or partial screening deltas)")
+    return "\\n".join([
+        f"Daily AML/CFT screening report submitted for {today}.",
+        f"Report: https://app.asana.com/0/0/{report_gid}",
+        f"New findings: {counts}.",
+        "Findings require MLRO review where applicable. Zero new findings is not screening clearance.",
+        "This reminder remains open and must be attested and completed manually after evidence review.",
+    ])
+
 
 def attest_followup_card(today, delta, report_gid):
     if not FOLLOWUP_PROJECT_GID:
@@ -8697,24 +8699,23 @@ def attest_followup_card(today, delta, report_gid):
         r = asana_request("GET", f"https://app.asana.com/api/1.0/projects/{FOLLOWUP_PROJECT_GID}/tasks",
                           params={"opt_fields": "name,notes,completed", "limit": 100})
         if r is None or r.status_code not in (200, 201):
-            log(f"  follow-ups: card lookup failed (http {getattr(r, 'status_code', 'none')}) — attestation skipped (non-fatal)")
+            log("  follow-ups: reminder lookup not remotely confirmed")
             return
         key = f"SYSTEM|daily-screening|{today}"
         card = next((t for t in (r.json().get("data") or [])
                      if key in (t.get("notes") or "") and not t.get("completed")), None)
         if not card:
-            log("  follow-ups: no open reminder card for today — nothing to attest")
+            log("  follow-ups: no open reminder card for today")
             return
-        asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
-                      json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
-        if followup_disposition(delta) == "complete":
-            asana_request("PUT", f"https://app.asana.com/api/1.0/tasks/{card['gid']}",
-                          json={"data": {"completed": True}})
-            log("  follow-ups: clean day — reminder card attested and completed")
-        else:
-            log("  follow-ups: findings present — proof comment posted, card left open for the analyst")
+        response = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{card['gid']}/stories",
+                                 json={"data": {"text": followup_comment_text(today, delta, report_gid)}})
+        if response is None or response.status_code not in (200, 201):
+            log("  follow-ups: reference not remotely confirmed; reminder remains open for human review")
+            return
+        log("  follow-ups: report reference posted; reminder remains open for human review")
     except Exception as e:
-        log(f"  follow-ups: attestation failed ({str(e)[:100]}) — non-fatal, card untouched")
+        log(f"  follow-ups: attestation not remotely confirmed ({str(e)[:100]})")
+
 
 def run_unified(run_time):
     if AM_COVERAGE_RETRY:
