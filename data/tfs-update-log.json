@@ -2583,10 +2583,42 @@
       "detectedAt": "2026-10-19T10:41:01.270Z",
       "prevCount": 21412,
       "newCount": 21481,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 39239204102,
+        "startedAt": "2026-10-19T10:41:05Z"
+      },
+      "status": "complete",
+      "chainPrev": "081e95190bba88235589d221719de001317a2a82de5f6b26ee7a4443690a64d4",
+      "chainHash": "d4a24107d8ea79f23172df39ecae6b71ae1b3f7fe38dee18ff66bffc94342d4e",
+      "latencyHours": 0,
+      "resolutionHash": "0bf44d5ab5c61fee877d6dcfe626ffd8f7aea23f1f93b03ff3d13ade42e42fd3"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-20T01:41:24.316Z",
+      "prevCount": 442,
+      "newCount": null,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "081e95190bba88235589d221719de001317a2a82de5f6b26ee7a4443690a64d4",
-      "chainHash": "d4a24107d8ea79f23172df39ecae6b71ae1b3f7fe38dee18ff66bffc94342d4e"
+      "chainPrev": "d4a24107d8ea79f23172df39ecae6b71ae1b3f7fe38dee18ff66bffc94342d4e",
+      "chainHash": "44af29c9f624a347fb823757045b95f7200ee24020b61d208853a3e14da6beda"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-20T01:41:24.316Z",
+      "prevCount": 21481,
+      "newCount": 21595,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "44af29c9f624a347fb823757045b95f7200ee24020b61d208853a3e14da6beda",
+      "chainHash": "70c0e35c45379e0d6388150037784aef474ab63e70019e23b83e7bcfd45d95bc"
     }
   ]
 }
