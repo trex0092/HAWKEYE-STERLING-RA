@@ -72,7 +72,7 @@ export const CUSTOMER_PROJECT_GID =
 export const EMPLOYEE_PROJECT_GID =
   process.env.ASANA_EMPLOYEE_PROJECT_GID !== undefined
     ? process.env.ASANA_EMPLOYEE_PROJECT_GID
-    : '1216139945846994';
+    : '1216239131596624';
 
 /* Consolidated designation lists screened against (data/sanctions-sources.json).
    Override the file with SANCTIONS_SOURCES_FILE. */
