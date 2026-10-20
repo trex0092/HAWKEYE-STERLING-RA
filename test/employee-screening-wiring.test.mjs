@@ -16,7 +16,7 @@
 
    Usage: node test/employee-screening-wiring.test.mjs */
 import { readFileSync } from 'node:fs';
-import { approvedSourcePopulationIssue } from '../scripts/screening-assurance.mjs';
+import { approvedSourcePopulationIssue, checkStored } from '../scripts/screening-assurance.mjs';
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -114,6 +114,27 @@ check('manual sanctions workflow screens completed employees from the approved H
    than as a live 404 in production. */
 check('the Python-engine workflows agree on the same employee variable name',
   WORKFLOWS.filter(w => w.engine.startsWith('Python')).every(w => w.varName === 'ASANA_EMPLOYEE_DB_GID'));
+
+/* An old successful run cannot attest a newer deployed screening engine. */
+const receiptTime = Date.parse('2026-10-20T12:00:00Z');
+const passingArtifact = {
+  version: 1,
+  generatedAt: '2026-10-20T12:00:00Z',
+  run: { commit: 'screening-version-a' },
+  domains: {
+    sanctions: { operational: true },
+    adverseMedia: { operational: true },
+    pep: { operational: true },
+  },
+};
+check('fresh assurance for the exact deployed commit is accepted',
+  checkStored(passingArtifact, { nowMs: receiptTime, expectedCommit: 'screening-version-a' }).ok);
+check('old green assurance cannot attest a different screening commit',
+  !checkStored(passingArtifact, { nowMs: receiptTime, expectedCommit: 'screening-version-b' }).ok);
+check('missing run commit never proves a deployed engine',
+  !checkStored({ ...passingArtifact, run: {} }, {
+    nowMs: receiptTime, expectedCommit: 'screening-version-b',
+  }).ok);
 
 console.log(`${passed} passed, ${failed} failed`);
 
