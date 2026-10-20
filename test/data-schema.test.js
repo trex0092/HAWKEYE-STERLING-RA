@@ -135,6 +135,25 @@ try {
   check('eocn list: eight published delisted entities remain excluded',
     delistedEntities.every(name => !eocnNames.has(name.trim().toLowerCase())));
 
+  const delistedPersons = [
+    'MOHAMMAD SAEED BIN HELWAN AL-SEQATRI',
+    'KHALIFA BIN MOHAMMAD AL-RABBAN',
+    'ABDULLAH BIN KHALID BIN HAMAD BIN ABDULLAH AL-THANI',
+    'ABDUL RAHIM AHMAD AL-HARAM', 'MUBARAK MOHAMMAD AL-AJJI',
+    'JABIR BIN NASSER AL-MARRI', 'MOHAMMED JASSIM AL-SULAITI',
+    'ALI BIN ABDALLAH AL-SUWAIDI', 'HASHIM SALEH ABDULLAH AL-AWADHY',
+    'HAMAD ABDULLAH AL-FUTTAIS AL-MARRI',
+    'KHALID SAEED AL-BOUNEIN', 'SHAQER JUMMAH AL-SHAHWANI',
+    'SALEH BIN AHMED AL-GHANIM AL-KUWARI',
+    'MOHAMMED SULAIMAN HAIDAR MOHAMMED AL-HAYDAR',
+    'HAYDER HABEEB ALI', 'BASIM YOUSUF HUSSEIN ALSHAGHANBI',
+    'SHARIF AHMED SHARIF BA ALAWI',
+    'MANOJ SABHARWAL OM PRAKASH', 'ABDO ABDULLAH DAEL AHMED'
+  ];
+  check('eocn list: all 19 published delisted persons remain excluded',
+    delistedPersons.every(name => !eocnNames.has(name.toLowerCase())));
+
+
 
   const sopPath = path.join(__dirname, '..', 'docs', 'aims', 'eocn-list-update-sop.md');
   check('eocn list: the written update SOP exists (docs/aims/eocn-list-update-sop.md)', fs.existsSync(sopPath));
