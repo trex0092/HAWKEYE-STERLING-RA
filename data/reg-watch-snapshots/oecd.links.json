@@ -4,24 +4,20 @@
   "h": "https://www.oecd.org/en/topics/artificial-intelligence.html"
  },
  {
-  "t": "Climate mitigation and net-zero transition",
-  "h": "https://www.oecd.org/en/topics/climate-mitigation-and-net-zero-transition.html"
+  "t": "Critical minerals",
+  "h": "https://www.oecd.org/en/topics/sustainable-mining-for-development.html"
  },
  {
-  "t": "Development co-operation",
-  "h": "https://www.oecd.org/en/topics/development-co-operation.html"
- },
- {
-  "t": "Gender equality",
-  "h": "https://www.oecd.org/en/topics/gender-equality.html"
+  "t": "Future of work",
+  "h": "https://www.oecd.org/en/topics/future-of-work.html"
  },
  {
   "t": "Global value and supply chains",
   "h": "https://www.oecd.org/en/topics/global-value-and-supply-chains.html"
  },
  {
-  "t": "Tax transparency and international co-operation",
-  "h": "https://www.oecd.org/en/topics/tax-transparency-and-international-co-operation.html"
+  "t": "Student performance (PISA)",
+  "h": "https://www.oecd.org/en/topics/student-performance-pisa.html"
  },
  {
   "t": "Agricultural policy monitoring",
@@ -38,6 +34,10 @@
  {
   "t": "Agriculture and sustainability",
   "h": "https://www.oecd.org/en/topics/agriculture-and-sustainability.html"
+ },
+ {
+  "t": "Biotechnology",
+  "h": "https://www.oecd.org/en/topics/policy-issues/biotechnology.html"
  },
  {
   "t": "Fisheries and aquaculture",
@@ -60,6 +60,10 @@
   "h": "https://www.oecd.org/en/topics/climate-adaptation-and-resilience.html"
  },
  {
+  "t": "Climate mitigation and net-zero transition",
+  "h": "https://www.oecd.org/en/topics/climate-mitigation-and-net-zero-transition.html"
+ },
+ {
   "t": "Finance and investment for climate goals",
   "h": "https://www.oecd.org/en/topics/finance-and-investment-for-climate-goals.html"
  },
@@ -80,8 +84,8 @@
   "h": "https://www.oecd.org/en/topics/climate-change.html"
  },
  {
-  "t": "Critical minerals",
-  "h": "https://www.oecd.org/en/topics/sustainable-mining-for-development.html"
+  "t": "Development co-operation",
+  "h": "https://www.oecd.org/en/topics/development-co-operation.html"
  },
  {
   "t": "Finance for sustainable development",
@@ -224,10 +228,6 @@
   "h": "https://www.oecd.org/en/topics/learning-environment.html"
  },
  {
-  "t": "Student performance (PISA)",
-  "h": "https://www.oecd.org/en/topics/student-performance-pisa.html"
- },
- {
   "t": "Teachers and educators",
   "h": "https://www.oecd.org/en/topics/teachers-and-educators.html"
  },
@@ -242,10 +242,6 @@
  {
   "t": "Employment services",
   "h": "https://www.oecd.org/en/topics/employment-services.html"
- },
- {
-  "t": "Future of work",
-  "h": "https://www.oecd.org/en/topics/future-of-work.html"
  },
  {
   "t": "Health and work",
@@ -448,6 +444,10 @@
   "h": "https://www.oecd.org/en/topics/consumer-policy.html"
  },
  {
+  "t": "Gender equality",
+  "h": "https://www.oecd.org/en/topics/gender-equality.html"
+ },
+ {
   "t": "Inclusion and equality",
   "h": "https://www.oecd.org/en/topics/inclusion-and-equality.html"
  },
@@ -486,6 +486,10 @@
  {
   "t": "Tax and the environment",
   "h": "https://www.oecd.org/en/topics/tax-and-the-environment.html"
+ },
+ {
+  "t": "Tax transparency and international co-operation",
+  "h": "https://www.oecd.org/en/topics/tax-transparency-and-international-co-operation.html"
  },
  {
   "t": "Tax treaties",
@@ -736,12 +740,12 @@
   "h": "https://www.oecd.org/en/blogs.html"
  },
  {
-  "t": "2026 OECD Global forum on building trust and reinforcing democracy",
-  "h": "https://www.oecd-events.org/e/global-forum-on-democracy/en"
- },
- {
   "t": "How much are people willing to pay to avoid chemicals-related health effects?",
   "h": "https://www.oecd.org/en/events/2026/10/how-much-are-people-willing-to-pay-to-avoid-chemicals-related-health-effects.html"
+ },
+ {
+  "t": "Global Forum on Competition 2026",
+  "h": "https://www.oecd.org/en/events/2026/12/global-forum-on-competition-2026.html"
  },
  {
   "t": "About the organisation",
