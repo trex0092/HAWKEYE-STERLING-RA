@@ -3209,6 +3209,48 @@ try:
     check("no screening population drops a row without recording it",
           _src.count("_record_skipped_row(") == 2
           and not _re_emp.search(r'if not t\.get\("gid"\) or not t\.get\("name"\):\s*\n\s*continue', _src))
+
+    # A well-formed pagination cursor does not establish distinct task identities.
+    # A page reusing an earlier GID must STOP screening, not double-count it.
+    _one_customer = {"gid": "c1", "name": "Synthetic Trading LLC", "notes": ""}
+    _one_employee = {"gid": "e1", "name": "Synthetic Employee", "notes": ""}
+    _duplicate_pages = [
+        {"data": [_one_customer], "next_page": {"offset": "page-2"}},
+        {"data": [_one_customer], "next_page": None},
+        {"data": [_one_employee], "next_page": None},
+    ]
+    def _paged_repeated_gid(method, url, **kw):
+        body = _duplicate_pages.pop(0)
+        return types.SimpleNamespace(status_code=200, json=lambda b=body: b, text="")
+    screen.asana_request = _paged_repeated_gid
+    try:
+        screen.get_all_customers()
+        _repeat_across_pages = False
+    except RuntimeError as exc:
+        _repeat_across_pages = "repeated Asana task identity" in str(exc)
+    check("customer GID reused across Asana pages fails the complete screening run",
+          _repeat_across_pages)
+
+    # A task multi-homed into customer and employee projects must not create
+    # two fictitious independently screened identities in the evidence totals.
+    screen.asana_request = _two_project_stub(
+        [_one_customer], [{"gid": "c1", "name": "Synthetic Employee", "notes": ""}])
+    try:
+        screen.get_all_customers()
+        _repeat_across_sources = False
+    except RuntimeError as exc:
+        _repeat_across_sources = "repeated Asana task identity" in str(exc)
+    check("customer task reused as an HR task fails the two-source receipt",
+          _repeat_across_sources)
+
+    screen.asana_request = _two_project_stub([_one_customer], [42])
+    try:
+        screen.get_all_customers()
+        _malformed_hr_rejected = False
+    except RuntimeError as exc:
+        _malformed_hr_rejected = "malformed employee task row" in str(exc)
+    check("malformed HR task identity fails rather than being silently skipped",
+          _malformed_hr_rejected)
 finally:
     screen.asana_request = _emp_orig
     screen.ASANA_EMPLOYEE_DB_GID = _emp_gid
