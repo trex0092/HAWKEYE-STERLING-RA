@@ -6722,7 +6722,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
             pass   # unparseable target = no delivery line, never a crash
     A(f"Population screened: {stats['subjects_total']} subjects "
       f"({stats['companies_screened']} legal entities; "
-      f"{stats['individuals_screened']} shareholders, directors and UBOs)")
+      f"{stats['individuals_screened']} natural-person screening slots, including employees)")
     A(f"Approved source records: {stats.get('customer_records', stats.get('customers_total', 0))} Customer Database tasks; "
       f"{stats.get('employee_records', 0)} HR employee tasks (completed HR records included)")
     A(f"Control status:  Sanctions {sanc_status}  ·  Adverse media {am_status}  ·  PEP {pep_status}")
