@@ -81,14 +81,6 @@ check('runtime assurance explicitly defaults to completed HR Employees populatio
    source ambiguity in audit logs while preserving the in-engine strict route
    check against a stale or redirected repository variable. */
 const primaryScreenWorkflow = readFileSync('.github/workflows/sanctions-screen.yml', 'utf8');
-const mainRevalidationSources = [
-  '.github/workflows/sanctions-screen.yml',
-  '.github/workflows/screening-assurance.yml',
-  'scripts/sanctions-screen.mjs',
-  'scripts/screening-assurance.mjs',
-  'scripts/screening-delivery.mjs',
-  'screen.py',
-];
 /* Runtime screening is intentionally schedule/manual-only: a code merge must
    run CI, but must not create an unscheduled screening cycle. */
 check('production screening does not run automatically on code pushes', 
