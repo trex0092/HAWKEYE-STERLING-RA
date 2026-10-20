@@ -43,68 +43,98 @@ def extract_principals(notes):
 
 APPROVED_CUSTOMER_PROJECT = "1214107620220121"
 APPROVED_EMPLOYEE_PROJECT = "1216239131596624"
-
-pat = os.environ["ASANA_PAT"]
-customer = os.environ["CUSTOMER_DB_GID"]
-employee = os.environ["EMPLOYEE_DB_GID"]
-if customer != APPROVED_CUSTOMER_PROJECT or employee != APPROVED_EMPLOYEE_PROJECT:
-    raise SystemExit("FATAL: screening source does not match the approved Customer Database and HR Employees projects")
-
-headers = {"Authorization": f"Bearer {pat}"}
-url = "https://app.asana.com/api/1.0/tasks"
+ASANA_TASKS_URL = "https://app.asana.com/api/1.0/tasks"
 
 
-def fetch_source_tasks(token, project_gid, source_name):
-    """Retrieve every page of an approved screening population or fail closed."""
+def fetch_source_tasks(token, project_gid, source_name, request=None):
+    """Retrieve the complete approved population. Never return partial records."""
+    if project_gid not in (APPROVED_CUSTOMER_PROJECT, APPROVED_EMPLOYEE_PROJECT):
+        raise RuntimeError("Asana screening project not approved")
+    if request is None:
+        request = requests.get
     records = []
-    params = {"project": project_gid, "opt_fields": "name,gid,permalink_url,notes", "limit": 100}
+    gids = set()
+    offsets = set()
+    params = {"project": project_gid, "opt_fields": "name,gid,permalink_url,notes,completed", "limit": 100}
     while True:
-        r = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params, timeout=30)
-        if not r.ok:
-            raise SystemExit(f"FATAL: Asana {source_name} fetch failed - HTTP {r.status_code}")
-        data = r.json()
-        if not isinstance(data.get("data"), list):
-            raise SystemExit(f"FATAL: Asana {source_name} response has no task array")
-        records.extend(data["data"])
+        response = request(ASANA_TASKS_URL,
+                           headers={"Authorization": f"Bearer {token}"},
+                           params=params, timeout=30)
+        if not response.ok:
+            raise RuntimeError(f"Asana {source_name} fetch failed - HTTP {response.status_code}")
+        data = response.json()
+        if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+            raise RuntimeError(f"Asana {source_name} malformed page")
+        for task in data["data"]:
+            if not isinstance(task, dict) or not str(task.get("gid") or "").strip():
+                raise RuntimeError(f"Asana {source_name} unidentifiable record")
+            gid = str(task["gid"])
+            if gid in gids:
+                raise RuntimeError(f"Asana {source_name} repeated a task identity")
+            gids.add(gid)
+            records.append(task)
         next_page = data.get("next_page")
-        if not next_page:
+        if next_page is None:
             break
-        if not isinstance(next_page, dict) or not next_page.get("offset"):
-            raise SystemExit(f"FATAL: Asana {source_name} returned invalid pagination")
-        params["offset"] = next_page["offset"]
+        offset = next_page.get("offset") if isinstance(next_page, dict) else None
+        if not offset or offset in offsets:
+            raise RuntimeError(f"Asana {source_name} repeated or missing continuation cursor")
+        offsets.add(offset)
+        params["offset"] = offset
     if not records:
-        raise SystemExit(f"FATAL: Asana {source_name} returned 0 tasks; refusing all-clear")
+        raise RuntimeError(f"Asana {source_name} has no verified records")
     return records
 
 
-customers = []
-for t in fetch_source_tasks(pat, customer, "Customer Database"):
-    cname = str(t.get("name") or "").strip()
-    if not cname:
-        continue
-    customers.append({"name": cname, "gid": t["gid"],
-                      "url": t.get("permalink_url", ""), "kind": "entity", "parent": ""})
-    for pr in extract_principals(t.get("notes", "")):
-        customers.append({"name": pr["name"], "gid": t["gid"],
-                          "url": t.get("permalink_url", ""), "kind": "individual",
-                          "parent": cname, "role": pr.get("role", ""),
-                          "nationality": pr.get("nationality", "")})
+def compile_screening_subjects(customers, staff):
+    """Include company principals and every employee, even completed HR tasks."""
+    if not customers or not staff:
+        raise RuntimeError("One screening population has no verified records")
+    subjects = []
+    for task in customers:
+        name = str(task.get("name") or "").strip()
+        if not name:
+            raise RuntimeError("Unidentifiable customer name")
+        subjects.append({"name": name, "gid": task["gid"],
+                         "url": task.get("permalink_url", ""),
+                         "kind": "entity", "parent": ""})
+        for person in extract_principals(task.get("notes", "")):
+            subjects.append({"name": person["name"], "gid": task["gid"],
+                             "url": task.get("permalink_url", ""),
+                             "kind": "individual", "parent": name,
+                             "role": person.get("role", "Principal"),
+                             "nationality": person.get("nationality", "")})
+    for task in staff:
+        name = str(task.get("name") or "").strip()
+        if not name:
+            raise RuntimeError("Unidentifiable employee name")
+        notes = task.get("notes") or ""
+        nat_match = re.search(r"\\bNationality\\s*:\\s*([^\\n]+)", notes, re.I)
+        subjects.append({"name": name, "gid": task["gid"],
+                         "url": task.get("permalink_url", ""),
+                         "kind": "individual", "parent": "", "role": "Employee",
+                         "nationality": nat_match.group(1).strip() if nat_match else ""})
+    return subjects
 
-# The HR project's completed tasks remain in scope. Completion represents
-# training status, not termination of employment.
-for t in fetch_source_tasks(pat, employee, "HR Employees"):
-    name = str(t.get("name") or "").strip()
-    if not name:
-        continue
-    customers.append({"name": name, "gid": t["gid"],
-                      "url": t.get("permalink_url", ""), "kind": "employee", "parent": ""})
 
-if not any(c["kind"] == "entity" for c in customers) or not any(c["kind"] == "employee" for c in customers):
-    raise SystemExit("FATAL: customer or employee screening population is empty; refusing all-clear")
+def main():
+    token = os.environ.get("ASANA_PAT", "")
+    customer = os.environ.get("CUSTOMER_DB_GID", "")
+    employee = os.environ.get("EMPLOYEE_DB_GID", "")
+    if customer != APPROVED_CUSTOMER_PROJECT or employee != APPROVED_EMPLOYEE_PROJECT:
+        raise RuntimeError("both approved Asana screening source projects are required")
+    if not token:
+        raise RuntimeError("Asana screening credential missing")
+    customers = fetch_source_tasks(token, customer, "Customer Database")
+    staff = fetch_source_tasks(token, employee, "HR Employees")
+    subjects = compile_screening_subjects(customers, staff)
+    with open("/tmp/customers.json", "w", encoding="utf-8") as output:
+        json.dump(subjects, output, ensure_ascii=False)
+    entities = sum(1 for item in subjects if item["kind"] == "entity")
+    employees = sum(1 for item in subjects if item.get("role") == "Employee")
+    print(f"Fetched {entities} customers, {employees} employees, "
+          f"{len(subjects) - entities - employees} principals/UBOs")
 
-with open("/tmp/customers.json","w") as f:
-    json.dump(customers, f, ensure_ascii=False)
 
-entity_count = sum(1 for c in customers if c.get("kind") != "individual")
-individual_count = len(customers) - entity_count
-print(f"Fetched {entity_count} customers + {individual_count} principals/UBOs = {len(customers)} subjects to screen")
+if __name__ == "__main__":
+    main()
