@@ -1,0 +1,1710 @@
+{
+  "sourceFile": "october 20, 2026.pdf",
+  "fileSha256": "83d46617a1f9cc8045fbec031a98aac568f5fd7e6f8d9670a5b53606dd87f858",
+  "pdfCreationDate": "2026-05-12T19:28:25Z",
+  "sourceStatus": "user supplied; pending official EOCN and MLRO verification",
+  "active": {
+    "individuals": [
+      {
+        "row": 1,
+        "name": "KHALIFA MOHD T AL SUBAEY",
+        "page": 1
+      },
+      {
+        "row": 2,
+        "name": "ABDULMALIK MOHAMMAD YOUSEF ABDELSALAM",
+        "page": 1
+      },
+      {
+        "row": 3,
+        "name": "ASHRAF MUHAMMAD YUSUF UTHMAN ABD ALSALAM",
+        "page": 1
+      },
+      {
+        "row": 4,
+        "name": "IBRAHIM 'ISA HAJJI MUHAMMAD AL-BAKR",
+        "page": 1
+      },
+      {
+        "row": 5,
+        "name": "ABDULAZIZ BIN KHALIFA ALATTIYAH",
+        "page": 1
+      },
+      {
+        "row": 6,
+        "name": "SALIM HASAN KHALIFA RASHID AL-KUWARI",
+        "page": 1
+      },
+      {
+        "row": 7,
+        "name": "ABDALLAH GHANIM MAHFUZ MUSLIM AL-KHAWAR",
+        "page": 1
+      },
+      {
+        "row": 8,
+        "name": "SA'D BIN SA'D MUHAMMAD SHARIAN AL-KA'BI",
+        "page": 1
+      },
+      {
+        "row": 9,
+        "name": "ABD AL-LATIF BIN ABDALLAH SALIH MUHAMMAD AL-KAWARI",
+        "page": 1
+      },
+      {
+        "row": 10,
+        "name": "ABD AL-RAHMAN BIN 'UMAYR AL-NU'AYMI",
+        "page": 1
+      },
+      {
+        "row": 11,
+        "name": "ABD AL-WAHHAB MUHAMMAD ABD AL-RAHMAN AL-HUMAYQANI",
+        "page": 1
+      },
+      {
+        "row": 12,
+        "name": "HAJJAJ BIN FAHD HAJJAJ MUHAMMAD AL-AJMI",
+        "page": 1
+      },
+      {
+        "row": 13,
+        "name": "YUSUF ABDULLAH AL-QARADAWI",
+        "page": 1
+      },
+      {
+        "row": 14,
+        "name": "ALI MOHAMMED MOHAMMED AL-SALLABI",
+        "page": 1
+      },
+      {
+        "row": 15,
+        "name": "ABD AL-HAKIM BELHAJ",
+        "page": 1
+      },
+      {
+        "row": 16,
+        "name": "MAHDI AL-HARATI",
+        "page": 1
+      },
+      {
+        "row": 17,
+        "name": "ISMAIL MOHAMMED MOHAMMED AL-SALLABI",
+        "page": 1
+      },
+      {
+        "row": 18,
+        "name": "AL-SADIQ ABD-ALRAHMAN ALI AL-QHRIANY",
+        "page": 1
+      },
+      {
+        "row": 19,
+        "name": "MOHAMMED AHMED SHAWQI ISLAMBOULI",
+        "page": 1
+      },
+      {
+        "row": 20,
+        "name": "TAREK ABD AL-MAWGOUD IBRAHIM AL-ZUMAR",
+        "page": 1
+      },
+      {
+        "row": 21,
+        "name": "MOHAMMED ABD AL-MAQSOUD MOHAMMED AFIFI",
+        "page": 1
+      },
+      {
+        "row": 22,
+        "name": "MOHAMMAD ELSAGHEER ABD AL-RAHIM MOHAMMED",
+        "page": 1
+      },
+      {
+        "row": 23,
+        "name": "WAGDY ABDEL HAMIED MOHAMED GHONIEM",
+        "page": 1
+      },
+      {
+        "row": 24,
+        "name": "HASSAN AHMED HASSAN MOHAMED AL-DIQQI AL-HOUTI",
+        "page": 1
+      },
+      {
+        "row": 25,
+        "name": "HAKEM OBAYSAN AL-HAMIDI AL-MUTAIRI",
+        "page": 1
+      },
+      {
+        "row": 26,
+        "name": "ABDALLAH MUHAMMAD BIN SULAYMAN AL-MUHAYSINI",
+        "page": 1
+      },
+      {
+        "row": 27,
+        "name": "HAMID ABDALLAH AHMAD AL-ALI",
+        "page": 1
+      },
+      {
+        "row": 28,
+        "name": "AYMAN AHMED ABDUL GHANI HASSANEIN",
+        "page": 1
+      },
+      {
+        "row": 29,
+        "name": "ASSEM ABDEL-MAGED MOHAMMED MADI",
+        "page": 1
+      },
+      {
+        "row": 30,
+        "name": "YAHYA AQIL SALMAN AQEEL",
+        "page": 1
+      },
+      {
+        "row": 31,
+        "name": "MOHAMED HAMADA EL-SAYED IBRAHIM",
+        "page": 1
+      },
+      {
+        "row": 32,
+        "name": "ABDEL RAHMAN MOHAMED SHOKRY ABDEL RAHMAN",
+        "page": 1
+      },
+      {
+        "row": 33,
+        "name": "HUSSEIN MOHAMED REZA IBRAHIM YOUSSEF",
+        "page": 1
+      },
+      {
+        "row": 34,
+        "name": "AHMED ABDELHAFID MAHMOUD ABDELHADY",
+        "page": 1
+      },
+      {
+        "row": 35,
+        "name": "MUSLIM FOUAD TARFAN",
+        "page": 1
+      },
+      {
+        "row": 36,
+        "name": "AYMAN MAHMOUD SADEQ RIFAT",
+        "page": 1
+      },
+      {
+        "row": 37,
+        "name": "MOHAMED SAAD ABDEL-NAIM AHMED",
+        "page": 1
+      },
+      {
+        "row": 38,
+        "name": "MOHAMED SAAD ABDEL MUTTALIB ABDO AL-RAZAFI",
+        "page": 1
+      },
+      {
+        "row": 39,
+        "name": "AHMED FOUAD AHMED GAD BELTAGY",
+        "page": 1
+      },
+      {
+        "row": 40,
+        "name": "AHMED RAGEB RAGEB SOLIMAN",
+        "page": 1
+      },
+      {
+        "row": 41,
+        "name": "KARIM MOHAMED MOHAMED ABDEL AZIZ",
+        "page": 1
+      },
+      {
+        "row": 42,
+        "name": "ALI ZAKI MOHAMMED ALI",
+        "page": 1
+      },
+      {
+        "row": 43,
+        "name": "NAJI IBRAHIM EZZOULI",
+        "page": 1
+      },
+      {
+        "row": 44,
+        "name": "SHEHATA FATHI HAFEZ MOHAMMED SULEIMAN",
+        "page": 1
+      },
+      {
+        "row": 45,
+        "name": "MUHAMMAD MUHARRAM FAHMI ABU ZEID",
+        "page": 1
+      },
+      {
+        "row": 46,
+        "name": "AMR ABDEL NASSER ABDELHAK ABDEL-BARRY",
+        "page": 1
+      },
+      {
+        "row": 47,
+        "name": "ALI HASSAN IBRAHIM ABDEL-ZAHER",
+        "page": 1
+      },
+      {
+        "row": 48,
+        "name": "MURTADHA MAJEED AL-SINDI",
+        "page": 1
+      },
+      {
+        "row": 49,
+        "name": "AHMED AL-HASSAN AL-DASKI",
+        "page": 1
+      },
+      {
+        "row": 50,
+        "name": "ABDULLAH MOHAMMED AL-YAZIDI",
+        "page": 2
+      },
+      {
+        "row": 51,
+        "name": "AHMED ALI AHMED BAROAUD",
+        "page": 2
+      },
+      {
+        "row": 52,
+        "name": "MOHAMMED BAKR AL-DABAA",
+        "page": 2
+      },
+      {
+        "row": 53,
+        "name": "HAMID HAMAD HAMID AL-'ALI",
+        "page": 2
+      },
+      {
+        "row": 54,
+        "name": "AL-SAADI ABDULLAH IBRAHIM BUKHAZEM",
+        "page": 2
+      },
+      {
+        "row": 55,
+        "name": "AHMED ABD AL-JALEEL AL-HASNAWI",
+        "page": 2
+      },
+      {
+        "row": 56,
+        "name": "NAYIF SALIH SALIM AL-QAYSI",
+        "page": 2
+      },
+      {
+        "row": 57,
+        "name": "HASHIM MUHSIN AYDARUS",
+        "page": 2
+      },
+      {
+        "row": 58,
+        "name": "NASHWAN AL-ADANI",
+        "page": 2
+      },
+      {
+        "row": 59,
+        "name": "KHALID ABDULLAH AL-MARFADI",
+        "page": 2
+      },
+      {
+        "row": 60,
+        "name": "SAIFULRAB SALIM AL-HEESHI",
+        "page": 2
+      },
+      {
+        "row": 61,
+        "name": "ADEL ABDU FARI OTHMAN AL-THAHBANI",
+        "page": 2
+      },
+      {
+        "row": 62,
+        "name": "RADWAN QANAN",
+        "page": 2
+      },
+      {
+        "row": 63,
+        "name": "WALI NASHWAN AL-YAFI'I",
+        "page": 2
+      },
+      {
+        "row": 64,
+        "name": "KHALID SA'ID GHABISH AL-UBAYDI",
+        "page": 2
+      },
+      {
+        "row": 65,
+        "name": "BILAL ALI AL-WAFI",
+        "page": 2
+      },
+      {
+        "row": 66,
+        "name": "KHALID NAZEM DIAB",
+        "page": 2
+      },
+      {
+        "row": 67,
+        "name": "SALEM JABER OMAR ALI SULTAN FATHALLAH JABER",
+        "page": 2
+      },
+      {
+        "row": 68,
+        "name": "MAYSAR ALI MUSA ABDALLAH AL-JUBURI",
+        "page": 2
+      },
+      {
+        "row": 69,
+        "name": "MOHAMMED ALI SAEED ATM",
+        "page": 2
+      },
+      {
+        "row": 70,
+        "name": "HASAN ALI MOHAMMED JUMA'A SULTAN",
+        "page": 2
+      },
+      {
+        "row": 71,
+        "name": "YAHIA AL SAYED IBRAHIM MOHAMED MOUSA",
+        "page": 2
+      },
+      {
+        "row": 72,
+        "name": "MOHAMMED GAMAL AHMED HESHMAT ABDELHAMEED",
+        "page": 2
+      },
+      {
+        "row": 73,
+        "name": "ALSAYED MAHMOUD EZZAT IBRAHIM EISSA",
+        "page": 2
+      },
+      {
+        "row": 74,
+        "name": "QADRI MOHAMMED FAHIM MAHMOUD AL-SHAIKH",
+        "page": 2
+      },
+      {
+        "row": 75,
+        "name": "ALAA ALI ALI MOHAMMED AL-SAMAHI",
+        "page": 2
+      },
+      {
+        "row": 76,
+        "name": "MAS'UD NIKBAKHT",
+        "page": 2
+      },
+      {
+        "row": 77,
+        "name": "SA'ID NAJAFPUR",
+        "page": 2
+      },
+      {
+        "row": 78,
+        "name": "MOHAMMAD HASAN KHODA'I",
+        "page": 2
+      },
+      {
+        "row": 79,
+        "name": "MOHAMMADREZA KHEDMATI VALADZAGHARD",
+        "page": 2
+      },
+      {
+        "row": 80,
+        "name": "MEGHDAD AMINI",
+        "page": 2
+      },
+      {
+        "row": 81,
+        "name": "FOAD SALEHI",
+        "page": 2
+      },
+      {
+        "row": 82,
+        "name": "MOHAMMAD EBRAHIM OWHADI",
+        "page": 2
+      },
+      {
+        "row": 83,
+        "name": "ESMA'IL RAZAVI",
+        "page": 2
+      },
+      {
+        "row": 84,
+        "name": "ABDULLAH SAMAD FAROQUI",
+        "page": 2
+      },
+      {
+        "row": 85,
+        "name": "MOHAMMAD DAWOOD",
+        "page": 2
+      },
+      {
+        "row": 86,
+        "name": "ABDUL RAHIM MANAN",
+        "page": 2
+      },
+      {
+        "row": 87,
+        "name": "MOHAMMAD NAEEM BARICH",
+        "page": 2
+      },
+      {
+        "row": 88,
+        "name": "SADR IBRAHIM",
+        "page": 2
+      },
+      {
+        "row": 89,
+        "name": "ABDUL AZIZ SHAH ZAMANI",
+        "page": 2
+      },
+      {
+        "row": 90,
+        "name": "HAFEEZ ABDUL MAJEED",
+        "page": 2
+      },
+      {
+        "row": 91,
+        "name": "ABD-AL RAHMAN 'ALI HUSAYN AL-AHMAD AL-RAWI",
+        "page": 2
+      },
+      {
+        "row": 92,
+        "name": "SAYED HABIB AHMAD KHAN",
+        "page": 2
+      },
+      {
+        "row": 93,
+        "name": "AHMED MOHAMMED ABDULLA MOHAMMED ALSHAIBA ALNUAIMI",
+        "page": 2
+      },
+      {
+        "row": 94,
+        "name": "MOHAMED SAQER YOUSIF SAQER AL ZAABI",
+        "page": 2
+      },
+      {
+        "row": 95,
+        "name": "HAMAD MOHAMMED RAHMAH HUMAID ALSHAMSI",
+        "page": 2
+      },
+      {
+        "row": 96,
+        "name": "SAEED NASER SAEED NASER ALTENEIJI",
+        "page": 2
+      },
+      {
+        "row": 97,
+        "name": "HASSAN HUSSAIN TABAJA",
+        "page": 2
+      },
+      {
+        "row": 98,
+        "name": "ADHAM HUSSAIN TABAJA",
+        "page": 2
+      },
+      {
+        "row": 99,
+        "name": "MOHAMMED AHMED MUSAED SAEED",
+        "page": 2
+      },
+      {
+        "row": 100,
+        "name": "RASHED SALEH SALEH AL JARMOUZI",
+        "page": 2
+      },
+      {
+        "row": 101,
+        "name": "NAIF NASSER SALEH ALJARMOUZI",
+        "page": 3
+      },
+      {
+        "row": 102,
+        "name": "Zubiullah Abdul Qahir Durani",
+        "page": 3
+      },
+      {
+        "row": 103,
+        "name": "Suliman Saleh Salem Aboulan",
+        "page": 3
+      },
+      {
+        "row": 104,
+        "name": "Adel Ahmed Salem Obaid Ali Badrah",
+        "page": 3
+      },
+      {
+        "row": 105,
+        "name": "Ali Nasser Alaseeri",
+        "page": 3
+      },
+      {
+        "row": 106,
+        "name": "FADHL SALEH SALEM ALTAYABI",
+        "page": 3
+      },
+      {
+        "row": 107,
+        "name": "Ashur Omar Ashur OBAIDOON",
+        "page": 3
+      },
+      {
+        "row": 108,
+        "name": "HAZEM MOHSEN FARHAN + HAZEM MOHSEN AL FARHAN",
+        "page": 3
+      },
+      {
+        "row": 109,
+        "name": "MEHDI AZIZOLLAH KIASATI",
+        "page": 3
+      },
+      {
+        "row": 110,
+        "name": "FARSHAD JAFAR HAKEMZADEH",
+        "page": 3
+      },
+      {
+        "row": 111,
+        "name": "SEYYED REZA MOHMMAD GHASEMI",
+        "page": 3
+      },
+      {
+        "row": 112,
+        "name": "MOHSEN HASSAN KARGARHODJAT ABADI",
+        "page": 3
+      },
+      {
+        "row": 113,
+        "name": "IBRAHIM MAHMOOD AHMED MOHAMMED",
+        "page": 3
+      },
+      {
+        "row": 114,
+        "name": "OSAMA HOUSEN DUGHAEM",
+        "page": 3
+      },
+      {
+        "row": 115,
+        "name": "ABDURRAHAMAN ADO MUSA",
+        "page": 3
+      },
+      {
+        "row": 116,
+        "name": "SALIHU YUSUF ADAMU",
+        "page": 3
+      },
+      {
+        "row": 117,
+        "name": "BASHIR ALI YUSUF",
+        "page": 3
+      },
+      {
+        "row": 118,
+        "name": "MUHAMMED IBRAHIM ISA",
+        "page": 3
+      },
+      {
+        "row": 119,
+        "name": "IBRAHIM ALI ALHASSAN",
+        "page": 3
+      },
+      {
+        "row": 120,
+        "name": "SURAJO ABUBAKAR MUHAMMAD",
+        "page": 3
+      },
+      {
+        "row": 121,
+        "name": "Alaa khanfurah - Alaa abdulrazzaq ali khanfurah - Alaa Alkhanfurah",
+        "page": 3
+      },
+      {
+        "row": 122,
+        "name": "FADI SAID KAMAR",
+        "page": 3
+      },
+      {
+        "row": 123,
+        "name": "WALID KAMEL AWAD",
+        "page": 3
+      },
+      {
+        "row": 124,
+        "name": "KHALED WALID AWAD",
+        "page": 3
+      },
+      {
+        "row": 125,
+        "name": "IMAD KHALLAK KANTAKDZHI",
+        "page": 3
+      },
+      {
+        "row": 126,
+        "name": "MOUHAMMAD AYMAN TAYSEER RASHID MARAYAT",
+        "page": 3
+      },
+      {
+        "row": 127,
+        "name": "Hassan Ahmed Moukalled",
+        "page": 3
+      },
+      {
+        "row": 128,
+        "name": "Rani Hassan Moukalled",
+        "page": 3
+      },
+      {
+        "row": 129,
+        "name": "Ryyan Hassan Moukalled",
+        "page": 3
+      },
+      {
+        "row": 130,
+        "name": "YOUSEF HASSAN AHMAD AL MULLA",
+        "page": 3
+      },
+      {
+        "row": 131,
+        "name": "SAEED KHADEM AHMED BINTOUQ ALMARRI",
+        "page": 3
+      },
+      {
+        "row": 132,
+        "name": "IBRAHIM AHMED IBRAHIM ALI ALHAMMADI",
+        "page": 3
+      },
+      {
+        "row": 133,
+        "name": "ELHAM ABDULLA AHMAD ALHASHEMI",
+        "page": 3
+      },
+      {
+        "row": 134,
+        "name": "JASEM RASHED KHALFAN RASHED ALSHAMSI",
+        "page": 3
+      },
+      {
+        "row": 135,
+        "name": "KHALID OBAID YOUSIF BUATABA ALZAABI",
+        "page": 3
+      },
+      {
+        "row": 136,
+        "name": "ABDUL RAHMAN HASAN MUNIF A. ALJABERI",
+        "page": 3
+      },
+      {
+        "row": 137,
+        "name": "HUMAID ABDULLA ABDULRAHMAN J. ALNUAIMI",
+        "page": 3
+      },
+      {
+        "row": 138,
+        "name": "ABDELRAHMAN OMAR SALIM BAJUBAIR ALHADHRAMI",
+        "page": 3
+      },
+      {
+        "row": 139,
+        "name": "ALI HASAN ALI HUSAIN ALHAMMADI",
+        "page": 3
+      },
+      {
+        "row": 140,
+        "name": "MOHAMED ALI HASSAN ALI ALHAMMADI",
+        "page": 3
+      },
+      {
+        "row": 141,
+        "name": "Hasaan Abshir Xuuroow",
+        "page": 3
+      },
+      {
+        "row": 142,
+        "name": "Aadan Yusuf Saciid Ibrahim",
+        "page": 3
+      },
+      {
+        "row": 143,
+        "name": "Mumin Dheere",
+        "page": 3
+      },
+      {
+        "row": 144,
+        "name": "Macalin Burhan",
+        "page": 3
+      },
+      {
+        "row": 145,
+        "name": "Ali Ahmed Hussein",
+        "page": 3
+      },
+      {
+        "row": 146,
+        "name": "Maxamed Cali",
+        "page": 3
+      },
+      {
+        "row": 147,
+        "name": "Ahmed Kabadhe",
+        "page": 3
+      },
+      {
+        "row": 148,
+        "name": "Siyaat Ayuto",
+        "page": 3
+      },
+      {
+        "row": 149,
+        "name": "Hassan Yariisow Aadan",
+        "page": 3
+      },
+      {
+        "row": 150,
+        "name": "Siciid Abdullahi Aadan",
+        "page": 3
+      },
+      {
+        "row": 151,
+        "name": "Mohamed Abdullah Hirey",
+        "page": 3
+      },
+      {
+        "row": 152,
+        "name": "Cabdi Roobow",
+        "page": 3
+      },
+      {
+        "row": 153,
+        "name": "Shiek Aadan Abuukar Malayle",
+        "page": 3
+      },
+      {
+        "row": 154,
+        "name": "Aadan Jiss",
+        "page": 3
+      },
+      {
+        "row": 155,
+        "name": "Cumar Guhaad",
+        "page": 4
+      },
+      {
+        "row": 156,
+        "name": "Ali Mohammed Karneeb",
+        "page": 4
+      },
+      {
+        "row": 157,
+        "name": "Nasser Hassan Nasr",
+        "page": 4
+      },
+      {
+        "row": 158,
+        "name": "Hassan Shehadeh Osman",
+        "page": 4
+      },
+      {
+        "row": 159,
+        "name": "Samer Hassan Fawaz",
+        "page": 4
+      },
+      {
+        "row": 160,
+        "name": "Ahmed Mohammed Yazbek",
+        "page": 4
+      },
+      {
+        "row": 161,
+        "name": "Isa Hussein Qasir",
+        "page": 4
+      },
+      {
+        "row": 162,
+        "name": "Ibrahim Ali Daher",
+        "page": 4
+      },
+      {
+        "row": 163,
+        "name": "Abbas Hassan Ghareeb",
+        "page": 4
+      },
+      {
+        "row": 164,
+        "name": "Emad Mohammed Bazzi",
+        "page": 4
+      },
+      {
+        "row": 165,
+        "name": "Ezzat Yousef Akr",
+        "page": 4
+      },
+      {
+        "row": 166,
+        "name": "Wahid Mahmud Sbeiti",
+        "page": 4
+      },
+      {
+        "row": 167,
+        "name": "Mustafa Habib Harb",
+        "page": 4
+      },
+      {
+        "row": 168,
+        "name": "Mohammed Suleiman Badir",
+        "page": 4
+      },
+      {
+        "row": 169,
+        "name": "Adel Mohammad Mansour",
+        "page": 4
+      },
+      {
+        "row": 170,
+        "name": "Ali Ahmed Krisht",
+        "page": 4
+      },
+      {
+        "row": 171,
+        "name": "Nima Ahmad Jamil",
+        "page": 4
+      }
+    ],
+    "organizations": [
+      {
+        "row": 1,
+        "name": "MUSLIM BROTHERHOOD IN THE UAE",
+        "page": 5
+      },
+      {
+        "row": 2,
+        "name": "KHALAYA AL JIHAD AL-EMIRATI (UAE JAHADIST CELLS",
+        "page": 5
+      },
+      {
+        "row": 3,
+        "name": "OMMAH PARTY",
+        "page": 5
+      },
+      {
+        "row": 4,
+        "name": "AL QAEDA (AQ",
+        "page": 5
+      },
+      {
+        "row": 5,
+        "name": "ISLAMIC STATE OF IRAQ AND THE LEVANT (ISIS",
+        "page": 5
+      },
+      {
+        "row": 6,
+        "name": "AL-QA'IDA IN THE ARABIAN PENINSULA",
+        "page": 5
+      },
+      {
+        "row": 7,
+        "name": "ANSAR AL-SHARIA(SUPPORTERS OF SHARIA LAW ) IN YEMEN",
+        "page": 5
+      },
+      {
+        "row": 8,
+        "name": "THE MUSLIM BROTHERHOOD",
+        "page": 5
+      },
+      {
+        "row": 9,
+        "name": "ISLAMIC GROUB IN EGYPT",
+        "page": 5
+      },
+      {
+        "row": 10,
+        "name": "ANSAR BAIT AL-MAQDIS (WILAYAT SINAI- PROVINCE OR STATE IN THE SINAI",
+        "page": 5
+      },
+      {
+        "row": 11,
+        "name": "AJNAD MISR",
+        "page": 5
+      },
+      {
+        "row": 12,
+        "name": "MAJLIS SHURA AL-MUJAHIDEEN FI AKNAF BAYT AL-MAQDIS (THE MUJAHEDEEN SHURA COUNCIL IN THE ENVIRONS OF JERUSALEM)",
+        "page": 5
+      },
+      {
+        "row": 13,
+        "name": "THE HOUTHI MOVEMENT IN YEMEN",
+        "page": 5
+      },
+      {
+        "row": 14,
+        "name": "HEZBOLLAH AL-HIJAZ IN SAUDI ARABIA",
+        "page": 5
+      },
+      {
+        "row": 15,
+        "name": "HEZBOLLAH IN THE GULF COOPERATION COUNCIL",
+        "page": 5
+      },
+      {
+        "row": 16,
+        "name": "AL-QAIDA ORGNAISATION IN IRAN",
+        "page": 5
+      },
+      {
+        "row": 17,
+        "name": "BADER ORGANISATION IN IRAQ",
+        "page": 5
+      },
+      {
+        "row": 18,
+        "name": "ASAAIB AHL AL-HAQ (LEAGUE OF THE RIGHTEOUS) IN IRAQ",
+        "page": 5
+      },
+      {
+        "row": 19,
+        "name": "HEZBOLLAH BRIGADE IN IRAQ",
+        "page": 5
+      },
+      {
+        "row": 20,
+        "name": "LIWA ABU AL-FADL AL-ABBAS IN SYRIA",
+        "page": 5
+      },
+      {
+        "row": 21,
+        "name": "AL-YOUM AL-MAOUD BRIGADE IN IRAQ",
+        "page": 5
+      },
+      {
+        "row": 22,
+        "name": "OMAR BIN YASSER BRIGADE IN SYRIA",
+        "page": 5
+      },
+      {
+        "row": 23,
+        "name": "ANSAR AL-ISLAM",
+        "page": 6
+      },
+      {
+        "row": 24,
+        "name": "AL-NUSRAH FRONT IN SYRIA",
+        "page": 6
+      },
+      {
+        "row": 25,
+        "name": "HARAKET AHRAR ASHAM IN SYRIA (ISLAMIC MOVEMENT OF THE FREE MAN OF THE LEVENT",
+        "page": 6
+      },
+      {
+        "row": 26,
+        "name": "THE ARMY OF ISLAM IN PALESTINE",
+        "page": 6
+      },
+      {
+        "row": 27,
+        "name": "ABDALLAH AZZAM BRIGADES",
+        "page": 6
+      },
+      {
+        "row": 28,
+        "name": "FATAH AL ISLAM IN LEBANON",
+        "page": 6
+      },
+      {
+        "row": 29,
+        "name": "ASBAT AL-ANSAR IN LEBANON",
+        "page": 6
+      },
+      {
+        "row": 30,
+        "name": "AL QAIDA IN THE LAND OF THE ISLAMIC MAGHREB",
+        "page": 6
+      },
+      {
+        "row": 31,
+        "name": "ANSAR AL-SHARIA IN LIBYA",
+        "page": 6
+      },
+      {
+        "row": 32,
+        "name": "ANSAR AL-SHARI'A IN TUNISIA",
+        "page": 6
+      },
+      {
+        "row": 33,
+        "name": "MUJAHIDEEN YOUTH MOVEMENT IN SOMALIA(HARAKET AL-SHABAAB AL-MUJAHIDEEN IN SOMALIA",
+        "page": 6
+      },
+      {
+        "row": 34,
+        "name": "BOKO HARAM IN NIGERIA",
+        "page": 6
+      },
+      {
+        "row": 35,
+        "name": "ALMOURABITOUN GROUB IN MALI(THE SENTINELS",
+        "page": 6
+      },
+      {
+        "row": 36,
+        "name": "ANSAR AL-DINE IN MALI",
+        "page": 6
+      },
+      {
+        "row": 37,
+        "name": "THE HAQQANI NETWORK IN PAKISTAN",
+        "page": 6
+      },
+      {
+        "row": 38,
+        "name": "LASHKAR E-TAYYIBA",
+        "page": 6
+      },
+      {
+        "row": 39,
+        "name": "EAST TURKISTAN MOVEMENT IN PAKISTAN",
+        "page": 6
+      },
+      {
+        "row": 40,
+        "name": "JAISH-I-MOHAMMED IN PAKISTAN",
+        "page": 6
+      },
+      {
+        "row": 41,
+        "name": "JAISH-E-MOHAMMED (THE ARMY OF MOHAMMAD IN PAKISTAN AND INDIA",
+        "page": 6
+      },
+      {
+        "row": 42,
+        "name": "AL-MUJAHIDEEN AL-HONOUD IN KASHMIR/INDIA (THE INDIAN MUJAHIDEEN",
+        "page": 6
+      },
+      {
+        "row": 43,
+        "name": "CAUCASUS EMIRATE",
+        "page": 6
+      },
+      {
+        "row": 44,
+        "name": "THE ISLAMIC MOVEMENT OF UZBEKISTAN",
+        "page": 6
+      },
+      {
+        "row": 45,
+        "name": "ABU SAYYAF GROUP",
+        "page": 6
+      },
+      {
+        "row": 46,
+        "name": "TAHRIK-E TALIBAN PAKISTAN",
+        "page": 6
+      },
+      {
+        "row": 47,
+        "name": "ABU-DHAR AL-GHIFARI BATTALION IN SYRIA",
+        "page": 6
+      },
+      {
+        "row": 48,
+        "name": "AL-TAWHEED BRIGADE IN SYRIA(BRIGADE OF UNITY,OR MONOTHEISM",
+        "page": 7
+      },
+      {
+        "row": 49,
+        "name": "AL-TAWHID WAL-EMAN BATTALION IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 50,
+        "name": "KATIBAT AL-KHADRA IN SYRIA(THE GREEN BATTALTION",
+        "page": 7
+      },
+      {
+        "row": 51,
+        "name": "ABU BAKR AL-SIDDIQ BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 52,
+        "name": "TALHA BIN OBAIDULLAH BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 53,
+        "name": "AL-SARIM AL-BATTAR BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 54,
+        "name": "ABDULLAH IBN MUBARAK BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 55,
+        "name": "CONVOYS OF MARTYRS BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 56,
+        "name": "ABU-OMER BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 57,
+        "name": "AHRAR SHAMMAR BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 58,
+        "name": "SARIYAT AL-JABAL BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 59,
+        "name": "AL-SHAHBA BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 60,
+        "name": "ALQAQAA BRIGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 61,
+        "name": "SUFIAN AL-THAWRI BRGADE IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 62,
+        "name": "EBAD AL-RAHMAN BRIGADE IN SYRIA(BRIGADE OF SOLDIERS OF ALLAH",
+        "page": 7
+      },
+      {
+        "row": 63,
+        "name": "OMAR IBN AL-KHATTAB BATTALION IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 64,
+        "name": "AL-SHAYMA BATTALTION IN SYRIA",
+        "page": 7
+      },
+      {
+        "row": 65,
+        "name": "KATIBAT AL-HAQ IN SYRIA (BRIGADE OF THE RIGHTEOUS",
+        "page": 7
+      },
+      {
+        "row": 66,
+        "name": "BENGHAZI DEFENSE BRIGADES",
+        "page": 7
+      },
+      {
+        "row": 67,
+        "name": "AL-ASHTAR BRIGADES",
+        "page": 7
+      },
+      {
+        "row": 68,
+        "name": "FEBRUARY 14 COALITION",
+        "page": 7
+      },
+      {
+        "row": 69,
+        "name": "THE POPULAR RESISTANCE BRIGADES IN BAHRAIN",
+        "page": 7
+      },
+      {
+        "row": 70,
+        "name": "BAHRAINS HEZBOLLAH",
+        "page": 7
+      },
+      {
+        "row": 71,
+        "name": "SARAYA AL-MUKHTAR",
+        "page": 7
+      },
+      {
+        "row": 72,
+        "name": "BAHRAIN FREEDOM MOVEMENT",
+        "page": 7
+      },
+      {
+        "row": 73,
+        "name": "BENGHAZI REVOLUTIONARIES SHURA COUNCIL",
+        "page": 8
+      },
+      {
+        "row": 74,
+        "name": "AL-SARAYA MEDIA CENTER",
+        "page": 8
+      },
+      {
+        "row": 75,
+        "name": "RAFALLAH AL-SAHATI BRIGADE",
+        "page": 8
+      }
+    ],
+    "entities": [
+      {
+        "row": 1,
+        "name": "AL-KARAMA ORGANISATION",
+        "page": 9
+      },
+      {
+        "row": 2,
+        "name": "THE COUNCIL ON AMERICAN ISLAMIC RELATIONS (CAIR",
+        "page": 9
+      },
+      {
+        "row": 3,
+        "name": "MUSLIM AMERICAN SOCIETY (MAS",
+        "page": 9
+      },
+      {
+        "row": 4,
+        "name": "INTERNAIONAL UNION OF MUSLIM SCHOLARS (IUMS",
+        "page": 9
+      },
+      {
+        "row": 5,
+        "name": "FADERATION OF ISLAMIC ORGANISATION IN EUROPE",
+        "page": 9
+      },
+      {
+        "row": 6,
+        "name": "UNION OF ISLAMIC ORGANISATION OF FRANCE (UOIF",
+        "page": 9
+      },
+      {
+        "row": 7,
+        "name": "MUSLIM ASSOCIATION OF BRITAIN (MAB",
+        "page": 9
+      },
+      {
+        "row": 8,
+        "name": "ISLAMIC COMMUNITY OF GERMANY",
+        "page": 9
+      },
+      {
+        "row": 9,
+        "name": "ISLAMIC ASSOCIATION OF DENMARK",
+        "page": 9
+      },
+      {
+        "row": 10,
+        "name": "ISLAMIC ASSOCIATION IN BELGIUM",
+        "page": 9
+      },
+      {
+        "row": 11,
+        "name": "ISAMIC ASSOCIATION OF ITALY",
+        "page": 9
+      },
+      {
+        "row": 12,
+        "name": "ISLAMIC ASSOCIATION OF FINLAND",
+        "page": 9
+      },
+      {
+        "row": 13,
+        "name": "ISLAMIC ASSOCIATION OF SWEDEN",
+        "page": 9
+      },
+      {
+        "row": 14,
+        "name": "ISLAMIC ASSOCIATION OF NORWAY",
+        "page": 9
+      },
+      {
+        "row": 15,
+        "name": "ISLAMIC AID",
+        "page": 9
+      },
+      {
+        "row": 16,
+        "name": "THE CORDOBA FOUNDATION",
+        "page": 9
+      },
+      {
+        "row": 17,
+        "name": "ISLAMIC RELETIEF WORLD WIDE",
+        "page": 9
+      },
+      {
+        "row": 18,
+        "name": "ALRAHMA FOUNDATION FOR HUMAN DEVELOPMENT",
+        "page": 9
+      },
+      {
+        "row": 19,
+        "name": "BOSHRA NEWS AGENCY",
+        "page": 9
+      },
+      {
+        "row": 20,
+        "name": "ALNABAA TV",
+        "page": 9
+      },
+      {
+        "row": 21,
+        "name": "TANASUH FOUNDATION FOR DAWA,CULTURE AND MEDIA",
+        "page": 9
+      },
+      {
+        "row": 22,
+        "name": "AL KHAYR SUPERMARKET",
+        "page": 9
+      },
+      {
+        "row": 23,
+        "name": "INTERNATIONAL ISLAMIC COUNCIL",
+        "page": 9
+      },
+      {
+        "row": 24,
+        "name": "INTERNATIONAL UNION OF MUSLIMS SCHOLARS",
+        "page": 9
+      },
+      {
+        "row": 25,
+        "name": "RASHED EXCHANGE",
+        "page": 9
+      },
+      {
+        "row": 26,
+        "name": "JAHAN ARAS KISH",
+        "page": 9
+      },
+      {
+        "row": 27,
+        "name": "KHEDMATI AND COMPANY JOINT PARTNERSHIP",
+        "page": 9
+      },
+      {
+        "row": 28,
+        "name": "TAWASUL COMPANY",
+        "page": 9
+      },
+      {
+        "row": 29,
+        "name": "AL HARAM EXCHANGE",
+        "page": 9
+      },
+      {
+        "row": 30,
+        "name": "AL KHALIDI EXCHANGE",
+        "page": 9
+      },
+      {
+        "row": 31,
+        "name": "NEJAAT SOCIAL WALFARE ORGANIZATION (NEJAAT",
+        "page": 9
+      },
+      {
+        "row": 32,
+        "name": "RAY TRACING TRADING CO LLC",
+        "page": 9
+      },
+      {
+        "row": 33,
+        "name": "H F Z A ARZOO INTERNATIONAL F Z E",
+        "page": 9
+      },
+      {
+        "row": 34,
+        "name": "HANAN SHIPPING L.L.C",
+        "page": 9
+      },
+      {
+        "row": 35,
+        "name": "FOUR CORNERS TRADING EST",
+        "page": 9
+      },
+      {
+        "row": 36,
+        "name": "SASCO LOGISTIC L.L.C",
+        "page": 9
+      },
+      {
+        "row": 37,
+        "name": "ALJARMOUZI GENERAL TRADING LLC",
+        "page": 9
+      },
+      {
+        "row": 38,
+        "name": "AL JARMOOZI CARGO & CLEARING (L.L.C",
+        "page": 10
+      },
+      {
+        "row": 39,
+        "name": "AL JARMOOZI TRANSPORT BY HEAVY & LIGHT TRUCKS (L.L.C",
+        "page": 10
+      },
+      {
+        "row": 40,
+        "name": "NASER ALJARMOUZI CENERAL TRADING (L.L.C",
+        "page": 10
+      },
+      {
+        "row": 41,
+        "name": "NASER ALJARMOUZI CARGO & CLEARING LLC",
+        "page": 10
+      },
+      {
+        "row": 42,
+        "name": "WAVE TECH COMPUTER LLC",
+        "page": 10
+      },
+      {
+        "row": 43,
+        "name": "NYBI TRADING - FZE",
+        "page": 10
+      },
+      {
+        "row": 44,
+        "name": "KCL GENERAL TRADING F Z E",
+        "page": 10
+      },
+      {
+        "row": 45,
+        "name": "Alinma group",
+        "page": 10
+      },
+      {
+        "row": 46,
+        "name": "AL-OMGY & BROS MONEY EXCHANGE",
+        "page": 10
+      },
+      {
+        "row": 47,
+        "name": "AlAlameya Express Company for Exchange & Remittance",
+        "page": 10
+      },
+      {
+        "row": 48,
+        "name": "Al Hadha Exchange Co",
+        "page": 10
+      },
+      {
+        "row": 49,
+        "name": "MOAZ ABDULLA DAEL FOR IMPORT AND EXPORT",
+        "page": 10
+      },
+      {
+        "row": 50,
+        "name": "PERIDOT SHIPPING AND TRADING LLC",
+        "page": 10
+      },
+      {
+        "row": 51,
+        "name": "LIGHT MOON",
+        "page": 10
+      },
+      {
+        "row": 52,
+        "name": "CTEX EXCHANGE",
+        "page": 10
+      },
+      {
+        "row": 53,
+        "name": "CAMBRIDGE EDUCATION AND TRAINING CENTER LTD",
+        "page": 10
+      },
+      {
+        "row": 54,
+        "name": "IMA6INE LTD",
+        "page": 10
+      },
+      {
+        "row": 55,
+        "name": "WEMBLEY TREE LTD",
+        "page": 10
+      },
+      {
+        "row": 56,
+        "name": "WASLAFORALL",
+        "page": 10
+      },
+      {
+        "row": 57,
+        "name": "FUTURE GRADUATES LTD",
+        "page": 10
+      },
+      {
+        "row": 58,
+        "name": "YAS FOR INVESTMENT AND REAL ESTATE",
+        "page": 10
+      },
+      {
+        "row": 59,
+        "name": "HOLDCO UK PROPERTIES LIMITED",
+        "page": 10
+      },
+      {
+        "row": 60,
+        "name": "NAFEL CAPITAL",
+        "page": 10
+      },
+      {
+        "row": 61,
+        "name": "Bayt Al-Mal ALMuslimeen",
+        "page": 10
+      },
+      {
+        "row": 62,
+        "name": "AL-Qard AL-Hassan Association",
+        "page": 10
+      },
+      {
+        "row": 63,
+        "name": "AL Tasheelat Company",
+        "page": 10
+      },
+      {
+        "row": 64,
+        "name": "The Auditors for Accounting and Auditing",
+        "page": 10
+      },
+      {
+        "row": 65,
+        "name": "AL-Khobara For Accounting, Auditing, and studies",
+        "page": 10
+      }
+    ]
+  },
+  "removed": {
+    "individuals": [
+      {
+        "row": 1,
+        "name": "MOHAMMAD SAEED BIN HELWAN AL-SEQATRI",
+        "page": 11
+      },
+      {
+        "row": 2,
+        "name": "KHALIFA BIN MOHAMMAD AL-RABBAN",
+        "page": 11
+      },
+      {
+        "row": 3,
+        "name": "ABDULLAH BIN KHALID BIN HAMAD BIN ABDULLAH AL-THANI",
+        "page": 11
+      },
+      {
+        "row": 4,
+        "name": "ABDUL RAHIM AHMAD AL-HARAM",
+        "page": 11
+      },
+      {
+        "row": 5,
+        "name": "MUBARAK MOHAMMAD AL-AJJI",
+        "page": 11
+      },
+      {
+        "row": 6,
+        "name": "JABIR BIN NASSER AL-MARRI",
+        "page": 11
+      },
+      {
+        "row": 7,
+        "name": "MOHAMMED JASSIM AL-SULAITI",
+        "page": 11
+      },
+      {
+        "row": 8,
+        "name": "ALI BIN ABDALLAH AL-SUWAIDI",
+        "page": 11
+      },
+      {
+        "row": 9,
+        "name": "HASHIM SALEH ABDULLAH AL-AWADHY",
+        "page": 11
+      },
+      {
+        "row": 10,
+        "name": "HAMAD ABDULLAH AL-FUTTAIS AL-MARRI",
+        "page": 11
+      },
+      {
+        "row": 11,
+        "name": "KHALID SAEED AL-BOUNEIN",
+        "page": 11
+      },
+      {
+        "row": 12,
+        "name": "SHAQER JUMMAH AL-SHAHWANI",
+        "page": 11
+      },
+      {
+        "row": 13,
+        "name": "SALEH BIN AHMED AL-GHANIM AL-KUWARI",
+        "page": 11
+      },
+      {
+        "row": 14,
+        "name": "MOHAMMED SULAIMAN HAIDAR MOHAMMED AL-HAYDAR",
+        "page": 11
+      },
+      {
+        "row": 15,
+        "name": "HAYDER HABEEB ALI",
+        "page": 11
+      },
+      {
+        "row": 16,
+        "name": "BASIM YOUSUF HUSSEIN ALSHAGHANBI",
+        "page": 11
+      },
+      {
+        "row": 17,
+        "name": "SHARIF AHMED SHARIF BA ALAWI",
+        "page": 11
+      },
+      {
+        "row": 18,
+        "name": "MANOJ SABHARWAL OM PRAKASH",
+        "page": 11
+      },
+      {
+        "row": 19,
+        "name": "ABDO ABDULLAH DAEL AHMED",
+        "page": 11
+      }
+    ],
+    "entities": [
+      {
+        "row": 1,
+        "name": "CANVAS : CENTER FOR APPLIED NONVIOLENT ACTION AND STRATEGIES",
+        "page": 12
+      },
+      {
+        "row": 2,
+        "name": "QATAR VOLUNTEER CENTER",
+        "page": 12
+      },
+      {
+        "row": 3,
+        "name": "DOHA APPLE",
+        "page": 12
+      },
+      {
+        "row": 4,
+        "name": "QATAR CHARITY",
+        "page": 12
+      },
+      {
+        "row": 5,
+        "name": "EID CHARITY",
+        "page": 12
+      },
+      {
+        "row": 6,
+        "name": "SHEIKH THANI BIN ABDULLAH FOUNDATION FOR HUMANITARIAN SERVICE",
+        "page": 12
+      },
+      {
+        "row": 7,
+        "name": "AL-BALAGH CHARITABLE FOUNDATION",
+        "page": 12
+      },
+      {
+        "row": 8,
+        "name": "AL-IHSAN CHARITABLE SOCIETY",
+        "page": 12
+      }
+    ]
+  }
+}

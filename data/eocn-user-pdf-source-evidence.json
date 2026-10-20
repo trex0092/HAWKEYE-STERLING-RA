@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sourceLabel": "User-supplied file named october 20, 2026.pdf",
+  "receivedOn": "2026-10-20",
+  "fileSha256": "83d46617a1f9cc8045fbec031a98aac568f5fd7e6f8d9670a5b53606dd87f858",
+  "pages": 12,
+  "pdfMetadataCreatedAt": "2026-05-12T19:28:25Z",
+  "listed": {
+    "individuals": 171,
+    "organizations": 75,
+    "entities": 65,
+    "totalDesignations": 311
+  },
+  "removed": {
+    "individuals": 19,
+    "entities": 8
+  },
+  "referenceNote": "Counts are from the numbered, active versus removed sections of the supplied PDF. Each designation may have multiple screening names or transliterations; entry count is not equal to designation count.",
+  "status": "PENDING_OFFICIAL_EOCN_AND_MLRO_CONFIRMATION",
+  "confirmedOfficialPublicationDate": null,
+  "mlroSignedOffAt": null,
+  "reviewNote": "Do not treat the user-supplied file name or receipt date as an official EOCN update date. The PDF's embedded creation date is May 12, 2026. Verify the authoritative current EOCN download and sign off before advancing data/eocn-local-terrorist-list.json:lastReviewed or declaring live coverage fresh.",
+  "datasetFile": "data/eocn-local-terrorist-list.json"
+}
