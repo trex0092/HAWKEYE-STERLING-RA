@@ -1,0 +1,6 @@
+# Preparation only. Do not submit until owner authorization and eligibility review.
+repo: https://github.com/trex0092/HAWKEYE-STERLING-RA#main
+primary_contact: hawkeye.sterling.v2@gmail.com
+dockerfile: .oss-scanner/Dockerfile
+threat_model: .oss-scanner/threat_model.md
+disabled: true
