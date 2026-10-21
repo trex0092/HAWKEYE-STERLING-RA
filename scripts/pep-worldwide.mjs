@@ -494,37 +494,37 @@ export function namesFromEntity(entity) {
 /* Exception recovery is explicitly QID-bound, not an officeholder inference.
  * These three public Wikidata items lost their labels in revisions below.
  * Each former label was independently cross-checked against the named
- * government publisher on 2026-10-21, AND the live item's own P39 reference
+ * 2025-1114 Madagascar official appointment decree on 2026-10-21, AND the live item's own P39 reference
  * has to keep the exact independent source URL recorded here. The latter ties
  * the source item to the identified person instead of merely their office.
  * No unreviewed QID, position, description, municipality or name fragment
  * may become a screenable identity. Review this fixed list as source policy;
  * these are not screening decisions or MLRO clearances.
  *
- * Sources: public Wikidata revision history; Madagascar Ministry of Public
- * Works, Prime Minister's official government member directory, and
- * Madagascar General Directorate of Meteorology. */
+ * Sources: public Wikidata revision history; Madagascar official appointment
+ * decree no. 2025-1114 (cnlegis.gov.mg/uploads/D2025-1114-VF.pdf), which
+ * names all three people in their specified ministries. */
 export const CORROBORATED_PEP_HISTORICAL_NAMES = Object.freeze({
   Q136689291: {
     name: 'Henri Jacob Razafindrianarivo',
     historicalLabel: 'RAZAFINDRIANARIVO Henri Jacob',
     historicalRevision: 2502842784,
     itemReferenceUrl: 'https://2424.mg/infrastructures-henri-jacob-razafindrianarivo-prone-la-continuite-des-grands-chantiers-publics/',
-    governmentUrl: 'https://mtp.gov.mg/actualite/iraka-fanaraha-maso-nataon-ny-delegasion-ny-ue-bei',
+    governmentUrl: 'https://cnlegis.gov.mg/uploads/D2025-1114-VF.pdf',
   },
   Q136689343: {
     name: 'Carl de Mon Espoir Andriamparany',
     historicalLabel: 'ANDRIAMPARANY Carl',
     historicalRevision: 2502841893,
     itemReferenceUrl: 'https://www.lexpress.mg/2025/10/mines-carl-andriamparany-ouvre-le.html?m=1',
-    governmentUrl: 'https://app.primature.gov.mg/gouvernement/membres?lang=fr&page=1',
+    governmentUrl: 'https://cnlegis.gov.mg/uploads/D2025-1114-VF.pdf',
   },
   Q136689373: {
     name: 'Juste Crescent Raharisone',
     historicalLabel: 'RAHARISONE Juste',
     historicalRevision: 2502841639,
     itemReferenceUrl: 'https://www.meteomadagascar.mg/actualite/visite-du-ministre-des-transports-et-de-la-meteorologie-a-la-direction-generale-de-la-meteorologie-30-octobre-2025/',
-    governmentUrl: 'https://www.meteomadagascar.mg/actualite/visite-du-ministre-des-transports-et-de-la-meteorologie-a-la-direction-generale-de-la-meteorologie-30-octobre-2025/',
+    governmentUrl: 'https://cnlegis.gov.mg/uploads/D2025-1114-VF.pdf',
   },
 });
 
