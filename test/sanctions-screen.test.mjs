@@ -25,6 +25,16 @@ function check(name, cond) {
   else { failed++; console.log('FAIL  ' + name); }
 }
 
+/* A successful second-pass response replaces, never accumulates, the
+   original subject's partial-coverage observation. Coverage failures remain
+   governed separately by amErrors and independent sourceQuality assurance. */
+check('second pass clears partial tally after complete recovery',
+  scr.reconcileAdversePartialCount(3, true, false) === 2);
+check('second pass preserves partial tally when still reduced redundancy',
+  scr.reconcileAdversePartialCount(3, true, true) === 3);
+check('second pass records newly partial result exactly once',
+  scr.reconcileAdversePartialCount(3, false, true) === 4);
+
 /* ── name folding ── */
 check('normalizeName folds case, punctuation and diacritics',
   normalizeName('YÜKSEL KIYMETLİ MADENLER TİCARET A.Ş.') === normalizeName('yuksel kiymetli madenler ticaret a s'));
@@ -2290,6 +2300,14 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   const r2 = await run([item(true)], { deadlineMs: t + 30000, delayMs: 60000, now: clock, sleep });
   check('second pass: skipped (and said so) when the cool-down would cross the enrichment deadline',
     r2.attempted === 0 && /budget/.test(r2.skipped));
+  const primaryEnd = t + 30000; // 30s left in the PRIMARY enrichment budget
+  const rLate = await run([item(true)], {
+    deadlineMs: primaryEnd + scr.AM_SECOND_PASS_GRACE_MS,
+    delayMs: 60000, now: clock, sleep,
+  });
+  check('second pass: bounded post-primary recovery allows a late zero-coverage subject to be rechecked',
+    scr.AM_SECOND_PASS_GRACE_MS === 120000 &&
+    rLate.attempted === 1 && rLate.recovered === 1);
   const many = Array.from({ length: scr.AM_SECOND_PASS_MAX + 1 }, () => item(true));
   const r3 = await run(many, { deadlineMs: 1e12, delayMs: 0, now: clock, sleep });
   check('second pass: a mass failure (providers down globally) is not re-queried', r3.attempted === 0 && /cap/.test(r3.skipped));
@@ -2303,8 +2321,13 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     && /if \(again\.errored\) return false;\s*amErrors--; amIncomplete = false;/.test(src));
   check('second pass: a recovered subject is rebuilt through the same finalize() path',
     /applyAm\(again\);\s*const rebuilt = finalize\(\);/.test(src) && /heartbeat\(\);\s*return finalize\(\);/.test(src));
-  check('second pass: runs before the input-order restore, bounded by the enrichment deadline',
-    src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order') && /deadlineMs: enrichDeadline/.test(src));
+  check('second pass: bounded post-primary grace is restricted to zero-coverage recovery',
+    src.indexOf('runAmSecondPass(amSecondPassQueue') < src.indexOf('Restore the input order') &&
+    /deadlineMs: enrichDeadline \+ AM_SECOND_PASS_GRACE_MS/.test(src) &&
+    /const enrich = Date\.now\(\) < enrichDeadline;/.test(src));
+  check('second pass: provider failure evidence decrements only on verified backbone recovery',
+    /!am\.backbones\?\.\[id\] && again\.backbones\?\.\[id\]/.test(src) &&
+    /amBackboneFailures\[id\]--/.test(src));
 }
 
 /* ── licence-free mode (OPENSANCTIONS_DATA=0) ── */
