@@ -491,6 +491,83 @@ export function namesFromEntity(entity) {
   return { name: primary, aliases: [...all] };
 }
 
+/* Exception recovery is explicitly QID-bound, not an officeholder inference.
+ * These three public Wikidata items lost their labels in revisions below.
+ * Each former label was independently cross-checked against the named
+ * 2025-1114 Madagascar official appointment decree on 2026-10-21, AND the live item's own P39 reference
+ * has to keep the exact independent source URL recorded here. The latter ties
+ * the source item to the identified person instead of merely their office.
+ * No unreviewed QID, position, description, municipality or name fragment
+ * may become a screenable identity. Review this fixed list as source policy;
+ * these are not screening decisions or MLRO clearances.
+ *
+ * Sources: public Wikidata revision history; Madagascar official appointment
+ * decree no. 2025-1114 (cnlegis.gov.mg/uploads/D2025-1114-VF.pdf), which
+ * names all three people in their specified ministries. */
+export const CORROBORATED_PEP_HISTORICAL_NAMES = Object.freeze({
+  Q136689291: {
+    name: 'Henri Jacob Razafindrianarivo',
+    historicalLabel: 'RAZAFINDRIANARIVO Henri Jacob',
+    historicalRevision: 2502842784,
+    itemReferenceUrl: 'https://2424.mg/infrastructures-henri-jacob-razafindrianarivo-prone-la-continuite-des-grands-chantiers-publics/',
+    governmentUrl: 'https://cnlegis.gov.mg/uploads/D2025-1114-VF.pdf',
+  },
+  Q136689343: {
+    name: 'Carl de Mon Espoir Andriamparany',
+    historicalLabel: 'ANDRIAMPARANY Carl',
+    historicalRevision: 2502841893,
+    itemReferenceUrl: 'https://www.lexpress.mg/2025/10/mines-carl-andriamparany-ouvre-le.html?m=1',
+    governmentUrl: 'https://cnlegis.gov.mg/uploads/D2025-1114-VF.pdf',
+  },
+  Q136689373: {
+    name: 'Juste Crescent Raharisone',
+    historicalLabel: 'RAHARISONE Juste',
+    historicalRevision: 2502841639,
+    itemReferenceUrl: 'https://www.meteomadagascar.mg/actualite/visite-du-ministre-des-transports-et-de-la-meteorologie-a-la-direction-generale-de-la-meteorologie-30-octobre-2025/',
+    governmentUrl: 'https://cnlegis.gov.mg/uploads/D2025-1114-VF.pdf',
+  },
+});
+
+/* Offline, fail-closed historical identity recovery. Only the successful
+ * richer wbgetentities response for the original requested QID is eligible.
+ * The current item must still explicitly be a HUMAN minister and retain its
+ * item-specific cited URL, rather than sharing an office with someone else.
+ * The published artifact carries both immutable source links and the Wikidata
+ * historical revision for independent audit. No outbound requests here. */
+export function bankCorroboratedPepNames(names, data, requestedQids = []) {
+  if (!data || data.error || data.errors || !data.entities || !Array.isArray(requestedQids)) return 0;
+  let added = 0;
+  for (const qid of requestedQids) {
+    const evidence = Object.hasOwn(CORROBORATED_PEP_HISTORICAL_NAMES, qid)
+      ? CORROBORATED_PEP_HISTORICAL_NAMES[qid] : null;
+    const entity = data.entities[qid];
+    if (!evidence || !entity || entity.id !== qid ||
+      Object.hasOwn(entity, 'missing') || Object.hasOwn(entity, 'invalid') ||
+      hasScreenableName(names.get(qid)) || hasScreenableName(namesFromEntity(entity))) continue;
+    const claims = entity.claims || {};
+    const hasClaim = (statements, value) => Array.isArray(statements)
+      && statements.some(s => s?.mainsnak?.datavalue?.value?.id === value);
+    if (!hasClaim(claims.P31, 'Q5')) continue;
+    if (!Array.isArray(claims.P39) || !claims.P39.some(s =>
+      s?.mainsnak?.datavalue?.value?.id === 'Q83307'
+      && Array.isArray(s.references) && s.references.some(ref =>
+        Array.isArray(ref?.snaks?.P854)
+        && ref.snaks.P854.some(snak => snak?.datavalue?.value === evidence.itemReferenceUrl)))) continue;
+    names.set(qid, {
+      name: evidence.name, aliases: [evidence.historicalLabel],
+      identityEvidence: {
+        type: 'independently-corroborated-historical-wikidata-label',
+        wikidataRevision: evidence.historicalRevision,
+        itemReferenceUrl: evidence.itemReferenceUrl,
+        governmentUrl: evidence.governmentUrl,
+        checkedOn: '2026-10-21',
+      },
+    });
+    added++;
+  }
+  return added;
+}
+
 // Failed or empty entities must remain pending, not become banked QIDs.
 // When wbgetentities follows a merged-QID redirect, propagate the target's
 // recovered name back onto the original requested QID because holderRows still
@@ -588,6 +665,7 @@ export function buildPepDataset({ harvestedAt, holderRows, positions, names, exp
     entries.push({
       qid, name: nm.name, aliases: nm.aliases,
       position: meta.position, country: meta.country, current: meta.current,
+      ...(nm.identityEvidence ? { identityEvidence: nm.identityEvidence } : {}),
     });
   }
   entries.sort((a, b) => (a.qid < b.qid ? -1 : 1));
@@ -742,7 +820,8 @@ export function seedResumeNames(qids, names, artifact, harvestedAt) {
       || !hasScreenableName(entry) || hasScreenableName(names.get(entry.qid))) continue;
     names.set(entry.qid, { name: entry.name.trim(),
       aliases: Array.isArray(entry.aliases)
-        ? entry.aliases.filter(a => typeof a === 'string' && a.trim()).map(a => a.trim()) : [] });
+        ? entry.aliases.filter(a => typeof a === 'string' && a.trim()).map(a => a.trim()) : [],
+      ...(entry.identityEvidence ? { identityEvidence: entry.identityEvidence } : {}) });
     added++;
   }
   return added;
@@ -804,7 +883,8 @@ async function harvest(outfile) {
     if (prev && rebuildWithCarried && (dataset.count || 0) < (prev.count || 0)
       && Array.isArray(prev.entries)) {
       const carried = prev.entries.filter(e => e && e.qid && e.name)
-        .map(e => [e.qid, { name: e.name, aliases: Array.isArray(e.aliases) ? e.aliases : [] }]);
+        .map(e => [e.qid, { name: e.name, aliases: Array.isArray(e.aliases) ? e.aliases : [],
+          ...(e.identityEvidence ? { identityEvidence: e.identityEvidence } : {}) }]);
       const merged = rebuildWithCarried(carried);
       if ((merged.count || 0) > (dataset.count || 0)) {
         console.log(`pep-worldwide: carried ${merged.count - dataset.count} already-published names forward — the list never shrinks on a lost chunk`);
@@ -1219,8 +1299,12 @@ async function harvest(outfile) {
       const batch = fallbackPending.slice(i, i + LABEL_CHUNK);
       const data = await fetchJsonSafe(fallbackLabelsUrl(batch));
       bankLabelNames(names, data, batch);
+      const verifiedHistorical = bankCorroboratedPepNames(names, data, batch);
+      if (verifiedHistorical) console.log('pep-worldwide: source-corroborated historical identities recovered: ' + verifiedHistorical);
       for (const qid of confirmedMissingQids(data, batch)) confirmedMissing.add(qid);
-      for (const qid of confirmedUnscreenableQids(data, batch)) confirmedUnscreenable.add(qid);
+      for (const qid of confirmedUnscreenableQids(data, batch)) {
+        if (!hasScreenableName(names.get(qid))) confirmedUnscreenable.add(qid);
+      }
       const redirects = new Map((Array.isArray(data?.redirects) ? data.redirects : [])
         .map(x => [String(x?.from || ''), String(x?.to || '')]));
       for (const qid of batch) {
@@ -1408,7 +1492,8 @@ export async function mergeShards(outfile, cpFile, shardFiles) {
   try { prevArtifact = readJsonMaybeGz(outfile); } catch { prevArtifact = null; }
   const carried = (prevArtifact && Array.isArray(prevArtifact.entries))
     ? prevArtifact.entries.filter(e => e && e.qid && e.name)
-      .map(e => [e.qid, { name: e.name, aliases: Array.isArray(e.aliases) ? e.aliases : [] }])
+      .map(e => [e.qid, { name: e.name, aliases: Array.isArray(e.aliases) ? e.aliases : [],
+          ...(e.identityEvidence ? { identityEvidence: e.identityEvidence } : {}) }])
     : [];
   if (carried.length) console.log(`  carrying ${carried.length} already-published names forward as a floor`);
   const names = mergeShardNames([[...st.names], ...slices, carried]);
