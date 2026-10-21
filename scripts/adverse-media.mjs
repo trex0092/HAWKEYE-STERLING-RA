@@ -1009,6 +1009,10 @@ class AdaptiveGoogleNewsGate extends RequestStartGate {
   }
   penalize() {
     this.intervalMs = Math.min(this.capMs, Math.max(this.baseMs, Math.ceil(this.intervalMs * 2)));
+    // The next send slot may already have been reserved at the old interval.
+    // Extend it immediately. Merely raising intervalMs would let a queued
+    // caller start at the old rate despite a provider rejection.
+    this.deferFor(this.intervalMs);
     return this.intervalMs;
   }
   reward() {
