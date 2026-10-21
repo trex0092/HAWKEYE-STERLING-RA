@@ -197,3 +197,77 @@ jobs:
             process.exitCode = 1;
           }
           NODE
+
+  gdelt-doc-live-probe:
+    if: github.repository == 'trex0092/HAWKEYE-STERLING-RA'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Restrict outbound traffic to GitHub and original GDELT DOC endpoint
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 raw.githubusercontent.com:443
+            nodejs.org:443 *.githubapp.com:443 api.gdeltproject.org:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Diagnose simple and real-shape GDELT DOC requests using synthetic data only
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { gdeltUrl, gdeltTerms, GDELT_RISK_TERMS, parseGdelt } from './scripts/adverse-media.mjs';
+          const subject = 'Hawkeye Synthetic Diagnostic';
+          const probes = [
+            ['public-simple', 'https://api.gdeltproject.org/api/v2/doc/doc?query='
+              + encodeURIComponent('"climate change"')
+              + '&mode=artlist&format=json&maxrecords=5&timespan=1d'],
+            ['production-base', gdeltUrl(subject, GDELT_RISK_TERMS)],
+            ['production-wide', gdeltUrl(subject, gdeltTerms(subject))]
+          ];
+          let failed = 0;
+          for (let i = 0; i < probes.length; i++) {
+            if (i) await new Promise(resolve => setTimeout(resolve, 7000));
+            const [label, url] = probes[i];
+            const result = { label, urlLength: url.length, at: new Date().toISOString(),
+              status: 0, responseKind: null, bytes: 0, parseAccepted: false,
+              articles: null, retryAfter: null, errorType: null };
+            try {
+              const response = await fetch(url, {
+                redirect: 'follow',
+                signal: AbortSignal.timeout(18000),
+                headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0',
+                  Accept: 'application/json' }
+              });
+              result.status = response.status;
+              result.retryAfter = response.headers.get('retry-after');
+              const text = await response.text();
+              result.bytes = text.length;
+              result.responseKind = text.trim().startsWith('{') ? 'json-shaped'
+                : text.trim().startsWith('<') ? 'html-shaped'
+                : text.trim() ? 'plain-text' : 'empty-body';
+              if (result.status === 200) {
+                const items = parseGdelt(text);
+                result.parseAccepted = Array.isArray(items);
+                result.articles = Array.isArray(items) ? items.length : null;
+              }
+            } catch (e) {
+              result.errorType = String(e?.name || 'transport-failure').slice(0,60);
+            }
+            console.log('GDELT_DOC_DIAGNOSTIC ' + JSON.stringify(result));
+            if (result.status !== 200 || !result.parseAccepted) failed++;
+          }
+          console.log('GDELT_DOC_DIAGNOSTIC_SUMMARY ' + JSON.stringify({
+            checked: probes.length, failed,
+            meaning: 'synthetic connectivity only, not screening or assurance'
+          }));
+          if (failed) process.exitCode = 1;
+          NODE
