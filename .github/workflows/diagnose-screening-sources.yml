@@ -82,3 +82,82 @@ jobs:
           }
           console.log('DIAGNOSTIC_ONLY: Public source references inspected. No customer queries, source edits, PEP identities, assurance artifacts, case dispositions or screening policies changed.');
           NODE
+
+  google-news-rss-probe:
+    if: github.repository == 'trex0092/HAWKEYE-STERLING-RA'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Restrict network access to Google News and GitHub
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 raw.githubusercontent.com:443
+            nodejs.org:443 *.githubapp.com:443 news.google.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Compare simple and production-shaped Google News RSS responses
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { adverseMediaUrlFor, LOCALES, parseRss } from './scripts/adverse-media.mjs';
+          const name = 'Hawkeye Synthetic Diagnostic';
+          const en = LOCALES.find(x => x.id === 'en-US');
+          const ar = LOCALES.find(x => x.id === 'ar-AE');
+          if (!en || !ar) throw new Error('The audited core Google News locales are missing');
+          const simple = 'https://news.google.com/rss/search?q='
+            + encodeURIComponent('"' + name + '"') + '&hl=en-US&gl=US&ceid=US:en';
+          const probes = [
+            ['simple-en-US', simple],
+            ['production-en-US', adverseMediaUrlFor(name, en)],
+            ['production-ar-AE', adverseMediaUrlFor(name, ar)]
+          ];
+          let failed = 0;
+          for (let i = 0; i < probes.length; i++) {
+            if (i) await new Promise(resolve => setTimeout(resolve, 5000));
+            const [label, url] = probes[i];
+            const output = { label, urlLength: url.length, queriedAt: new Date().toISOString(),
+              status: 0, validRss: false, articles: null, bytes: 0, error: null };
+            try {
+              const res = await fetch(url, {
+                redirect: 'follow', signal: AbortSignal.timeout(20000),
+                headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0',
+                  Accept: 'application/rss+xml, application/xml, text/xml' }
+              });
+              output.status = res.status;
+              output.contentType = res.headers.get('content-type');
+              output.retryAfter = res.headers.get('retry-after');
+              if (res.ok) {
+                let bytes = 0;
+                const chunks = [];
+                for await (const chunk of res.body) {
+                  bytes += chunk.length;
+                  if (bytes > 750000) throw new Error('feed exceeds diagnostic byte limit');
+                  chunks.push(chunk);
+                }
+                output.bytes = bytes;
+                const items = parseRss(Buffer.concat(chunks).toString('utf8'));
+                output.validRss = Array.isArray(items);
+                output.articles = output.validRss ? items.length : null;
+              }
+            } catch (e) {
+              output.error = String(e?.name || 'request error').slice(0, 80);
+            }
+            console.log('GOOGLE_NEWS_DIAGNOSTIC ' + JSON.stringify(output));
+            if (output.status !== 200 || !output.validRss) failed++;
+          }
+          console.log('DIAGNOSTIC_ONLY: No real subject names, screening outputs, source-quality badges or customer records read or changed.');
+          if (failed) {
+            console.error('GOOGLE_NEWS_DIAGNOSTIC_INCOMPLETE: ' + failed + ' of ' + probes.length + ' probes not verified');
+            process.exitCode = 1;
+          }
+          NODE
