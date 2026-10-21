@@ -1,14 +1,15 @@
-name: Screening source diagnostics, not assurance
+name: PEP source reference diagnostics, not assurance
 on:
   push:
     branches: ['diagnostics/screening-sources-20261021']
+    paths: ['.github/workflows/diagnose-screening-sources.yml']
 permissions:
   contents: read
 concurrency:
   group: screening-source-diagnostic-20261021
   cancel-in-progress: false
 jobs:
-  diagnose-not-assure:
+  inspect-pep-references:
     if: github.repository == 'trex0092/HAWKEYE-STERLING-RA'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -21,9 +22,7 @@ jobs:
           allowed-endpoints: >
             github.com:443 api.github.com:443 codeload.github.com:443
             objects.githubusercontent.com:443 raw.githubusercontent.com:443
-            nodejs.org:443 *.githubapp.com:443
-            www.wikidata.org:443 wikidata.org:443
-            news.google.com:443 api.gdeltproject.org:443
+            nodejs.org:443 *.githubapp.com:443 www.wikidata.org:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
@@ -31,78 +30,55 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Observe eight public PEP source exceptions and bounded synthetic news requests
+      - name: Inspect explicit source references for the eight existing public identity exceptions
         shell: bash
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
-          import { fallbackLabelsUrl, namesFromEntity } from './scripts/pep-worldwide.mjs';
-          import { adverseMediaUrl, gdeltUrl, GDELT_RISK_TERMS, parseRss, parseGdelt } from './scripts/adverse-media.mjs';
-          const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-          const allowed = new Set(['www.wikidata.org', 'wikidata.org', 'news.google.com', 'api.gdeltproject.org']);
-          async function observe(url) {
-            const u = new URL(url);
-            if (u.protocol !== 'https:' || !allowed.has(u.hostname)) throw new Error('Diagnostic origin not allowed');
-            const started = Date.now();
-            try {
-              const r = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(45000), headers: {
-                'user-agent': 'HawkeyeSterling-SourceDiagnostic/1.0 (public synthetic checks; https://github.com/trex0092/HAWKEYE-STERLING-RA)',
-                accept: 'application/json, application/rss+xml, application/xml, text/plain'
-              } });
-              const chunks = []; let size = 0;
-              for await (const c of r.body) {
-                size += c.length;
-                if (size > 2000000) throw new Error('Diagnostic response exceeded byte budget');
-                chunks.push(c);
-              }
-              return { status: r.status, ok: r.ok, type: r.headers.get('content-type'),
-                retryAfter: r.headers.get('retry-after'), elapsedMs: Date.now() - started,
-                body: Buffer.concat(chunks).toString('utf8') };
-            } catch (error) {
-              return { status: null, ok: false, elapsedMs: Date.now() - started,
-                error: error.name + ': ' + error.message, body: '' };
-            }
-          }
+          import { namesFromEntity } from './scripts/pep-worldwide.mjs';
           const qids = ['Q136689291', 'Q136689343', 'Q136689373', 'Q138161351',
             'Q58316593', 'Q58316598', 'Q58316599', 'Q58334883'];
-          const pep = await observe(fallbackLabelsUrl(qids));
-          let data = null;
-          if (pep.ok) { try { data = JSON.parse(pep.body); } catch { /* malformed is unknown */ } }
-          const redirected = new Map((data?.redirects || []).map(r => [r.from, r.to]));
-          const observations = qids.map(qid => {
-            const entity = data?.entities?.[redirected.get(qid) || qid];
-            const result = namesFromEntity(entity);
-            return { qid, responsePresent: !!entity, missing: !!entity && Object.hasOwn(entity, 'missing'),
-              lastRevision: entity?.lastrevid || null, hasScreenableName: !!result.name,
-              labels: Object.values(entity?.labels || {}).map(x => x.value).slice(0, 10),
-              aliases: Object.values(entity?.aliases || {}).flat().map(x => x.value).slice(0, 10),
-              nameClaims: Object.fromEntries(['P1559', 'P1477', 'P2561'].map(p => [p,
-                (entity?.claims?.[p] || []).map(s => s.mainsnak?.datavalue?.value)])),
-              claimKeys: Object.keys(entity?.claims || {}).sort(),
-              sitelinkSites: Object.keys(entity?.sitelinks || {}).sort() };
-          });
-          console.log('PEP_DIAGNOSTIC ' + JSON.stringify({ checkedAt: new Date().toISOString(),
-            status: pep.status, error: pep.error || data?.error?.code || null, observations }));
-          const synthetic = 'Hawkeye Synthetic Diagnostic';
-          const news = [
-            ['google-default', adverseMediaUrl(synthetic), parseRss],
-            ['gdelt-default', gdeltUrl(synthetic), parseGdelt],
-            ['gdelt-base-fallback', gdeltUrl(synthetic, GDELT_RISK_TERMS), parseGdelt],
-          ];
-          for (const [id, url, parse] of news) {
-            const result = await observe(url);
-            let items = null;
-            if (result.ok) { try { items = parse(result.body); } catch { /* invalid shape */ } }
-            console.log('NEWS_DIAGNOSTIC ' + JSON.stringify({ id, checkedAt: new Date().toISOString(),
-              queryLength: new URL(url).searchParams.get('query')?.length || new URL(url).searchParams.get('q')?.length,
-              status: result.status, contentType: result.type, retryAfter: result.retryAfter || null,
-              elapsedMs: result.elapsedMs, bytes: Buffer.byteLength(result.body), parsedArray: Array.isArray(items),
-              itemCount: Array.isArray(items) ? items.length : null,
-              error: result.error || null,
-              rejectionText: !Array.isArray(items) ? result.body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 300) : null }));
-            const retry = Number(result.retryAfter);
-            if (Number.isFinite(retry) && retry > 120) break;
-            await wait(Math.max(6500, result.status === 429 ? 30000 : 0, Number.isFinite(retry) ? retry * 1000 : 0));
+          const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+          async function request(params) {
+            const u = new URL('https://www.wikidata.org/w/api.php');
+            u.search = new URLSearchParams({ format: 'json', maxlag: '5', ...params });
+            const response = await fetch(u, { redirect: 'error', signal: AbortSignal.timeout(45000), headers: {
+              'user-agent': 'HawkeyeSterling-PEPReferenceDiagnostic/1.0 (https://github.com/trex0092/HAWKEYE-STERLING-RA)',
+              accept: 'application/json'
+            } });
+            if (!response.ok) throw new Error('Source HTTP ' + response.status + '; no automatic retry');
+            let bytes = 0; const chunks = [];
+            for await (const chunk of response.body) {
+              bytes += chunk.length;
+              if (bytes > 2000000) throw new Error('Response byte budget exceeded');
+              chunks.push(chunk);
+            }
+            const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            if (data.error || data.errors) throw new Error('Source API error; no completeness claim');
+            return data;
           }
-          console.log('DIAGNOSTIC_COMPLETE: No customer population was read or screened. No artifact, source-quality verdict, risk score, or MLRO case was changed. These observations are NOT Combined Screening Assurance.');
+          const data = await request({ action: 'wbgetentities', props: 'info|labels|aliases|descriptions|sitelinks|claims',
+            redirects: 'yes', ids: qids.join('|') });
+          const redirects = new Map((data.redirects || []).map(r => [r.from, r.to]));
+          const values = snaks => Object.fromEntries(Object.entries(snaks || {}).map(([prop, list]) =>
+            [prop, list.map(s => ({ type: s.snaktype, value: s.datavalue?.value ?? null }))]));
+          for (const qid of qids) {
+            const entity = data.entities?.[redirects.get(qid) || qid];
+            if (!entity) throw new Error('Requested public QID not returned');
+            const claims = Object.fromEntries(Object.entries(entity.claims || {}).map(([prop, list]) =>
+              [prop, list.map(s => ({ rank: s.rank, value: s.mainsnak?.datavalue?.value ?? null,
+                qualifiers: values(s.qualifiers), references: (s.references || []).map(r => values(r.snaks)) }))]));
+            console.log('PUBLIC_PEP_SOURCE ' + JSON.stringify({ qid, checkedAt: new Date().toISOString(),
+              revision: entity.lastrevid || null, modified: entity.modified || null,
+              parsedNameAvailable: !!namesFromEntity(entity).name,
+              descriptions: Object.values(entity.descriptions || {}).map(x => x.value).slice(0, 10), claims }));
+            await pause(1500);
+            const history = await request({ action: 'query', prop: 'revisions', titles: qid,
+              rvprop: 'ids|timestamp|comment', rvlimit: '3' });
+            const pages = Object.values(history.query?.pages || {});
+            console.log('PUBLIC_PEP_HISTORY ' + JSON.stringify({ qid,
+              revisions: pages.flatMap(p => p.revisions || []).map(r => ({ id: r.revid, parent: r.parentid,
+                timestamp: r.timestamp, comment: String(r.comment || '').slice(0, 400) })) }));
+          }
+          console.log('DIAGNOSTIC_ONLY: Public source references inspected. No customer queries, source edits, PEP identities, assurance artifacts, case dispositions or screening policies changed.');
           NODE
