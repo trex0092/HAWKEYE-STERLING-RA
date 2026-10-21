@@ -11,6 +11,17 @@ function blockingBrowserGate(source) {
     !/^\s*if\s*:/m.test(body) && !/^ {4}continue-on-error\s*:/m.test(source);
 }
 
+// Changes to any part of the passive research surface must exercise the real
+// browsers after merge, not only on pull requests.
+const referencePaths = ['conflict-context.html', 'conflict-context.css',
+  'legal-footer.js', 'data/conflict-context-sources.json', 'test/asset-integrity.test.mjs'];
+function referencePushGate(source) {
+  const push = /^  push:\n    branches: \[main\]\n    paths: \[([^\n]+)\]/m.exec(source);
+  if (!push) return false;
+  const paths = new Set([...push[1].matchAll(/'([^']+)'/g)].map(match => match[1]));
+  return referencePaths.every(path => paths.has(path));
+}
+
 export function run(check) {
   const workflow = readFileSync(new URL('../../.github/workflows/cross-browser.yml', import.meta.url), 'utf8');
   check('browser failures block the required job', blockingBrowserGate(workflow));
@@ -30,6 +41,12 @@ export function run(check) {
       'test/axe.spec.mjs',
       'test/cross-browser.spec.mjs'
     ].every(path => push[1].includes("'" + path + "'")));
+  check('conflict page, styles, navigation, policy and guards trigger main browser tests',
+    referencePushGate(workflow));
+  for (const path of referencePaths) {
+    check('reject an unmonitored conflict research file: ' + path,
+      !referencePushGate(workflow.replace("'" + path + "'", "'unrelated.fixture'")));
+  }
   check('retain failure artifacts for diagnosis',
     workflow.includes('      - name: Upload report\n        if: always()'));
 }
