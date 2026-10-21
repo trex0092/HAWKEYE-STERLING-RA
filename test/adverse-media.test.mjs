@@ -3,7 +3,7 @@
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
-  bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker,
+  bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker, googleNewsRateState, GNEWS_PACING_CAP_MS,
   RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS, ADVERSE_BACKBONE_MAX_ATTEMPTS, resetAdverseMediaRateGates,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
   gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker,
@@ -327,6 +327,38 @@ check('breaker: a non-refusal failure (e.g. HTTP 500 parse path) never opens it'
   return closed;
 })());
 
+/* Adaptive refusal recovery must slow requests after evidence of refusal,
+   and only validated RSS can earn the rate back. All tests are offline. */
+{
+  resetGnewsBreaker();
+  const base = googleNewsRateState();
+  noteGnewsResult(false, 429);
+  const refused = googleNewsRateState();
+  check('Google News HTTP 429 increases shared pacing and records rate-limited failures',
+    refused.rateLimited === 1 && refused.paceMs > base.paceMs
+    && refused.paceMs <= GNEWS_PACING_CAP_MS);
+  noteGnewsResult(false, 403);
+  const forbidden = googleNewsRateState();
+  check('HTTP 403 extends polite provider backoff rather than claiming coverage',
+    forbidden.forbidden === 1 && forbidden.paceMs >= refused.paceMs);
+  noteGnewsResult(true, 200);
+  const recovered = googleNewsRateState();
+  check('only validated feed responses decay pacing toward its safe base',
+    recovered.ok === 1 && recovered.paceMs < forbidden.paceMs
+    && recovered.paceMs >= GNEWS_MIN_INTERVAL_MS);
+  noteGnewsResult(false, 200);
+  const badFeed = googleNewsRateState();
+  check('HTTP 200 without valid RSS is recorded as invalid coverage and slows pacing',
+    badFeed.invalidFeed === 1 && badFeed.paceMs > recovered.paceMs);
+  noteGnewsResult(false, 500);
+  check('HTTP 500 does not masquerade as a Google rate-limit signal',
+    googleNewsRateState().paceMs === badFeed.paceMs);
+  resetGnewsBreaker();
+  const reset = googleNewsRateState();
+  check('test/run reset restores initial Google News pacing and clears aggregate errors',
+    reset.paceMs === GNEWS_MIN_INTERVAL_MS && reset.ok === 0
+    && reset.rateLimited === 0 && reset.invalidFeed === 0);
+}
 /* ── Phase-4 hardening: description scanning, tiers, canonical dedup ──────── */
 const descRss = '<rss><channel><item><title>Acme Corp restructures Gulf operations</title>'
   + '<link>https://www.ft.com/content/acme-restructure?utm_source=rss</link>'

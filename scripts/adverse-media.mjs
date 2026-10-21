@@ -994,7 +994,43 @@ export const ADVERSE_BACKBONE_MAX_ATTEMPTS = Math.max(1,
 export const ADVERSE_RATE_LIMIT_BACKOFF_MS = Math.min(900000,
   Math.max(1000, Number(process.env.ADVERSE_RATE_LIMIT_BACKOFF_MS) || 30000));
 
-const _gnewsGate = new RequestStartGate(GNEWS_MIN_INTERVAL_MS);
+/* Google News occasionally refuses requests from a shared CI runner even at
+   the default fixed start interval. Unlike a single 30-second Retry-After,
+   an adaptive interval makes the next requests progressively more polite,
+   and decays only after a validated RSS response. It is bounded so an upstream
+   outage remains an explicit failed coverage result, not an infinite wait. */
+export const GNEWS_PACING_CAP_MS = Math.max(GNEWS_MIN_INTERVAL_MS,
+  Math.min(60000, Number(process.env.GNEWS_PACING_CAP_MS) || 20000));
+class AdaptiveGoogleNewsGate extends RequestStartGate {
+  constructor(baseMs, capMs) {
+    super(baseMs);
+    this.baseMs = baseMs;
+    this.capMs = capMs;
+  }
+  penalize() {
+    this.intervalMs = Math.min(this.capMs, Math.max(this.baseMs, Math.ceil(this.intervalMs * 2)));
+    // The next send slot may already have been reserved at the old interval.
+    // Extend it immediately. Merely raising intervalMs would let a queued
+    // caller start at the old rate despite a provider rejection.
+    this.deferFor(this.intervalMs);
+    return this.intervalMs;
+  }
+  reward() {
+    this.intervalMs = Math.max(this.baseMs, Math.floor(this.intervalMs * 0.85));
+    return this.intervalMs;
+  }
+  reset() {
+    super.reset();
+    this.intervalMs = this.baseMs;
+  }
+}
+const _gnewsGate = new AdaptiveGoogleNewsGate(GNEWS_MIN_INTERVAL_MS, GNEWS_PACING_CAP_MS);
+const _gnewsObservations = { ok: 0, rateLimited: 0, forbidden: 0, unavailable: 0,
+  transport: 0, invalidFeed: 0 };
+export function googleNewsRateState() {
+  return { paceMs: _gnewsGate.intervalMs, baseMs: GNEWS_MIN_INTERVAL_MS,
+    capMs: GNEWS_PACING_CAP_MS, ..._gnewsObservations };
+}
 const _gdeltGate = new RequestStartGate(GDELT_MIN_INTERVAL_MS);
 const _bingGate = new RequestStartGate(BING_MIN_INTERVAL_MS);
 
@@ -1040,7 +1076,11 @@ async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, per
 const GNEWS_BREAKER_AFTER = Math.max(1, Number(process.env.GNEWS_BREAKER_AFTER) || 25);
 const _gnews = new RecoveryCircuit(GNEWS_BREAKER_AFTER, ADVERSE_RECOVERY_COOLDOWN_MS);
 export function gnewsBreakerOpen() { return _gnews.open; }
-export function resetGnewsBreaker() { _gnews.reset(); }
+export function resetGnewsBreaker() {
+  _gnews.reset();
+  _gnewsGate.reset();
+  for (const key of Object.keys(_gnewsObservations)) _gnewsObservations[key] = 0;
+}
 export function gnewsCanRequest(localeId = 'en-US', nowMs = Date.now()) {
   return !_gnews.open || (localeId === 'en-US' && _gnews.canRequest(nowMs));
 }
@@ -1048,11 +1088,38 @@ export function gnewsBreakerPermit(localeId = 'en-US', nowMs = Date.now()) {
   return gnewsCanRequest(localeId, nowMs) ? _gnews.permit(nowMs) : null;
 }
 export function noteGnewsResult(ok, status, ticket = null) {
-  if (ok) { _gnews.success(ticket); return; }
-  if (ticket?.probe || [429, 403, 503, 0].includes(status)) {
-    if (_gnews.failure(ticket)) {
-      console.error('adverse-media: Google News circuit OPEN; only one en-US probe is admitted after cooldown');
+  // A response admitted before the current circuit generation must not
+  // unthrottle a subsequent outage, nor consume its only recovery probe.
+  if (ticket && !_gnews.accepts(ticket)) return;
+  if (ok) {
+    if (!_gnews.open || ticket?.probe) {
+      _gnewsGate.reward();
+      _gnewsObservations.ok++;
     }
+    _gnews.success(ticket);
+    return;
+  }
+  // A 200 interstitial or malformed RSS is NOT a successful news sweep.
+  // Treat it like a provider outage, not a clean "zero adverse hits".
+  const key = status === 429 ? 'rateLimited' : status === 403 ? 'forbidden'
+    : status === 503 ? 'unavailable' : status === 0 ? 'transport'
+      : status === 200 ? 'invalidFeed' : null;
+  if (key) {
+    _gnewsObservations[key]++;
+    const prevPace = _gnewsGate.intervalMs;
+    const pace = _gnewsGate.penalize();
+    if (_gnewsObservations[key] === 1 || (pace === _gnewsGate.capMs && prevPace < pace)) {
+      console.warn('adverse-media: Google News ' + (status === 0 ? 'network failure'
+        : status === 200 ? 'invalid RSS response' : 'HTTP ' + status)
+        + '; pacing ' + pace + 'ms per request; unverified source remains partial');
+    }
+    if (_gnews.failure(ticket)) {
+      console.error('adverse-media: Google News circuit OPEN; only one en-US probe is admitted after cooldown; '
+        + 'provider observations=' + JSON.stringify(_gnewsObservations));
+    }
+  } else if (ticket?.probe) {
+    // Recovery probes must never become stuck in the half-open state.
+    _gnews.failure(ticket);
   }
 }
 function fetchGoogleNews(name, loc, timeoutMs) {
