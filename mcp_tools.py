@@ -832,6 +832,11 @@ RESOURCES = {
         "application/json",
         lambda: _read_json_file("data/country-indicators.json"),
     ),
+    "hawkeye://reference/ocindex-2025": (
+        "Global Organized Crime Index 2025 publisher links and source inventory; context only, never scored or screened",
+        "application/json",
+        lambda: _read_json_file("data/ocindex-2025-references.json"),
+    ),
     "hawkeye://reference/internal-watchlist": (
         "Firm-internal watchlist (declined/known-bad counterparties)",
         "application/json",
