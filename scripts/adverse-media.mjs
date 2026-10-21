@@ -743,6 +743,28 @@ export function gdeltQueryString(name, terms) {
   return '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
 }
 
+/* A provider outage is not an invalid long query. The legacy DOC endpoint
+ * also returns throttling/error text behind HTTP 200, so malformed bodies
+ * require explicit classification before attempting the shorter query. Only
+ * exact query-syntax rejection allows a second request to this rate-limited
+ * service. These classifications are never screening results. */
+export function gdeltFailureClass(status, body = '') {
+  if (status === 429) return 'throttle';
+  if ([400, 413, 414, 422].includes(status)) return 'query-rejection';
+  if (status === 200) {
+    const sample = String(body == null ? '' : body).slice(0, 1500);
+    if (/please\s+limit\s+requests|rate[ -]?limit|too many requests|retry[ -]?after|exceeded.*requests/i.test(sample)) return 'throttle';
+    if (/invalid.*query|query.*(invalid|too long|malformed|syntax|unsupported|exceeds|not allowed)|syntax error|query length/i.test(sample)) return 'query-rejection';
+    return 'malformed';
+  }
+  if (status === 0) return 'transport';
+  return 'provider';
+}
+export function gdeltCanFallbackToBase(status, failureClass = null) {
+  return [400, 413, 414, 422].includes(status)
+    || (status === 200 && failureClass === 'query-rejection');
+}
+
 export function gdeltUrl(name, terms = gdeltTerms(name)) {
   const q = gdeltQueryString(name, terms);
   const span = String(process.env.ADVERSE_MEDIA_TIMESPAN || '12m');
@@ -762,12 +784,26 @@ export const ADVERSE_RECOVERY_COOLDOWN_MS = Math.min(900000,
   Math.max(1000, Number(process.env.ADVERSE_RECOVERY_COOLDOWN_MS) || 120000));
 export const GDELT_BREAKER_AFTER = Number(process.env.GDELT_BREAKER_AFTER) || 5;
 export const gdeltBreakerState = new RecoveryCircuit(GDELT_BREAKER_AFTER, ADVERSE_RECOVERY_COOLDOWN_MS);
-export function resetGdeltBreaker() { gdeltBreakerState.reset(); }
+const _gdeltResponses = { valid: 0, queryRejection: 0, throttle: 0, transport: 0,
+  provider: 0, malformed: 0 };
+export function gdeltResponseObservations() { return { ..._gdeltResponses }; }
+function noteGdeltObservation(ok, reason) {
+  const key = ok ? 'valid' : ({
+    'query-rejection': 'queryRejection', throttle: 'throttle',
+    transport: 'transport', provider: 'provider', malformed: 'malformed'
+  }[reason] || 'provider');
+  _gdeltResponses[key]++;
+}
+export function resetGdeltBreaker() {
+  gdeltBreakerState.reset();
+  for (const key of Object.keys(_gdeltResponses)) _gdeltResponses[key] = 0;
+}
 export function gdeltBreakerPermit(nowMs = Date.now()) { return gdeltBreakerState.permit(nowMs); }
 export function gdeltBreakerRecordSuccess(ticket = null) { gdeltBreakerState.success(ticket); }
 export function gdeltBreakerRecordFailure(ticket = null) {
   if (gdeltBreakerState.failure(ticket)) {
-    console.warn('adverse-media: GDELT circuit OPEN; coverage remains unavailable until a validated cooldown probe succeeds');
+    console.warn('adverse-media: GDELT circuit OPEN; coverage remains unavailable until a validated cooldown probe succeeds; '
+      + 'response classes=' + JSON.stringify(_gdeltResponses));
   }
 }
 
@@ -1069,14 +1105,24 @@ async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, per
     if (!res.ok) {
       if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after'))
         || (res.status === 429 ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
-      if (note) note(false, res.status, ticket);
+      if (note) note(false, res.status, ticket, parse === parseGdelt
+        ? gdeltFailureClass(res.status) : null);
       return null;
     }
-    const items = parse(await res.text());
+    const body = await res.text();
+    const items = parse(body);
+    // An invalid HTTP 200 GDELT body may itself be a throttle message.
+    // Defer the shared queue before the next already-waiting call starts.
+    const problem = items === null && parse === parseGdelt
+      ? gdeltFailureClass(res.status, body) : null;
+    if (gate && problem === 'throttle') gate.deferFor(ADVERSE_RATE_LIMIT_BACKOFF_MS);
     // HTTP 200 consent/error pages are not successful screening coverage.
-    if (note) note(items !== null, res.status, ticket);
+    if (note) note(items !== null, res.status, ticket, problem);
     return items;
-  } catch { if (note) note(false, 0, ticket); return null; }
+  } catch {
+    if (note) note(false, 0, ticket, parse === parseGdelt ? 'transport' : null);
+    return null;
+  }
   finally { clearTimeout(t); }
 }
 
@@ -1175,15 +1221,24 @@ async function fetchGdelt(name, timeoutMs) {
   if (!ticket) return null;
   const permit = () => gdeltBreakerState.accepts(ticket) ? ticket : null;
   const wide = gdeltTerms(name);
-  let wideStatus = 0;
-  const noteWide = (_ok, status) => { wideStatus = status; };
+  let wideStatus = 0, wideFailure = null;
+  const noteWide = (ok, status, _ticket, reason) => {
+    wideStatus = status;
+    wideFailure = reason;
+    noteGdeltObservation(ok, reason);
+  };
   let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,
     'application/json', timeoutMs, noteWide, _gdeltGate, permit);
-  // A 429 is not a query rejection. A shorter query consumes the same quota.
-  if (gd === null && wideStatus !== 429 && wide.length > GDELT_RISK_TERMS.length && permit()) {
-    console.warn('adverse-media: GDELT rejected the widened query; retrying on the base term set');
+  // A rate limit, service outage or transport failure is never evidence that
+  // the expanded query is invalid. Retrying its base form would burn the same
+  // shared-IP quota and worsen coverage for other subjects.
+  if (gd === null && gdeltCanFallbackToBase(wideStatus, wideFailure)
+      && wide.length > GDELT_RISK_TERMS.length && permit()) {
+    console.warn('adverse-media: GDELT rejected the widened query as invalid; retrying the base term set');
     gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt,
-      'application/json', timeoutMs, null, _gdeltGate, permit);
+      'application/json', timeoutMs,
+      (ok, _status, _ticket, reason) => noteGdeltObservation(ok, reason),
+      _gdeltGate, permit);
   }
   if (gd === null) gdeltBreakerRecordFailure(ticket);
   else gdeltBreakerRecordSuccess(ticket);
