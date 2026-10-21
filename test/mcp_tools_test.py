@@ -563,6 +563,21 @@ check("resources/read serves the country indicators (every indicator carries a s
       ci_doc["indicators"] and all(v["source"].startswith("https://") and v["published"]
                                    for v in ci_doc["indicators"].values()))
 
+
+oc_ref = rpc("resources/read", {"uri": "hawkeye://reference/ocindex-2025"})
+oc_doc = json.loads(oc_ref["result"]["contents"][0]["text"])
+check("resources/read serves publisher-only 2025 OCIndex country profile links",
+      oc_doc["edition"] == 2025 and oc_doc["coveredUNMemberStates"] == 193
+      and len(oc_doc["publisherNamedPdfStems"]) == 192
+      and oc_doc["uploadedArchive"]["pdfCount"] == 193
+      and oc_doc["uploadedArchive"]["nonstandardPdf"][0]["officialPublisherUrl"].startswith(
+          "https://ocindex.net/assets/downloads/2025/english/"))
+check("OCIndex MCP reference never supplies screening evidence or risk-score input",
+      all(oc_doc["controls"][key] is False for key in (
+          "automaticFetching", "storesPdfContent", "affectsRiskScore",
+          "contributesScreeningAssurance", "countsAsNewsBackbone",
+          "countsAsSanctionsList", "allowsCaseDisposition")))
+
 pl = rpc("prompts/list")["result"]["prompts"]
 check("prompts/list returns the prompt templates", len(pl) == len(mcp_server.PROMPTS))
 pg = rpc("prompts/get", {"name": "adverse_media_triage", "arguments": {"subject": "ACME FZE", "headline": "ACME fined for fraud"}})
