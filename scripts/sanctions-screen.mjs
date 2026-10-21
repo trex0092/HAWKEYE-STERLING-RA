@@ -1987,6 +1987,12 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+export function reconcileAdversePartialCount(current, beforePartial, afterPartial) {
+  // Only called after a successful second-pass attempt for the same subject.
+  // An unanswered first attempt must never be counted as a successful screen.
+  return current - Number(beforePartial === true) + Number(afterPartial === true);
+}
+
 /* Adverse-media SECOND PASS. The per-subject last-resort retry runs while the
    whole book is still being swept, so the providers are under peak pressure:
    on 2 Oct 2026 it recovered 275 of 286 subjects and left 11 with ZERO
@@ -2177,7 +2183,9 @@ export async function screenLocally(subjects, cfg) {
           for (const id of ['googleNews', 'gdelt', 'bing']) {
             if (!am.backbones?.[id] && again.backbones?.[id]) amBackboneFailures[id]--;
           }
-          if (again.partial) amPartial++;
+          // Replace the original per-subject observation rather than counting
+          // both attempts. Even a recovered subject can still be partial.
+          amPartial = reconcileAdversePartialCount(amPartial, am.partial, again.partial);
           applyAm(again);
           const rebuilt = finalize();
           const at = results.findIndex(r => r && r.key === rebuilt.key);
