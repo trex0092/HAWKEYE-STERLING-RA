@@ -25,6 +25,16 @@ function check(name, cond) {
   else { failed++; console.log('FAIL  ' + name); }
 }
 
+/* A successful second-pass response replaces, never accumulates, the
+   original subject's partial-coverage observation. Coverage failures remain
+   governed separately by amErrors and independent sourceQuality assurance. */
+check('second pass clears partial tally after complete recovery',
+  scr.reconcileAdversePartialCount(3, true, false) === 2);
+check('second pass preserves partial tally when still reduced redundancy',
+  scr.reconcileAdversePartialCount(3, true, true) === 3);
+check('second pass records newly partial result exactly once',
+  scr.reconcileAdversePartialCount(3, false, true) === 4);
+
 /* ── name folding ── */
 check('normalizeName folds case, punctuation and diacritics',
   normalizeName('YÜKSEL KIYMETLİ MADENLER TİCARET A.Ş.') === normalizeName('yuksel kiymetli madenler ticaret a s'));
