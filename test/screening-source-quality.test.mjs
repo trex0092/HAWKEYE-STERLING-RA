@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { assessRuntime, checkStored } from '../scripts/screening-assurance.mjs';
 import { LOCALES } from '../scripts/adverse-media.mjs';
 import { PEP_FLOOR } from '../scripts/pep-worldwide.mjs';
+import * as pep from '../scripts/pep-worldwide.mjs';
 
 const contract = JSON.parse(readFileSync('data/worldwide-screening-sources.json', 'utf8'));
 const nowMs = Date.parse('2026-10-20T12:00:00Z');
@@ -99,4 +100,51 @@ assert.equal(checkStored(oldEvidence, { nowMs }).ok, false,
   'prior-schema artifacts cannot silently claim the new quality assurance');
 assert.equal(checkStored(assess(), { nowMs, expectedCommit: 'different-commit' }).ok, false,
   'a different screening commit remains a hard provenance error');
+
+// Alias-only PEP recovery: retain source identities, never waive exceptions.
+{
+  let aliasChecks = 0;
+  const check = (message, value) => { assert.ok(value, message); aliasChecks++; };
+  const aliasOnly = { id: 'Q1', labels: {}, aliases: {
+    ar: [{ value: ' \u0646\u0627\u062f\u0631 \u0645\u062b\u0627\u0644 ' }],
+    en: [{ value: 'Synthetic Alias Person' }, { value: 'Synthetic Alias Person' }],
+  } };
+  const named = pep.namesFromEntity(aliasOnly);
+  check('alias-only record gets a source-provided primary name', pep.hasScreenableName(named));
+  check('all multilingual alias forms survive without duplication',
+    new Set([named.name, ...named.aliases]).size === 2 && named.aliases.length === 1);
+  check('name is trimmed and is one of the actual source aliases',
+    ['\u0646\u0627\u062f\u0631 \u0645\u062b\u0627\u0644', 'Synthetic Alias Person'].includes(named.name));
+  const data = { entities: { Q1: aliasOnly } };
+  check('valid aliases are not source-quality exceptions', pep.confirmedUnscreenableQids(data, ['Q1']).length === 0);
+  const bank = new Map();
+  pep.bankLabelNames(bank, data, ['Q1']);
+  check('alias-only holder is banked', pep.hasScreenableName(bank.get('Q1')));
+  check('alias-only holder leaves the missing-name queue', pep.pendingLabels(['Q1'], bank, { count: 1, index: 0 }).length === 0);
+  const set = pep.buildPepDataset({ harvestedAt: '2026-10-21T00:00:00Z',
+    holderRows: [{ person: 'Q1', pos: 'Q100', classKey: 'minister' }],
+    positions: new Map([['Q100', { label: 'Synthetic Office', country: 'Synthetic Country' }]]), names: bank, expected: 1 });
+  check('alias-only holder reaches the screening dataset', set.count === 1 && !set.partial);
+  check('screening list retains both scripts', pep.pepListFromDataset(set).list.names.length === 2);
+  const redirects = { redirects: [{ from: 'Q2', to: 'Q1' }], entities: data.entities };
+  const redirected = new Map();
+  pep.bankLabelNames(redirected, redirects, ['Q2']);
+  check('redirected alias-only holder preserves original identity key', pep.hasScreenableName(redirected.get('Q2')));
+  check('redirected alias-only holder is not an unscreenable exception', pep.confirmedUnscreenableQids(redirects, ['Q2']).length === 0);
+  const label = pep.namesFromEntity({ ...aliasOnly, labels: { en: { value: 'Synthetic Primary' } } });
+  check('existing label priority is unchanged', label.name === 'Synthetic Primary' && label.aliases.length === 2);
+  const claimed = pep.namesFromEntity({ ...aliasOnly, claims: { P1559: [{ mainsnak: { datavalue: { value: { text: 'Synthetic Native Name' } } } }] } });
+  check('existing literal-claim priority is unchanged', claimed.name === 'Synthetic Native Name');
+  const linked = pep.namesFromEntity({ ...aliasOnly, sitelinks: { enwiki: { title: 'Synthetic Officeholder (politician)' } } });
+  check('existing sitelink priority is unchanged', linked.name === 'Synthetic Officeholder');
+  for (const marker of ['missing', 'invalid']) {
+    check(marker + ' record cannot recover through aliases', !pep.hasScreenableName(pep.namesFromEntity({ ...aliasOnly, [marker]: '' })));
+  }
+  const blank = { labels: {}, aliases: { en: [{ value: ' ' }, { value: 7 }, null], fr: { value: 'not an alias array' } }, descriptions: { en: { value: 'Unrelated narrative must not supply a name' } } };
+  check('blank and malformed aliases do not invent identity', !pep.hasScreenableName(pep.namesFromEntity(blank)));
+  check('a genuinely unnamed live source remains an explicit exception', pep.confirmedUnscreenableQids({ entities: { Q3: blank } }, ['Q3']).join() === 'Q3');
+  check('provider API error cannot become a recovered record', pep.bankLabelNames(new Map(), { ...data, error: { code: 'maxlag' } }, ['Q1']) === 0);
+  check('API error cannot certify an unscreenable exception', pep.confirmedUnscreenableQids({ ...data, error: { code: 'maxlag' } }, ['Q1']).length === 0);
+  console.log('PASS: ' + aliasChecks + ' PEP alias recovery checks');
+}
 console.log('PASS: screening-source quality, floors, fallback, redundancy, PEP and provenance');
