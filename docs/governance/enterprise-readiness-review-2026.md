@@ -344,7 +344,9 @@ runner. Watchman matching benchmark added beside the yente one: a dispatch-only,
 workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
 no government list. Measurement only — no scored control changed.*
 
-Verified at HEAD: 77 workflows · 203 markdown documents under docs/ (170 excluding docs/research/auto).
+Verified at HEAD: 78 workflows · 203 markdown documents under docs/ (170 excluding docs/research/auto).
+
+*Estate-count reconciliation · 21 October 2026: PR #996 added a diagnostic-only, blocked-egress GitHub Actions workflow. Workflow count 77 → 78; blocked-egress count 75 → 76. No score, readiness approval, screening evidence or operating-assurance claim changed.*
 
 *Estate-count reconciliation · 13 October 2026: one AI framework selection and threat-coverage document added. This updates documentary inventory counts only; it does not ratify an enterprise readiness score, approve an AI model, or close the currently degraded operational adverse-media screening assurance.*
 
