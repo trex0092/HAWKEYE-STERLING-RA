@@ -6,6 +6,7 @@ import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, sco
   bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker, googleNewsRateState, GNEWS_PACING_CAP_MS,
   RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS, ADVERSE_BACKBONE_MAX_ATTEMPTS, resetAdverseMediaRateGates,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
+  gdeltFailureClass, gdeltCanFallbackToBase, gdeltResponseObservations,
   gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker,
   checkAdverseMedia } from '../scripts/adverse-media.mjs';
 import { readFileSync } from 'node:fs';
@@ -118,6 +119,24 @@ check('parseGdelt: valid JSON with no articles array is an error envelope, not z
 check('parseGdelt: GDELT\'s real zero-result shapes still mean zero results',
   Array.isArray(parseGdelt('{"articles":[]}')) && parseGdelt('{"articles":[]}').length === 0
   && Array.isArray(parseGdelt('')) && Array.isArray(parseGdelt('   \n')));
+
+check('GDELT: only an explicit rejected query permits a shorter retry',
+  [400, 413, 414, 422].every(s => gdeltCanFallbackToBase(s))
+  && [0, 200, 403, 429, 500, 502, 503, 504].every(s => !gdeltCanFallbackToBase(s))
+  && gdeltCanFallbackToBase(200, 'query-rejection')
+  && !gdeltCanFallbackToBase(200, 'throttle')
+  && !gdeltCanFallbackToBase(200, 'malformed'));
+check('GDELT: HTTP 200 throttle messages are not mistaken for an invalid long query',
+  gdeltFailureClass(200, 'Please limit requests to one every 5 seconds') === 'throttle'
+  && gdeltFailureClass(200, 'Too many requests, retry after 30s') === 'throttle'
+  && gdeltFailureClass(200, 'Service temporarily unavailable') === 'malformed'
+  && gdeltFailureClass(200, 'Error: query syntax is invalid') === 'query-rejection'
+  && gdeltFailureClass(200, '{"error":"unknown"}') === 'malformed');
+check('GDELT: genuine provider errors stay distinct from query syntax errors',
+  gdeltFailureClass(0) === 'transport'
+  && gdeltFailureClass(429) === 'throttle'
+  && gdeltFailureClass(503) === 'provider'
+  && gdeltFailureClass(400) === 'query-rejection');
 
 const gdScore = scoreAdverseMedia('Acme Co', gd);
 check('GDELT items score through the same scorer', gdScore.hit === true && gdScore.terms.includes('money laundering'));
@@ -551,14 +570,42 @@ resetGdeltBreaker();
     stub(() => reply(503, 'temporarily unavailable'));
     let allErrored = true;
     for (let i = 0; i < GDELT_BREAKER_AFTER; i++) allErrored = (await checkAdverseMedia(subject, opts)).errored === true && allErrored;
-    check('gdelt live path: wide AND base failing counts as one failure per subject; the breaker opens at the threshold',
-      gdeltBreakerState.open === true && calls.length === 2 * GDELT_BREAKER_AFTER);
+    check('gdelt live path: provider HTTP 503 is NOT retried as a shorter query; the breaker opens',
+      gdeltBreakerState.open === true && calls.length === GDELT_BREAKER_AFTER
+      && calls.every(url => url === wideUrl));
+    check('gdelt live path: provider status diagnostics contain no subject names or fetched articles',
+      gdeltResponseObservations().provider === GDELT_BREAKER_AFTER
+      && Object.keys(gdeltResponseObservations()).every(key => !/subject|article|name/i.test(key)));
     check('gdelt live path: a subject GDELT could not answer is errored, never a silent clear',
       allErrored);
     stub(() => reply(200, hitBody));
     const r3 = await checkAdverseMedia(subject, opts);
     check('gdelt live path: once the breaker is open GDELT is not asked again, and the subject degrades loudly',
       calls.length === 0 && r3.errored === true);
+    resetGdeltBreaker();
+    resetAdverseMediaRateGates();
+    stub(() => reply(429, 'Too many requests'));
+    const throttled = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: an HTTP 429 produces exactly one request and remains unscreened',
+      throttled.errored === true && calls.length === 1 && gdeltResponseObservations().throttle === 1);
+
+    resetGdeltBreaker();
+    resetAdverseMediaRateGates();
+    stub(() => reply(200, 'Please limit requests to one every 5 seconds'));
+    const hiddenThrottle = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: HTTP 200 throttling text never triggers an immediate second query',
+      hiddenThrottle.errored === true && calls.length === 1
+      && gdeltResponseObservations().throttle === 1);
+
+    resetGdeltBreaker();
+    resetAdverseMediaRateGates();
+    stub(url => url === wideUrl
+      ? reply(200, 'Error: query syntax is invalid') : reply(200, hitBody));
+    const queryRejected = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: explicit HTTP 200 query rejection recovers through exact base terms',
+      calls.length === 2 && calls[0] === wideUrl && calls[1] === baseUrl
+      && queryRejected.hit === true && !queryRejected.errored);
+
   } finally {
     globalThis.fetch = realFetch;
     console.warn = realWarn;
