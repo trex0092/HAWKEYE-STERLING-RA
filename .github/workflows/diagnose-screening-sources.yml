@@ -1,0 +1,84 @@
+name: PEP source reference diagnostics, not assurance
+on:
+  push:
+    branches: ['diagnostics/screening-sources-20261021']
+    paths: ['.github/workflows/diagnose-screening-sources.yml']
+permissions:
+  contents: read
+concurrency:
+  group: screening-source-diagnostic-20261021
+  cancel-in-progress: false
+jobs:
+  inspect-pep-references:
+    if: github.repository == 'trex0092/HAWKEYE-STERLING-RA'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden read-only diagnostic runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 raw.githubusercontent.com:443
+            nodejs.org:443 *.githubapp.com:443 www.wikidata.org:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Inspect explicit source references for the eight existing public identity exceptions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { namesFromEntity } from './scripts/pep-worldwide.mjs';
+          const qids = ['Q136689291', 'Q136689343', 'Q136689373', 'Q138161351',
+            'Q58316593', 'Q58316598', 'Q58316599', 'Q58334883'];
+          const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+          async function request(params) {
+            const u = new URL('https://www.wikidata.org/w/api.php');
+            u.search = new URLSearchParams({ format: 'json', maxlag: '5', ...params });
+            const response = await fetch(u, { redirect: 'error', signal: AbortSignal.timeout(45000), headers: {
+              'user-agent': 'HawkeyeSterling-PEPReferenceDiagnostic/1.0 (https://github.com/trex0092/HAWKEYE-STERLING-RA)',
+              accept: 'application/json'
+            } });
+            if (!response.ok) throw new Error('Source HTTP ' + response.status + '; no automatic retry');
+            let bytes = 0; const chunks = [];
+            for await (const chunk of response.body) {
+              bytes += chunk.length;
+              if (bytes > 2000000) throw new Error('Response byte budget exceeded');
+              chunks.push(chunk);
+            }
+            const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            if (data.error || data.errors) throw new Error('Source API error; no completeness claim');
+            return data;
+          }
+          const data = await request({ action: 'wbgetentities', props: 'info|labels|aliases|descriptions|sitelinks|claims',
+            redirects: 'yes', ids: qids.join('|') });
+          const redirects = new Map((data.redirects || []).map(r => [r.from, r.to]));
+          const values = snaks => Object.fromEntries(Object.entries(snaks || {}).map(([prop, list]) =>
+            [prop, list.map(s => ({ type: s.snaktype, value: s.datavalue?.value ?? null }))]));
+          for (const qid of qids) {
+            const entity = data.entities?.[redirects.get(qid) || qid];
+            if (!entity) throw new Error('Requested public QID not returned');
+            const claims = Object.fromEntries(Object.entries(entity.claims || {}).map(([prop, list]) =>
+              [prop, list.map(s => ({ rank: s.rank, value: s.mainsnak?.datavalue?.value ?? null,
+                qualifiers: values(s.qualifiers), references: (s.references || []).map(r => values(r.snaks)) }))]));
+            console.log('PUBLIC_PEP_SOURCE ' + JSON.stringify({ qid, checkedAt: new Date().toISOString(),
+              revision: entity.lastrevid || null, modified: entity.modified || null,
+              parsedNameAvailable: !!namesFromEntity(entity).name,
+              descriptions: Object.values(entity.descriptions || {}).map(x => x.value).slice(0, 10), claims }));
+            await pause(1500);
+            const history = await request({ action: 'query', prop: 'revisions', titles: qid,
+              rvprop: 'ids|timestamp|comment', rvlimit: '3' });
+            const pages = Object.values(history.query?.pages || {});
+            console.log('PUBLIC_PEP_HISTORY ' + JSON.stringify({ qid,
+              revisions: pages.flatMap(p => p.revisions || []).map(r => ({ id: r.revid, parent: r.parentid,
+                timestamp: r.timestamp, comment: String(r.comment || '').slice(0, 400) })) }));
+          }
+          console.log('DIAGNOSTIC_ONLY: Public source references inspected. No customer queries, source edits, PEP identities, assurance artifacts, case dispositions or screening policies changed.');
+          NODE
