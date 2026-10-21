@@ -34,3 +34,34 @@
 
 ## Implementation status
 Source due diligence documented. **No automated fetch, scheduler, ingestion, designation matching, risk-score change or dataset copying enabled.** This is deliberate until reuse rights and stable supported access are verified.
+
+## 21 October 2026 addendum: link-only research feature and CFR
+
+The [Conflict and Supply-Chain Context page](../../conflict-context.html) is an
+optional manual research surface, reachable from the suite's shared footer.
+[data/conflict-context-sources.json](../../data/conflict-context-sources.json)
+records source roles and explicitly disabled ingestion, score, assurance and
+case-disposition capabilities. It contains no copied conflict data or case data.
+
+Source documentation checked on 2026-10-21:
+- [ArmedConflicts methodology](https://armedconflicts.org/methodology.html)
+  identifies secondary aggregation and different headline/profile update cadences.
+  The exact [LLM information endpoint](https://armedconflicts.org/llm-info/) could
+  not be retrieved; no API contract or additional reuse permission was verified.
+- [CFR methodology](https://www.cfr.org/global-conflict-tracker/methodology)
+  describes analytical judgments, review dates and incomplete conflict coverage.
+  Impact-on-the-United-States labels are not AML country-risk scores.
+- [CFR terms](https://www.cfr.org/terms-use) restrict public/commercial content
+  reuse. Link-only references do not grant copying, embedding or bulk-use rights.
+  Appropriate rights and internal approval remain required before expansion.
+
+Neither current robots policy was verified. No crawler is introduced. If a
+source derives from CFR, count the originating assessment once, not as two
+independent corroborations. Missing source/evidence dates stay UNKNOWN; retrieval
+and page-modification dates do not establish freshness of underlying facts.
+
+The page supplies a checklist and manual review-state definitions for use in the
+existing restricted case process. It has no form, scripts, case storage, model
+call, telemetry or automatic external request. A recorded review is not a clear
+screening result. No Board/MLRO sign-off, source-license approval or case closure
+is asserted. The existing asset-integrity CI suite guards these boundaries.
