@@ -330,9 +330,19 @@ export function parsePrincipals(task) {
       push(nm[1], role || 'Principal', nat ? nat[1] : '', dob ? dob[1] : '', pass ? pass[1] : '', corporate);
     }
   }
-  if (!structured) {
-    // No "Individual N —" structure: harvest names from explicit name-bearing
-    // labels too (UBO / beneficial owner / signatory), not only "Name:".
+  if (structured) {
+    /* A recognised Individual-N block cannot hide a second named party under
+       a drifted header (e.g. "Individual 2, Shareholder"). The Python daily
+       engine takes the union of structured and explicit Name: fields. Only
+       anchor within Section 4: "Sanctions Match: ... Name:" in later sections
+       is NOT a customer identity. The push() dedup preserves richer identity
+       attributes from structured blocks and screens the extra person. */
+    const nameLines = /^[ \t]*Name[ \t]*:[ \t]*([^\n]+)/gmi;
+    let named;
+    while ((named = nameLines.exec(block))) push(named[1], 'Principal', '');
+  } else {
+    // No "Individual N" structure: harvest explicit person-bearing field
+    // names within Section 4, never a narrative mention elsewhere.
     const nameRe = /\b(?:Name|UBO|Beneficial Owner|Authori[sz]ed Signatory|Signatory|Shareholder|Director|Partner)\s*:\s*([^\n]+)/gi;
     let n;
     while ((n = nameRe.exec(block))) push(n[1], 'Principal', '');
@@ -385,6 +395,14 @@ export function parseSubjects(tasks) {
     // principals (UBOs/directors) must still be screened — they are keyed by
     // parent gid below, so they never collide. Only the duplicate entity row is
     // suppressed; principals are always processed.
+    if (s.name && seen.has(s.key) && String(t?.gid || '').trim()) {
+      /* Two approved Asana tasks with one folded legal name are distinct
+         source records. A name-only dedup silently omitted the second entity
+         while the population receipt counted only the survivors. Do not
+         transfer the first task's screening decision to another identity:
+         fail closed pending record-level reconciliation. */
+      throw new Error('Distinct Customer Database records share a normalized entity name; source-record screening must be reconciled manually');
+    }
     if (s.name && !seen.has(s.key)) {
       seen.add(s.key);
       out.push(s);

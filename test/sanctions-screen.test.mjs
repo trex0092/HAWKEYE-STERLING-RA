@@ -130,6 +130,46 @@ check('parsePrincipals is empty for a record with no identifications section',
     && combined.some(p => p.name === 'Alpha Example'));
 }
 
+/* Regression: recognised structured identities do not suppress additional
+   Name: rows written under a drifted Individual header in Section 4. */
+{
+  const drifted = { gid: 'drifted-1', name: 'Synthetic Metals FZCO', notes: [
+    'SECTION 4 — IDENTIFICATIONS',
+    'Individual 1 — Director',
+    'Name: Synthetic Director',
+    'Nationality: Exampleland',
+    'Individual 2, Shareholder',
+    'Name: Synthetic Shareholder',
+    'Name: N/A',
+    'SECTION 5 — PF REVIEW',
+    'Match context: Name: Fake Sanctions Match',
+  ].join('\n') };
+  const parties = parsePrincipals(drifted);
+  const subjects = parseSubjects([drifted]);
+  check('mixed recognized and drifted Section-4 identity headers retain every named party',
+    parties.length === 2 && parties.some(x => x.name === 'Synthetic Director' && x.nationality === 'Exampleland')
+      && parties.some(x => x.name === 'Synthetic Shareholder')
+      && subjects.length === 3);
+  check('Section-4 identity fallback still excludes placeholders and later report narratives',
+    !parties.some(x => /Fake Sanctions Match|^N\/A$/.test(x.name)));
+}
+
+/* Two distinct Asana customer records may legitimately share a trade name.
+   The name-only entity deduper must not quietly screen only the first. */
+{
+  const collision = [
+    {gid:'customer-a',name:'Synthetic Holdings LLC',notes:'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — Director\nName: Synthetic Person A'},
+    {gid:'customer-b',name:'synthetic holdings llc',notes:'SECTION 4 — IDENTIFICATIONS\nIndividual 1 — Director\nName: Synthetic Person B'},
+  ];
+  let failedClosed = false;
+  try { parseSubjects(collision); } catch (e) {
+    failedClosed = String(e?.message || '').includes('source-record screening must be reconciled');
+  }
+  check('two source task GIDs with one normalized entity name fail closed rather than skip one', failedClosed);
+  check('different legal entity names still produce separate source records',
+    parseSubjects([{gid:'customer-c',name:'Synthetic Company A'}, {gid:'customer-d',name:'Synthetic Company B'}]).length === 2);
+}
+
 const withPpl = parseSubjects([cddTask]);
 check('parseSubjects emits the entity PLUS each principal as its own subject',
   withPpl.length === 3 &&
