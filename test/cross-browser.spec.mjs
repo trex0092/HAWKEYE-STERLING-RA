@@ -81,8 +81,8 @@ test('conflict research: passive page and private manual navigation', async ({ p
   expect(external, 'no automatic external source requests').toEqual([]);
   await expect(page.locator('script, form, input, textarea, select, iframe')).toHaveCount(0);
   await expect(page.getByText('External-source availability and freshness: UNKNOWN.', { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.evaluate(() => window.localStorage.length + window.sessionStorage.length)).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const sourceLinks = page.locator('a[href^="https:"]');
   await expect(sourceLinks).toHaveCount(5);
   expect(await sourceLinks.evaluateAll(links => links.some(link => link.href.includes('SYNTHETIC')))).toBe(false);
