@@ -213,6 +213,7 @@ python test/mcp_tools_test.py
 | `hawkeye://reference/jurisdiction-risk` | The maintained higher-risk jurisdiction list. |
 | `hawkeye://reference/fatf-assessments` | FATF black/grey lists with each jurisdiction's action-plan assessment, quoted from the FATF statements with source URLs. |
 | `hawkeye://reference/country-indicators` | Public-source country context (US INCSR major money-laundering jurisdictions, US TIP tiers, EU tax list Annex I), each with publisher, edition, date and source URL. Never scored. |
+| `hawkeye://reference/ocindex-2025` | Global Organized Crime Index 2025 publisher links, methodology, edition, and user-supplied archive inventory provenance. Country-level research metadata only; never scored, screened or interpreted as sanctions/PEP evidence. |
 | `hawkeye://reference/internal-watchlist` | The firm-internal watchlist file. |
 
 ## Prompts
