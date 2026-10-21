@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-21T07:33:07.771Z",
-  "githubRunId": "39562627059",
-  "commit": "c1a4f5017080a46510d607257b658dd7e1499c90",
+  "generatedAt": "2026-10-21T10:23:54.886Z",
+  "githubRunId": "39584141751",
+  "commit": "4b05b615363de3f49258efaaf178b894f0f8b48d",
   "screenedSubjects": 991,
   "sourceProjects": {
     "customer": {
@@ -34,27 +34,27 @@
         "partial": false
       },
       {
-        "id": "ofac-consolidated",
-        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
-        "count": 1674,
-        "partial": false
-      },
-      {
         "id": "un-consolidated",
         "name": "UN Security Council — Consolidated list (XML)",
         "count": 3773,
         "partial": false
       },
       {
-        "id": "eu-fsf",
-        "name": "EU — Consolidated financial sanctions list (CSV)",
-        "count": 31044,
+        "id": "ofac-consolidated",
+        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
+        "count": 1674,
         "partial": false
       },
       {
         "id": "ofac-sdn",
         "name": "US OFAC — SDN list (CSV)",
         "count": 19438,
+        "partial": false
+      },
+      {
+        "id": "eu-fsf",
+        "name": "EU — Consolidated financial sanctions list (CSV)",
+        "count": 31044,
         "partial": false
       },
       {
