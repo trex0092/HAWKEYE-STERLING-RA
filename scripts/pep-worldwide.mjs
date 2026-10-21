@@ -468,7 +468,7 @@ export function namesFromEntity(entity) {
       if (value) claimNames.push(value);
     }
   }
-  const primary = labelPrimary || fallbackPrimary || claimNames[0] || '';
+  let primary = labelPrimary || fallbackPrimary || claimNames[0] || '';
 
   const all = new Set(Object.values(labels).map(text).filter(Boolean));
   for (const value of claimNames) all.add(value);
@@ -483,6 +483,9 @@ export function namesFromEntity(entity) {
     const stripped = stripQualifier(title);
     if (stripped) all.add(stripped);
   }
+  // A source-provided alias is usable even when there is no primary label.
+  // Preserve existing label, sitelink and claim priority; never invent a name.
+  if (!primary) primary = all.values().next().value || '';
   all.delete(primary);
   return { name: primary, aliases: [...all] };
 }
@@ -1092,8 +1095,8 @@ async function harvest(outfile) {
        hundred distinct countries behind 59,204 offices, so this is a handful of
        chunks on the same hang-proof path, and it runs against the whole
        positions map (not just this link's slice) so countries banked by an
-       earlier link get named too. Best-effort like the rest: an unresolved QID
-       stays as it is rather than being blanked. */
+       earlier link get named too. Best-effort: an unresolved QID stays as it is
+       rather than being blanked. */
     const countryQids = [...new Set([...positions.values()].map(p => p.country).filter(c => /^Q\d+$/.test(c)))];
     if (countryQids.length) {
       console.log(`pep-worldwide: naming ${countryQids.length} distinct countries`);
