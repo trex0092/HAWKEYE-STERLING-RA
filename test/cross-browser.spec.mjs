@@ -47,7 +47,7 @@ test.afterAll(async () => {
   if (server) await new Promise(done => server.close(done));
 });
 
-for (const file of ['index.html', 'console.html', 'advisor.html']) {
+for (const file of ['index.html', 'console.html', 'advisor.html', 'conflict-context.html']) {
   test(`cross-browser smoke: ${file}`, async ({ page }) => {
     const pageErrors = [];
     const consoleErrors = [];
@@ -68,3 +68,28 @@ for (const file of ['index.html', 'console.html', 'advisor.html']) {
     expect(consoleErrors, `console errors in ${file}: ${consoleErrors.join(' | ')}`).toEqual([]);
   });
 }
+
+// Runs in each configured browser/mobile project. External navigation is mocked;
+// the test never calls either publisher or sends any genuine case information.
+test('conflict research: passive page and private manual navigation', async ({ page, context }) => {
+  const external = [];
+  await context.route('https://**/*', route => {
+    external.push({ url: route.request().url(), referer: route.request().headers()['referer'] });
+    return route.fulfill({ status: 200, contentType: 'text/html', body: '<!DOCTYPE html><title>Synthetic destination</title><p>Navigation fixture</p>' });
+  });
+  await page.goto(`${base}/conflict-context.html?case=SYNTHETIC-NOT-REAL`, { waitUntil: 'load' });
+  expect(external, 'no automatic external source requests').toEqual([]);
+  await expect(page.locator('script, form, input, textarea, select, iframe')).toHaveCount(0);
+  await expect(page.getByText('External-source availability and freshness: UNKNOWN.', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const sourceLinks = page.locator('a[href^="https:"]');
+  await expect(sourceLinks).toHaveCount(5);
+  expect(await sourceLinks.evaluateAll(links => links.some(link => link.href.includes('SYNTHETIC')))).toBe(false);
+  const popupPromise = page.waitForEvent('popup');
+  await page.getByRole('link', { name: 'Open ArmedConflicts.org (external)', exact: true }).click();
+  const popup = await popupPromise;
+  await popup.waitForLoadState();
+  expect(await popup.evaluate(() => window.opener === null)).toBe(true);
+  expect(external).toEqual([{ url: 'https://armedconflicts.org/', referer: undefined }]);
+});
