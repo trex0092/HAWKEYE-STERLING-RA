@@ -26,4 +26,12 @@
   footer.appendChild(privacyLink);
   footer.appendChild(sep);
   footer.appendChild(termsLink);
+
+  // Static local reference page; never pass case data into an external URL.
+  var conflictLink = document.createElement('a');
+  conflictLink.href = 'conflict-context.html';
+  conflictLink.textContent = 'Conflict research (English)';
+  conflictLink.style.cssText = 'color:inherit;text-decoration:underline;margin:0 8px';
+  footer.appendChild(document.createTextNode(' | '));
+  footer.appendChild(conflictLink);
 })();

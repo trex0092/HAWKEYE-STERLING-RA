@@ -1,0 +1,43 @@
+{
+  "schema": "hawkeye.conflict-context/v1",
+  "reviewedOn": "2026-10-21",
+  "purpose": "Optional human-reviewed conflict and supply-chain context, not a screening source",
+  "mode": "link-only",
+  "automaticFetching": false,
+  "storesCaseData": false,
+  "affectsRiskScore": false,
+  "contributesScreeningAssurance": false,
+  "allowsCaseDisposition": false,
+  "sourceAvailability": "not-monitored",
+  "sources": [
+    {
+      "id": "armedconflicts",
+      "name": "ArmedConflicts.org",
+      "url": "https://armedconflicts.org/",
+      "methodologyUrl": "https://armedconflicts.org/methodology.html",
+      "unverifiedInfoUrl": "https://armedconflicts.org/llm-info/",
+      "role": "secondary-conflict-context",
+      "upstreamOverlap": [
+        "ACLED",
+        "UCDP",
+        "CFR",
+        "Google News"
+      ],
+      "contentAsOf": null,
+      "countsAsIndependentBackbone": false,
+      "automatedReuse": "not-approved"
+    },
+    {
+      "id": "cfr",
+      "name": "Council on Foreign Relations Global Conflict Tracker",
+      "url": "https://www.cfr.org/global-conflict-tracker",
+      "methodologyUrl": "https://www.cfr.org/global-conflict-tracker/methodology",
+      "termsUrl": "https://www.cfr.org/terms-use",
+      "role": "analytical-conflict-context",
+      "upstreamOverlap": [],
+      "contentAsOf": null,
+      "countsAsIndependentBackbone": false,
+      "automatedReuse": "not-approved"
+    }
+  ]
+}
