@@ -1998,6 +1998,12 @@ async function mapLimit(items, limit, fn) {
    still fails stays a counted error: degrade loudly, never a false clear.
    Pure orchestration (clock / sleep injectable) — unit-tested. */
 export const AM_SECOND_PASS_MAX = 100;
+/* The primary enrichment budget is 100 minutes in the 120-minute screening
+   job. A last-resort retry at minute 99 previously never ran: the mandatory
+   60-second cooldown crossed the primary deadline. Permit at most two minutes
+   of dedicated RECOVERY time after that deadline, not a new bulk sweep. The
+   shared job timeout remains the hard outer bound; failed sources stay FAIL. */
+export const AM_SECOND_PASS_GRACE_MS = 120000;
 export async function runAmSecondPass(queue, {
   deadlineMs, delayMs = 60000, max = AM_SECOND_PASS_MAX, concurrency = 2,
   now = Date.now, sleep = ms => new Promise(res => setTimeout(res, ms)),
@@ -2164,6 +2170,13 @@ export async function screenLocally(subjects, cfg) {
           const again = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
           if (again.errored) return false;
           amErrors--; amIncomplete = false;
+          /* Account for a backbone that genuinely RECOVERED on the second
+             pass. Without this, source-quality evidence still reports the
+             original loss despite a verified response on that same subject.
+             Never deduct a failure unless the provider actually answered. */
+          for (const id of ['googleNews', 'gdelt', 'bing']) {
+            if (!am.backbones?.[id] && again.backbones?.[id]) amBackboneFailures[id]--;
+          }
           if (again.partial) amPartial++;
           applyAm(again);
           const rebuilt = finalize();
@@ -2255,7 +2268,7 @@ export async function screenLocally(subjects, cfg) {
     return finalize();
   });
   const amSecondPass = await runAmSecondPass(amSecondPassQueue, {
-    deadlineMs: enrichDeadline,
+    deadlineMs: enrichDeadline + AM_SECOND_PASS_GRACE_MS,
     delayMs: Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0),
   });
   if (amSecondPassQueue.length) {
