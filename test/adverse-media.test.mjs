@@ -49,6 +49,17 @@ check('parseRss extracts items incl. CDATA titles', items.length === 2 && items[
 check('parseRss: a consent/interstitial page is "could not ask" (null), not a clean locale',
   parseRss('<!DOCTYPE html><html><body>Before you continue to Google</body></html>') === null
   && parseRss('') === null && parseRss(null) === null);
+check('parseRss rejects partial RSS documents even if they contain feed-looking tags',
+  parseRss('<rss><channel><title>partial') === null
+  && parseRss('<rss><channel></rss>') === null
+  && parseRss('<feed><title>unsupported Atom</title></feed>') === null);
+check('parseRss rejects a truncated article rather than claiming an empty feed',
+  parseRss('<rss><channel><item><title>Incomplete') === null
+  && parseRss('<rss><channel><item><title>Unclosed</title></channel></rss>') === null);
+check('parseRss rejects malformed item titles instead of certifying a clean search',
+  parseRss('<rss><channel><item><link>https://example.org/one</link></item></channel></rss>') === null);
+check('parseRss accepts a complete standard item with attributes',
+  parseRss('<rss><channel><item id="one"><title>Valid coverage</title></item></channel></rss>')?.[0]?.title === 'Valid coverage');
 check('parseRss: a real feed with no matching stories still means zero results',
   Array.isArray(parseRss('<rss><channel><title>q</title></channel></rss>'))
   && parseRss('<rss><channel><title>q</title></channel></rss>').length === 0);

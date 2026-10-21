@@ -795,8 +795,14 @@ export function parseRss(xml) {
      RSS endpoint always returns a document, so absence of the envelope — not
      absence of items — is the failure signal. */
   const s = String(xml == null ? '' : xml);
-  if (!/<(rss|feed|channel)\b/i.test(s)) return null;
-  const items = [], re = /<item>([\s\S]*?)<\/item>/g;
+  // A fragment, error page or truncated response can contain an <rss> or
+  // <channel> token without being a complete feed. Only a closed RSS 2.0
+  // channel counts as attempted coverage; this endpoint does not return Atom.
+  if (!/<rss\b[^>]*>[\s\S]*?<channel\b[^>]*>[\s\S]*?<\/channel\s*>[\s\S]*?<\/rss\s*>/i.test(s)) return null;
+  const openedItems = (s.match(/<item(?:\s|>)/gi) || []).length;
+  const closedItems = (s.match(/<\/item\s*>/gi) || []).length;
+  if (openedItems !== closedItems) return null;
+  const items = [], re = /<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi;
   let m;
   while ((m = re.exec(s))) {
     const b = m[1];
@@ -807,6 +813,9 @@ export function parseRss(xml) {
       .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1000);
     items.push({ title, link: tag('link'), source: tag('source'), date: tag('pubDate'), description });
   }
+  // If the feed advertises items that cannot be parsed into screenable
+  // headlines, it was NOT a proven empty result.
+  if (openedItems > items.length) return null;
   return items;
 }
 
