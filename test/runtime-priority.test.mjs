@@ -51,6 +51,46 @@ try {
   await am.checkAdverseMedia('Synthetic Rate Limit Two', options);
   check('429 without Retry-After postpones the shared provider queue',
     starts.length === 2 && starts[1] - starts[0] >= am.ADVERSE_RATE_LIMIT_BACKOFF_MS - 10);
+
+  // A regional edition can return perfectly valid RSS while the global
+  // en-US Google backbone is unreachable. Operational fallback must retain
+  // the regional story, but full-source assurance must still fail loudly.
+  const localePair = ['en-US', 'ar-AE'].map(id => am.LOCALES.find(l => l.id === id));
+  assert.ok(localePair.every(Boolean), 'expected supported Google News locales');
+  let failingLocale = 'en-US';
+  am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+  globalThis.fetch = async url => {
+    const u = new URL(url);
+    if (u.hostname === 'api.gdeltproject.org') return reply(200, '{"articles":[]}');
+    if (u.hostname === 'www.bing.com') return reply(200, rss);
+    if (u.hostname === 'news.google.com') {
+      const failedEdition = localePair.find(loc => loc.id === failingLocale);
+      if (u.searchParams.get('hl') === failedEdition.hl && u.searchParams.get('gl') === failedEdition.gl)
+        throw new Error('synthetic connection failure');
+      return reply(200, rss);
+    }
+    throw new Error('unexpected test provider');
+  };
+  const regionalOnly = await am.checkAdverseMedia('Synthetic Regional Only', {
+    ...options, locales: localePair,
+  });
+  check('regional Google News success cannot certify a failed en-US global backbone',
+    regionalOnly.partial && !regionalOnly.errored
+    && regionalOnly.backbones.googleNewsAnyLocale === true
+    && regionalOnly.backbones.googleNewsEnUs === false
+    && regionalOnly.backbones.googleNews === false
+    && regionalOnly.sourcesFailed === 1);
+  failingLocale = 'ar-AE';
+  am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+  const globalOnly = await am.checkAdverseMedia('Synthetic Global Only', {
+    ...options, locales: localePair,
+  });
+  check('validated en-US globally evidences Google while a regional failure remains partial',
+    globalOnly.partial && !globalOnly.errored
+    && globalOnly.backbones.googleNewsAnyLocale === true
+    && globalOnly.backbones.googleNewsEnUs === true
+    && globalOnly.backbones.googleNews === true
+    && globalOnly.sourcesFailed === 1);
 } finally {
   globalThis.fetch = realFetch;
   am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
