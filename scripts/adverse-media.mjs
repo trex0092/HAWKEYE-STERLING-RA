@@ -1325,7 +1325,11 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const enUs = localeResults.find(r => r.id === 'en-US');
   const okLocales = localeResults.filter(r => r.items !== null);
   const backbones = {
-    googleNews: okLocales.length > 0,
+    // Source-quality assurance requires the en-US worldwide Google News
+    // backbone. A responding regional edition is useful partial coverage,
+    // but must not hide an en-US failure from the independent verifier.
+    googleNews: !!(enUs && enUs.items !== null),
+    googleNewsAnyLocale: okLocales.length > 0,
     googleNewsEnUs: !!(enUs && enUs.items !== null),
     gdelt: gd !== null,
     bingEnabled: bingOn,
