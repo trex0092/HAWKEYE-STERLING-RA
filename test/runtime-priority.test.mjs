@@ -64,7 +64,9 @@ try {
     if (u.hostname === 'api.gdeltproject.org') return reply(200, '{"articles":[]}');
     if (u.hostname === 'www.bing.com') return reply(200, rss);
     if (u.hostname === 'news.google.com') {
-      if (u.searchParams.get('hl') === failingLocale) throw new Error('synthetic connection failure');
+      const failedEdition = localePair.find(loc => loc.id === failingLocale);
+      if (u.searchParams.get('hl') === failedEdition.hl && u.searchParams.get('gl') === failedEdition.gl)
+        throw new Error('synthetic connection failure');
       return reply(200, rss);
     }
     throw new Error('unexpected test provider');
