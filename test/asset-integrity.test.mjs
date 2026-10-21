@@ -97,7 +97,7 @@ for (const css of ['app.css', 'console.css', 'advisor.css', 'conflict-context.cs
   const localLinks = new Set(['#main', 'index.html', 'console.html', 'advisor.html', 'conflict-context.html']);
   const deniedCapabilities = ['automaticFetching', 'storesCaseData', 'affectsRiskScore',
     'contributesScreeningAssurance', 'allowsCaseDisposition'];
-  const csp = "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'";
+  const csp = "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'";
   function passivePage(page, style, config) {
     const tags = [...page.matchAll(/<\s*\/?\s*([a-z][a-z0-9-]*)\b/gi)].map(m => m[1].toLowerCase());
     const allowedTags = new Set(['html', 'head', 'meta', 'title', 'link', 'body', 'a', 'header',
@@ -106,8 +106,15 @@ for (const css of ['app.css', 'console.css', 'advisor.css', 'conflict-context.cs
     if (!page.includes('name="referrer" content="no-referrer"')
       || !page.includes('http-equiv="Content-Security-Policy" content="' + csp + '"')) return false;
     if ([...page.matchAll(/http-equiv\s*=\s*"([^"]+)"/gi)].some(m => m[1] !== 'Content-Security-Policy')) return false;
-    const sheets = [...page.matchAll(/<link\b[^>]*>/gi)];
-    if (sheets.length !== 1 || sheets[0][0] !== '<link rel="stylesheet" href="conflict-context.css">'
+    // Permit only the fixed local stylesheet and explicit local favicon.
+    // Firefox otherwise probes /favicon.ico under default-src 'none'.
+    const expectedLinks = [
+      '<link rel="stylesheet" href="conflict-context.css">',
+      '<link rel="icon" type="image/svg+xml" href="assets/icon.svg">',
+    ];
+    const resourceLinks = [...page.matchAll(/<link\b[^>]*>/gi)].map(m => m[0]);
+    if (resourceLinks.length !== expectedLinks.length
+      || resourceLinks.some((tag, i) => tag !== expectedLinks[i])
       || /@import|url\s*\(/i.test(style)) return false;
     const urls = [];
     for (const match of page.matchAll(/<a\b[^>]*>/gi)) {
@@ -139,6 +146,14 @@ for (const css of ['app.css', 'console.css', 'advisor.css', 'conflict-context.cs
   check('conflict research: review states never assert clearance',
     ['Not reviewed', 'Review required', 'Review completed', 'Source unavailable'].every(s => html.includes(s))
     && html.includes('this does not mean the subject is clear'));
+  check('conflict research: missing explicit local favicon fails the guard',
+    !passivePage(html.replace('<link rel="icon" type="image/svg+xml" href="assets/icon.svg">', ''), css, policy));
+  check('conflict research: remote favicon fails the guard',
+    !passivePage(html.replace('href="assets/icon.svg"', 'href="https://example.invalid/icon.svg"'), css, policy));
+  check('conflict research: extra automatic resource hint fails the guard',
+    !passivePage(html.replace('</head>', '<link rel="prefetch" href="https://example.invalid/">\n</head>'), css, policy));
+  check('conflict research: broadening image sources fails the guard',
+    !passivePage(html.replace("img-src 'self'", 'img-src *'), css, policy));
   check('conflict research: injected script fails the guard', !passivePage(html + '<script src="app.js"></script>', css, policy));
   check('conflict research: embedded content fails the guard', !passivePage(html + '<iframe src="https://www.cfr.org/"></iframe>', css, policy));
   check('conflict research: automatic refresh fails the guard', !passivePage(html + '<meta http-equiv="refresh" content="0">', css, policy));

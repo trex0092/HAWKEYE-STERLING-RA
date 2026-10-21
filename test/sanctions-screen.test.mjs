@@ -210,30 +210,42 @@ check('subjectLabel marks an individual with role + parent, entity stays plain',
     /employees = await fetchAsanaEmployeeSubjects\(EMPLOYEE_PROJECT_GID/.test(src));
 }
 
-/* Two DISTINCT active customers sharing a legal name: the duplicate entity row
-   is deduped, but the second customer's principals must STILL be screened (they
-   were previously dropped by the early `continue`). */
+/* Distinct source GIDs with one entity key require reconciliation.
+   Reject the entire batch rather than transfer one record's result to another.
+   Principal extraction remains checked for each source record independently. */
+function sourceCollisionFailsClosed(tasks) {
+  try { parseSubjects(tasks); }
+  catch (error) {
+    return error instanceof Error && error.message ===
+      'Distinct Customer Database records share a normalized entity name; source-record screening must be reconciled manually';
+  }
+  return false;
+}
 const dupA = { gid: 'A', name: 'Acme LLC', completed: false,
   notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Alpha Person\n    Nationality: India' };
 const dupB = { gid: 'B', name: 'Acme LLC', completed: false,
   notes: 'SECTION 4 — IDENTIFICATIONS\n    Individual 1 — Director\n    Name: Bravo Person\n    Nationality: UAE' };
-const dupSubs = parseSubjects([dupA, dupB]);
-check('duplicate-named customers: entity deduped but BOTH customers’ principals are screened',
-  dupSubs.filter(x => x.entityType === 'organisation').length === 1 &&
-  dupSubs.some(x => x.name === 'Alpha Person') && dupSubs.some(x => x.name === 'Bravo Person'));
+check('duplicate-named customers: distinct GIDs fail closed in either order',
+  sourceCollisionFailsClosed([dupA, dupB]) && sourceCollisionFailsClosed([dupB, dupA]));
+check('duplicate-named customers: each source record retains its own principal',
+  parseSubjects([dupA]).some(x => x.name === 'Alpha Person' && x.gid === 'A') &&
+  parseSubjects([dupB]).some(x => x.name === 'Bravo Person' && x.gid === 'B'));
 
-/* Empty-normalization customers (symbols-only / unscreenable records) used to
-   COLLIDE on the shared key '': the second was deduped away before screening
-   and never even reached MANUAL REVIEW. Each now gets a distinct raw-string
-   key; only a true duplicate of the SAME raw name dedupes. */
-const symbolSubs = parseSubjects([
+/* Distinct unscreenable names retain distinct raw keys and MANUAL REVIEW.
+   Identical raw names under different source GIDs are still a reconciliation
+   collision, not permission to omit the second source record. */
+const symbolTasks = [
   { gid: 'S1', name: '☠☠', completed: false, notes: '' },
   { gid: 'S2', name: '♛♛♛', completed: false, notes: '' },
-  { gid: 'S3', name: '☠☠', completed: false, notes: '' },   // true duplicate name → deduped
-]);
+];
+const symbolSubs = parseSubjects(symbolTasks);
 check('two distinct symbol-only customers BOTH survive parsing with distinct stable keys',
   symbolSubs.length === 2 && new Set(symbolSubs.map(x => x.key)).size === 2
   && symbolSubs.every(x => x.key && x.key.startsWith('raw:')));
+const duplicateSymbolTask = { ...symbolTasks[0], gid: 'S3' };
+check('same raw symbol name on distinct source GIDs fails closed in either order',
+  sourceCollisionFailsClosed([symbolTasks[0], duplicateSymbolTask]) &&
+  sourceCollisionFailsClosed([duplicateSymbolTask, symbolTasks[0]]));
 const symbolIdx = buildIndex([{ id: 'o', name: 'OFAC SDN', names: ['SOME ENTITY LLC'] }]);
 check('both symbol-only customers produce MANUAL REVIEW rows (neither silently dropped)',
   symbolSubs.every(x => {
