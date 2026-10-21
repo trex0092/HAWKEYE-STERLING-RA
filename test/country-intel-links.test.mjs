@@ -92,6 +92,35 @@ check('OC Index: no Index content is stored in the data directory, and the link 
   && !/ocindex/i.test(readFileSync(new URL('../data/country-score-suggested.json', import.meta.url), 'utf8'))
   && !/ocIndexUrl/.test(pick(/function recalc\(\)[\s\S]*?\n\}/, 'recalc')));
 
+/* The uploaded 2025 country-report bundle is reference inventory, not
+   OCIndex-sourced risk data. Validate exact publisher URL shapes, the 192
+   publisher-named files and the separately authored Türkiye derivative. */
+const ocRefs = JSON.parse(readFileSync(new URL('../data/ocindex-2025-references.json', import.meta.url), 'utf8'));
+const pdfStems = ocRefs.publisherNamedPdfStems;
+const derivative = ocRefs.uploadedArchive.nonstandardPdf;
+check('OC Index report manifest has 192 unique official-style 2025 PDF names, plus publisher Türkiye link',
+  pdfStems.length === 192 && new Set(pdfStems).size === 192
+  && pdfStems.every(x => /^[a-z0-9_-]+$/.test(x) && x !== 'turkiye')
+  && ocRefs.coveredUNMemberStates === 193
+  && derivative.length === 1 && derivative[0].filename === 'turkiye.pdf'
+  && derivative[0].officialPublisherFilename === 'ocindex_profile_turkiye_2025.pdf');
+check('OC Index 2025 PDF links, downloads and methodology use the correct publisher host',
+  ocRefs.pdfPrefix === 'https://ocindex.net/assets/downloads/2025/english/'
+  && ocRefs.pdfFilenamePattern === 'ocindex_profile_{stem}_2025.pdf'
+  && derivative[0].officialPublisherUrl === ocRefs.pdfPrefix + derivative[0].officialPublisherFilename
+  && ocRefs.officialDownloads === 'https://ocindex.net/downloads/2025/english'
+  && ocRefs.methodology.startsWith('https://ocindex.net/'));
+check('OC Index archive provenance accounts for identical uploads, but no PDF contents are committed',
+  ocRefs.uploadedArchive.duplicateUploads === 2
+  && /^[a-f0-9]{64}$/.test(ocRefs.uploadedArchive.duplicateSha256)
+  && ocRefs.uploadedArchive.pdfCount === 193
+  && ocRefs.uploadedArchive.standardPublisherNamed2025PdfCount === 192
+  && ocRefs.controls.mode === 'link-only' && ocRefs.controls.storesPdfContent === false);
+check('OC Index links cannot count toward scores, sanctions, media backbones, MLRO or screening assurance',
+  [
+    'automaticFetching', 'affectsRiskScore', 'contributesScreeningAssurance',
+    'countsAsNewsBackbone', 'countsAsSanctionsList', 'allowsCaseDisposition'
+  ].every(key => ocRefs.controls[key] === false));
 /* DRAFT suggested country score (scripts/country-score.mjs): displayed beside
    the current score, never applied. The Python engine suite re-derives every
    row of the generated file; here the generator's band edges and the app's

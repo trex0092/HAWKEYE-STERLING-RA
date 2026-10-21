@@ -3,9 +3,10 @@
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
-  bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker,
+  bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker, googleNewsRateState, GNEWS_PACING_CAP_MS,
   RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS, ADVERSE_BACKBONE_MAX_ATTEMPTS, resetAdverseMediaRateGates,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
+  gdeltFailureClass, gdeltCanFallbackToBase, gdeltResponseObservations,
   gdeltBreakerState, GDELT_BREAKER_AFTER, gdeltBreakerRecordFailure, gdeltBreakerRecordSuccess, resetGdeltBreaker,
   checkAdverseMedia } from '../scripts/adverse-media.mjs';
 import { readFileSync } from 'node:fs';
@@ -49,6 +50,17 @@ check('parseRss extracts items incl. CDATA titles', items.length === 2 && items[
 check('parseRss: a consent/interstitial page is "could not ask" (null), not a clean locale',
   parseRss('<!DOCTYPE html><html><body>Before you continue to Google</body></html>') === null
   && parseRss('') === null && parseRss(null) === null);
+check('parseRss rejects partial RSS documents even if they contain feed-looking tags',
+  parseRss('<rss><channel><title>partial') === null
+  && parseRss('<rss><channel></rss>') === null
+  && parseRss('<feed><title>unsupported Atom</title></feed>') === null);
+check('parseRss rejects a truncated article rather than claiming an empty feed',
+  parseRss('<rss><channel><item><title>Incomplete') === null
+  && parseRss('<rss><channel><item><title>Unclosed</title></channel></rss>') === null);
+check('parseRss rejects malformed item titles instead of certifying a clean search',
+  parseRss('<rss><channel><item><link>https://example.org/one</link></item></channel></rss>') === null);
+check('parseRss accepts a complete standard item with attributes',
+  parseRss('<rss><channel><item id="one"><title>Valid coverage</title></item></channel></rss>')?.[0]?.title === 'Valid coverage');
 check('parseRss: a real feed with no matching stories still means zero results',
   Array.isArray(parseRss('<rss><channel><title>q</title></channel></rss>'))
   && parseRss('<rss><channel><title>q</title></channel></rss>').length === 0);
@@ -107,6 +119,24 @@ check('parseGdelt: valid JSON with no articles array is an error envelope, not z
 check('parseGdelt: GDELT\'s real zero-result shapes still mean zero results',
   Array.isArray(parseGdelt('{"articles":[]}')) && parseGdelt('{"articles":[]}').length === 0
   && Array.isArray(parseGdelt('')) && Array.isArray(parseGdelt('   \n')));
+
+check('GDELT: only an explicit rejected query permits a shorter retry',
+  [400, 413, 414, 422].every(s => gdeltCanFallbackToBase(s))
+  && [0, 200, 403, 429, 500, 502, 503, 504].every(s => !gdeltCanFallbackToBase(s))
+  && gdeltCanFallbackToBase(200, 'query-rejection')
+  && !gdeltCanFallbackToBase(200, 'throttle')
+  && !gdeltCanFallbackToBase(200, 'malformed'));
+check('GDELT: HTTP 200 throttle messages are not mistaken for an invalid long query',
+  gdeltFailureClass(200, 'Please limit requests to one every 5 seconds') === 'throttle'
+  && gdeltFailureClass(200, 'Too many requests, retry after 30s') === 'throttle'
+  && gdeltFailureClass(200, 'Service temporarily unavailable') === 'malformed'
+  && gdeltFailureClass(200, 'Error: query syntax is invalid') === 'query-rejection'
+  && gdeltFailureClass(200, '{"error":"unknown"}') === 'malformed');
+check('GDELT: genuine provider errors stay distinct from query syntax errors',
+  gdeltFailureClass(0) === 'transport'
+  && gdeltFailureClass(429) === 'throttle'
+  && gdeltFailureClass(503) === 'provider'
+  && gdeltFailureClass(400) === 'query-rejection');
 
 const gdScore = scoreAdverseMedia('Acme Co', gd);
 check('GDELT items score through the same scorer', gdScore.hit === true && gdScore.terms.includes('money laundering'));
@@ -327,6 +357,38 @@ check('breaker: a non-refusal failure (e.g. HTTP 500 parse path) never opens it'
   return closed;
 })());
 
+/* Adaptive refusal recovery must slow requests after evidence of refusal,
+   and only validated RSS can earn the rate back. All tests are offline. */
+{
+  resetGnewsBreaker();
+  const base = googleNewsRateState();
+  noteGnewsResult(false, 429);
+  const refused = googleNewsRateState();
+  check('Google News HTTP 429 increases shared pacing and records rate-limited failures',
+    refused.rateLimited === 1 && refused.paceMs > base.paceMs
+    && refused.paceMs <= GNEWS_PACING_CAP_MS);
+  noteGnewsResult(false, 403);
+  const forbidden = googleNewsRateState();
+  check('HTTP 403 extends polite provider backoff rather than claiming coverage',
+    forbidden.forbidden === 1 && forbidden.paceMs >= refused.paceMs);
+  noteGnewsResult(true, 200);
+  const recovered = googleNewsRateState();
+  check('only validated feed responses decay pacing toward its safe base',
+    recovered.ok === 1 && recovered.paceMs < forbidden.paceMs
+    && recovered.paceMs >= GNEWS_MIN_INTERVAL_MS);
+  noteGnewsResult(false, 200);
+  const badFeed = googleNewsRateState();
+  check('HTTP 200 without valid RSS is recorded as invalid coverage and slows pacing',
+    badFeed.invalidFeed === 1 && badFeed.paceMs > recovered.paceMs);
+  noteGnewsResult(false, 500);
+  check('HTTP 500 does not masquerade as a Google rate-limit signal',
+    googleNewsRateState().paceMs === badFeed.paceMs);
+  resetGnewsBreaker();
+  const reset = googleNewsRateState();
+  check('test/run reset restores initial Google News pacing and clears aggregate errors',
+    reset.paceMs === GNEWS_MIN_INTERVAL_MS && reset.ok === 0
+    && reset.rateLimited === 0 && reset.invalidFeed === 0);
+}
 /* ── Phase-4 hardening: description scanning, tiers, canonical dedup ──────── */
 const descRss = '<rss><channel><item><title>Acme Corp restructures Gulf operations</title>'
   + '<link>https://www.ft.com/content/acme-restructure?utm_source=rss</link>'
@@ -508,14 +570,42 @@ resetGdeltBreaker();
     stub(() => reply(503, 'temporarily unavailable'));
     let allErrored = true;
     for (let i = 0; i < GDELT_BREAKER_AFTER; i++) allErrored = (await checkAdverseMedia(subject, opts)).errored === true && allErrored;
-    check('gdelt live path: wide AND base failing counts as one failure per subject; the breaker opens at the threshold',
-      gdeltBreakerState.open === true && calls.length === 2 * GDELT_BREAKER_AFTER);
+    check('gdelt live path: provider HTTP 503 is NOT retried as a shorter query; the breaker opens',
+      gdeltBreakerState.open === true && calls.length === GDELT_BREAKER_AFTER
+      && calls.every(url => url === wideUrl));
+    check('gdelt live path: provider status diagnostics contain no subject names or fetched articles',
+      gdeltResponseObservations().provider === GDELT_BREAKER_AFTER
+      && Object.keys(gdeltResponseObservations()).every(key => !/subject|article|name/i.test(key)));
     check('gdelt live path: a subject GDELT could not answer is errored, never a silent clear',
       allErrored);
     stub(() => reply(200, hitBody));
     const r3 = await checkAdverseMedia(subject, opts);
     check('gdelt live path: once the breaker is open GDELT is not asked again, and the subject degrades loudly',
       calls.length === 0 && r3.errored === true);
+    resetGdeltBreaker();
+    resetAdverseMediaRateGates();
+    stub(() => reply(429, 'Too many requests'));
+    const throttled = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: an HTTP 429 produces exactly one request and remains unscreened',
+      throttled.errored === true && calls.length === 1 && gdeltResponseObservations().throttle === 1);
+
+    resetGdeltBreaker();
+    resetAdverseMediaRateGates();
+    stub(() => reply(200, 'Please limit requests to one every 5 seconds'));
+    const hiddenThrottle = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: HTTP 200 throttling text never triggers an immediate second query',
+      hiddenThrottle.errored === true && calls.length === 1
+      && gdeltResponseObservations().throttle === 1);
+
+    resetGdeltBreaker();
+    resetAdverseMediaRateGates();
+    stub(url => url === wideUrl
+      ? reply(200, 'Error: query syntax is invalid') : reply(200, hitBody));
+    const queryRejected = await checkAdverseMedia(subject, opts);
+    check('gdelt live path: explicit HTTP 200 query rejection recovers through exact base terms',
+      calls.length === 2 && calls[0] === wideUrl && calls[1] === baseUrl
+      && queryRejected.hit === true && !queryRejected.errored);
+
   } finally {
     globalThis.fetch = realFetch;
     console.warn = realWarn;
