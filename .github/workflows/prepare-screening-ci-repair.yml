@@ -1,0 +1,100 @@
+name: Prepare reviewed screening CI repair
+on:
+  push:
+    branches: ['fix/screening-ci-browser-20261021']
+permissions:
+  contents: write
+concurrency:
+  group: prepare-screening-ci-browser-20261021
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'trex0092/HAWKEYE-STERLING-RA'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 raw.githubusercontent.com:443
+            nodejs.org:443 *.githubapp.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Verify reviewed base and unchanged source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = 4b05b615363de3f49258efaaf178b894f0f8b48d
+          test -z "$(git status --porcelain)"
+          test "$(git hash-object conflict-context.html)" = bd92bab54c6dd518e3c7f3952018b224af9972c3
+          test "$(git hash-object test/asset-integrity.test.mjs)" = 2299a964976608d2e2d66be0d0c7fb5b642be79f
+          test "$(git hash-object test/sanctions-screen.test.mjs)" = a8d59d0806a61543274fe5b0333a7bbce4efa4f4
+      - name: Apply only the reviewed favicon and collision-fixture repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY_PATCH'
+          import base64, gzip, hashlib, os
+          from pathlib import Path
+          # The two previously reviewed unified patches, compressed for transport.
+          encoded = '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'
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          if hashlib.sha256(patch).hexdigest() != '18d163083140c5b89fd1794f502c6ca5b1977d8119d230abb657f95df9e7a347':
+              raise SystemExit('Patch digest mismatch')
+          (Path(os.environ['RUNNER_TEMP']) / 'reviewed-repair.patch').write_bytes(patch)
+          PY_PATCH
+          git apply --check "$RUNNER_TEMP/reviewed-repair.patch"
+          git apply "$RUNNER_TEMP/reviewed-repair.patch"
+          git diff --check
+          git diff --stat
+      - name: Run complete affected suites against real repository modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          node test/sanctions-screen.test.mjs
+          node test/asset-integrity.test.mjs
+          node test/screening-source-quality.test.mjs
+          node test/csp.test.mjs
+      - name: Publish only to the repair branch and remove this temporary workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          python3 - <<'PY_CHECK'
+          import subprocess
+          expected = {'conflict-context.html', 'test/asset-integrity.test.mjs', 'test/sanctions-screen.test.mjs'}
+          actual = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          if actual != expected:
+              raise SystemExit('Unexpected repair file set; refusing publication')
+          PY_CHECK
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- conflict-context.html test/asset-integrity.test.mjs test/sanctions-screen.test.mjs
+          git rm -- .github/workflows/prepare-screening-ci-repair.yml
+          git commit -m "Fix screening collision fixtures and same-origin conflict favicon"
+          test "$(git diff --name-only 4b05b615363de3f49258efaaf178b894f0f8b48d HEAD | wc -l)" -eq 3
+          ASKPASS=$(mktemp "$RUNNER_TEMP/repair-askpass.XXXXXX")
+          trap 'rm -f "$ASKPASS"' EXIT
+          cat > "$ASKPASS" <<'ASKPASS_SCRIPT'
+          #!/bin/sh
+          case "$1" in
+            *Username*) printf '%s\n' x-access-token ;;
+            *Password*) printf '%s\n' "$GH_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          ASKPASS_SCRIPT
+          chmod 700 "$ASKPASS"
+          GIT_ASKPASS="$ASKPASS" git push origin HEAD:refs/heads/fix/screening-ci-browser-20261021
+          git rev-parse HEAD
