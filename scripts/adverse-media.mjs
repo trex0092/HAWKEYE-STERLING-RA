@@ -802,7 +802,7 @@ export function parseRss(xml) {
   const openedItems = (s.match(/<item(?:\s|>)/gi) || []).length;
   const closedItems = (s.match(/<\/item\s*>/gi) || []).length;
   if (openedItems !== closedItems) return null;
-  const items = [], re = /<item>([\s\S]*?)<\/item>/g;
+  const items = [], re = /<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi;
   let m;
   while ((m = re.exec(s))) {
     const b = m[1];
@@ -813,6 +813,9 @@ export function parseRss(xml) {
       .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1000);
     items.push({ title, link: tag('link'), source: tag('source'), date: tag('pubDate'), description });
   }
+  // If the feed advertises items that cannot be parsed into screenable
+  // headlines, it was NOT a proven empty result.
+  if (openedItems > items.length) return null;
   return items;
 }
 
