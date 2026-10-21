@@ -147,4 +147,59 @@ assert.equal(checkStored(assess(), { nowMs, expectedCommit: 'different-commit' }
   check('API error cannot certify an unscreenable exception', pep.confirmedUnscreenableQids({ ...data, error: { code: 'maxlag' } }, ['Q1']).length === 0);
   console.log('PASS: ' + aliasChecks + ' PEP alias recovery checks');
 }
+// Historical label recovery is QID-specific and requires an item-bound source
+// reference, not a matching office, location, gender, or old revision alone.
+{
+  const refs = pep.CORROBORATED_PEP_HISTORICAL_NAMES;
+  let checks = 0;
+  const ok = (description, expr) => { assert.ok(expr, description); checks++; };
+  const supported = Object.keys(refs);
+  ok('exactly three reviewed exceptions, never an entire class', supported.length === 3);
+  const person = qid => ({ id: qid, labels: {}, aliases: {},
+    claims: { P31: [{ mainsnak: { datavalue: { value: { id: 'Q5' } } } }],
+      P39: [{ mainsnak: { datavalue: { value: { id: 'Q83307' } } },
+        references: [{ snaks: { P854: [{ datavalue: { value: refs[qid].itemReferenceUrl } }] } }] }] } });
+  for (const qid of supported) {
+    const d = { entities: { [qid]: person(qid) } };
+    const names = new Map();
+    ok(qid + ' accepts supported item-specific source evidence',
+      pep.bankCorroboratedPepNames(names, d, [qid]) === 1);
+    ok(qid + ' preserves the exact source name and Wikidata revision',
+      names.get(qid)?.name === refs[qid].name
+      && names.get(qid)?.identityEvidence?.wikidataRevision === refs[qid].historicalRevision);
+    ok(qid + ' supplies a screenable identity, never a synthetic office name',
+      pep.hasScreenableName(names.get(qid)));
+    ok(qid + ' loses recovery on an unrelated citation',
+      pep.bankCorroboratedPepNames(new Map(), { entities: { [qid]: { ...person(qid),
+        claims: { ...person(qid).claims, P39: [{ ...person(qid).claims.P39[0],
+          references: [{ snaks: { P854: [{ datavalue: { value: 'https://example.org/unrelated' } }] } }] }] } } } }, [qid]) === 0);
+    ok(qid + ' loses recovery on a mismatched entity ID',
+      pep.bankCorroboratedPepNames(new Map(), { entities: { [qid]: { ...person(qid), id: 'Q123' } } }, [qid]) === 0);
+    ok(qid + ' does not replace a fresh label',
+      pep.bankCorroboratedPepNames(new Map([[qid, { name: 'Fresh Name' }]]), d, [qid]) === 0);
+    const bank = new Map();
+    pep.bankCorroboratedPepNames(bank, d, [qid]);
+    const dataset = pep.buildPepDataset({ harvestedAt: '2026-10-21T00:00:00Z',
+      holderRows: [{ person: qid, pos: 'Q83307', classKey: 'minister' }],
+      positions: new Map([['Q83307', { label: 'Minister' }]]), names: bank, expected: 1 });
+    ok(qid + ' keeps evidence in the final dataset', dataset.count === 1
+      && dataset.entries[0].identityEvidence?.itemReferenceUrl === refs[qid].itemReferenceUrl);
+  }
+  const noRef = person(supported[0]);
+  delete noRef.claims.P39[0].references;
+  ok('missing statement provenance fails closed', pep.bankCorroboratedPepNames(new Map(),
+    { entities: { [supported[0]]: noRef } }, [supported[0]]) === 0);
+  const withoutClass = person(supported[0]);
+  withoutClass.claims.P31 = [];
+  ok('missing human class fails closed', pep.bankCorroboratedPepNames(new Map(),
+    { entities: { [supported[0]]: withoutClass } }, [supported[0]]) === 0);
+  const invalid = { entities: { [supported[0]]: { ...person(supported[0]), missing: '' } } };
+  ok('deleted source entity fails closed', pep.bankCorroboratedPepNames(new Map(), invalid, [supported[0]]) === 0);
+  ok('API error fails closed', pep.bankCorroboratedPepNames(new Map(),
+    { entities: { [supported[0]]: person(supported[0]) }, error: { code: 'maxlag' } }, [supported[0]]) === 0);
+  ok('unreviewed five exceptions are still unscreenable',
+    ['Q138161351', 'Q58316593', 'Q58316598', 'Q58316599', 'Q58334883'].every(qid =>
+      pep.bankCorroboratedPepNames(new Map(), { entities: { [qid]: person(supported[0]) } }, [qid]) === 0));
+  console.log('PASS: ' + checks + ' corroborated historical PEP identity checks');
+}
 console.log('PASS: screening-source quality, floors, fallback, redundancy, PEP and provenance');
