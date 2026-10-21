@@ -79,11 +79,13 @@
       "checkedAt": "2026-10-21",
       "changedAt": "2026-10-21",
       "contentAsOf": "2026-10-21",
-      "status": 200,
+      "status": "error",
       "prevHash": "cb9f7982832c37d744c2154ca839df33ba51eb2e0fdb58c7379ff7b7df65dced",
       "fp": 2,
       "count": 21907,
-      "errStreak": 0
+      "errStreak": 1,
+      "error": "This operation was aborted",
+      "errorStreak": 1
     }
   }
 }
