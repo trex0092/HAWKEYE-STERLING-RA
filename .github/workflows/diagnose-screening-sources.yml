@@ -155,6 +155,42 @@ jobs:
             console.log('GOOGLE_NEWS_DIAGNOSTIC ' + JSON.stringify(output));
             if (output.status !== 200 || !output.validRss) failed++;
           }
+          // A few well-spaced, unique synthetic production queries exercise a
+          // sequence of real RSS responses, not just one cached successful 200.
+          // No live subject data, no automatic retries after a rate limit.
+          let steadyPass = 0;
+          let steadyFail = 0;
+          for (let i = 0; i < 12; i++) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const url = adverseMediaUrlFor(name + ' Probe ' + (i + 1), en);
+            let state = { request: i + 1, status: 0, validRss: false };
+            try {
+              const response = await fetch(url, {
+                redirect: 'follow', signal: AbortSignal.timeout(15000),
+                headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0',
+                  Accept: 'application/rss+xml, application/xml, text/xml' }
+              });
+              state.status = response.status;
+              if (response.ok) {
+                const text = await response.text();
+                if (text.length > 750000) throw new Error('excessive response');
+                state.validRss = Array.isArray(parseRss(text));
+              }
+            } catch (error) {
+              state.error = String(error?.name || 'transport error').slice(0, 50);
+            }
+            console.log('GOOGLE_NEWS_STEADY ' + JSON.stringify(state));
+            if (state.status === 200 && state.validRss) steadyPass++;
+            else {
+              steadyFail++;
+              // Stop at first refusal. The probe must not make IP throttling worse.
+              break;
+            }
+          }
+          console.log('GOOGLE_NEWS_STEADY_SUMMARY ' + JSON.stringify({
+            succeeded: steadyPass, failed: steadyFail, planned: 12, spacingMs: 3000
+          }));
+          if (steadyFail || steadyPass !== 12) failed++;
           console.log('DIAGNOSTIC_ONLY: No real subject names, screening outputs, source-quality badges or customer records read or changed.');
           if (failed) {
             console.error('GOOGLE_NEWS_DIAGNOSTIC_INCOMPLETE: ' + failed + ' of ' + probes.length + ' probes not verified');
