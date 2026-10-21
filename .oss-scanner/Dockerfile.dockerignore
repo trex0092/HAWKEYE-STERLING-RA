@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+!.env.example
+node_modules
+**/__pycache__
+**/*.pyc
+**/*.enc
+.venv
+venv
+playwright-report
+test-results
+screen-state
+screen-progress
+pep-worldwide-state
+sanctions-screen-results.json
