@@ -2193,6 +2193,44 @@ _empty_out, _empty_err = _gdelt_reply("")
 check("GDELT: an empty body is GDELT's own zero-result shape, not a failure",
       _empty_out == [] and _empty_err is None)
 screen._GDELT_GATE.wait, screen.requests.get = _orig_gate, _orig_req_get
+# Real HTTP 429 responses must defer the same source queue without
+# manufacturing an empty GDELT response as verified coverage.
+_throttle_gate = screen._RateGate(5.0, 5.0)
+_now_original = screen.time.monotonic
+try:
+    screen.time.monotonic = lambda: 1000.0
+    check("Retry-After: missing header applies bounded 60s quiet time",
+          screen._adverse_retry_after_seconds({}) == 60.0)
+    check("Retry-After: valid integer and cap are honored",
+          screen._adverse_retry_after_seconds({"Retry-After": "15"}) == 15.0 and
+          screen._adverse_retry_after_seconds({"Retry-After": "600"}) == 300.0)
+    check("Retry-After: invalid, negative and nonfinite values stay bounded",
+          screen._adverse_retry_after_seconds({"Retry-After": "invalid"}) == 60.0 and
+          screen._adverse_retry_after_seconds({"Retry-After": "-3"}) == 0.0 and
+          screen._adverse_retry_after_seconds({"Retry-After": "NaN"}) == 60.0)
+    _throttle_gate.defer_for(60)
+    check("provider rate gate defers new reservations until cooldown",
+          _throttle_gate._next == 1060.0)
+    class _ThrottledReply:
+        status_code = 429
+        headers = {"Retry-After": "24"}
+    _orig_provider_gate, _orig_provider_get = screen._GDELT_GATE, screen.requests.get
+    try:
+        screen._GDELT_GATE = _throttle_gate
+        screen._GDELT_GATE.wait = lambda: None
+        screen.requests.get = lambda *_a, **_kw: _ThrottledReply()
+        _failed_closed = False
+        try:
+            screen.search_gdelt("Synthetic subject")
+        except RuntimeError as exc:
+            _failed_closed = "GDELT HTTP 429" in str(exc)
+        check("live GDELT 429 pushes queue cooldown and still fails closed",
+              _failed_closed and _throttle_gate._next == 1060.0)
+    finally:
+        screen._GDELT_GATE, screen.requests.get = _orig_provider_gate, _orig_provider_get
+finally:
+    screen.time.monotonic = _now_original
+
 
 _ev = os.path.join(_tf.mkdtemp(), "evidence.json")
 def _find(title, day):
