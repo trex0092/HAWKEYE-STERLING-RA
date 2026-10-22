@@ -20,6 +20,14 @@ on:
   schedule:
     - cron: '17 2 * * 0'   # Sundays 02:17 UTC — artifact is ready for Monday's daily screens
   workflow_dispatch:
+  # A reviewed harvester implementation change can alter which PEP identities
+  # are recoverable. Refresh the operative artifact immediately after such a
+  # merge instead of waiting up to a week for the next Sunday harvest.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pep-worldwide.yml'
+      - 'scripts/pep-worldwide.mjs'
 
 # Least privilege: the workflow token is READ-ONLY at top level; the single
 # job below elevates only the two scopes it actually uses. A top-level write
