@@ -1,7 +1,7 @@
 /* Offline synthetic regression cases ONLY. No screening or provider evidence. */
 import assert from 'node:assert/strict';
 import { screeningDecision, qualifyEvidence, independentReady,
-  makeEvidenceReader, readPinnedEvidence } from './evidence-aware-recovery.mjs';
+  makeEvidenceReader, readPinnedEvidence, safeRecoverySummary } from './evidence-aware-recovery.mjs';
 
 const sha = 'a'.repeat(40), oldSha = 'b'.repeat(40), stateSha = 'c'.repeat(40), blobSha = 'd'.repeat(40);
 const nowMs = Date.parse('2026-10-22T16:00:00Z');
@@ -128,5 +128,24 @@ await test('read API refuses redirects and masks response body', async () => {
     return { ok: false, status: 403 };
   } });
   await assert.rejects(read('/git/ref/heads/main'), /HTTP 403/);
+});
+await test('recovery summary never emits raw API reasoning or injected markdown', () => {
+  const marker = 'UNTRUSTED_API_REASON_DO_NOT_WRITE';
+  const s = safeRecoverySummary([
+    { id: 'sanctions-screen.yml', action: 'blocked', reason: marker },
+    { id: 'invalid|control\n' + marker, action: 'healthy\n' + marker, reason: marker },
+  ], { state: 'degraded', stateSha: marker, blobSha: marker },
+  ['sanctions-screen.yml']);
+  assert.match(s, /sanctions-screen\.yml \| blocked \| Manual intervention required/);
+  assert.match(s, /unrecognized-control \| unknown/);
+  assert.match(s, /validation state: degraded/);
+  assert.ok(!s.includes(marker) && !s.includes('invalid|control'));
+});
+await test('recovery report never promotes an unknown receipt to verified', () => {
+  const s = safeRecoverySummary([{ id: 'freshness-check.yml', action: 'dispatched' }],
+    { state: 'verified\nFALSE_PASS' }, ['freshness-check.yml']);
+  assert.match(s, /validation state: unknown/);
+  assert.match(s, /accepted dispatch; result unverified/);
+  assert.ok(!s.includes('FALSE_PASS'));
 });
 console.log(`${passed} offline software checks passed. No live screening, provider, security-scan or deployment claim.`);
