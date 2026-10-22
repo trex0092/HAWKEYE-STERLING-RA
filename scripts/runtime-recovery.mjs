@@ -37,7 +37,12 @@ export class RequestStartGate {
     try {
       if (shouldAdmit && !shouldAdmit()) return false;
       while (this.nextAt > Date.now()) {
-        await new Promise(resolve => setTimeout(resolve, this.nextAt - Date.now()));
+        // Rate limits can defer for minutes. Check an active breaker at least
+        // once a second so a request already sleeping is not stuck behind an
+        // otherwise valid Retry-After for a now-closed provider.
+        const remaining = this.nextAt - Date.now();
+        await new Promise(resolve => setTimeout(resolve,
+          shouldAdmit ? Math.min(1000, remaining) : remaining));
         if (shouldAdmit && !shouldAdmit()) return false;
       }
       if (shouldAdmit && !shouldAdmit()) return false;
