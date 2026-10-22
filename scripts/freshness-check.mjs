@@ -33,7 +33,7 @@ import { pathToFileURL } from 'node:url';
    cannot silently sit outside the alarm the way the weekly/quarterly evals
    once did. */
 export const CONTROLS = [
-  { id: 'sanctions-watch.yml',      name: 'Sanctions Watch',                                       cadence: 'daily',     maxAgeDays: 0 },
+  { id: 'sanctions-watch.yml',      name: 'Sanctions Watch',                                       cadence: 'daily',     maxAgeDays: 0, allowPush: true },
   { id: 'weekly-adverse-media.yml', name: 'Daily Screening (Sanctions + Adverse Media + PEP)',     cadence: 'daily',     maxAgeDays: 0 },
   { id: 'regulatory-watch.yml',     name: 'Regulatory Watch',                                      cadence: 'daily',     maxAgeDays: 0 },
   { id: 'sanctions-screen.yml',     name: 'Sanctions Screen (case engine)',                        cadence: 'daily',     maxAgeDays: 0 },
