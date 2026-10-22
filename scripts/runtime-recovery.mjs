@@ -59,6 +59,39 @@ export class RequestStartGate {
   }
 }
 
+/* GDELT DOC meters requests across the entire request/response cycle.
+   A start-only 5s gate permits overlapping HTTP requests when a query takes
+   longer than 5s, even though starts look compliant. GDELT alone uses this
+   completion-relative, single-flight queue. An upstream Retry-After extends
+   nextAt and is never shortened by an ordinary response completing. Calls
+   rejected by the circuit while queued do not send or reserve a slot. */
+export class RequestCompletionGate extends RequestStartGate {
+  async run(send, shouldAdmit = null, permit = null) {
+    let release;
+    const prior = this.tail;
+    this.tail = new Promise(resolve => { release = resolve; });
+    await prior;
+    let started = false;
+    try {
+      if (shouldAdmit && !shouldAdmit()) return null;
+      while (this.nextAt > Date.now()) {
+        const remaining = this.nextAt - Date.now();
+        await new Promise(resolve => setTimeout(resolve,
+          shouldAdmit ? Math.min(1000, remaining) : remaining));
+        if (shouldAdmit && !shouldAdmit()) return null;
+      }
+      if (shouldAdmit && !shouldAdmit()) return null;
+      const ticket = permit ? permit() : null;
+      if (permit && !ticket) return null;
+      started = true;
+      return await send(ticket);
+    } finally {
+      if (started) this.nextAt = Math.max(this.nextAt, Date.now() + this.intervalMs);
+      release();
+    }
+  }
+}
+
 /* Tickets bind results to the circuit generation that admitted the request.
    Late responses cannot close a newer outage or interfere with its probe. */
 export class RecoveryCircuit {

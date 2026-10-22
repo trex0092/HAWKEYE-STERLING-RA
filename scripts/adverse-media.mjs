@@ -19,8 +19,8 @@
    Pure helpers (query building + RSS parsing + scoring) are unit-tested offline;
    the fetch wrapper is the only network part. */
 import { readFileSync } from 'node:fs';
-import { RecoveryCircuit, RequestStartGate, retryAfterDelayMs } from './runtime-recovery.mjs';
-export { RequestStartGate, retryAfterDelayMs };
+import { RecoveryCircuit, RequestStartGate, RequestCompletionGate, retryAfterDelayMs } from './runtime-recovery.mjs';
+export { RequestStartGate, RequestCompletionGate, retryAfterDelayMs };
 
 /* ── English risk terms (default) ─────────────────────────────────────────────
    Appended to the customer name. A hit on a "strong" term (see STRONG_LIST)
@@ -1076,7 +1076,7 @@ export function googleNewsRateState() {
   return { paceMs: _gnewsGate.intervalMs, baseMs: GNEWS_MIN_INTERVAL_MS,
     capMs: GNEWS_PACING_CAP_MS, ..._gnewsObservations };
 }
-const _gdeltGate = new RequestStartGate(GDELT_MIN_INTERVAL_MS);
+const _gdeltGate = new RequestCompletionGate(GDELT_MIN_INTERVAL_MS);
 const _bingGate = new RequestStartGate(BING_MIN_INTERVAL_MS);
 
 export function resetAdverseMediaRateGates() {
@@ -1091,43 +1091,48 @@ export function resetAdverseMediaRateGates() {
    of requests per second from one runner IP, which tripped Google/GDELT
    protection and degraded nearly the whole book. */
 export async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, permit = null, canAttempt = null) {
-  // A circuit may OPEN after a caller joins the shared start-rate queue. Do not
-  // wait 20s per discarded caller or reserve a slot for an impossible request.
-  // canAttempt must be PURE: probe tickets are allocated only by permit below.
+  const send = async (ticket) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        signal: ctrl.signal, redirect: 'follow',
+        headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: accept }
+      });
+      if (!res.ok) {
+        if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after'))
+          || (res.status === 429 ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
+        if (note) note(false, res.status, ticket, parse === parseGdelt
+          ? gdeltFailureClass(res.status) : null);
+        return null;
+      }
+      const body = await res.text();
+      const items = parse(body);
+      // An invalid HTTP 200 GDELT body may itself be a throttle message.
+      // Defer the shared queue before the next already-waiting call starts.
+      const problem = items === null && parse === parseGdelt
+        ? gdeltFailureClass(res.status, body) : null;
+      if (gate && problem === 'throttle') gate.deferFor(ADVERSE_RATE_LIMIT_BACKOFF_MS);
+      // HTTP 200 consent/error pages are not successful screening coverage.
+      if (note) note(items !== null, res.status, ticket, problem);
+      return items;
+    } catch {
+      if (note) note(false, 0, ticket, parse === parseGdelt ? 'transport' : null);
+      return null;
+    } finally {
+      clearTimeout(t);
+    }
+  };
+  // The original GDELT DOC index uses single-flight, completion-relative
+  // pacing. The same endpoint, subject query, error contract and circuit
+  // admission remain intact. Google's and Bing's start gates are unchanged.
+  if (gate && typeof gate.run === 'function') return gate.run(send, canAttempt, permit);
+  // A circuit may OPEN after a caller joins the shared start-rate queue.
   if (gate && (await gate.wait(canAttempt)) === false) return null;
   if (!gate && canAttempt && !canAttempt()) return null;
-  // Check admission AGAIN after queuing: only one cooldown probe may execute.
   const ticket = permit ? permit() : null;
   if (permit && !ticket) return null;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: ctrl.signal, redirect: 'follow',
-      headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: accept }
-    });
-    if (!res.ok) {
-      if (gate) gate.deferFor(retryAfterDelayMs(res.headers?.get?.('retry-after'))
-        || (res.status === 429 ? ADVERSE_RATE_LIMIT_BACKOFF_MS : 0));
-      if (note) note(false, res.status, ticket, parse === parseGdelt
-        ? gdeltFailureClass(res.status) : null);
-      return null;
-    }
-    const body = await res.text();
-    const items = parse(body);
-    // An invalid HTTP 200 GDELT body may itself be a throttle message.
-    // Defer the shared queue before the next already-waiting call starts.
-    const problem = items === null && parse === parseGdelt
-      ? gdeltFailureClass(res.status, body) : null;
-    if (gate && problem === 'throttle') gate.deferFor(ADVERSE_RATE_LIMIT_BACKOFF_MS);
-    // HTTP 200 consent/error pages are not successful screening coverage.
-    if (note) note(items !== null, res.status, ticket, problem);
-    return items;
-  } catch {
-    if (note) note(false, 0, ticket, parse === parseGdelt ? 'transport' : null);
-    return null;
-  }
-  finally { clearTimeout(t); }
+  return send(ticket);
 }
 
 /* Google News uses the same bounded recovery policy. Only the en-US global
