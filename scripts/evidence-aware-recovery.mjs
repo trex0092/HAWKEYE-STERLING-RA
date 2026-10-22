@@ -155,6 +155,16 @@ export function independentReady(runs, evidence, currentSha) {
     time(latest) >= Date.parse(evidence.generatedAt);
 }
 
+// The summary file accepts locally authored status text only. API-derived
+// receipt identifiers and per-control details remain in the job log, never in
+// a local file that another workflow step could mistake for trusted input.
+export function recoveryStepSummary(evidence, rows) {
+  const known = evidence?.state === 'verified' && Array.isArray(rows) && rows.length > 0 &&
+    rows.every(r => object(r) && ['healthy', 'wait', 'cooldown', 'skip', 'dispatched'].includes(r.action));
+  if (!known) return '# Evidence-aware control recovery\n\nBLOCKED OR UNVERIFIED. Review the job log for pinned receipt metadata and per-control decisions. No operational pass is established.\n';
+  return '# Evidence-aware control recovery\n\nRecovery routing decisions recorded. Review the job log for pinned receipt metadata and per-control decisions. Routing or dispatch is not independent screening, AI, security or deployment assurance.\n';
+}
+
 export async function main() {
   const { makeApi, readRuns, decide, HELPERS, activePrerequisite } = await import('./workflow-recovery.mjs');
   const { dispatchOnce } = await import('./github-workflow-dispatch-guard.mjs');
@@ -233,7 +243,7 @@ export async function main() {
     '| Control | Recovery state | Evidence / action |', '| --- | --- | --- |',
     ...rows.map(r => `| ${cell(r.id)} | ${cell(r.action)} | ${cell(r.reason)} |`), ''].join('\n');
   console.log(report);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, recoveryStepSummary(evidence, rows));
   if (evidence.state !== 'verified' || rows.some(r => ['unknown', 'blocked'].includes(r.action))) process.exitCode = 1;
 }
 

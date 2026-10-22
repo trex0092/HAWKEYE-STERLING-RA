@@ -65,11 +65,12 @@ jobs:
           node scripts/evidence-aware-recovery-selftest.mjs
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
           import { CONTROLS } from './scripts/freshness-check.mjs';
           import { decide, makeApi, readRuns, HELPERS, activePrerequisite } from './scripts/workflow-recovery.mjs';
           import { dispatchOnce } from './scripts/github-workflow-dispatch-guard.mjs';
           import { checkStored, approvedSourcePopulationIssue } from './scripts/screening-assurance.mjs';
-          import { qualifyEvidence } from './scripts/evidence-aware-recovery.mjs';
+          import { qualifyEvidence, recoveryStepSummary } from './scripts/evidence-aware-recovery.mjs';
           for (const helper of [makeApi, readRuns, activePrerequisite, dispatchOnce, checkStored, approvedSourcePopulationIssue]) {
             assert.equal(typeof helper, 'function', 'the runtime helper must be exported and loadable');
           }
@@ -108,6 +109,34 @@ jobs:
           fixture.domains.sanctions.evidence.sourcePopulation.employee.projectGid = 'unapproved-fixture';
           assert.equal(verify().state, 'degraded', 'actual production source validation rejects redirection');
           console.log('Three offline integration cases passed with real imported validators; no live evidence was generated.');
+          const payload = '<script>untrusted-API-payload</script>\n::error::payload';
+          const valid = { state: 'verified', stateSha: payload, blobSha: payload };
+          const row = action => ({ action, id: payload, reason: payload });
+          const fixed = recoveryStepSummary(valid, [row('healthy')]);
+          const blocked = recoveryStepSummary({ state: 'degraded' }, [row('healthy')]);
+          assert.match(blocked, /BLOCKED OR UNVERIFIED/);
+          assert.notEqual(fixed, blocked);
+          let checks = 2;
+          for (const action of ['healthy', 'wait', 'cooldown', 'skip', 'dispatched']) {
+            const output = recoveryStepSummary(valid, [row(action)]);
+            assert.equal(output, fixed);
+            assert.ok(!output.includes(payload) && !output.includes('untrusted-API-payload'));
+            checks++;
+          }
+          for (const rows of [[], null, [null], [row('blocked')], [row('unknown')], [row(payload)]]) {
+            assert.equal(recoveryStepSummary(valid, rows), blocked);
+            checks++;
+          }
+          for (const state of ['unknown', 'degraded', payload, undefined]) {
+            assert.equal(recoveryStepSummary({ state }, [row('healthy')]), blocked);
+            checks++;
+          }
+          const code = readFileSync('scripts/evidence-aware-recovery.mjs', 'utf8');
+          assert.ok(code.includes('console.log(report);'));
+          assert.ok(code.includes('appendFileSync(process.env.GITHUB_STEP_SUMMARY, recoveryStepSummary(evidence, rows));'));
+          assert.ok(!code.includes('appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);'));
+          checks += 3;
+          console.log(`${checks} offline summary-security checks passed. No live evidence was created or changed.`);
           NODE
 
   heal:
@@ -150,4 +179,4 @@ jobs:
         run: |
           node scripts/asana-alert.mjs \
             "WORKFLOW RECOVERY BLOCKED: a registered control needs intervention" \
-            "Recovery encountered an unverifiable status, disabled workflow, or exhausted retry budget. Review the per-control job summary. No operational pass is inferred from an accepted dispatch. $RUN_URL"
+            "Recovery encountered an unverifiable status, disabled workflow, or exhausted retry budget. Review the job log for per-control decisions and the summary for status. No operational pass is inferred from an accepted dispatch. $RUN_URL"
