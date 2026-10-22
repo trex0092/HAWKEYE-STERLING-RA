@@ -1090,7 +1090,7 @@ export function resetAdverseMediaRateGates() {
    Without a gate those two concurrency layers multiplied into bursts of dozens
    of requests per second from one runner IP, which tripped Google/GDELT
    protection and degraded nearly the whole book. */
-async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, permit = null, canAttempt = null) {
+export async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, permit = null, canAttempt = null) {
   // A circuit may OPEN after a caller joins the shared start-rate queue. Do not
   // wait 20s per discarded caller or reserve a slot for an impossible request.
   // canAttempt must be PURE: probe tickets are allocated only by permit below.
