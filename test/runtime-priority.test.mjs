@@ -91,6 +91,54 @@ try {
     && globalOnly.backbones.googleNewsEnUs === true
     && globalOnly.backbones.googleNews === true
     && globalOnly.sourcesFailed === 1);
+
+  am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+  const googleOrder = [];
+  globalThis.fetch = async url => {
+    const u = new URL(url);
+    if (u.hostname === 'news.google.com') {
+      googleOrder.push(u.searchParams.get('hl'));
+      return reply(200, rss);
+    }
+    if (u.hostname === 'api.gdeltproject.org') return reply(200, '{"articles":[]}');
+    return reply(200, rss);
+  };
+  const reversed = await am.checkAdverseMedia('Synthetic Priority', {
+    ...options, locales: [...localePair].reverse(), concurrency: 2,
+  });
+  check('en-US global Google backbone is requested before optional regional feeds',
+    googleOrder.join(',') === 'en-US,ar' && reversed.backbones.googleNewsEnUs
+    && !reversed.partial);
+
+  am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+  const gdeltUrls = [];
+  globalThis.fetch = async url => {
+    const u = new URL(url);
+    if (u.hostname === 'api.gdeltproject.org') {
+      gdeltUrls.push(String(url));
+      if (gdeltUrls.length === 1) throw new Error('synthetic reset');
+      return reply(200, '{"articles":[]}');
+    }
+    return reply(200, rss);
+  };
+  const recovered = await am.checkAdverseMedia('Synthetic GDELT Connection Recovery', options);
+  check('one bounded original-GDELT transport retry can restore validated coverage',
+    gdeltUrls.length === 2 && gdeltUrls[0] === gdeltUrls[1]
+    && recovered.backbones.gdelt && !recovered.partial);
+
+  am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
+  let unavailableRequests = 0;
+  globalThis.fetch = async url => {
+    if (new URL(url).hostname === 'api.gdeltproject.org') {
+      unavailableRequests++;
+      return reply(503, 'temporarily unavailable');
+    }
+    return reply(200, rss);
+  };
+  const unavailable = await am.checkAdverseMedia('Synthetic GDELT 503', options);
+  check('GDELT HTTP 503 is not hammered or accepted as a valid source',
+    unavailableRequests === 1 && unavailable.partial
+    && !unavailable.backbones.gdelt && unavailable.backbones.googleNewsEnUs);
 } finally {
   globalThis.fetch = realFetch;
   am.resetAdverseMediaRateGates(); am.resetGdeltBreaker(); am.resetGnewsBreaker();
