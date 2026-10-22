@@ -2678,10 +2678,16 @@
       "detectedAt": "2026-10-22T05:39:16.985Z",
       "prevCount": 19458,
       "newCount": 19472,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 39733491088,
+        "startedAt": "2026-10-22T06:22:04Z"
+      },
+      "status": "complete",
       "chainPrev": "d4837eceb8a3f91a565acfd805e8550782fbb0ddd0f80310123d8fb7c4e1a720",
-      "chainHash": "a18e6c5d5b4f5711d8dff3c59626bb1a686a72a937b2e5a19e2128f160346632"
+      "chainHash": "a18e6c5d5b4f5711d8dff3c59626bb1a686a72a937b2e5a19e2128f160346632",
+      "latencyHours": 0.7,
+      "resolutionHash": "fcc3e4c551771906688d9a04bf8f313df2b1b5360de29db3fee6d8dfde08bcc0"
     },
     {
       "id": "ofac-sdn-alt",
@@ -2691,10 +2697,16 @@
       "detectedAt": "2026-10-22T05:39:16.985Z",
       "prevCount": 20197,
       "newCount": 20193,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 39733491088,
+        "startedAt": "2026-10-22T06:22:04Z"
+      },
+      "status": "complete",
       "chainPrev": "a18e6c5d5b4f5711d8dff3c59626bb1a686a72a937b2e5a19e2128f160346632",
-      "chainHash": "39c3add75c46b93317cce4af85ec6e968414a5785e0e1bcdc4fce58d2fb84689"
+      "chainHash": "39c3add75c46b93317cce4af85ec6e968414a5785e0e1bcdc4fce58d2fb84689",
+      "latencyHours": 0.7,
+      "resolutionHash": "3963e48cde733b2808667ca9ac3bdb0bfd0643bf728b6d03d18c2902b8a1ade6"
     },
     {
       "id": "ofac-consolidated",
@@ -2704,10 +2716,29 @@
       "detectedAt": "2026-10-22T05:39:16.985Z",
       "prevCount": 442,
       "newCount": null,
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 39733491088,
+        "startedAt": "2026-10-22T06:22:04Z"
+      },
+      "status": "complete",
+      "chainPrev": "39c3add75c46b93317cce4af85ec6e968414a5785e0e1bcdc4fce58d2fb84689",
+      "chainHash": "3d73278717c2837a20dbcb77e99c05de002f6860bf67cfbd3ded732d0019dbf5",
+      "latencyHours": 0.7,
+      "resolutionHash": "23df234e57358d32100ebbd9e524863571ba969fd38c7ba77cb21998ac509a96"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-22T10:03:17.375Z",
+      "prevCount": 21907,
+      "newCount": 22184,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "39c3add75c46b93317cce4af85ec6e968414a5785e0e1bcdc4fce58d2fb84689",
-      "chainHash": "3d73278717c2837a20dbcb77e99c05de002f6860bf67cfbd3ded732d0019dbf5"
+      "chainPrev": "3d73278717c2837a20dbcb77e99c05de002f6860bf67cfbd3ded732d0019dbf5",
+      "chainHash": "af476789a1b385381bc529dd8e6519fe2fff8993d4f33180b25d8df5c5d12437"
     }
   ]
 }

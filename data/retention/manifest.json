@@ -518,6 +518,13 @@
     "recordedAt": "2026-10-21T01:29:50.325Z"
   },
   {
+    "file": "sanctions-state-2026-10-22-2ef055f8e73b56c5.json",
+    "sha256": "2ef055f8e73b56c5ad7f2d0e481ea90f3bc3ab466e49cd9af480eaac2e928e57",
+    "bytes": 2839,
+    "updated": "2026-10-22",
+    "recordedAt": "2026-10-22T10:03:30.419Z"
+  },
+  {
     "file": "sanctions-state-2026-10-22-a6c692cf811249e8.json",
     "sha256": "a6c692cf811249e80f3a47f32463f07478d146964d4c90ca99d001007136dc81",
     "bytes": 3064,
