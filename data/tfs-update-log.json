@@ -2735,10 +2735,16 @@
       "detectedAt": "2026-10-22T10:03:17.375Z",
       "prevCount": 21907,
       "newCount": 22184,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 39771703958,
+        "startedAt": "2026-10-22T11:35:16Z"
+      },
+      "status": "complete",
       "chainPrev": "3d73278717c2837a20dbcb77e99c05de002f6860bf67cfbd3ded732d0019dbf5",
-      "chainHash": "af476789a1b385381bc529dd8e6519fe2fff8993d4f33180b25d8df5c5d12437"
+      "chainHash": "af476789a1b385381bc529dd8e6519fe2fff8993d4f33180b25d8df5c5d12437",
+      "latencyHours": 1.5,
+      "resolutionHash": "1e00ba3dfb541e192214715cfabee7008bb34c8f107d5e0774c417ca92bed879"
     }
   ]
 }
