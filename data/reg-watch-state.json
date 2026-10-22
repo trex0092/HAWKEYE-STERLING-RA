@@ -27,9 +27,11 @@
       "checkedAt": "2026-10-22",
       "changedAt": "2026-09-21",
       "contentAsOf": "2026-10-22",
-      "status": 200,
+      "status": 403,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261022113723"
+      "via": "web.archive.org save-page-now 20261022113723",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -79,7 +81,7 @@
       "fp": 2,
       "via": "web.archive.org snapshot 20261004141918",
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "wolfsberg": {
       "hash": "575ebdfe1028c70db1de23dfd4f5f5ec3d9b6ed11ef6646943945d298c284815",
@@ -116,10 +118,12 @@
       "checkedAt": "2026-10-22",
       "changedAt": "2026-10-20",
       "contentAsOf": "2026-10-17",
-      "status": 200,
+      "status": 403,
       "prevHash": "ddb347c02540b058f782228ce2bd6c381526ad01881359e41320c3effebbe291",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261017163448"
+      "via": "web.archive.org snapshot 20261017163448",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "ofac": {
       "hash": "913cf6dc11907833a9723c7e63a59434e77ef12fc8890e9a5c9cf45a43cf854c",
@@ -137,9 +141,11 @@
       "checkedAt": "2026-10-22",
       "changedAt": "2026-10-18",
       "contentAsOf": "2026-10-22",
-      "status": 200,
+      "status": 502,
       "prevHash": "bc74bf86fbc31be6dd4708f2ef0eb52541c5fe408ca2ae30e9964813588040f0",
-      "fp": 2
+      "fp": 2,
+      "error": "HTTP 502",
+      "errorStreak": 1
     },
     "eu-sanctions": {
       "hash": "81886c821ce7f2d8a2e264394a0337c968fa4d182c0f7578e161dcf5366450de",
@@ -219,7 +225,7 @@
       "prevHash": "6ac70f5bf9cd6c497757effab0c759935c0b14f6de6cedc3b31842a84a46e94a",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 3
+      "errorStreak": 4
     }
   }
 }
