@@ -18,6 +18,13 @@ on:
       mode:
         description: 'check (compare + alert on change) | seed (record baseline)'
         default: 'check'
+  # Runtime implementation changes need a real protected-main watch, not only
+  # offline PR tests or a wait until tomorrow's daily schedule.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sanctions-watch.yml'
+      - 'scripts/sanctions-watch.mjs'
 
 permissions:
   contents: read
