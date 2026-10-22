@@ -11,9 +11,9 @@
       "prevHash": "f18774a2143208d80bd8bff4a367d54e1c789e8ca35328fce2f34f5ce370fb62",
       "fp": 2,
       "count": 19458,
-      "errStreak": 1,
+      "errStreak": 2,
       "error": "fetch failed <- ECONNREFUSED",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "ofac-sdn-alt": {
       "hash": "7d137399eb55fb4e62d73de9dd2b8b52fb137516ac244bca5786eff8cdf73a26",
@@ -25,9 +25,9 @@
       "prevHash": "14e7ddd4121c5f72a77b5acc9e33cecb8860b27f09d87fba03fe72a65caa4496",
       "fp": 2,
       "count": 20197,
-      "errStreak": 1,
+      "errStreak": 2,
       "error": "fetch failed <- ECONNREFUSED",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "ofac-consolidated": {
       "hash": "30f0cc91109ebac74e67341a620f26f825525b4e259d04c695f212b53cfdfe53",
@@ -39,9 +39,9 @@
       "prevHash": "b37e29caa7f1ca2786b72cb59639a441b8210bc63a57ce87e220d263bb8dd558",
       "fp": 2,
       "count": 442,
-      "errStreak": 1,
+      "errStreak": 2,
       "error": "fetch failed <- ECONNREFUSED",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "un-consolidated": {
       "hash": "11aebb8358e860650a05956f4768784f9524b8516abbf78863309ab1611835dc",
