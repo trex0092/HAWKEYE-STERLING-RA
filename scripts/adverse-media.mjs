@@ -1090,9 +1090,13 @@ export function resetAdverseMediaRateGates() {
    Without a gate those two concurrency layers multiplied into bursts of dozens
    of requests per second from one runner IP, which tripped Google/GDELT
    protection and degraded nearly the whole book. */
-async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, permit = null) {
-  if (gate) await gate.wait();
-  // Check admission AFTER queueing: an earlier request may have opened it.
+async function fetchSource(url, parse, accept, timeoutMs, note, gate = null, permit = null, canAttempt = null) {
+  // A circuit may OPEN after a caller joins the shared start-rate queue. Do not
+  // wait 20s per discarded caller or reserve a slot for an impossible request.
+  // canAttempt must be PURE: probe tickets are allocated only by permit below.
+  if (gate && (await gate.wait(canAttempt)) === false) return null;
+  if (!gate && canAttempt && !canAttempt()) return null;
+  // Check admission AGAIN after queuing: only one cooldown probe may execute.
   const ticket = permit ? permit() : null;
   if (permit && !ticket) return null;
   const ctrl = new AbortController();
@@ -1181,7 +1185,8 @@ function fetchGoogleNews(name, loc, timeoutMs) {
   if (!gnewsCanRequest(loc.id)) return Promise.resolve(null);
   return fetchSource(adverseMediaUrlFor(name, loc), parseRss,
     'application/rss+xml, application/xml, text/xml', timeoutMs,
-    noteGnewsResult, _gnewsGate, () => gnewsBreakerPermit(loc.id));
+    noteGnewsResult, _gnewsGate, () => gnewsBreakerPermit(loc.id),
+    () => gnewsCanRequest(loc.id));
 }
 
 /* ── Bing News RSS — independent THIRD news backbone (screen.py parity) ──────
@@ -1228,7 +1233,8 @@ async function fetchGdelt(name, timeoutMs) {
     noteGdeltObservation(ok, reason);
   };
   let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,
-    'application/json', timeoutMs, noteWide, _gdeltGate, permit);
+    'application/json', timeoutMs, noteWide, _gdeltGate, permit,
+    () => gdeltBreakerState.accepts(ticket));
   // A rate limit, service outage or transport failure is never evidence that
   // the expanded query is invalid. Retrying its base form would burn the same
   // shared-IP quota and worsen coverage for other subjects.
@@ -1238,7 +1244,7 @@ async function fetchGdelt(name, timeoutMs) {
     gd = await fetchSource(gdeltUrl(name, GDELT_RISK_TERMS), parseGdelt,
       'application/json', timeoutMs,
       (ok, _status, _ticket, reason) => noteGdeltObservation(ok, reason),
-      _gdeltGate, permit);
+      _gdeltGate, permit, () => gdeltBreakerState.accepts(ticket));
   }
   if (gd === null) gdeltBreakerRecordFailure(ticket);
   else gdeltBreakerRecordSuccess(ticket);
