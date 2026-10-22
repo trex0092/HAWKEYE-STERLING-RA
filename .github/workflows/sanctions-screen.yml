@@ -72,11 +72,12 @@ jobs:
       contents: write
       issues: write
     runs-on: ubuntu-latest
-    # The 2026-09-30 run reached the 90-minute enrichment budget with five
-    # subjects remaining. Allow 100 minutes without increasing provider rates.
-    # Keep 20 minutes of job headroom for list loading, cases, delivery and state.
-    # Skipped enrichment still fails assurance; a larger budget is not proof
-    # that every provider answered or that the full population was covered.
+    # The 22 Oct full approved-book run exhausted a 100-minute enrichment
+    # window and skipped 43 subjects. Allow 106 minutes without changing
+    # provider rate, query, subject population or assurance requirements.
+    # Reserve 14 minutes of the 120-minute job for list loading, cases,
+    # second-pass recovery, delivery and state persistence. A hard timeout
+    # remains protective; skipped subjects still FAIL independent assurance.
     timeout-minutes: 120
     steps:
       - name: Harden the runner (egress block)
@@ -226,7 +227,7 @@ jobs:
           # genuinely separate MLRO queue exists again.
           ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
           ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
-          SCREEN_ENRICH_BUDGET_MS: '6000000'
+          SCREEN_ENRICH_BUDGET_MS: '6360000'
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           # Personal EU FSF crawler token (optional): the shared public token now
           # redirects to EU Login. Unset = public token, and the EU list fails loudly.
