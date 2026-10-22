@@ -42,6 +42,28 @@ python3 -m http.server 8000
 Node is only needed to run the test/automation scripts (Node 22, pinned in
 `.nvmrc` — same version CI uses).
 
+## GitHub CLI in Codespaces
+
+This repository provisions the official GitHub CLI in GitHub Codespaces and
+compatible Dev Containers through [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json).
+Create a new Codespace, or rebuild an existing one, to install the feature.
+The configuration runs `gh --version` after container creation to verify that
+the CLI is available.
+
+To work with this repository from the Codespace terminal:
+
+```bash
+gh --version
+gh auth status
+gh repo view trex0092/HAWKEYE-STERLING-RA
+```
+
+Authenticate using GitHub's supported sign-in flow only if required. Never
+commit tokens. For a **local Windows** terminal, `winget install --id
+GitHub.cli --exact --source winget` installs the CLI on that PC, not in the
+repository or its Linux CI runners. GitHub-hosted Actions runners already
+include `gh`; their runtime installation does not persist between jobs.
+
 ## Before you open a PR
 
 Run the checks locally — CI (`.github/workflows/ci.yml`) runs the same ones plus
