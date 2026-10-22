@@ -105,6 +105,18 @@ try {
       && probeTickets === 0 && outbounds === 0 && Date.now() - t0 < 2000);
   } finally { globalThis.fetch = realFetchForDenied; }
 
+  const sleepingGate = new am.RequestStartGate(5000);
+  sleepingGate.deferFor(5000);
+  let stillAdmitted = true;
+  const sleepingStart = Date.now();
+  const sleeping = sleepingGate.wait(() => stillAdmitted);
+  await new Promise(resolve => setTimeout(resolve, 25));
+  stillAdmitted = false;
+  const abandoned = await sleeping;
+  check('an already sleeping gate aborts within a bounded poll instead of waiting full Retry-After',
+    abandoned === false && Date.now() - sleepingStart < 2000
+    && sleepingGate.nextAt >= sleepingStart + 4500);
+
   const afterQueueGate = new am.RequestStartGate(30000);
   let releaseAhead;
   afterQueueGate.tail = new Promise(resolve => { releaseAhead = resolve; });
