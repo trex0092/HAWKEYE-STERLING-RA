@@ -85,6 +85,40 @@ try {
   await waiting;
   check('a queued request re-checks a Retry-After deadline extended while asleep', Date.now() - start >= 25);
 
+  // Circuit-breaker admission is rechecked at the FRONT of the shared
+  // provider queue. Hundreds of already-queued lookups should not each spend
+  // a 20-second provider cooldown slot after an upstream outage.
+  const deniedGate = new am.RequestStartGate(30000);
+  deniedGate.deferFor(30000);
+  const slotBefore = deniedGate.nextAt;
+  const t0 = Date.now();
+  let probeTickets = 0;
+  let outbounds = 0;
+  const realFetchForDenied = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => { outbounds++; throw Error('test must not reach network'); };
+    const denied = await am.fetchSource('https://example.invalid/provider',
+      () => [], 'application/json', 100,
+      null, deniedGate, () => { probeTickets++; return {}; }, () => false);
+    check('open circuit cancels a queued request immediately without consuming a rate slot or probe',
+      denied === null && deniedGate.nextAt === slotBefore
+      && probeTickets === 0 && outbounds === 0 && Date.now() - t0 < 2000);
+  } finally { globalThis.fetch = realFetchForDenied; }
+
+  const afterQueueGate = new am.RequestStartGate(30000);
+  let releaseAhead;
+  afterQueueGate.tail = new Promise(resolve => { releaseAhead = resolve; });
+  let admissionAllowed = true;
+  const afterQueue = afterQueueGate.wait(() => admissionAllowed);
+  admissionAllowed = false;  // breaker opens while waiting for an earlier caller
+  releaseAhead();
+  const deniedAfterWaiting = await afterQueue;
+  check('admission changes while queued release the gate without delaying later callers',
+    deniedAfterWaiting === false && afterQueueGate.nextAt === 0);
+  const stillAvailable = await afterQueueGate.wait(() => true);
+  check('a later valid recovery permit still receives an ordinary rate slot',
+    stillAvailable === true && afterQueueGate.nextAt >= Date.now());
+
   const realFetch = globalThis.fetch;
   try {
     let calls = 0;
