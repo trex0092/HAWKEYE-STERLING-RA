@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-21T10:23:54.886Z",
-  "githubRunId": "39584141751",
-  "commit": "4b05b615363de3f49258efaaf178b894f0f8b48d",
+  "generatedAt": "2026-10-22T01:46:07.627Z",
+  "githubRunId": "39707490993",
+  "commit": "957339a6c62729d951927dbcb46c6eeb03b6cc38",
   "screenedSubjects": 991,
   "sourceProjects": {
     "customer": {
@@ -48,7 +48,7 @@
       {
         "id": "ofac-sdn",
         "name": "US OFAC — SDN list (CSV)",
-        "count": 19438,
+        "count": 19452,
         "partial": false
       },
       {
