@@ -75,6 +75,14 @@ jobs:
             assert.equal(typeof helper, 'function', 'the runtime helper must be exported and loadable');
           }
           assert.ok(Array.isArray(HELPERS), 'the existing operational helpers remain registered');
+          const watchControl = CONTROLS.find(c => c.id === 'sanctions-watch.yml');
+          assert.ok(watchControl, 'the mandatory Sanctions Watch must remain registered');
+          assert.equal(watchControl.allowPush, true,
+            'protected-main Sanctions Watch executions are real operational runs');
+          const watchRun = { id: 2, event: 'push', head_branch: 'main',
+            status: 'completed', conclusion: 'success', created_at: '2026-09-29T06:00:00Z' };
+          assert.equal(decide(watchControl, [watchRun], { nowMs: Date.parse('2026-09-29T12:00:00Z') }).action,
+            'healthy', 'a successful protected-main Sanctions Watch must prevent duplicate recovery dispatch');
           const control = CONTROLS.find(c => c.id === 'sanctions-screen.yml');
           assert.ok(control, 'the actual sanctions producer must remain registered');
           const nowMs = Date.parse('2026-09-29T12:00:00Z');
