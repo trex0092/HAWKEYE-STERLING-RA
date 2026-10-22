@@ -84,6 +84,7 @@ jobs:
       # documentation at https://github.com/fortify/github-action#readme for more information on the various
       # configuration options and available sub-actions.
       - name: Run Fortify Scan
+        id: fortify-scan
         if: steps.fortify-creds.outputs.configured == 'true'
         # NOTE (verified via the GitHub API against fortify/github-action, 2026-08-28): this pinned commit is
         # actually the "chore(main): release 3.1.1" merge commit, NOT "version 1.6.2" as this starter template's
@@ -162,3 +163,20 @@ jobs:
           # EXPORT_ACTION: <URL or file>                   # Customize export action
           # EXPORT_EXTRA_OPTS: --on-unsigned=ignore        # Pass extra options to export action
           # TOOL_DEFINITIONS: <URL>                        # URL from where to retrieve Fortify tool definitions
+
+      - name: Require real Fortify scan evidence on protected runs
+        if: always() && github.event_name != 'pull_request'
+        env:
+          FORTIFY_CONFIGURED: ${{ steps.fortify-creds.outputs.configured }}
+          FORTIFY_SCAN_OUTCOME: ${{ steps.fortify-scan.outcome }}
+        run: |
+          if [ "$FORTIFY_CONFIGURED" != "true" ]; then
+            echo "::error title=Fortify AST Scan not configured::Protected-main, scheduled, and manual Fortify runs require an approved FoD or SSC credential path. A skipped scanner is not a passing security control."
+            exit 1
+          fi
+          if [ "$FORTIFY_SCAN_OUTCOME" != "success" ]; then
+            echo "::error title=Fortify AST Scan did not pass::The substantive Fortify scan outcome is '$FORTIFY_SCAN_OUTCOME', not success."
+            exit 1
+          fi
+          echo "Fortify substantive scan executed successfully."
+
