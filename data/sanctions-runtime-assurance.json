@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-22T06:24:13.276Z",
-  "githubRunId": "39733581157",
-  "commit": "beb8cb8f3cec23ade3dac64528d353c85928d13d",
+  "generatedAt": "2026-10-22T10:23:24.473Z",
+  "githubRunId": "39762497123",
+  "commit": "486cb576369b370c2d6ff5dc687bf6d27181165b",
   "screenedSubjects": 991,
   "sourceProjects": {
     "customer": {
@@ -34,12 +34,6 @@
         "partial": false
       },
       {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3773,
-        "partial": false
-      },
-      {
         "id": "ofac-consolidated",
         "name": "US OFAC — Consolidated (non-SDN) list (XML)",
         "count": 1674,
@@ -52,6 +46,12 @@
         "partial": false
       },
       {
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3773,
+        "partial": false
+      },
+      {
         "id": "eu-fsf",
         "name": "EU — Consolidated financial sanctions list (CSV)",
         "count": 31044,
@@ -60,7 +60,7 @@
       {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
-        "count": 21910,
+        "count": 22187,
         "partial": false
       }
     ],
