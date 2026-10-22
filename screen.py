@@ -10,6 +10,8 @@ Modes:
 
 import os, sys, re, csv, json, hashlib, unicodedata, io, datetime, requests, time, html
 import threading
+import math
+from email.utils import parsedate_to_datetime
 import zipfile
 import functools
 # The one call site (safe_xml_fromstring, below) refuses any DTD/ENTITY
@@ -1914,6 +1916,31 @@ def _gdelt_should_probe(now=None):
 # and adapts: failures back the shared interval off multiplicatively (a tripped
 # limiter gets quiet time to cool), successes decay it back toward base (a
 # healthy feed keeps full throughput).
+def _adverse_retry_after_seconds(headers, default=60.0, maximum=300.0):
+    """Parse an upstream Retry-After or apply bounded quiet time for HTTP 429.
+
+    Missing and invalid Retry-After is common for the approved public feeds.
+    This only delays future requests. It never counts a failed response as news
+    coverage, changes source identity, or changes screening dispositions.
+    """
+    raw = str((headers or {}).get("Retry-After", "")).strip()
+    if not raw:
+        return default
+    try:
+        delay = float(raw)
+    except ValueError:
+        try:
+            until = parsedate_to_datetime(raw)
+            if until.tzinfo is None:
+                return default
+            delay = (until - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+        except (TypeError, ValueError, OverflowError):
+            return default
+    if not math.isfinite(delay):
+        return default
+    return max(0.0, min(maximum, delay))
+
+
 class _RateGate:
     """Thread-safe request pacing for one external feed.
 
@@ -1952,6 +1979,17 @@ class _RateGate:
     def reward(self):
         with self._lock:
             self.interval = max(self.base, self.interval * self.decay)
+
+    def defer_for(self, delay_seconds):
+        """Postpone future send-slot reservations after an upstream HTTP 429.
+
+        Already-reserved slots cannot be recalled; the fail-closed circuit
+        breaker remains responsible for persistent provider refusal.
+        """
+        if delay_seconds <= 0:
+            return
+        with self._lock:
+            self._next = max(self._next, time.monotonic() + delay_seconds)
 
     @property
     def at_cap(self):
@@ -2055,6 +2093,11 @@ def search_gdelt(name: str, max_results: int = 8) -> list:
     q = requests.utils.quote(f'"{name}" ({" OR ".join(GDELT_RISK_TERMS)})')
     r = requests.get(GDELT_URL.format(query=q), timeout=20,
                      headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
+    if r.status_code == 429:
+        # The real GDELT DOC endpoint returns 429 even for simple queries and
+        # often omits Retry-After (live diagnostic run 39604741068).
+        # Its fixed 5s gate otherwise immediately queues more rejected calls.
+        _GDELT_GATE.defer_for(_adverse_retry_after_seconds(getattr(r, "headers", None)))
     if r.status_code != 200:
         raise RuntimeError(f"GDELT HTTP {r.status_code}")
     if not r.content or not r.content.strip():
@@ -2487,6 +2530,16 @@ def search_adverse_media(name: str, max_results: int = None) -> list:
                     articles.extend([a for a in fetched if not a["flagged"]][
                         : max(0, max_results - len(fl))])
                     ok = True
+                else:
+                    # HTTP errors were previously indistinguishable from malformed
+                    # feeds in the aggregate, hiding real Google News throttling.
+                    # Never log subject names or URLs in public workflow logs.
+                    _k = f"HTTP_{r.status_code}"
+                    _GNEWS_FAIL_KINDS[_k] = _GNEWS_FAIL_KINDS.get(_k, 0) + 1
+                    if _GNEWS_FAIL_KINDS[_k] <= 3:
+                        log(f"  google-news returned HTTP {r.status_code}; locale coverage refused")
+                    if r.status_code == 429:
+                        _GNEWS_GATE.defer_for(_adverse_retry_after_seconds(getattr(r, "headers", None)))
             except Exception as e:
                 ok = False
                 # Diagnosable degrade: record WHY this fetch/parse failed so a
