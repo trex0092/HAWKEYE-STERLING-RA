@@ -13,11 +13,19 @@ on:
       - '.github/workflows/control-retry.yml'
       - 'scripts/workflow-recovery.mjs'
       - 'scripts/freshness-check.mjs'
+      - 'scripts/evidence-aware-recovery.mjs'
+      - 'scripts/evidence-aware-recovery-selftest.mjs'
+      - 'scripts/screening-assurance.mjs'
+      - 'scripts/github-workflow-dispatch-guard.mjs'
   pull_request:
     paths:
       - '.github/workflows/control-retry.yml'
       - 'scripts/workflow-recovery.mjs'
       - 'scripts/freshness-check.mjs'
+      - 'scripts/evidence-aware-recovery.mjs'
+      - 'scripts/evidence-aware-recovery-selftest.mjs'
+      - 'scripts/screening-assurance.mjs'
+      - 'scripts/github-workflow-dispatch-guard.mjs'
 
 permissions:
   contents: read
@@ -53,6 +61,8 @@ jobs:
         run: |
           node --check scripts/workflow-recovery.mjs
           node scripts/workflow-recovery.mjs --self-test
+          node --check scripts/evidence-aware-recovery.mjs
+          node scripts/evidence-aware-recovery-selftest.mjs
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { CONTROLS } from './scripts/freshness-check.mjs';
@@ -64,7 +74,7 @@ jobs:
             status: 'completed', conclusion: 'success', created_at: '2026-09-29T06:00:00Z' };
           assert.equal(decide(control, [run], { nowMs }).action, 'healthy');
           assert.equal(decide(control, [{ ...run, conclusion: 'failure' }], { nowMs }).action, 'dispatch');
-          console.log('Registry integration: successful sanctions execution is recognized; a failed bail is retried.');
+          console.log('Legacy cadence regression only; evidence-aware recovery independently gates the producer.');
           NODE
 
   heal:
@@ -98,7 +108,7 @@ jobs:
       - name: Recover controls without duplicate runs or false success
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/workflow-recovery.mjs
+        run: node scripts/evidence-aware-recovery.mjs
       - name: Alert when recovery needs intervention
         if: failure()
         env:
