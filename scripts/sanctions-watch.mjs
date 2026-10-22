@@ -105,6 +105,24 @@ export const SIGN_IN_RE = /requires a sign-in|login page|HTML page/i;
    cookie-carrying redirect follower when a redirect loops, and the full cause
    chain on failure instead of a bare "fetch failed". fetchImpl is injectable
    for the offline tests. */
+/* A transient network failure is distinct from a stale, sign-in-gated, or
+ * malformed sanctions source. Retry only safe, bounded failures against the
+ * SAME reviewed official source URL. No other list may replace a designation
+ * source without a separately declared and independently assured fallback.
+ * HTTP 429 is deliberately NOT retried to avoid amplifying provider throttling.
+ */
+export const WATCH_FETCH_RETRY_DELAYS_MS = Object.freeze([1500, 3500]);
+export function retryableWatchFailure(result) {
+  if (!result || result.ok || result.gated) return false;
+  if (typeof result.status === 'number') return [502, 503, 504].includes(result.status);
+  return /\b(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT)\b/i
+    .test(String(result.error || ''));
+}
+
+/* Keep the reviewed one-shot network boundary unchanged. Source URLs come from
+ * the repository's reviewed sanctions registry; this function never substitutes
+ * a mirror or derives a destination from subject data. Bounded retry policy is
+ * applied by fetchSourceWithRetry(), outside this sink. */
 export async function fetchSource(s, timeoutMs = 45000, { fetchImpl = fetch } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -132,6 +150,33 @@ export async function fetchSource(s, timeoutMs = 45000, { fetchImpl = fetch } = 
     const error = describeFetchError(e);
     return { ok: false, status: 'error', body: '', error, gated: SIGN_IN_RE.test(error) };
   } finally { clearTimeout(t); }
+}
+
+/* Retry the same reviewed source only for narrowly classified transient
+ * failures. Each one-shot attempt owns its timeout; the outer wall-clock budget
+ * also includes retry sleeps so recovery remains bounded. */
+export async function fetchSourceWithRetry(s, timeoutMs = 45000, {
+  fetchImpl = fetch,
+  sleepImpl = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  retryDelaysMs = WATCH_FETCH_RETRY_DELAYS_MS,
+} = {}) {
+  const started = Date.now();
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    const remainingMs = timeoutMs - (Date.now() - started);
+    if (remainingMs <= 0) {
+      return { ok: false, status: 'error', body: '', error: 'list fetch timed out' };
+    }
+    const result = await fetchSource(s, remainingMs, { fetchImpl });
+    if (!retryableWatchFailure(result) || attempt === retryDelaysMs.length) return result;
+    const afterAttemptMs = timeoutMs - (Date.now() - started);
+    const delayMs = Math.min(retryDelaysMs[attempt], afterAttemptMs - 1);
+    if (delayMs <= 0) return result;
+    console.warn('sanctions-watch: temporary source failure for ' + s.id
+      + '; retry ' + (attempt + 1) + '/' + retryDelaysMs.length
+      + ' against the same source after ' + delayMs + 'ms');
+    await sleepImpl(delayMs);
+  }
+  return { ok: false, status: 'error', body: '', error: 'source retry budget exhausted' };
 }
 
 /* A core list's declared fallback (fallbackSourceId, e.g. eu-fsf -> fr-dgt
@@ -506,7 +551,7 @@ async function main() {
   const prev = (prevState && prevState.sources) || {};
 
   const fetched = {};
-  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchSource(s); }));
+  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchSourceWithRetry(s); }));
   const nameCounts = {};
   for (const s of sources) {
     const f = fetched[s.id];

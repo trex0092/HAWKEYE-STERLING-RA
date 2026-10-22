@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { countEntries, buildReport, trackErrorStreaks, extractPublishedDate, tfsNewEntries,
   resolveRescreens, capTfsEntries, sealTfsLog, verifyTfsChain, canonicalJson,
-  SCREEN_WORKFLOWS, TFS_LOG_CAP, fetchSource, looksLikeHtmlPage,
+  SCREEN_WORKFLOWS, TFS_LOG_CAP, fetchSource, fetchSourceWithRetry, looksLikeHtmlPage, retryableWatchFailure, WATCH_FETCH_RETRY_DELAYS_MS,
   watchedSources, namesFingerprintBody, rescreenTriggers, splitCoveredErrors, WATCHED_FALLBACK_URLS } from '../scripts/sanctions-watch.mjs';
 import { loadSources, fingerprint, computeChanges, contentChanges } from '../scripts/reg-watch.mjs';
 
@@ -241,7 +241,7 @@ check('report is quiet when nothing moved',
     'https://list.example/content?token=pub': resp(307, '', { location: 'https://sso.example/cas/login?id=1', cookies: ['s=1'] }),
     'https://sso.example/cas/login?id=1': resp(200, '<html>login</html>'),
   };
-  const gated = await fetchSource(csvSrc, 5000, { fetchImpl: async (u, o) => { if (o.redirect === 'follow') throw loopErr; return gateHops[u]; } });
+  const gated = await fetchSourceWithRetry(csvSrc, 5000, { fetchImpl: async (u, o) => { if (o.redirect === 'follow') throw loopErr; return gateHops[u]; } });
   check('watch: a redirect loop ending on a sign-in page is named, not a bare "fetch failed"', !gated.ok && gated.gated && /requires a sign-in/.test(gated.error));
   const ok = await fetchSource(csvSrc, 5000, { fetchImpl: async (u, o) => { if (o.redirect === 'follow') throw loopErr; return resp(200, 'Entity;Name\n1;X'); } });
   check('watch: a cookie-gated loop that resolves to the list is fingerprinted normally', ok.ok && ok.body.startsWith('Entity'));
@@ -263,6 +263,72 @@ check('report is quiet when nothing moved',
   check('watch: the workflow passes EU_FSF_TOKEN to the check step', /EU_FSF_TOKEN: \$\{\{ secrets\.EU_FSF_TOKEN \}\}\n\s+run: node scripts\/sanctions-watch\.mjs "\$MODE"/.test(wf));
 }
 
+/* OFAC SLS connection refusal is not an authorization failure. Allow at most
+ * two bounded retries of the exact official URL, retaining failed coverage if
+ * the upstream endpoint does not recover. All cases are offline fixtures. */
+{
+  const source = { id: 'ofac-sdn', name: 'OFAC SDN', type: 'csv',
+    url: 'https://sanctionslistservice.ofac.treas.gov/api/publicationpreview/exports/sdn.csv' };
+  const response = (status, body) => ({
+    status, ok: status >= 200 && status < 300, text: async () => body,
+  });
+  const refused = () => {
+    throw new TypeError('fetch failed', {
+      cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+    });
+  };
+  const sendUrls = [], delays = [];
+  let attempt = 0;
+  const recovered = await fetchSourceWithRetry(source, 45000, {
+    fetchImpl: async url => {
+      sendUrls.push(url); attempt++;
+      if (attempt < 3) return refused();
+      return response(200, 'entity_id,name\n1,ALPHA\n');
+    },
+    sleepImpl: async ms => { delays.push(ms); },
+  });
+  check('watch: transient connection refusals recover with no more than two retries',
+    recovered.ok && attempt === 3
+    && delays.join(',') === WATCH_FETCH_RETRY_DELAYS_MS.join(',')
+    && sendUrls.length === 3 && sendUrls.every(u => u === source.url));
+
+  let exhaustedCount = 0;
+  const exhausted = await fetchSourceWithRetry(source, 45000, {
+    fetchImpl: async () => { exhaustedCount++; return refused(); },
+    sleepImpl: async () => {},
+  });
+  check('watch: repeated ECONNREFUSED remains an explicit failure after the strict retry cap',
+    !exhausted.ok && exhaustedCount === 3 && /ECONNREFUSED/.test(exhausted.error));
+
+  let transient503 = 0;
+  const retry503 = await fetchSourceWithRetry(source, 45000, {
+    fetchImpl: async () => ++transient503 === 1 ? response(503, 'unavailable') : response(200, 'a,b\n1,2'),
+    sleepImpl: async () => {},
+  });
+  check('watch: transient 503 is retried and valid official data can recover',
+    retry503.ok && transient503 === 2);
+
+  for (const status of [400, 401, 403, 404, 429]) {
+    let attempts = 0;
+    const blocked = await fetchSourceWithRetry(source, 45000, {
+      fetchImpl: async () => { attempts++; return response(status, 'error'); },
+      sleepImpl: async () => { throw Error('unexpected wait'); },
+    });
+    check('watch: HTTP ' + status + ' is not blindly retried', !blocked.ok && attempts === 1);
+  }
+  let attemptedHtml = 0;
+  const gated = await fetchSource(source, 45000, {
+    fetchImpl: async () => { attemptedHtml++; return response(200, '<html>login</html>'); },
+    sleepImpl: async () => { throw Error('unexpected wait'); },
+  });
+  check('watch: fake HTTP 200 login is not retried or fingerprinted',
+    !gated.ok && gated.gated && attemptedHtml === 1);
+  check('watch: no guessed fallback, 429, permanent DNS failure or sign-in is considered transient',
+    !retryableWatchFailure({ ok: false, status: 429, error: 'HTTP 429' })
+    && !retryableWatchFailure({ ok: false, status: 'error', error: 'getaddrinfo ENOTFOUND' })
+    && !retryableWatchFailure({ ok: false, status: 200, gated: true, error: 'HTML page' })
+    && retryableWatchFailure({ ok: false, status: 'error', error: 'fetch failed <- ECONNREFUSED' }));
+}
 /* Declared fallbacks are watched (eu-fsf -> fr-dgt while EU Login gates the
    EU list), fingerprinted by name set, and a first snapshot never re-screens. */
 {
