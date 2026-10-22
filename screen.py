@@ -2040,10 +2040,14 @@ _GNEWS_GATE = _RateGate(
     GNEWS_MIN_INTERVAL, GNEWS_BACKOFF_CAP,
     on_cap=lambda: log(f"  Google News rate-limited — pacing backed off to cap "
                        f"({GNEWS_BACKOFF_CAP:g}s between fetches; recovers on success)"))
-# GDELT asks for ≤ 1 request per 5 seconds per IP; a fixed-interval gate
-# (base == cap) enforces exactly that across all workers.
+# The existing fixed-interval gate limited GDELT REQUEST STARTS, but a
+# slow request could remain in flight when the next worker's slot opened.
+# Serialise actual HTTP lifetimes and reserve at least one full interval AFTER
+# each response completes, while retaining the original provider, timeout and
+# circuit breaker. The adaptive Google News and Bing gates are unaffected.
 GDELT_MIN_INTERVAL = float(os.environ.get("GDELT_MIN_INTERVAL", "5.0"))
 _GDELT_GATE = _RateGate(GDELT_MIN_INTERVAL, GDELT_MIN_INTERVAL)
+_GDELT_FLIGHT_LOCK = threading.Lock()
 
 def parse_gdelt(payload, max_results: int = 8) -> list:
     """GDELT artlist JSON → the same article shape the Google News pass emits.
@@ -2089,15 +2093,21 @@ def search_gdelt(name: str, max_results: int = 8) -> list:
     Paced by the run-global GDELT gate: 8 workers used to fire their first
     GDELT requests simultaneously, which 429'd the feed inside the first minute
     of the 13 Jul run and opened the circuit for all 838 subjects."""
-    _GDELT_GATE.wait()
     q = requests.utils.quote(f'"{name}" ({" OR ".join(GDELT_RISK_TERMS)})')
-    r = requests.get(GDELT_URL.format(query=q), timeout=20,
-                     headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
-    if r.status_code == 429:
-        # The real GDELT DOC endpoint returns 429 even for simple queries and
-        # often omits Retry-After (live diagnostic run 39604741068).
-        # Its fixed 5s gate otherwise immediately queues more rejected calls.
-        _GDELT_GATE.defer_for(_adverse_retry_after_seconds(getattr(r, "headers", None)))
+    with _GDELT_FLIGHT_LOCK:
+        _GDELT_GATE.wait()
+        try:
+            r = requests.get(GDELT_URL.format(query=q), timeout=20,
+                             headers={"User-Agent": "Mozilla/5.0 (compliance screening)"})
+            if r.status_code == 429:
+                # Live GDELT also 429s simple queries without Retry-After.
+                # Preserve the bounded provider-declared or default cooldown.
+                _GDELT_GATE.defer_for(_adverse_retry_after_seconds(getattr(r, "headers", None)))
+        finally:
+            # Release only after the previous HTTP response (or transport
+            # failure), then enforce the complete quiet interval. A prior
+            # 429 cooldown always wins over this shorter ordinary delay.
+            _GDELT_GATE.defer_for(GDELT_MIN_INTERVAL)
     if r.status_code != 200:
         raise RuntimeError(f"GDELT HTTP {r.status_code}")
     if not r.content or not r.content.strip():
