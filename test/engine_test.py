@@ -2193,6 +2193,44 @@ _empty_out, _empty_err = _gdelt_reply("")
 check("GDELT: an empty body is GDELT's own zero-result shape, not a failure",
       _empty_out == [] and _empty_err is None)
 screen._GDELT_GATE.wait, screen.requests.get = _orig_gate, _orig_req_get
+# The Python engine also calls the original GDELT DOC endpoint from several
+# workers. Request-START pacing alone allows simultaneous slow in-flight calls.
+# Exercise the real search path with two synthetic HTTP responses and a fake
+# gate: the per-provider flight lock must keep concurrency at exactly one.
+import threading as _gdelt_test_threading
+import time as _gdelt_test_time
+from concurrent.futures import ThreadPoolExecutor as _gdelt_test_pool
+_gdelt_original_gate, _gdelt_original_get = screen._GDELT_GATE, screen.requests.get
+_gdelt_events, _gdelt_active, _gdelt_peak = [], [0], [0]
+_gdelt_test_lock = _gdelt_test_threading.Lock()
+class _GdeltStubGate:
+    def wait(self):
+        _gdelt_events.append("admit")
+    def defer_for(self, delay):
+        _gdelt_events.append(("post", delay))
+def _gdelt_slow_reply(*_args, **_kwargs):
+    with _gdelt_test_lock:
+        _gdelt_active[0] += 1
+        _gdelt_peak[0] = max(_gdelt_peak[0], _gdelt_active[0])
+    try:
+        _gdelt_test_time.sleep(0.025)
+        return _Resp('{"articles":[]}')
+    finally:
+        with _gdelt_test_lock:
+            _gdelt_active[0] -= 1
+try:
+    screen._GDELT_GATE = _GdeltStubGate()
+    screen.requests.get = _gdelt_slow_reply
+    with _gdelt_test_pool(max_workers=2) as _pool:
+        _gdelt_two = list(_pool.map(screen.search_gdelt, ["Synthetic One", "Synthetic Two"]))
+    check("GDELT HTTP requests never overlap across Python screening workers",
+          _gdelt_peak[0] == 1 and _gdelt_two == [[], []])
+    check("each finished GDELT request reserves its own post-response quiet interval",
+          _gdelt_events == ["admit", ("post", screen.GDELT_MIN_INTERVAL),
+                            "admit", ("post", screen.GDELT_MIN_INTERVAL)])
+finally:
+    screen._GDELT_GATE, screen.requests.get = _gdelt_original_gate, _gdelt_original_get
+
 # Real HTTP 429 responses must defer the same source queue without
 # manufacturing an empty GDELT response as verified coverage.
 _throttle_gate = screen._RateGate(5.0, 5.0)
