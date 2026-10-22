@@ -108,7 +108,7 @@ export function makeEvidenceReader({ repo, token, fetchImpl = fetch }) {
       throw new Error('refusing unapproved evidence endpoint');
     }
     const response = await fetchImpl('https://api.github.com/repos/' + repo + path, {
-      method: 'GET', redirect: 'error', signal: AbortSignal.timeout(15000),
+      method: 'GET', redirect: 'error', signal: globalThis.AbortSignal.timeout(15000),
       headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28' },
     });
