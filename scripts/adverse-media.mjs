@@ -1232,9 +1232,23 @@ async function fetchGdelt(name, timeoutMs) {
     wideFailure = reason;
     noteGdeltObservation(ok, reason);
   };
-  let gd = await fetchSource(gdeltUrl(name, wide), parseGdelt,
+  const startedMs = Date.now();
+  const queryUrl = gdeltUrl(name, wide);
+  let gd = await fetchSource(queryUrl, parseGdelt,
     'application/json', timeoutMs, noteWide, _gdeltGate, permit,
     () => gdeltBreakerState.accepts(ticket));
+  // A connection reset/refusal may recover on one more attempt from the SAME
+  // reviewed GDELT endpoint. Keep the shared rate gate and original query;
+  // never retry an HTTP 429/503 or an invalid response just to claim coverage.
+  // The entire retry uses only the original subject's remaining time budget.
+  if (gd === null && wideFailure === 'transport' && permit()) {
+    const remainingMs = timeoutMs - (Date.now() - startedMs);
+    if (remainingMs > 0) {
+      gd = await fetchSource(queryUrl, parseGdelt,
+        'application/json', remainingMs, noteWide, _gdeltGate, permit,
+        () => gdeltBreakerState.accepts(ticket));
+    }
+  }
   // A rate limit, service outage or transport failure is never evidence that
   // the expanded query is invalid. Retrying its base form would burn the same
   // shared-IP quota and worsen coverage for other subjects.
@@ -1283,11 +1297,26 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
     return items;
   };
 
+  // En-US is the REQUIRED worldwide Google News backbone. Ask it before
+  // optional regional editions can occupy the same shared, rate-limited gate
+  // or trip its circuit. Run GDELT and Bing independently at the same time.
+  // Regional queries still run after that first en-US attempt, at the same
+  // budget and with their original coverage/failure accounting.
+  const googleSweep = async () => {
+    const enUs = localeSet.find(loc => loc.id === 'en-US');
+    const first = enUs
+      ? [{ id: enUs.id, items: await fetchGoogleNews(name, enUs, timeoutMs) }]
+      : [];
+    const regional = await mapPool(localeSet.filter(loc => loc.id !== 'en-US'),
+      conc, loc => fetchGoogleNews(name, loc, timeoutMs)
+        .then(items => ({ id: loc.id, items })));
+    const results = new Map([...first, ...regional].map(result => [result.id, result]));
+    return localeSet.map(loc => results.get(loc.id));
+  };
   const [gd, initialBing, localeResults] = await Promise.all([
     fetchGdelt(name, timeoutMs),
     bingOn ? fetchBing() : Promise.resolve(null),
-    mapPool(localeSet, conc, loc =>
-      fetchGoogleNews(name, loc, timeoutMs).then(items => ({ id: loc.id, items }))),
+    googleSweep(),
   ]);
   let bgRaw = initialBing;
   let bingAttempts = bingOn ? 1 : 0;
