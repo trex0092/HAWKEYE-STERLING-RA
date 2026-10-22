@@ -216,7 +216,7 @@ export async function main() {
       }
       if (!decision) decision = control.id === PRODUCER
         ? screeningDecision(runs, evidence, { nowMs, currentSha, activeRuns: controlActive })
-        : decide(control, runs, { nowMs, branch: 'main', activeRuns: controlActive });
+        : decide(control, runs, { nowMs, branch: 'main', activeRuns: controlActive, currentSha });
       if (decision.action === 'dispatch') {
         const mainRef = await read('/git/ref/heads/main');
         if (mainRef?.object?.sha !== currentSha) throw new Error('main moved; require a new controller invocation');
