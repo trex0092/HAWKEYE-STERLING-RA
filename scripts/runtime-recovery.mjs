@@ -23,16 +23,26 @@ export class RequestStartGate {
     this.nextAt = Math.max(this.nextAt, Date.now() + delay);
   }
 
-  async wait() {
+  /* Optional admission predicate is checked when this caller actually reaches
+     the front of the queue, not only when it first requested a slot. A circuit
+     can open while hundreds of calls are queued. Rejected calls must release
+     their queue position immediately, without waiting for or reserving a
+     provider rate-limit slot. The predicate is read-only: a probe ticket is
+     still issued by the caller AFTER the rate gate admits it. */
+  async wait(shouldAdmit = null) {
     let release;
     const prior = this.tail;
     this.tail = new Promise(resolve => { release = resolve; });
     await prior;
     try {
+      if (shouldAdmit && !shouldAdmit()) return false;
       while (this.nextAt > Date.now()) {
         await new Promise(resolve => setTimeout(resolve, this.nextAt - Date.now()));
+        if (shouldAdmit && !shouldAdmit()) return false;
       }
+      if (shouldAdmit && !shouldAdmit()) return false;
       this.nextAt = Date.now() + this.intervalMs;
+      return true;
     } finally {
       release();
     }
