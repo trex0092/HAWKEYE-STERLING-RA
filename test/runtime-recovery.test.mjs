@@ -85,6 +85,48 @@ try {
   await waiting;
   check('a queued request re-checks a Retry-After deadline extended while asleep', Date.now() - start >= 25);
 
+  // GDELT DOC must not send another query until the previous response has
+  // finished AND the provider's full quiet interval has elapsed. A start-only
+  // gap can overlap slow responses and induce 429s on a shared runner IP.
+  const completeGate = new am.RequestCompletionGate(25);
+  const completions = [];
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const answers = await Promise.all([
+    completeGate.run(async () => {
+      completions.push(['first-start', Date.now()]);
+      await sleep(15);
+      completions.push(['first-end', Date.now()]);
+      return 'first';
+    }),
+    completeGate.run(async () => {
+      completions.push(['second-start', Date.now()]);
+      return 'second';
+    }),
+  ]);
+  const finishedAt = completions.find(x => x[0] === 'first-end')?.[1];
+  const secondAt = completions.find(x => x[0] === 'second-start')?.[1];
+  check('GDELT completion gate prevents overlapping outbound requests and waits a full post-response interval',
+    answers.join(',') === 'first,second' && Number.isFinite(finishedAt)
+    && secondAt >= finishedAt + completeGate.intervalMs);
+
+  const deferredComplete = new am.RequestCompletionGate(5);
+  await deferredComplete.run(async () => { deferredComplete.deferFor(35); });
+  const deferredAt = Date.now();
+  await deferredComplete.run(async () => {});
+  check('GDELT completion never shortens a provider Retry-After cooldown',
+    Date.now() - deferredAt >= 28);
+
+  const skippedComplete = new am.RequestCompletionGate(2000);
+  skippedComplete.deferFor(100);
+  const beforeNoAdmission = skippedComplete.nextAt;
+  let rejectedPermitCalls = 0;
+  const rejected = await skippedComplete.run(
+    async () => { throw Error('breaker-open request contacted provider'); },
+    () => false,
+    () => { rejectedPermitCalls++; return {}; });
+  check('GDELT completion gate refuses a breaker-closed slot without consuming time or a probe',
+    rejected === null && rejectedPermitCalls === 0 && skippedComplete.nextAt === beforeNoAdmission);
+
   // Circuit-breaker admission is rechecked at the FRONT of the shared
   // provider queue. Hundreds of already-queued lookups should not each spend
   // a 20-second provider cooldown slot after an upstream outage.
