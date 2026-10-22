@@ -13,11 +13,19 @@ on:
       - '.github/workflows/control-retry.yml'
       - 'scripts/workflow-recovery.mjs'
       - 'scripts/freshness-check.mjs'
+      - 'scripts/evidence-aware-recovery.mjs'
+      - 'scripts/evidence-aware-recovery-selftest.mjs'
+      - 'scripts/screening-assurance.mjs'
+      - 'scripts/github-workflow-dispatch-guard.mjs'
   pull_request:
     paths:
       - '.github/workflows/control-retry.yml'
       - 'scripts/workflow-recovery.mjs'
       - 'scripts/freshness-check.mjs'
+      - 'scripts/evidence-aware-recovery.mjs'
+      - 'scripts/evidence-aware-recovery-selftest.mjs'
+      - 'scripts/screening-assurance.mjs'
+      - 'scripts/github-workflow-dispatch-guard.mjs'
 
 permissions:
   contents: read
@@ -53,10 +61,19 @@ jobs:
         run: |
           node --check scripts/workflow-recovery.mjs
           node scripts/workflow-recovery.mjs --self-test
+          node --check scripts/evidence-aware-recovery.mjs
+          node scripts/evidence-aware-recovery-selftest.mjs
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { CONTROLS } from './scripts/freshness-check.mjs';
-          import { decide } from './scripts/workflow-recovery.mjs';
+          import { decide, makeApi, readRuns, HELPERS, activePrerequisite } from './scripts/workflow-recovery.mjs';
+          import { dispatchOnce } from './scripts/github-workflow-dispatch-guard.mjs';
+          import { checkStored, approvedSourcePopulationIssue } from './scripts/screening-assurance.mjs';
+          import { qualifyEvidence } from './scripts/evidence-aware-recovery.mjs';
+          for (const helper of [makeApi, readRuns, activePrerequisite, dispatchOnce, checkStored, approvedSourcePopulationIssue]) {
+            assert.equal(typeof helper, 'function', 'the runtime helper must be exported and loadable');
+          }
+          assert.ok(Array.isArray(HELPERS), 'the existing operational helpers remain registered');
           const control = CONTROLS.find(c => c.id === 'sanctions-screen.yml');
           assert.ok(control, 'the actual sanctions producer must remain registered');
           const nowMs = Date.parse('2026-09-29T12:00:00Z');
@@ -64,7 +81,33 @@ jobs:
             status: 'completed', conclusion: 'success', created_at: '2026-09-29T06:00:00Z' };
           assert.equal(decide(control, [run], { nowMs }).action, 'healthy');
           assert.equal(decide(control, [{ ...run, conclusion: 'failure' }], { nowMs }).action, 'dispatch');
-          console.log('Registry integration: successful sanctions execution is recognized; a failed bail is retried.');
+          console.log('Legacy cadence regression only; evidence-aware recovery independently gates the producer.');
+          // Synthetic integration fixture only. No operational receipt is written.
+          const expectedSha = 'a'.repeat(40);
+          const fixture = { version: 1, generatedAt: '2026-09-29T10:00:00Z', operational: true,
+            run: { githubRunId: '123', commit: expectedSha, screenedSubjects: 991 },
+            sourceQuality: { assured: true, reasons: [], evidence: {
+              sanctionsFloors: [{ id: 'fixture', minimum: 1, observed: 1, primaryComplete: true }],
+              fallbackSourcesUsed: [], adverseMediaPartialSubjects: 0, pepUnscreenableSourceRecords: 0,
+              adverseMediaBackboneFailures: { googleNews: 0, gdelt: 0, bing: 0 } } },
+            domains: {
+              sanctions: { operational: true, evidence: { sourcePopulation: {
+                customer: { projectGid: '1214107620220121', screenedSubjects: 971 },
+                employee: { projectGid: '1216239131596624', screenedSubjects: 20 } } } },
+              adverseMedia: { operational: true, evidence: { screenedSubjects: 991, skippedSubjects: 0,
+                partialSubjects: 0, globalBackbones: ['Google News RSS', 'GDELT global index', 'Bing News'],
+                backboneFailures: { googleNews: 0, gdelt: 0, bing: 0 } } },
+              pep: { operational: true, evidence: { sourceUnscreenable: [] } } } };
+          const producer = { ...run, id: 123, head_sha: expectedSha, path: '.github/workflows/sanctions-screen.yml' };
+          const verify = () => qualifyEvidence(fixture, producer, expectedSha,
+            { nowMs, checkStored, approvedSourcePopulationIssue });
+          assert.equal(verify().state, 'verified', 'valid fixture integrates with unchanged production validators');
+          fixture.sourceQuality.assured = false;
+          assert.equal(verify().state, 'degraded', 'actual production quality validation fails closed');
+          fixture.sourceQuality.assured = true;
+          fixture.domains.sanctions.evidence.sourcePopulation.employee.projectGid = 'unapproved-fixture';
+          assert.equal(verify().state, 'degraded', 'actual production source validation rejects redirection');
+          console.log('Three offline integration cases passed with real imported validators; no live evidence was generated.');
           NODE
 
   heal:
@@ -98,7 +141,7 @@ jobs:
       - name: Recover controls without duplicate runs or false success
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/workflow-recovery.mjs
+        run: node scripts/evidence-aware-recovery.mjs
       - name: Alert when recovery needs intervention
         if: failure()
         env:
