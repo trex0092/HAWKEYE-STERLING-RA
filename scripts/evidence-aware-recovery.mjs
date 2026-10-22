@@ -42,10 +42,14 @@ export function screeningDecision(runs, evidence, {
       latest.head_sha === currentSha && String(latest.id) === evidence.runId && evidence.state === 'verified') {
     return { action: 'healthy', reason: 'current-code producer and pinned receipt agree; independent assurance remains required' };
   }
-  const attempts = unique.filter(r => time(r) >= midnight(nowMs));
-  if (attempts.length >= 3) return { action: 'blocked', reason: 'screening retry limit of three attempts today reached; intervention required' };
-  const last = [...unique].sort((a, b) => time(b) - time(a))[0];
-  if (last && nowMs - time(last) < HOUR) return { action: 'cooldown', reason: 'last screening attempt was less than one hour ago' };
+  // Retry and cooldown budgets are scoped to the code revision being
+  // assured. A run against an older SHA still blocks while ACTIVE above, but
+  // once completed it must not consume the new revision's recovery budget.
+  const currentCode = unique.filter(r => r.head_sha === currentSha);
+  const attempts = currentCode.filter(r => time(r) >= midnight(nowMs));
+  if (attempts.length >= 3) return { action: 'blocked', reason: 'current-code screening retry limit of three attempts today reached; intervention required' };
+  const last = [...currentCode].sort((a, b) => time(b) - time(a))[0];
+  if (last && nowMs - time(last) < HOUR) return { action: 'cooldown', reason: 'last current-code screening attempt was less than one hour ago' };
   return { action: 'dispatch', reason: 'current-code assured screening not evidenced; bounded producer recovery required' };
 }
 
