@@ -277,6 +277,7 @@ const assuranceWf = readFileSync(join(wfDir, 'screening-assurance.yml'), 'utf8')
 const pepWf = readFileSync(join(wfDir, 'pep-worldwide.yml'), 'utf8');
 const pepShardWf = readFileSync(join(wfDir, 'pep-shard-harvest.yml'), 'utf8');
 const sanctionsScreenWf = readFileSync(join(wfDir, 'sanctions-screen.yml'), 'utf8');
+const sanctionsWatchWf = readFileSync(join(wfDir, 'sanctions-watch.yml'), 'utf8');
 
 check('screening assurance avoids the dangerous workflow_run trigger',
   !/workflow_run:/.test(assuranceWf));
@@ -285,6 +286,9 @@ check('complete PEP harvest rebuilds runtime evidence through Sanctions Screen',
   && /steps\.harvest\.outputs\.resume != '1'/.test(pepWf)
   && /sanctions-screen\.yml\/dispatches/.test(pepWf)
   && !/screening-assurance\.yml\/dispatches/.test(pepWf));
+check('Sanctions Watch runtime changes self-validate with a real protected-main execution',
+  /push:\s*\n\s*branches:\s*\[main\]/.test(sanctionsWatchWf)
+  && /paths:\s*\n\s*- ['"]\.github\/workflows\/sanctions-watch\.yml['"]\s*\n\s*- ['"]scripts\/sanctions-watch\.mjs['"]/.test(sanctionsWatchWf));
 check('Sanctions Screen writes runtime assurance before persisting state',
   /screening-assurance\.mjs --write/.test(sanctionsScreenWf)
   && /Persist screening \+ case state/.test(sanctionsScreenWf));
