@@ -2659,10 +2659,55 @@
       "detectedAt": "2026-10-22T01:44:57.295Z",
       "prevCount": 1010,
       "newCount": 1010,
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 39723066497,
+        "startedAt": "2026-10-22T04:33:46Z"
+      },
+      "status": "complete",
+      "chainPrev": "89be507a7463c792079b8df53027750b433e8c80e48927cae8cf94c4a9fc5843",
+      "chainHash": "d4837eceb8a3f91a565acfd805e8550782fbb0ddd0f80310123d8fb7c4e1a720",
+      "latencyHours": 2.8,
+      "resolutionHash": "a2b8a14af1d93a9934edf8e900161e1e94900023c4bb5e3f35fca29972229c5f"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-22T05:39:16.985Z",
+      "prevCount": 19458,
+      "newCount": 19472,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "89be507a7463c792079b8df53027750b433e8c80e48927cae8cf94c4a9fc5843",
-      "chainHash": "d4837eceb8a3f91a565acfd805e8550782fbb0ddd0f80310123d8fb7c4e1a720"
+      "chainPrev": "d4837eceb8a3f91a565acfd805e8550782fbb0ddd0f80310123d8fb7c4e1a720",
+      "chainHash": "a18e6c5d5b4f5711d8dff3c59626bb1a686a72a937b2e5a19e2128f160346632"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-22T05:39:16.985Z",
+      "prevCount": 20197,
+      "newCount": 20193,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "a18e6c5d5b4f5711d8dff3c59626bb1a686a72a937b2e5a19e2128f160346632",
+      "chainHash": "39c3add75c46b93317cce4af85ec6e968414a5785e0e1bcdc4fce58d2fb84689"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-22T05:39:16.985Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "39c3add75c46b93317cce4af85ec6e968414a5785e0e1bcdc4fce58d2fb84689",
+      "chainHash": "3d73278717c2837a20dbcb77e99c05de002f6860bf67cfbd3ded732d0019dbf5"
     }
   ]
 }
