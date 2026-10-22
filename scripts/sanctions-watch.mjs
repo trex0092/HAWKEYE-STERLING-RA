@@ -119,59 +119,64 @@ export function retryableWatchFailure(result) {
     .test(String(result.error || ''));
 }
 
-/* Total request time budget includes ALL retries and their delays. The
- * injected sleep is used only in offline tests; operational runs retain
- * actual delays and the AbortController deadline. */
-export async function fetchSource(s, timeoutMs = 45000, {
-  fetchImpl = fetch,
-  sleepImpl = ms => new Promise(resolve => setTimeout(resolve, ms)),
-  retryDelaysMs = WATCH_FETCH_RETRY_DELAYS_MS,
-} = {}) {
+/* Keep the reviewed one-shot network boundary unchanged. Source URLs come from
+ * the repository's reviewed sanctions registry; this function never substitutes
+ * a mirror or derives a destination from subject data. Bounded retry policy is
+ * applied by fetchSourceWithRetry(), outside this sink. */
+export async function fetchSource(s, timeoutMs = 45000, { fetchImpl = fetch } = {}) {
   const ctrl = new AbortController();
-  const started = Date.now();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   const headers = { 'user-agent': 'HawkeyeSterling-SanctionsWatch/1.0' };
   const href = applySourceToken(s.url, s.tokenEnv).href;
   try {
-    for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
-      if (ctrl.signal.aborted) {
-        return { ok: false, status: 'error', body: '', error: 'list fetch timed out' };
-      }
-      let result;
-      try {
-        let res;
-        try {
-          // codeql[js/file-access-to-http]: reviewed 2026-10-02, fixed
-          // official URL from the source registry; no subject data.
-          res = await fetchImpl(href, { signal: ctrl.signal, redirect: 'follow', headers });
-        } catch (e) {
-          if (!/redirect count exceeded/i.test(describeFetchError(e))) throw e;
-          res = await fetchFollowingCookies(href, { signal: ctrl.signal, headers }, { fetchImpl });
-        }
-        const body = await res.text();
-        if (!res.ok) {
-          result = { ok: false, status: res.status, body: '', error: 'HTTP ' + res.status };
-        } else if (LIST_TYPES.has(String(s.type || '').toLowerCase()) && looksLikeHtmlPage(body)) {
-          result = { ok: false, status: res.status, body: '', gated: true,
-            error: 'served an HTML page, not the ' + s.type + ' list (sign-in or error page) - not fingerprinted' };
-        } else {
-          return { ok: true, status: res.status, body, error: null };
-        }
-      } catch (e) {
-        const error = describeFetchError(e);
-        result = { ok: false, status: 'error', body: '', error, gated: SIGN_IN_RE.test(error) };
-      }
-      if (!retryableWatchFailure(result) || attempt === retryDelaysMs.length || ctrl.signal.aborted) return result;
-      const remainingMs = timeoutMs - (Date.now() - started);
-      const delayMs = Math.min(retryDelaysMs[attempt], remainingMs - 1);
-      if (delayMs <= 0) return result;
-      console.warn('sanctions-watch: temporary source failure for ' + s.id
-        + '; retry ' + (attempt + 1) + '/' + retryDelaysMs.length
-        + ' against the same source after ' + delayMs + 'ms');
-      await sleepImpl(delayMs);
+    let res;
+    try {
+      // codeql[js/file-access-to-http]: reviewed 2026-10-02, intended design, not a leak.
+      // Same flow the watcher always had: a public designation-list URL from the
+      // reviewed in-repo config (data/sanctions-sources.json); no subject data is sent.
+      res = await fetchImpl(href, { signal: ctrl.signal, redirect: 'follow', headers });
+    } catch (e) {
+      if (!/redirect count exceeded/i.test(describeFetchError(e))) throw e;
+      res = await fetchFollowingCookies(href, { signal: ctrl.signal, headers }, { fetchImpl });
     }
-    return { ok: false, status: 'error', body: '', error: 'source retry budget exhausted' };
+    const body = await res.text();
+    if (!res.ok) return { ok: false, status: res.status, body: '', error: 'HTTP ' + res.status };
+    if (LIST_TYPES.has(String(s.type || '').toLowerCase()) && looksLikeHtmlPage(body)) {
+      return { ok: false, status: res.status, body: '', gated: true,
+        error: 'served an HTML page, not the ' + s.type + ' list (sign-in or error page) - not fingerprinted' };
+    }
+    return { ok: true, status: res.status, body, error: null };
+  } catch (e) {
+    const error = describeFetchError(e);
+    return { ok: false, status: 'error', body: '', error, gated: SIGN_IN_RE.test(error) };
   } finally { clearTimeout(t); }
+}
+
+/* Retry the same reviewed source only for narrowly classified transient
+ * failures. Each one-shot attempt owns its timeout; the outer wall-clock budget
+ * also includes retry sleeps so recovery remains bounded. */
+export async function fetchSourceWithRetry(s, timeoutMs = 45000, {
+  fetchImpl = fetch,
+  sleepImpl = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  retryDelaysMs = WATCH_FETCH_RETRY_DELAYS_MS,
+} = {}) {
+  const started = Date.now();
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    const remainingMs = timeoutMs - (Date.now() - started);
+    if (remainingMs <= 0) {
+      return { ok: false, status: 'error', body: '', error: 'list fetch timed out' };
+    }
+    const result = await fetchSource(s, remainingMs, { fetchImpl });
+    if (!retryableWatchFailure(result) || attempt === retryDelaysMs.length) return result;
+    const afterAttemptMs = timeoutMs - (Date.now() - started);
+    const delayMs = Math.min(retryDelaysMs[attempt], afterAttemptMs - 1);
+    if (delayMs <= 0) return result;
+    console.warn('sanctions-watch: temporary source failure for ' + s.id
+      + '; retry ' + (attempt + 1) + '/' + retryDelaysMs.length
+      + ' against the same source after ' + delayMs + 'ms');
+    await sleepImpl(delayMs);
+  }
+  return { ok: false, status: 'error', body: '', error: 'source retry budget exhausted' };
 }
 
 /* A core list's declared fallback (fallbackSourceId, e.g. eu-fsf -> fr-dgt
@@ -546,7 +551,7 @@ async function main() {
   const prev = (prevState && prevState.sources) || {};
 
   const fetched = {};
-  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchSource(s); }));
+  await Promise.all(sources.map(async s => { fetched[s.id] = await fetchSourceWithRetry(s); }));
   const nameCounts = {};
   for (const s of sources) {
     const f = fetched[s.id];
