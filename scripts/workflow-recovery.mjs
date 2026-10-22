@@ -47,7 +47,9 @@ export function activePrerequisite(control, activeRuns, {
     && (!currentSha || run.head_sha === currentSha)) || null;
 }
 
-export function decide(control, runs, { nowMs = Date.now(), branch = 'main', activeRuns = [] } = {}) {
+export function decide(control, runs, {
+  nowMs = Date.now(), branch = 'main', activeRuns = [], currentSha = '',
+} = {}) {
   if (!Array.isArray(runs) || !Array.isArray(activeRuns) || !Number.isFinite(nowMs)) {
     return { action: 'unknown', reason: 'invalid run history or clock' };
   }
@@ -62,20 +64,24 @@ export function decide(control, runs, { nowMs = Date.now(), branch = 'main', act
   const finished = scoped.filter(r => r.status === 'completed' && r.conclusion !== 'skipped')
     .sort((a, b) => runTime(b) - runTime(a));
   const cutoff = dayStart(nowMs) - (control.maxAgeDays || 0) * DAY;
-  const success = finished.find(r => r.conclusion === 'success' && runTime(r) >= cutoff);
-  const latest = finished[0];
+  const currentCode = currentSha ? scoped.filter(r => r.head_sha === currentSha) : scoped;
+  const successPool = currentSha ? finished.filter(r => r.head_sha === currentSha) : finished;
+  const success = successPool.find(r => r.conclusion === 'success' && runTime(r) >= cutoff);
+  const latest = successPool[0];
   if (success && latest?.conclusion === 'success') {
     return { action: 'healthy', reason: `operational run ${success.id} succeeded inside its cadence window` };
   }
-  // Includes schedules/manual attempts, preventing an API/billing failure storm.
-  const attempts = scoped.filter(r => runTime(r) >= dayStart(nowMs));
+  // Retry/cooldown budgets are revision-scoped when the caller supplies the
+  // checked-out main SHA. Historical failures cannot certify current code and
+  // must not exhaust its recovery budget. Active old-SHA runs still block above.
+  const attempts = currentCode.filter(r => runTime(r) >= dayStart(nowMs));
   const limit = control.maxAgeDays > 0 ? 1 : 3;
   if (attempts.length >= limit) {
-    return { action: 'blocked', reason: `${attempts.length} attempts today; limit ${limit}, unresolved failure requires review` };
+    return { action: 'blocked', reason: `${attempts.length} current-code attempts today; limit ${limit}, unresolved failure requires review` };
   }
-  const last = scoped.sort((a, b) => runTime(b) - runTime(a))[0];
+  const last = [...currentCode].sort((a, b) => runTime(b) - runTime(a))[0];
   if (last && nowMs - runTime(last) < 3600000) {
-    return { action: 'cooldown', reason: 'last operational attempt was less than one hour ago' };
+    return { action: 'cooldown', reason: 'last current-code operational attempt was less than one hour ago' };
   }
   return { action: 'dispatch', reason: latest && latest.conclusion !== 'success'
     ? `latest operational run ${latest.id} concluded ${latest.conclusion}`
