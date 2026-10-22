@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { countEntries, buildReport, trackErrorStreaks, extractPublishedDate, tfsNewEntries,
   resolveRescreens, capTfsEntries, sealTfsLog, verifyTfsChain, canonicalJson,
-  SCREEN_WORKFLOWS, TFS_LOG_CAP, fetchSource, looksLikeHtmlPage, retryableWatchFailure, WATCH_FETCH_RETRY_DELAYS_MS,
+  SCREEN_WORKFLOWS, TFS_LOG_CAP, fetchSource, fetchSourceWithRetry, looksLikeHtmlPage, retryableWatchFailure, WATCH_FETCH_RETRY_DELAYS_MS,
   watchedSources, namesFingerprintBody, rescreenTriggers, splitCoveredErrors, WATCHED_FALLBACK_URLS } from '../scripts/sanctions-watch.mjs';
 import { loadSources, fingerprint, computeChanges, contentChanges } from '../scripts/reg-watch.mjs';
 
@@ -241,7 +241,7 @@ check('report is quiet when nothing moved',
     'https://list.example/content?token=pub': resp(307, '', { location: 'https://sso.example/cas/login?id=1', cookies: ['s=1'] }),
     'https://sso.example/cas/login?id=1': resp(200, '<html>login</html>'),
   };
-  const gated = await fetchSource(csvSrc, 5000, { fetchImpl: async (u, o) => { if (o.redirect === 'follow') throw loopErr; return gateHops[u]; } });
+  const gated = await fetchSourceWithRetry(csvSrc, 5000, { fetchImpl: async (u, o) => { if (o.redirect === 'follow') throw loopErr; return gateHops[u]; } });
   check('watch: a redirect loop ending on a sign-in page is named, not a bare "fetch failed"', !gated.ok && gated.gated && /requires a sign-in/.test(gated.error));
   const ok = await fetchSource(csvSrc, 5000, { fetchImpl: async (u, o) => { if (o.redirect === 'follow') throw loopErr; return resp(200, 'Entity;Name\n1;X'); } });
   check('watch: a cookie-gated loop that resolves to the list is fingerprinted normally', ok.ok && ok.body.startsWith('Entity'));
@@ -279,7 +279,7 @@ check('report is quiet when nothing moved',
   };
   const sendUrls = [], delays = [];
   let attempt = 0;
-  const recovered = await fetchSource(source, 45000, {
+  const recovered = await fetchSourceWithRetry(source, 45000, {
     fetchImpl: async url => {
       sendUrls.push(url); attempt++;
       if (attempt < 3) return refused();
@@ -293,7 +293,7 @@ check('report is quiet when nothing moved',
     && sendUrls.length === 3 && sendUrls.every(u => u === source.url));
 
   let exhaustedCount = 0;
-  const exhausted = await fetchSource(source, 45000, {
+  const exhausted = await fetchSourceWithRetry(source, 45000, {
     fetchImpl: async () => { exhaustedCount++; return refused(); },
     sleepImpl: async () => {},
   });
@@ -301,7 +301,7 @@ check('report is quiet when nothing moved',
     !exhausted.ok && exhaustedCount === 3 && /ECONNREFUSED/.test(exhausted.error));
 
   let transient503 = 0;
-  const retry503 = await fetchSource(source, 45000, {
+  const retry503 = await fetchSourceWithRetry(source, 45000, {
     fetchImpl: async () => ++transient503 === 1 ? response(503, 'unavailable') : response(200, 'a,b\n1,2'),
     sleepImpl: async () => {},
   });
@@ -310,7 +310,7 @@ check('report is quiet when nothing moved',
 
   for (const status of [400, 401, 403, 404, 429]) {
     let attempts = 0;
-    const blocked = await fetchSource(source, 45000, {
+    const blocked = await fetchSourceWithRetry(source, 45000, {
       fetchImpl: async () => { attempts++; return response(status, 'error'); },
       sleepImpl: async () => { throw Error('unexpected wait'); },
     });
