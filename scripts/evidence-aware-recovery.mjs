@@ -155,6 +155,39 @@ export function independentReady(runs, evidence, currentSha) {
     time(latest) >= Date.parse(evidence.generatedAt);
 }
 
+/* Untrusted GitHub Actions data must not be interpolated into a job summary.
+ * Log the validated immutable commit hashes separately. The markdown report
+ * uses only code-owned control IDs and fixed action interpretations. */
+const SUMMARY_ACTIONS = Object.freeze({
+  healthy: 'Validated recovery routing; independent assurance still required',
+  wait: 'Another run is active; not an operational PASS',
+  cooldown: 'Cooldown is in force; no duplicate dispatch',
+  dispatch: 'Dispatch is eligible; not yet verified',
+  dispatched: 'GitHub accepted dispatch; result unverified',
+  skip: 'Duplicate dispatch suppressed; result unverified',
+  blocked: 'Manual intervention required; no operational PASS',
+  unknown: 'Evidence unavailable or invalid; no operational PASS',
+  deferred: 'Deferred pending required evidence',
+});
+
+export function safeRecoverySummary(rows, evidence, approvedControls = []) {
+  const allowed = Array.isArray(approvedControls) ? approvedControls.filter(name =>
+    typeof name === 'string' && /^[a-z][a-z0-9-]{0,75}\.yml$/.test(name)) : [];
+  const rendered = Array.isArray(rows) ? rows.slice(0, 40).map(row => {
+    const id = allowed.find(name => name === row?.id) || 'unrecognized-control';
+    const action = typeof row?.action === 'string' && Object.hasOwn(SUMMARY_ACTIONS, row.action)
+      ? row.action : 'unknown';
+    return '| ' + id + ' | ' + action + ' | ' + SUMMARY_ACTIONS[action] + ' |';
+  }) : [];
+  const state = evidence?.state === 'verified' ? 'verified' :
+    evidence?.state === 'degraded' ? 'degraded' : 'unknown';
+  return ['# Evidence-aware control recovery', '',
+    'Recovery routing is not screening, AI, security or deployment assurance. A dispatch is not a pass.',
+    'Immutable receipt validation state: ' + state + '. Evidence hashes and exact reasons are in checked runtime logs.', '',
+    '| Control | Recovery state | Interpretation |', '| --- | --- | --- |',
+    ...rendered, ''].join('\n');
+}
+
 export async function main() {
   const { makeApi, readRuns, decide, HELPERS, activePrerequisite } = await import('./workflow-recovery.mjs');
   const { dispatchOnce } = await import('./github-workflow-dispatch-guard.mjs');
@@ -226,12 +259,10 @@ export async function main() {
       branch: 'main', nowMs: Date.now(), quietMs: 30 * 60000,
     }) });
   }
-  const cell = value => String(value).replaceAll('|', '/').replace(/[\r\n]/g, ' ');
-  const report = ['# Evidence-aware control recovery', '',
-    'Recovery routing is not screening, AI, security or deployment assurance. A dispatch is not a pass.',
-    'Pinned receipt: ' + (evidence.stateSha || 'unverified') + ' / blob ' + (evidence.blobSha || 'unverified'), '',
-    '| Control | Recovery state | Evidence / action |', '| --- | --- | --- |',
-    ...rows.map(r => `| ${cell(r.id)} | ${cell(r.action)} | ${cell(r.reason)} |`), ''].join('\n');
+  const report = safeRecoverySummary(rows, evidence,
+    [...CONTROLS, ...HELPERS].map(control => control.id).concat('freshness-check.yml'));
+  console.log('Validated evidence pin: ' + (evidence.stateSha || 'unverified')
+    + ' / ' + (evidence.blobSha || 'unverified'));
   console.log(report);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
   if (evidence.state !== 'verified' || rows.some(r => ['unknown', 'blocked'].includes(r.action))) process.exitCode = 1;
