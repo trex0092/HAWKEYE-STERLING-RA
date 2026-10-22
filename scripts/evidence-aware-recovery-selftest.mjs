@@ -50,6 +50,19 @@ await test('three-attempt limit retained even for unassured success', () => {
   const failed = { ...good, state: 'degraded' };
   assert.equal(plan([baseRun, { ...baseRun, id: 112 }, { ...baseRun, id: 113 }], failed).action, 'blocked');
 });
+await test('completed old-code attempts do not exhaust a new main SHA budget', () => {
+  const failed = { ...good, state: 'degraded' };
+  const old = { ...baseRun, head_sha: oldSha };
+  assert.equal(plan([old, { ...old, id: 112 }, { ...old, id: 113 }], failed).action, 'dispatch');
+});
+await test('recent old-code completion does not impose current-code cooldown', () => {
+  const old = { ...baseRun, head_sha: oldSha, conclusion: 'failure', created_at: '2026-10-22T15:30:00Z' };
+  assert.equal(plan([old], { ...good, state: 'degraded' }).action, 'dispatch');
+});
+await test('active old-code producer still prevents duplicate screening', () => {
+  const oldActive = { ...baseRun, head_sha: oldSha, status: 'in_progress', conclusion: null };
+  assert.equal(plan([oldActive], { ...good, state: 'degraded' }).action, 'wait');
+});
 await test('duplicate history rows do not inflate attempts', () => assert.equal(plan([baseRun, baseRun, baseRun], { ...good, state: 'degraded' }).action, 'dispatch'));
 await test('skipped workflow is not success', () => assert.equal(plan([{ ...baseRun, conclusion: 'skipped' }]).action, 'dispatch'));
 await test('unrelated branches cannot supply successful screening', () => assert.equal(plan([{ ...baseRun, head_branch: 'feature' }]).action, 'dispatch'));
