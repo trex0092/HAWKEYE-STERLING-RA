@@ -105,32 +105,72 @@ export const SIGN_IN_RE = /requires a sign-in|login page|HTML page/i;
    cookie-carrying redirect follower when a redirect loops, and the full cause
    chain on failure instead of a bare "fetch failed". fetchImpl is injectable
    for the offline tests. */
-export async function fetchSource(s, timeoutMs = 45000, { fetchImpl = fetch } = {}) {
+/* A transient network failure is distinct from a stale, sign-in-gated, or
+ * malformed sanctions source. Retry only safe, bounded failures against the
+ * SAME reviewed official source URL. No other list may replace a designation
+ * source without a separately declared and independently assured fallback.
+ * HTTP 429 is deliberately NOT retried to avoid amplifying provider throttling.
+ */
+export const WATCH_FETCH_RETRY_DELAYS_MS = Object.freeze([1500, 3500]);
+export function retryableWatchFailure(result) {
+  if (!result || result.ok || result.gated) return false;
+  if (typeof result.status === 'number') return [502, 503, 504].includes(result.status);
+  return /\b(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT)\b/i
+    .test(String(result.error || ''));
+}
+
+/* Total request time budget includes ALL retries and their delays. The
+ * injected sleep is used only in offline tests; operational runs retain
+ * actual delays and the AbortController deadline. */
+export async function fetchSource(s, timeoutMs = 45000, {
+  fetchImpl = fetch,
+  sleepImpl = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  retryDelaysMs = WATCH_FETCH_RETRY_DELAYS_MS,
+} = {}) {
   const ctrl = new AbortController();
+  const started = Date.now();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   const headers = { 'user-agent': 'HawkeyeSterling-SanctionsWatch/1.0' };
   const href = applySourceToken(s.url, s.tokenEnv).href;
   try {
-    let res;
-    try {
-      // codeql[js/file-access-to-http]: reviewed 2026-10-02, intended design, not a leak.
-      // Same flow the watcher always had: a public designation-list URL from the
-      // reviewed in-repo config (data/sanctions-sources.json); no subject data is sent.
-      res = await fetchImpl(href, { signal: ctrl.signal, redirect: 'follow', headers });
-    } catch (e) {
-      if (!/redirect count exceeded/i.test(describeFetchError(e))) throw e;
-      res = await fetchFollowingCookies(href, { signal: ctrl.signal, headers }, { fetchImpl });
+    for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+      if (ctrl.signal.aborted) {
+        return { ok: false, status: 'error', body: '', error: 'list fetch timed out' };
+      }
+      let result;
+      try {
+        let res;
+        try {
+          // codeql[js/file-access-to-http]: reviewed 2026-10-02, fixed
+          // official URL from the source registry; no subject data.
+          res = await fetchImpl(href, { signal: ctrl.signal, redirect: 'follow', headers });
+        } catch (e) {
+          if (!/redirect count exceeded/i.test(describeFetchError(e))) throw e;
+          res = await fetchFollowingCookies(href, { signal: ctrl.signal, headers }, { fetchImpl });
+        }
+        const body = await res.text();
+        if (!res.ok) {
+          result = { ok: false, status: res.status, body: '', error: 'HTTP ' + res.status };
+        } else if (LIST_TYPES.has(String(s.type || '').toLowerCase()) && looksLikeHtmlPage(body)) {
+          result = { ok: false, status: res.status, body: '', gated: true,
+            error: 'served an HTML page, not the ' + s.type + ' list (sign-in or error page) - not fingerprinted' };
+        } else {
+          return { ok: true, status: res.status, body, error: null };
+        }
+      } catch (e) {
+        const error = describeFetchError(e);
+        result = { ok: false, status: 'error', body: '', error, gated: SIGN_IN_RE.test(error) };
+      }
+      if (!retryableWatchFailure(result) || attempt === retryDelaysMs.length || ctrl.signal.aborted) return result;
+      const remainingMs = timeoutMs - (Date.now() - started);
+      const delayMs = Math.min(retryDelaysMs[attempt], remainingMs - 1);
+      if (delayMs <= 0) return result;
+      console.warn('sanctions-watch: temporary source failure for ' + s.id
+        + '; retry ' + (attempt + 1) + '/' + retryDelaysMs.length
+        + ' against the same source after ' + delayMs + 'ms');
+      await sleepImpl(delayMs);
     }
-    const body = await res.text();
-    if (!res.ok) return { ok: false, status: res.status, body: '', error: 'HTTP ' + res.status };
-    if (LIST_TYPES.has(String(s.type || '').toLowerCase()) && looksLikeHtmlPage(body)) {
-      return { ok: false, status: res.status, body: '', gated: true,
-        error: 'served an HTML page, not the ' + s.type + ' list (sign-in or error page) - not fingerprinted' };
-    }
-    return { ok: true, status: res.status, body, error: null };
-  } catch (e) {
-    const error = describeFetchError(e);
-    return { ok: false, status: 'error', body: '', error, gated: SIGN_IN_RE.test(error) };
+    return { ok: false, status: 'error', body: '', error: 'source retry budget exhausted' };
   } finally { clearTimeout(t); }
 }
 
