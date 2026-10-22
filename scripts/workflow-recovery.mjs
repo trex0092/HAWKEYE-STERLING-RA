@@ -493,6 +493,32 @@ export async function selfTest() {
   assert.equal(action([r({ conclusion: 'failure' }), r({ id: 2, created_at: '2026-09-29T08:00:00Z' })]), 'healthy');
   assert.equal(action([r({ conclusion: 'failure', created_at: '2026-09-29T11:30:00Z' })]), 'cooldown');
   assert.equal(action([r({ conclusion: 'failure' }), r({ conclusion: 'timed_out' }), r({ conclusion: 'cancelled' })]), 'blocked');
+  const current = 'a'.repeat(40);
+  const old = 'b'.repeat(40);
+  assert.equal(action([
+    r({ id: 11, conclusion: 'failure', head_sha: old }),
+    r({ id: 12, conclusion: 'timed_out', head_sha: old }),
+    r({ id: 13, conclusion: 'cancelled', head_sha: old }),
+  ], c, { currentSha: current }), 'dispatch',
+  'completed old-SHA attempts do not exhaust a new revision recovery budget');
+  assert.equal(action([
+    r({ id: 14, conclusion: 'failure', head_sha: old, created_at: '2026-09-29T11:30:00Z' }),
+  ], c, { currentSha: current }), 'dispatch',
+  'recent old-SHA completion does not impose current-code cooldown');
+  assert.equal(action([
+    r({ id: 15, conclusion: 'failure', head_sha: current }),
+    r({ id: 16, conclusion: 'timed_out', head_sha: current }),
+    r({ id: 17, conclusion: 'cancelled', head_sha: current }),
+  ], c, { currentSha: current }), 'blocked',
+  'three current-SHA attempts still exhaust the existing limit');
+  assert.equal(action([], c, { currentSha: current, activeRuns: [
+    r({ id: 18, status: 'in_progress', conclusion: null, head_sha: old }),
+  ] }), 'wait',
+  'active old-SHA run still blocks duplicate dispatch');
+  assert.equal(action([
+    r({ id: 19, conclusion: 'success', head_sha: old }),
+  ], c, { currentSha: current }), 'dispatch',
+  'old-SHA success cannot certify current code');
   assert.equal(action([r({ created_at: '2026-09-20T00:00:00Z' })], { ...c, maxAgeDays: 8 }), 'dispatch');
   assert.equal(action([r({ created_at: '2026-09-23T00:00:00Z' })], { ...c, maxAgeDays: 8 }), 'healthy');
   assert.equal(action([r({ conclusion: 'failure' })], { ...c, maxAgeDays: 8 }), 'blocked');
@@ -599,7 +625,7 @@ export async function selfTest() {
   const dv = guardVerdict([{ id: 'sanctions-screen.yml', doneAtMs: deadline - 1, degraded: true }, { id: 'b', doneAtMs: deadline - 1 }], deadline);
   assert.equal(dv.ok, true);
   assert.ok(dv.degraded && /DEGRADED/.test(dv.reason) && /sanctions-screen\.yml/.test(dv.reason), 'degraded is named, never silent');
-  console.log('workflow-recovery: 63 offline regression checks passed');
+  console.log('workflow-recovery: 68 offline regression checks passed');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
