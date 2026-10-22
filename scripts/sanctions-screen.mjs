@@ -2022,9 +2022,10 @@ export function reconcileAdversePartialCount(current, beforePartial, afterPartia
    still fails stays a counted error: degrade loudly, never a false clear.
    Pure orchestration (clock / sleep injectable) — unit-tested. */
 export const AM_SECOND_PASS_MAX = 100;
-/* The primary enrichment budget is 100 minutes in the 120-minute screening
-   job. A last-resort retry at minute 99 previously never ran: the mandatory
-   60-second cooldown crossed the primary deadline. Permit at most two minutes
+/* The deployed workflow budgets up to 106 minutes of the 120-minute screening
+   job for enrichment. A last-resort retry near that deadline otherwise cannot
+   run: the mandatory 60-second cooldown can cross the primary limit.
+   Permit at most two minutes
    of dedicated RECOVERY time after that deadline, not a new bulk sweep. The
    shared job timeout remains the hard outer bound; failed sources stay FAIL. */
 export const AM_SECOND_PASS_GRACE_MS = 120000;
