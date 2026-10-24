@@ -1,0 +1,75 @@
+{
+ "run_id": "40087299604",
+ "run_attempt": "1",
+ "started_utc": "2026-10-24T10:53:16Z",
+ "updated_utc": "2026-10-24T11:18:49Z",
+ "elapsed_s": 1532.6,
+ "current_phase": "done",
+ "phases": [
+  {
+   "phase": "customers-loaded",
+   "at_utc": "2026-10-24T10:53:16Z",
+   "elapsed_s": 0.0,
+   "detail": {
+    "customers": 339
+   }
+  },
+  {
+   "phase": "enrichment-start",
+   "at_utc": "2026-10-24T10:53:16Z",
+   "elapsed_s": 0.5,
+   "detail": {
+    "subjects": 1017,
+    "workers": 8
+   }
+  },
+  {
+   "phase": "sanctions-done",
+   "at_utc": "2026-10-24T11:07:33Z",
+   "elapsed_s": 857.1,
+   "detail": {
+    "flagged": 71,
+    "clear": 288
+   }
+  },
+  {
+   "phase": "enrichment",
+   "at_utc": "2026-10-24T11:18:24Z",
+   "elapsed_s": 1508.3,
+   "detail": {
+    "done": 1017,
+    "total": 1017
+   }
+  },
+  {
+   "phase": "ai-triage-start",
+   "at_utc": "2026-10-24T11:18:43Z",
+   "elapsed_s": 1527.4,
+   "detail": {
+    "flagged": 71
+   }
+  },
+  {
+   "phase": "ai-triage-done",
+   "at_utc": "2026-10-24T11:18:44Z",
+   "elapsed_s": 1527.8,
+   "detail": {
+    "flagged": 71,
+    "clusters": 71
+   }
+  },
+  {
+   "phase": "delivered",
+   "at_utc": "2026-10-24T11:18:45Z",
+   "elapsed_s": 1529.1,
+   "detail": {
+    "task_gid": "1219837746875785"
+   }
+  },
+  {
+   "phase": "done",
+   "at_utc": "2026-10-24T11:18:49Z",
+   "elapsed_s": 1532.6
+  }
+ ]
+}
