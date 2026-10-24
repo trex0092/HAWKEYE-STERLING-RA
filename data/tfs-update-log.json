@@ -2764,6 +2764,19 @@
       "chainHash": "9fcf811c32c7a5e2e24c29ea226ee5f5af08180a7834801e609e12685c2b1100",
       "latencyHours": 0,
       "resolutionHash": "d2b392287869b24797d4e3738e31e82c4198435f48179083303ead90798d3de3"
+    },
+    {
+      "id": "eu-fsf",
+      "list": "EU — Consolidated financial sanctions list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-24T01:29:07.941Z",
+      "prevCount": 43852,
+      "newCount": 44043,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "9fcf811c32c7a5e2e24c29ea226ee5f5af08180a7834801e609e12685c2b1100",
+      "chainHash": "d29f86584fe28792b4041ccd6ea52057d7312804b0f4846af2acf3dd6e5a7eed"
     }
   ]
 }
