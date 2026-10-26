@@ -1,54 +1,14 @@
-# OSV suppressions for the CI tool venvs pinned in this directory (hash-locked
-# pip lockfiles for the semgrep/zizmor toolchains). Read by osv-scanner
-# (.github/workflows/osv-scanner.yml, `scan --recursive .`) and by the OpenSSF
-# Scorecard Vulnerabilities check (which scans dependencies via the osv-scanner
-# library) — an osv-scanner.toml applies to manifests in the SAME directory.
+# OSV vulnerability-scanning policy for hash-locked CI toolchain manifests.
+# The scanner reads this file alongside ci/*-requirements.txt.
 #
-# Rule for this file: an entry is only acceptable when the vulnerability is
-# (a) NOT remediable by a version bump (upstream pins the vulnerable range) AND
-# (b) NOT exploitable in how this repo uses the package, with the reasoning
-# written out. Remove the entry the moment the upstream unpins — Dependabot
-# (pip, /ci, weekly) will surface the fixed resolution automatically.
-
-[[IgnoredVulns]]
-id = "PYSEC-2026-2132"
-# click 8.1.8 — command injection in click.edit() (CVE-2026-7246 /
-# GHSA-47fr-3ffg-hgmw), fixed in click 8.3.3.
-reason = "Unfixable-by-upgrade and unreachable: semgrep — the only consumer of this venv — requires click~=8.1.8 (still true on the latest semgrep 1.169.0), so click 8.3.3 cannot resolve into ci/semgrep-requirements.txt. The vulnerable function, click.edit(), launches an interactive $EDITOR; the semgrep job runs strictly non-interactively (`semgrep --config .semgrep/hawkeye.yml --error`) on repo-local input in an egress-audited runner and has no code path into click.edit(). This is a CI-only SAST tool venv, never product code (the product is a static web app with no Python runtime). Revisit on every semgrep bump; delete this entry when semgrep accepts click >= 8.3.3."
-
-[[IgnoredVulns]]
-id = "GHSA-47fr-3ffg-hgmw"
-# Alias of PYSEC-2026-2132 above — listed separately in case the scanner
-# reports the advisory under its GHSA id rather than the PYSEC id.
-reason = "Alias of PYSEC-2026-2132 — see the entry above for the full justification (semgrep pins click~=8.1.8; click.edit() is unreachable in the non-interactive CI job)."
-
-# ── mcp 1.23.3 (semgrep venv) — three server-transport advisories, 2026-07-16 ──
-# All three are in the MCP Python SDK's SERVER transports; fixed in mcp 1.27.2 /
-# 1.28.1. semgrep 1.169.0 (latest) declares the exact pin `mcp==1.23.3`
-# (Requires-Dist verified from the wheel metadata), so no fixed version can
-# resolve into ci/semgrep-requirements.txt until semgrep re-pins. The semgrep CI
-# job (semgrep.yml) only ever runs `semgrep scan` as a one-shot, non-interactive
-# static analyzer inside a harden-runner egress-blocked job: it never starts an
-# MCP server, never opens an SSE/Streamable-HTTP/WebSocket listener, and accepts
-# no inbound connections — the vulnerable code is unreachable in this venv.
-# CI-only tool venv, never product code. Revisit on every semgrep bump; delete
-# these entries the moment semgrep accepts mcp >= 1.28.1 (Dependabot pip/ci
-# weekly will surface it).
-
-[[IgnoredVulns]]
-id = "GHSA-hvrp-rf83-w775"
-# CVE-2026-52870 — experimental tasks feature: missing per-client authorization
-# in default task handlers (mcp 1.23.0–1.27.1, fixed 1.27.2).
-reason = "Unfixable-by-upgrade and unreachable: semgrep==1.169.0 hard-pins mcp==1.23.3; the vulnerable code is the MCP SERVER tasks feature on a multi-client server, and the semgrep CI job never starts an MCP server (one-shot non-interactive scan, egress-blocked runner, no inbound connections). See block comment above."
-
-[[IgnoredVulns]]
-id = "GHSA-jpw9-pfvf-9f58"
-# CVE-2026-52869 — SSE / Streamable HTTP server transports: session hijack via
-# session id without principal verification (mcp <= 1.27.1, fixed 1.27.2).
-reason = "Unfixable-by-upgrade and unreachable: semgrep==1.169.0 hard-pins mcp==1.23.3; the vulnerable code is the MCP SERVER HTTP/SSE transport, and the semgrep CI job never opens an HTTP/SSE listener (one-shot non-interactive scan, egress-blocked runner, no inbound connections). See block comment above."
-
-[[IgnoredVulns]]
-id = "GHSA-vj7q-gjh5-988w"
-# Deprecated WebSocket server transport: missing Host/Origin validation on the
-# handshake (mcp < 1.28.1, fixed 1.28.1).
-reason = "Unfixable-by-upgrade and unreachable: semgrep==1.169.0 hard-pins mcp==1.23.3; the vulnerable code is the deprecated MCP WebSocket SERVER transport, and the semgrep CI job never starts a WebSocket server (one-shot non-interactive scan, egress-blocked runner, no inbound connections). See block comment above."
+# No vulnerabilities are currently ignored. All observed findings remain
+# blocking in the recursive OSV scan, including toolchain-only dependencies.
+# Do not use [[IgnoredVulns]] to paper over findings or missing upstream patches.
+#
+# On 2026-10-26 the previous five ignored IDs were retired because the pinned
+# click==8.4.2 and mcp==1.29.0 already exceed their affected version ranges.
+# A separate pair of newly reported advisories remains UNSUPPRESSED:
+# GHSA-84m7-p3x7-pcfv (mcp) and GHSA-xcq7-p3pf-p88h (opentelemetry-api).
+# The upstream Semgrep v1.181/1.182 dependency constraints currently block
+# a supported metadata-consistent upgrade, so OSV MUST remain red until fixed.
+# Incident: https://github.com/trex0092/HAWKEYE-STERLING-RA/issues/1068

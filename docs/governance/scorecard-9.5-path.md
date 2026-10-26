@@ -4,6 +4,18 @@ _Last updated: 2026-07-23 · Scorecard v5.3.0 · live aggregate at the time of
 writing: **8.1** (verified in the 2026-07-23 run results JSON; the README badge
 is served live by `api.scorecard.dev`)._
 
+**2026-10-26 security update:** The historical vulnerability scores and
+suppression explanations below describe the July state, not the current CI
+toolchain. The original Click/MCP exceptions have been removed from
+[`ci/osv-scanner.toml`](../../ci/osv-scanner.toml) because those versions
+are now patched for those older advisories. The repaired OSV run
+[#40328928482](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/40328928482)
+found *new*, unsuppressed `mcp` and `opentelemetry-api` advisories
+[tracked here](https://github.com/trex0092/HAWKEYE-STERLING-RA/issues/1068).
+The recursive OSV scan **failed** and must stay red until those are genuinely
+patched and the verified scanner reruns. This does not change the historical
+2026-07-23 aggregate stated below.
+
 ## 2026-07-23: the Branch-Protection fix landed exactly as predicted — 7.7 → 8.1
 
 The Settings app applied the merged `settings.yml` (approvals 1 + code-owner
