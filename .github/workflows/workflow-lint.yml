@@ -69,7 +69,7 @@ jobs:
             fi
             if [ "$attempt" -lt 3 ]; then
               echo "::warning::actionlint Go module download failed; bounded retry $attempt of 3"
-              sleep $((attempt * 10))
+              sleep "$((attempt * 10))"
             fi
           done
           if [ "$installed" != true ]; then
