@@ -564,27 +564,26 @@ if (pkg.private === true) {
     osv.includes('go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2'));
 }
 
-/* Former OSV ignores became obsolete after upstream dependency upgrades.
-   The new vulnerabilities remain unsuppressed, so no failed scan is forgiven. */
+/* Former OSV ignores are obsolete after upstream dependency upgrades.
+   New vulnerabilities remain unsuppressed, so scans cannot return false green. */
 {
   const lock = readFileSync('ci/semgrep-requirements.txt', 'utf8');
   const policy = readFileSync('ci/osv-scanner.toml', 'utf8');
   const version = name => {
-    const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\/* The Scorecard result can be computed and signed successfully while');
-    const match = new RegExp('^' + safe + '==(\\d+)\\.(\\d+)\\.(\\d+)\\b', 'm').exec(lock);
-    return match ? match.slice(1).map(Number) : null;
+    const entry = lock.split('\n').find(line => line.startsWith(name + '==')) || '';
+    const found = /==([0-9]+)\.([0-9]+)\.([0-9]+)/.exec(entry);
+    return found ? found.slice(1).map(Number) : null;
   };
-  const atLeast = (actual, floor) =>
-    actual && actual.every((n, i) =>
-      n === floor[i] || (n > floor[i] && actual.slice(0, i).every((v, j) => v === floor[j])))
-      || (actual && actual.some((n, i) =>
-        n > floor[i] && actual.slice(0, i).every((v, j) => v === floor[j])));
-  check('old Click and MCP exceptions are removed only after their patched versions',
+  const atLeast = (v, min) => Array.isArray(v) && (
+    v[0] > min[0] ||
+    v[0] === min[0] && (v[1] > min[1] || v[1] === min[1] && v[2] >= min[2])
+  );
+  check('old Click and MCP exceptions are retired only after patched versions',
     atLeast(version('click'), [8, 3, 3]) &&
     atLeast(version('mcp'), [1, 28, 1]));
-  check('OSV cannot silently ignore CI toolchain vulnerabilities',
-    !policy.includes('[[IgnoredVulns]]') &&
-    !/\nid\s*=/.test(policy) &&
+  check('OSV does not silently ignore CI toolchain findings',
+    !/^\s*\[\[IgnoredVulns\]\]/m.test(policy) &&
+    !/^\s*id\s*=/m.test(policy) &&
     policy.includes('GHSA-84m7-p3x7-pcfv') &&
     policy.includes('GHSA-xcq7-p3pf-p88h'));
 }
