@@ -95,6 +95,15 @@ build to attempt to conceal deployment drift. A failed Site Currency check
 is an operational incident requiring Netlify deploy inspection, not grounds
 to bypass production protections.
 
+## Missing-hook configuration
+
+If `NETLIFY_BUILD_HOOK_URL` is absent, a push, scheduled run, or manual deploy
+**fails** because no publishing evidence exists. This is not a successful CD
+run. Only failures after Netlify accepted a hook POST can trigger the bounded
+push retry. Restore an approved repository secret or reconnect continuous
+deployment, then verify the exact bytes served on the production site. A
+build-hook HTTP 200 alone never establishes publication.
+
 ## Optional API preflight, fail fast without weakening production proof
 
 The main branch build-hook workflow now supports a **read-only** Netlify
