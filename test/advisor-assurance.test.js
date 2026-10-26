@@ -714,8 +714,34 @@ const LIMIT_MSG = 'You have reached your specified API usage limits. You will re
   });
   check('every probe runs independently — one outage must not mask another',
     guarded.length === probeIds.length);
-  /* ...and the alert still only fires on a real failure. */
-  check('the alert step still fires only on failure', /if:\s*failure\(\)/.test(HEALTH));
+  /* Regression for the 2026-10-26 incident: all three Netlify function
+     probes passed, but the provider billing error and a failed Asana alert
+     incorrectly triggered a second FUNCTION DOWN incident. */
+  const advisorAlert = HEALTH.split('      - name: Alert in Asana when Advisor upstream is unavailable')[1]
+    ?.split('      - name: Alert in Asana on function infrastructure failure')[0] || '';
+  const infraAlert = HEALTH.split('      - name: Alert in Asana on function infrastructure failure')[1]
+    ?.split('      - name: Require real Advisor upstream evidence')[0] || '';
+  const finalGate = HEALTH.split('      - name: Require real Advisor upstream evidence')[1] || '';
+  check('Advisor outage still emits its own incident even after another probe fails',
+    advisorAlert.includes("!cancelled() && steps.brain_soul_e2e.outcome == 'failure'") &&
+    advisorAlert.includes('ADVISOR DEPENDENCY DOWN'));
+  check('generic function-down incident is limited to actual infrastructure probe failures',
+    infraAlert.includes('!cancelled()') &&
+    ['asana_task', 'risk_backup', 'brain_soul', 'asana_token_e2e'].every(id =>
+      infraAlert.includes("steps." + id + ".outcome == 'failure'")) &&
+    !infraAlert.includes('if: failure()') &&
+    !infraAlert.includes("steps.brain_soul_e2e.outcome == 'failure'"));
+  check('live Advisor evidence stays mandatory even if outage alert delivery succeeds',
+    HEALTH.indexOf('      - name: Require real Advisor upstream evidence') >
+      HEALTH.indexOf('      - name: Alert in Asana on function infrastructure failure') &&
+    finalGate.includes("if: '!cancelled()'") &&
+    finalGate.includes('steps.brain_soul_e2e.outcome') &&
+    finalGate.includes('"$ADVISOR_PROBE_OUTCOME" != "success"') &&
+    finalGate.includes('exit 1'));
+  check('the live provider probe remains nonblocking only to complete other probes',
+    /id:\s*brain_soul_e2e\s*\n\s*continue-on-error:\s*true/.test(HEALTH) &&
+    finalGate.length > 100);
+
 
   // restore environment
   global.fetch = origFetch;
