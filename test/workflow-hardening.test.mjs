@@ -543,6 +543,9 @@ if (pkg.private === true) {
     osv.includes('exit 1'));
   check('OSV source tree and SBOM scans are both blocking despite tee',
     osv.includes('set -uo pipefail') &&
+    osv.includes('set +e') && osv.includes('set -e') &&
+    osv.indexOf('set +e') < osv.indexOf('sbom_status=$?') &&
+    osv.indexOf('tree_status=$?') < osv.indexOf('set -e') &&
     osv.includes('sbom_status=$?') &&
     osv.includes('tree_status=$?') &&
     osv.includes('if [ "$sbom_status" -ne 0 ] || [ "$tree_status" -ne 0 ]; then') &&

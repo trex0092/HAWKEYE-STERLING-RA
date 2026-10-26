@@ -110,12 +110,16 @@ jobs:
           # Explicit pipefail keeps tee from hiding scanner exit statuses.
           # Do not stop after the first failed scan: retain both results.
           set -uo pipefail
+          # GitHub's explicit Bash shell starts with errexit. Disable it only
+          # while collecting both independent scan statuses, then restore it.
+          set +e
           SCANNER="$(go env GOPATH)/bin/osv-scanner"
           "$SCANNER" --sbom=sbom.cdx.json | tee -a "$GITHUB_STEP_SUMMARY"
           sbom_status=$?
           # OSV v1.9.2 CLI has no "scan" subcommand; use its documented flag.
           "$SCANNER" --recursive . | tee -a "$GITHUB_STEP_SUMMARY"
           tree_status=$?
+          set -e
           if [ "$sbom_status" -ne 0 ] || [ "$tree_status" -ne 0 ]; then
             echo "::error::OSV findings or incomplete scan: SBOM=$sbom_status; recursive=$tree_status. Both must pass."
             exit 1
