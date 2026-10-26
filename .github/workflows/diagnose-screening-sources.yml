@@ -55,7 +55,14 @@ jobs:
               chunks.push(chunk);
             }
             const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-            if (data.error || data.errors) throw new Error('Source API error; no completeness claim');
+            if (data.error || data.errors) {
+              // Only the provider's machine-readable error code is diagnostic;
+              // never echo arbitrary response bodies, PII or request headers.
+              const code = String(data.error?.code || data.errors?.[0]?.code || 'unknown')
+                .replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+              console.error('PUBLIC_PEP_API_ERROR_CODE ' + code);
+              throw new Error('Source API error; no completeness claim');
+            }
             return data;
           }
           const data = await request({ action: 'wbgetentities', props: 'info|labels|aliases|descriptions|sitelinks|claims',
