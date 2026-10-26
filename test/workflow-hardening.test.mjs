@@ -548,8 +548,12 @@ if (pkg.private === true) {
     osv.includes('if [ "$sbom_status" -ne 0 ] || [ "$tree_status" -ne 0 ]; then') &&
     osv.includes('exit 1') &&
     !osv.includes('|| true') &&
-    osv.includes('scan --recursive .') &&
+    osv.includes('"$SCANNER" --recursive . | tee -a "$GITHUB_STEP_SUMMARY"') &&
     osv.includes('--sbom=sbom.cdx.json'));
+  check('OSV invokes the documented v1.9.2 recursive CLI, not the newer scan subcommand',
+    osv.includes('go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2') &&
+    osv.includes('"$SCANNER" --recursive . | tee -a "$GITHUB_STEP_SUMMARY"') &&
+    !osv.includes('"$SCANNER" scan --recursive .'));
   check('OSV keeps harden-runner egress blocking and pinned scanner version',
     osv.includes('egress-policy: block') &&
     osv.includes('api.osv.dev:443') &&
