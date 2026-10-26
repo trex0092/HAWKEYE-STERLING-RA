@@ -746,9 +746,9 @@ export function gdeltTerms(name, extra = GDELT_EXTRA_TERMS, max = GDELT_QUERY_MA
    Only query construction changes; no list, scorer or recall threshold does. */
 export function gdeltQueryString(name, terms) {
   const phrase = String(name).normalize('NFKC')
-    .replace(/["“”„‟()\\u0000-\\u001f\\u007f]/g, ' ')
-    .replace(/\\s+/g, ' ').trim();
-  const risk = terms.map(t => /[\\s-]/u.test(t) ? '"' + t + '"' : t);
+    .replace(/["“”„‟()\x00-\x1f\x7f]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  const risk = terms.map(t => /[\s-]/u.test(t) ? '"' + t + '"' : t);
   return '"' + phrase + '" (' + risk.join(' OR ') + ')';
 }
 
