@@ -27,10 +27,8 @@ on:
   # merge to main that touches the SERVED app re-publishes production even if
   # Netlify's own Git integration stays broken (it has been since 27 Jun).
   # Path-filtered so the many daily state-sync/docs/workflow merges don't
-  # burn Netlify build minutes; while the secret is still missing a push
-  # firing is a soft no-op (warning, green), so this trigger is safe to
-  # carry before setup completes. Site Currency (08:07 UTC) independently
-  # alarms if production ever drifts behind main again.
+  # burn Netlify build minutes. Missing hook secrets fail closed even
+  # on a push. Site Currency separately verifies exact production bytes.
   push:
     branches:
       - main
@@ -57,10 +55,9 @@ on:
   # next push and Netlify built whatever was at HEAD by then, not the commit
   # that triggered it). This unconditional daily re-fire closes that gap and
   # self-heals a day's worth of "Netlify's Git integration is still broken"
-  # without waiting on a qualifying push - `kicked` still no-ops quietly if
-  # NETLIFY_BUILD_HOOK_URL is unset, so this is a strict addition, not a new
-  # failure mode. `retry` intentionally stays push-only (see that job): a
-  # scheduled run that fails doesn't self-retry same-day, it just tries again
+  # without waiting on a qualifying push. Missing hook credentials fail,
+  # and do not trigger a pointless re-dispatch. `retry` stays push-only
+  # after an accepted hook. Failed scheduled runs try again
   # at tomorrow's 07:00 UTC, with Site Currency as the independent alarm in
   # between.
   schedule:
@@ -75,6 +72,10 @@ concurrency:
 
 jobs:
   deploy:
+    # Only a confirmed hook POST can be a candidate for retry.
+    # Export a boolean, never the build hook secret URL.
+    outputs:
+      hook_accepted: ${{ steps.kick.outputs.kicked }}
     runs-on: ubuntu-latest
     timeout-minutes: 25 # headroom for the ~18-min publish-verify poll (slow Free-tier CDN propagation)
     steps:
@@ -135,22 +136,10 @@ jobs:
               # expose names AND values even when we intended to print names.
               echo "Probed and empty: NETLIFY_BUILD_HOOK_URL and common variants (NETLIFY_BUILD_HOOK, NETLIFY_BUILDHOOK_URL, NETLIFY_HOOK_URL, BUILD_HOOK_URL, NETLIFY_WEBHOOK_URL), plus the Variables tab."
               echo "Remaining causes: saved under an ENVIRONMENT (this workflow binds none — re-save as a Repository secret), saved on a different repository, or never saved on the GitHub side at all."
-              if [ "$EVENT" = "push" ]; then
-                # Deliberately non-fatal so ordinary merges are not blocked by a
-                # one-time setup step nobody can perform from CI — but the
-                # warning must name the CONSEQUENCE, not just the missing
-                # secret. Netlify's own Git integration has not published a
-                # production deploy from a push since 27 Jun (no Netlify
-                # check-run appears on any main commit), so with this secret
-                # absent there is NO path from a merge to the live site at all.
-                # Site Currency (08:07 UTC daily) is the alarm that this has
-                # happened; it went undetected for a month because it was
-                # comparing a hand-maintained version string instead of content.
-                echo "::warning::NETLIFY_BUILD_HOOK_URL is not set, so THIS MERGE IS NOT DEPLOYED — it is on main but not on the live site, and Netlify's Git integration has not published a push-triggered production build since 27 Jun. Set the secret (see the header of this workflow) or re-link the repository in Netlify."
-                echo "kicked=false" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-              echo "::error::NETLIFY_BUILD_HOOK_URL is not set as a Repository secret (all likely variants probed empty — see above). Netlify -> Site configuration -> Build & deploy -> Build hooks -> Add build hook (branch: main); then GitHub -> Settings -> Secrets and variables -> Actions -> SECRETS tab -> New repository secret, name NETLIFY_BUILD_HOOK_URL."
+              # Never claim a successful deployment when no build was triggered.
+              # Fail closed on push, schedule, and manual dispatch.
+              echo "kicked=false" >> "$GITHUB_OUTPUT"
+              echo "::error::NETLIFY_BUILD_HOOK_URL is absent, so production was NOT deployed. Configure an approved main-branch build-hook Repository secret, or restore Netlify continuous deployment. No publication proof exists."
               exit 1
             fi
           fi
@@ -246,8 +235,8 @@ jobs:
   #
   # Degrade loudly, never silently:
   #   - the failed deploy job KEEPS its red — nothing here rewrites history;
-  #   - only a push-triggered failure retries, so a retried run that fails
-  #     again stops at a human instead of chaining;
+  #   - only a push-triggered failure AFTER an accepted hook retries;
+  #     absent credentials cannot cause a pointless re-dispatch;
   #   - a hard cap of 3 workflow runs per UTC day backstops even that — at
   #     the cap this job goes red itself and says so, because a Netlify build
   #     spends the team's build minutes and a fourth identical failure needs
@@ -280,7 +269,7 @@ jobs:
 
   retry:
     needs: deploy
-    if: ${{ failure() && github.event_name == 'push' }}
+    if: ${{ failure() && github.event_name == 'push' && needs.deploy.outputs.hook_accepted == 'true' }}
     # ACCEPTED RISK — OpenSSF Scorecard Token-Permissions (code-scanning alert
     # #136, dismissed 2026-08-05): `gh workflow run` (the workflow_dispatch API)
     # requires `actions: write`; GitHub offers no narrower "dispatch-only"
