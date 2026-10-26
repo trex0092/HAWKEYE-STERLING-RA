@@ -563,7 +563,7 @@ if (pkg.private === true) {
   check('screening assurance still requires genuine source quality on the current commit',
     assurance.includes('node scripts/screening-assurance.mjs --check') &&
     assurance.includes('SCREENING_ASSURANCE_EXPECTED_COMMIT: ${{ github.sha }}') &&
-    /sourceQuality\.assured !== true/.test(
+    /sourceQuality\?\.assured !== true/.test(
       readFileSync('scripts/screening-assurance.mjs', 'utf8')));
 }
 
