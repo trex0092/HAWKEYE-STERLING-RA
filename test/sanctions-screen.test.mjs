@@ -35,6 +35,71 @@ check('second pass preserves partial tally when still reduced redundancy',
 check('second pass records newly partial result exactly once',
   scr.reconcileAdversePartialCount(3, false, true) === 4);
 
+/* Independent media and PEP checks may overlap, but they MUST preserve
+   both actual provider observations. Never substitute a skip/success on error. */
+{
+  const starts = [];
+  let releaseMedia, releasePep;
+  const mediaPending = new Promise(resolve => { releaseMedia = resolve; });
+  const pepPending = new Promise(resolve => { releasePep = resolve; });
+  const pending = scr.fetchIndependentEnrichment('Synthetic Subject', {
+    adverseMedia: true, pep: true, timeoutMs: 777,
+  }, {
+    mediaLookup: (name, opts) => {
+      starts.push('media:' + name + ':' + opts.timeoutMs);
+      return mediaPending;
+    },
+    pepLookup: (name, opts) => {
+      starts.push('pep:' + name + ':' + opts.timeoutMs);
+      return pepPending;
+    },
+  });
+  check('enrichment: media and PEP requests both start without waiting for the other',
+    starts.join('|') === 'media:Synthetic Subject:777|pep:Synthetic Subject:777');
+  let finished = false;
+  pending.then(() => { finished = true; });
+  releaseMedia({ errored: true, backbones: { bing: false } });
+  await Promise.resolve();
+  check('enrichment: one completed provider is not treated as two completed checks',
+    finished === false);
+  releasePep({ errored: false, hit: true });
+  const [media, pep] = await pending;
+  check('enrichment: true provider outcomes remain separate, including failure evidence',
+    media.errored === true && media.backbones.bing === false &&
+    pep.errored === false && pep.hit === true);
+
+  let called = 0;
+  const service = { mediaLookup: async () => { called++; return { hit: false }; },
+    pepLookup: async () => { called++; return { hit: false }; } };
+  const disabled = await scr.fetchIndependentEnrichment('Synthetic Subject', {
+    adverseMedia: false, pep: false,
+  }, service);
+  check('enrichment: disabled services never issue requests or invent verified results',
+    called === 0 && disabled[0] === null && disabled[1] === null);
+  const pepOnly = await scr.fetchIndependentEnrichment('Synthetic Subject', {
+    adverseMedia: false, pep: true,
+  }, service);
+  check('enrichment: PEP-only routing does not secretly query adverse media',
+    called === 1 && pepOnly[0] === null && pepOnly[1].hit === false);
+  const mediaOnly = await scr.fetchIndependentEnrichment('Synthetic Subject', {
+    adverseMedia: true, pep: false,
+  }, service);
+  check('enrichment: media-only routing preserves disabled PEP',
+    called === 2 && mediaOnly[0].hit === false && mediaOnly[1] === null);
+
+  let rejected = false;
+  try {
+    await scr.fetchIndependentEnrichment('Synthetic Subject', {
+      adverseMedia: true, pep: false,
+    }, { mediaLookup: async () => { throw new Error('synthetic outage'); },
+      pepLookup: async () => ({ hit: false }) });
+  } catch (e) { rejected = e.message === 'synthetic outage'; }
+  check('enrichment: unexpected lookup exceptions still fail closed', rejected);
+  const source = readFileSync(new URL('../scripts/sanctions-screen.mjs', import.meta.url), 'utf8');
+  check('enrichment: the production per-subject loop actually uses the parallel helper',
+    /const \\[am, pp\\] = enrich[\\s\\S]{0,200}await fetchIndependentEnrichment\\(s\\.name/.test(source));
+}
+
 /* ── name folding ── */
 check('normalizeName folds case, punctuation and diacritics',
   normalizeName('YÜKSEL KIYMETLİ MADENLER TİCARET A.Ş.') === normalizeName('yuksel kiymetli madenler ticaret a s'));
