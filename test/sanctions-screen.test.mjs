@@ -97,7 +97,8 @@ check('second pass records newly partial result exactly once',
   check('enrichment: unexpected lookup exceptions still fail closed', rejected);
   const source = readFileSync(new URL('../scripts/sanctions-screen.mjs', import.meta.url), 'utf8');
   check('enrichment: the production per-subject loop actually uses the parallel helper',
-    /const \\[am, pp\\] = enrich[\\s\\S]{0,200}await fetchIndependentEnrichment\\(s\\.name/.test(source));
+    source.includes('const [am, pp] = enrich') &&
+    source.includes('await fetchIndependentEnrichment(s.name, {'));
 }
 
 /* ── name folding ── */
