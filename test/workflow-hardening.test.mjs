@@ -487,7 +487,32 @@ if (pkg.private === true) {
   const lintWorkflow = readFileSync(join(dir, 'workflow-lint.yml'), 'utf8');
   check('workflow lint retries the pinned actionlint INSTALL at most three times',
     lintWorkflow.includes('for attempt in 1 2 3; do') &&
-    lintWorkflow.includes('if go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7; then'));
+    lintWorkflow.includes('if go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12; then'));
+  check('proxy refusal permits only one direct pinned actionlint install with checksum validation',
+    lintWorkflow.includes('if GOPROXY=direct GOSUMDB=sum.golang.org go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12; then') &&
+    lintWorkflow.includes('Go module proxy unavailable') &&
+    !/GOSUMDB=(?:off|sumdb\.off)/.test(lintWorkflow) &&
+    !/GOINSECURE=/.test(lintWorkflow));
+  const primary = lintWorkflow.indexOf('for attempt in 1 2 3; do');
+  const direct = lintWorkflow.indexOf('if GOPROXY=direct GOSUMDB=sum.golang.org');
+  const failed = lintWorkflow.indexOf('workflow lint did NOT run.');
+  const actualLint = lintWorkflow.indexOf('bin/actionlint" -color');
+  check('direct fallback occurs after the three proxy attempts and before mandatory lint',
+    primary >= 0 && direct > primary && failed > direct && actualLint > failed);
+  check('official actionlint fallback is SHA-256 pinned before extraction',
+    lintWorkflow.includes('actionlint_1.7.12_linux_amd64.tar.gz') &&
+    lintWorkflow.includes('8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8') &&
+    lintWorkflow.includes('sha256sum --check --status') &&
+    lintWorkflow.includes('release-assets.githubusercontent.com:443') &&
+    lintWorkflow.includes('install -m 0755') &&
+    lintWorkflow.indexOf('sha256sum --check --status') <
+      lintWorkflow.indexOf('tar -xzf "$archive"') &&
+    lintWorkflow.indexOf('tar -xzf "$archive"') <
+      lintWorkflow.indexOf('install -m 0755'));
+  check('release mismatch and transport exhaustion never pretend lint succeeded',
+    lintWorkflow.includes('SHA-256 mismatch; refusing execution') &&
+    lintWorkflow.includes('workflow lint did NOT run.') &&
+    !lintWorkflow.includes('actionlint" -color || true'));
   check('actionlint cannot pass on exhausted installation retries',
     lintWorkflow.includes('if [ "$installed" != true ]; then') &&
     lintWorkflow.includes('workflow lint did NOT run.') &&

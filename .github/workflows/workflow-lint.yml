@@ -43,6 +43,7 @@ jobs:
             api.github.com:443
             codeload.github.com:443
             objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
             proxy.golang.org:443
             sum.golang.org:443
             storage.googleapis.com:443
@@ -63,7 +64,7 @@ jobs:
           # a real actionlint YAML/expression/security finding.
           installed=false
           for attempt in 1 2 3; do
-            if go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7; then
+            if go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12; then
               installed=true
               break
             fi
@@ -72,8 +73,41 @@ jobs:
               sleep "$((attempt * 10))"
             fi
           done
+          # The default GOPROXY does not fall back to VCS on connection refusal
+          # (only on 404/410). Try one direct fetch of the same pinned version
+          # if all official-proxy attempts were refused. Keep the public
+          # checksum database enabled and REQUIRED; never bypass verification.
           if [ "$installed" != true ]; then
-            echo "::error::actionlint could not be installed after three attempts; workflow lint did NOT run."
+            echo "::warning::Go module proxy unavailable; trying one version-pinned direct GitHub fetch with the public checksum database still enforced."
+            if GOPROXY=direct GOSUMDB=sum.golang.org go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12; then
+              installed=true
+            fi
+          fi
+          # A version-pinned, SHA-256-verified release archive is the final
+          # bounded path when both Go module services refuse connections.
+          # The expected digest comes from the upstream GitHub release metadata.
+          # Never extract or run a downloaded archive until it matches.
+          if [ "$installed" != true ]; then
+            echo "::warning::Go module services unavailable; trying a checksum-pinned official actionlint release."
+            tmp_dir=$(mktemp -d)
+            trap 'rm -rf "$tmp_dir"' EXIT
+            archive="$tmp_dir/actionlint_1.7.12_linux_amd64.tar.gz"
+            if curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 --retry 1 \
+              -o "$archive" \
+              "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"; then
+              if ! printf '%s  %s\n' '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' "$archive" | sha256sum --check --status; then
+                echo "::error::Official actionlint release SHA-256 mismatch; refusing execution."
+                exit 1
+              fi
+              if tar -xzf "$archive" -C "$tmp_dir" actionlint; then
+                mkdir -p "$(go env GOPATH)/bin"
+                install -m 0755 "$tmp_dir/actionlint" "$(go env GOPATH)/bin/actionlint"
+                installed=true
+              fi
+            fi
+          fi
+          if [ "$installed" != true ]; then
+            echo "::error::actionlint could not be installed via verified Go module or pinned release paths; workflow lint did NOT run."
             exit 1
           fi
           "$(go env GOPATH)/bin/actionlint" -color

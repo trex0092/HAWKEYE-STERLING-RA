@@ -45,6 +45,21 @@ check('country-score suggestion JSON changes alone trigger publishing, not risk-
 check('unrelated governance and transient state do not consume Netlify build minutes',
   !deployTriggeredFor('data/grc-metrics.json') &&
   !deployTriggeredFor('docs/governance/dpia-2026.md'));
+/* An absent hook used to exit 0 on main pushes, despite publishing nothing.
+   No accepted hook also means a retry cannot recover this configuration. */
+const configFailure = workflow.split('if [ -z "$found" ]; then')[1]?.split("          # The hook itself")[0] || '';
+check('absent hook fails closed for a production push',
+  configFailure.includes('kicked=false') &&
+  configFailure.includes('production was NOT deployed') &&
+  configFailure.includes('exit 1') && !configFailure.includes('exit 0') &&
+  !configFailure.includes('if [ "$EVENT" = "push" ]'));
+check('deploy exposes only hook-accepted boolean, never a secret',
+  workflow.includes("hook_accepted: ${{ steps.kick.outputs.kicked }}") &&
+  !workflow.includes("hook_accepted: ${{ steps.kick.outputs.HOOK_URL }}"));
+check('recovery retries accepted publish hooks, not missing credentials',
+  workflow.includes("needs.deploy.outputs.hook_accepted == 'true'") &&
+  workflow.includes("github.event_name == 'push'") &&
+  workflow.includes('if [ "$runs" -ge 3 ]'));
 check('production deploy never equates HTTP 200 with published assets',
   workflow.includes('scripts/site-currency.mjs --quiet') &&
   workflow.includes('in ~18 minutes') &&
