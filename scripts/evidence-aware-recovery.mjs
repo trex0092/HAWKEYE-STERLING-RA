@@ -201,16 +201,12 @@ export async function main() {
       }
       const controlActive = activeRuns.filter(r => r.path === '.github/workflows/' + control.id);
       let decision;
-      if (control.id === 'site-currency.yml') {
-        let assured = false;
-        if (evidence.state === 'verified') {
-          const assuranceRuns = await readRuns(api, '/actions/workflows/screening-assurance.yml/runs', {
-            branch: 'main', created: '>=' + evidence.generatedAt,
-          });
-          assured = independentReady(assuranceRuns, evidence, currentSha);
-        }
-        if (!assured) decision = { action: 'blocked', reason: 'production parity deferred until independent screening recovery' };
-      }
+      // Site Currency performs a READ-ONLY byte comparison between the live
+      // Netlify site and main. It is a separate failure detector, not a deploy
+      // action or screening clearance. A missing independent screening receipt
+      // must never suppress this inspection; if production is stale the Site
+      // Currency workflow itself will correctly FAIL. Retain the separate
+      // active-deployment prerequisite below to avoid premature comparisons.
       if (!decision && activePrerequisite(control, activeRuns, { branch: 'main', currentSha })) {
         decision = { action: 'wait', reason: 'current-main deployment remains active; no premature production probe' };
       }
@@ -220,7 +216,10 @@ export async function main() {
       if (decision.action === 'dispatch') {
         const mainRef = await read('/git/ref/heads/main');
         if (mainRef?.object?.sha !== currentSha) throw new Error('main moved; require a new controller invocation');
-        if ([PRODUCER, 'site-currency.yml'].includes(control.id)) {
+        // Pin the source receipt only when dispatching its SCREENING producer.
+        // The independent, read-only Site Currency probe verifies expected
+        // main SHA against served bytes and never consumes screening receipts.
+        if (control.id === PRODUCER) {
           const latestState = await read('/git/ref/heads/screen-state');
           if (latestState?.object?.sha !== evidence.stateSha) throw new Error('screening evidence changed; re-evaluation required');
         }
