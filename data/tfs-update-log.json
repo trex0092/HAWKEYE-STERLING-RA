@@ -2811,10 +2811,29 @@
       "detectedAt": "2026-10-26T10:59:16.352Z",
       "prevCount": 58610,
       "newCount": 58646,
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 40324628106,
+        "startedAt": "2026-10-26T12:42:43Z"
+      },
+      "status": "complete",
+      "chainPrev": "b56bbc5f485aaddfbc8c4d257f51e541179877e383d76b332b4cd9d531b59d79",
+      "chainHash": "4cf7b180eeb822e2d93981d0fac523113a8c69cfbb0523d5045d4ab181a1831e",
+      "latencyHours": 1.7,
+      "resolutionHash": "2f9ff9b5d067cff6cd6d95924335be36cfacdcfa70c21ce04778ce73f44424c3"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-26T19:08:38.583Z",
+      "prevCount": 22485,
+      "newCount": 22840,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "b56bbc5f485aaddfbc8c4d257f51e541179877e383d76b332b4cd9d531b59d79",
-      "chainHash": "4cf7b180eeb822e2d93981d0fac523113a8c69cfbb0523d5045d4ab181a1831e"
+      "chainPrev": "4cf7b180eeb822e2d93981d0fac523113a8c69cfbb0523d5045d4ab181a1831e",
+      "chainHash": "9a4eb483af5055097ba02a95dda8a8d4aa146c8da7ebe880e400d81dd6874ce0"
     }
   ]
 }
