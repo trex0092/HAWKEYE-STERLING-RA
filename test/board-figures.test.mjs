@@ -293,5 +293,29 @@ console.log('\n— runtime worldwide screening assurance —\n');
     of('black').every(j => j.call === 'countermeasures' || j.call === 'enhanced due diligence'));
 }
 
+
+/* README assurance visibility is part of the fail-closed control surface.
+   Cosmetic badge reduction must never hide an independently failing control. */
+{
+  const intro = readFileSync(join(ROOT, 'README.md'), 'utf8').split('## Contents')[0];
+  const required = [
+    'screening-assurance.yml', 'sanctions-screen.yml', 'freshness-check.yml',
+    'control-retry.yml', 'fortify.yml', 'advisor-eval.yml', 'advisor-bias-eval.yml',
+    'netlify-production-deploy.yml', 'site-currency.yml', 'function-health.yml',
+  ];
+  for (const file of required) {
+    check('README exposes live main status for ' + file,
+      intro.includes('/actions/workflows/' + file) &&
+      intro.includes('/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/' + file + '?branch=main'));
+  }
+  check('README distinguishes actual screening source quality from runtime status',
+    intro.includes('`sourceQuality.assured`') &&
+    intro.includes('`operational`') &&
+    intro.includes('/screen-state/data/screening-assurance.json'));
+  check('README does not present green domain-runtime badges as independent assurance',
+    !/data\\/badges\\/(sanctions|adverse-media|pep)-operational\\.svg/.test(intro));
+  check('README keeps the operational badge inventory focused', (intro.match(/!\\[/g) || []).length <= 15);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
