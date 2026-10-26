@@ -1,0 +1,39 @@
+name: Read-only GRC snapshot diagnostics
+on:
+  push:
+    branches:
+      - diagnostics/grc-metrics-snapshot-20261026
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Harden the runner (egress block)
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            *.githubapp.com:443
+      - name: Read-only checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Recompute committed public governance metrics
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/grc-metrics.mjs --write
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const value = JSON.parse(readFileSync('data/grc-metrics.json', 'utf8'));
+          if (value.schema !== 'hawkeye-sterling.grc-metrics/v1') throw Error('Unexpected schema');
+          if (!value.metrics || !value.kris || !value.counters) throw Error('Missing metrics');
+          console.log('GRC_SNAPSHOT_JSON=' + JSON.stringify(value));
+          NODE
