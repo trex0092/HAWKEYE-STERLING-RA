@@ -88,7 +88,16 @@ try {
      append is verified by Asana's story receipt. On lookup/post failure the
      existing GitHub issue fallback is retained. Real regressions and actual
      regulatory/list changes continue through notifyAsana unchanged. */
-  const refreshed = await refreshOpenAdvisorEvaluationOutage(asana, REG_PROJECT_GID, title, notes);
+  // A full per-case live model report may exceed Asana's 4 KB story limit.
+  // The existing task already holds the original report; each new run needs
+  // a compact outcome plus the unique workflow URL, never a silently dropped
+  // or truncated provider response.
+  const resultLine = (report.split(/\r?\n/).find(line => line.startsWith('**Result:')) ||
+    'Result unavailable in report; review workflow evidence.').slice(0, 1000);
+  const outageEvidence = [title, resultLine, link ? 'Workflow run: ' + link : '']
+    .filter(Boolean).join('\n');
+  const refreshed = await refreshOpenAdvisorEvaluationOutage(
+    asana, REG_PROJECT_GID, title, outageEvidence);
   if (refreshed) {
     console.log('watch-notify: ongoing Advisor evaluation outage (' + (refreshed.url || refreshed.gid)
       + '); latest run evidence ' + (refreshed.evidencePosted ? 'attached' : 'already recorded')
