@@ -150,8 +150,8 @@ await test('read API refuses redirects and masks response body', async () => {
 await test('both workflows still require one shared non-cancelling state-writer group', () => {
   for (const id of ['weekly-adverse-media.yml', 'onboarding-screen.yml']) {
     const text = readFileSync('.github/workflows/' + id, 'utf8');
-    assert.match(text, /group:\\s*screen-state/);
-    assert.match(text, /cancel-in-progress:\\s*false/);
+    assert.match(text, /group:\s*screen-state/);
+    assert.match(text, /cancel-in-progress:\s*false/);
   }
 });
 const writerRun = (id, status = 'in_progress', branch = 'main') => ({
