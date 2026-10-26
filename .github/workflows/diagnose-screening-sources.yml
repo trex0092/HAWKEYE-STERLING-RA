@@ -232,7 +232,7 @@ jobs:
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
-          import { gdeltUrl, gdeltTerms, GDELT_RISK_TERMS, parseGdelt } from './scripts/adverse-media.mjs';
+          import { gdeltUrl, gdeltTerms, GDELT_RISK_TERMS, parseGdelt, gdeltFailureClass } from './scripts/adverse-media.mjs';
           const subject = 'Hawkeye Synthetic Diagnostic';
           const probes = [
             ['public-simple', 'https://api.gdeltproject.org/api/v2/doc/doc?query='
@@ -262,11 +262,16 @@ jobs:
               result.responseKind = text.trim().startsWith('{') ? 'json-shaped'
                 : text.trim().startsWith('<') ? 'html-shaped'
                 : text.trim() ? 'plain-text' : 'empty-body';
+              // Classify provider refusals with the existing production parser;
+              // do not print arbitrary provider bodies or treat HTTP 200 as success.
               if (result.status === 200) {
                 const items = parseGdelt(text);
                 result.parseAccepted = Array.isArray(items);
                 result.articles = Array.isArray(items) ? items.length : null;
-              }
+                result.failureClass = result.parseAccepted ? null : gdeltFailureClass(200, text);
+                result.noResultNotice = !result.parseAccepted &&
+                  /(?:no matching (?:documents|articles)|no results found)/i.test(text);
+              } else result.failureClass = gdeltFailureClass(result.status);
             } catch (e) {
               result.errorType = String(e?.name || 'transport-failure').slice(0,60);
             }
