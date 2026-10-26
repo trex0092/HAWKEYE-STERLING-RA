@@ -523,5 +523,49 @@ if (pkg.private === true) {
     scorecard.includes('exit 1'));
 }
 
+/* 2026-10-26: after checkout failed through an intermittent blocked GitHub
+   connection, Screening Assurance's if: failure() step ran a non-existent
+   scripts/asana-alert.mjs and lost the incident. The fallback must not need
+   checkout, must confirm remote issue writes, and must never turn red evidence
+   into a passing screening result. */
+{
+  const assurance = readFileSync(join(dir, 'screening-assurance.yml'), 'utf8');
+  const fetch = assurance.split('      - uses: actions/checkout@')[1]
+    ?.split('      - uses: actions/setup-node@')[0] || '';
+  const asana = assurance.split('      - name: Alert in Asana when worldwide screening assurance fails')[1]
+    ?.split('      - name: Record checkout infrastructure failure')[0] || '';
+  const fallback = assurance.split('      - name: Record checkout infrastructure failure')[1] || '';
+  check('screening assurance checkout outcome is observable for fail-closed routing',
+    fetch.includes('id: checkout') && fetch.includes('persist-credentials: false'));
+  check('screening assurance Asana alert is only attempted after a successful source checkout',
+    asana.includes("if: failure() && steps.checkout.outcome == 'success'") &&
+    asana.includes('node scripts/asana-alert.mjs'));
+  check('missing checkout uses pinned standalone GitHub incident routing',
+    fallback.includes("if: failure() && steps.checkout.outcome == 'failure'") &&
+    /uses: actions\/github-script@[a-f0-9]{40}/.test(fallback) &&
+    !fallback.includes('node scripts/asana-alert.mjs'));
+  check('checkout incident deduplicates open issues and run-attempt evidence',
+    fallback.includes('github.paginate(github.rest.issues.listForRepo') &&
+    fallback.includes('state: \'open\'') &&
+    fallback.includes('github.paginate(github.rest.issues.listComments') &&
+    fallback.includes("'/attempts/' + attempt") &&
+    fallback.includes('existing.title === title') === false &&
+    fallback.includes('issue.title === title'));
+  check('checkout incident only claims delivery after confirmed GitHub receipts',
+    fallback.includes('receipt?.data?.number') &&
+    fallback.includes('receipt?.data?.id') &&
+    fallback.includes('throw new Error(') &&
+    !fallback.includes('continue-on-error'));
+  check('checkout failure routing receives minimally scoped issues write capability',
+    /  verify:\s*\n[\s\S]{0,220}?\n      issues: write\b/.test(assurance) &&
+    /^permissions:\s*\n  contents: read\s*$/m.test(assurance) &&
+    !/^permissions:\s*\n  issues: write/m.test(assurance));
+  check('screening assurance still requires genuine source quality on the current commit',
+    assurance.includes('node scripts/screening-assurance.mjs --check') &&
+    assurance.includes('SCREENING_ASSURANCE_EXPECTED_COMMIT: ${{ github.sha }}') &&
+    /sourceQuality\?\.assured !== true/.test(
+      readFileSync('scripts/screening-assurance.mjs', 'utf8')));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
