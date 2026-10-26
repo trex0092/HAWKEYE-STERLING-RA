@@ -479,5 +479,49 @@ if (pkg.private === true) {
     fortify.includes('if [ "$FORTIFY_SCAN_OUTCOME" != "success" ]'));
 }
 
+/* Actionlint's pinned Go tool download is a different failure class from
+   actionlint itself finding malformed workflows. On 26 Oct a runner blocked
+   proxy.golang.org despite the existing exact egress allowlist. A bounded
+   installer retry must not convert a real lint finding into a pass. */
+{
+  const lintWorkflow = readFileSync(join(dir, 'workflow-lint.yml'), 'utf8');
+  check('workflow lint retries the pinned actionlint INSTALL at most three times',
+    lintWorkflow.includes('for attempt in 1 2 3; do') &&
+    lintWorkflow.includes('if go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7; then'));
+  check('actionlint cannot pass on exhausted installation retries',
+    lintWorkflow.includes('if [ "$installed" != true ]; then') &&
+    lintWorkflow.includes('workflow lint did NOT run.') &&
+    lintWorkflow.includes('exit 1'));
+  check('actual actionlint validation remains blocking after successful installation',
+    lintWorkflow.includes('"$(go env GOPATH)/bin/actionlint" -color') &&
+    !lintWorkflow.includes('actionlint" -color || true') &&
+    /go install[\s\S]+?exit 1[\s\S]+?actionlint" -color/.test(lintWorkflow));
+}
+
+/* The Scorecard result can be computed and signed successfully while
+   actions/upload-artifact fails to CreateArtifact with ECONNREFUSED. An
+   unconditional "continue-on-error" would erase audit retention evidence.
+   Require an independent receipt from either a primary or one bounded retry,
+   and continue to upload the same SARIF to code scanning. */
+{
+  const scorecard = readFileSync(join(dir, 'scorecard.yml'), 'utf8');
+  check('Scorecard retains mandatory signed analysis and code scanning upload',
+    scorecard.includes('publish_results: true') &&
+    scorecard.includes('name: Upload SARIF to code scanning') &&
+    scorecard.includes('sarif_file: results.sarif'));
+  check('Scorecard artifact retry is bounded, conditional, and reuses pinned action',
+    (scorecard.match(/uses: actions\/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9/g) || []).length === 2 &&
+    scorecard.includes("if: steps.artifact_primary.outcome == 'failure'") &&
+    scorecard.includes("id: artifact_retry") &&
+    scorecard.includes("name: SARIF file retry"));
+  check('Scorecard refuses missing input SARIF rather than warning and succeeding',
+    (scorecard.match(/if-no-files-found: error/g) || []).length === 2);
+  check('Scorecard final gate is a hard failure unless one artifact upload passed',
+    scorecard.includes('if: always()') &&
+    scorecard.includes('"$PRIMARY_UPLOAD_OUTCOME" != "success"') &&
+    scorecard.includes('"$RETRY_UPLOAD_OUTCOME" != "success"') &&
+    scorecard.includes('exit 1'));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

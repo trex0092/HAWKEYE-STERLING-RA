@@ -68,12 +68,49 @@ jobs:
           results_format: sarif
           publish_results: true
 
-      - name: Upload artifact
+      # GitHub's artifact service intermittently rejects CreateArtifact with
+      # ECONNREFUSED after Scorecard successfully analyzed and signed results
+      # (26 Oct 2026, runs 40277010685 and 40288017901). Retry once through
+      # the SAME pinned upload action. The second name is distinct: when the
+      # first request was committed but the response was lost, v4+ artifacts
+      # are immutable and an identical name would be refused as a duplicate.
+      # The final gate MUST fail if neither upload confirms retention.
+      - name: Upload SARIF artifact (primary)
+        id: artifact_primary
+        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: SARIF file
           path: results.sarif
+          if-no-files-found: error
           retention-days: 5
+
+      - name: Cool down after transient artifact service failure
+        if: steps.artifact_primary.outcome == 'failure'
+        run: sleep 10
+
+      - name: Retry SARIF artifact upload once
+        id: artifact_retry
+        if: steps.artifact_primary.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SARIF file retry
+          path: results.sarif
+          if-no-files-found: error
+          retention-days: 5
+
+      - name: Require verified Scorecard SARIF artifact retention
+        if: always()
+        env:
+          PRIMARY_UPLOAD_OUTCOME: ${{ steps.artifact_primary.outcome }}
+          RETRY_UPLOAD_OUTCOME: ${{ steps.artifact_retry.outcome }}
+        run: |
+          if [ "$PRIMARY_UPLOAD_OUTCOME" != "success" ] && [ "$RETRY_UPLOAD_OUTCOME" != "success" ]; then
+            echo "::error::Scorecard SARIF artifact was NOT retained after a bounded retry; no supply-chain evidence may be certified."
+            exit 1
+          fi
+          echo "Verified: Scorecard SARIF artifact upload succeeded."
 
       - name: Upload SARIF to code scanning
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
