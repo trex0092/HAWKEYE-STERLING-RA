@@ -14,6 +14,11 @@ concurrency:
 
 jobs:
   verify:
+    # A runner checkout outage must still be able to file one deduplicated
+    # infrastructure incident, while the actual assurance job stays FAILED.
+    permissions:
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -33,6 +38,7 @@ jobs:
             *.githubapp.com:443
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        id: checkout
         with:
           persist-credentials: false
 
@@ -56,7 +62,9 @@ jobs:
         run: node scripts/screening-assurance.mjs --check
 
       - name: Alert in Asana when worldwide screening assurance fails
-        if: failure()
+        # The alert helper is part of the checkout. If checkout itself failed,
+        # do not try to execute a missing file; use the self-contained fallback.
+        if: failure() && steps.checkout.outcome == 'success'
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_SECTION_GID: '1218451960830318'
@@ -68,3 +76,62 @@ jobs:
           node scripts/asana-alert.mjs \
             "SCREENING ASSURANCE DEGRADED: worldwide sanctions / adverse media / PEP evidence failed" \
             "The fail-loud runtime assurance control found stale or degraded screening evidence. A green 195-country scope badge is not operational proof. Review the Screening Assurance run and the underlying Sanctions Screen / adverse-media / PEP evidence before relying on a clean screening result. Run: $RUN_URL"
+
+      - name: Record checkout infrastructure failure without repository files
+        # The scheduled assurance can lose checkout when GitHub's edge IP rotates
+        # under a restrictive egress policy (2026-10-26 run 40280966515).
+        # The Asana helper does not exist in that case. This pinned, self-contained
+        # action creates or updates ONE open GitHub incident and confirms the
+        # remote write. It never claims screening ran, alters a badge or returns
+        # a passing assurance result.
+        if: failure() && steps.checkout.outcome == 'failure'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const title = 'Screening Assurance infrastructure failure: checkout unavailable';
+            const { owner, repo } = context.repo;
+            const attempt = process.env.GITHUB_RUN_ATTEMPT || '1';
+            const runUrl = process.env.GITHUB_SERVER_URL + '/' + owner + '/' + repo
+              + '/actions/runs/' + context.runId + '/attempts/' + attempt;
+            const marker = 'Workflow run: ' + runUrl;
+            const note = 'Screening Assurance could not check out the repository on its hardened runner. '
+              + 'The independent verifier did NOT run, and no assurance, cleared screening, '
+              + 'or source-quality result may be inferred. Diagnose checkout/network '
+              + 'access and rerun the full verifier after actual screening evidence is ready.\n\n'
+              + marker;
+            // A failed remote inventory is NOT an empty inventory. GitHub-script
+            // throws, leaving the original checkout job red with no false success.
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            if (!Array.isArray(open)) throw new Error('Open issue inventory unavailable');
+            const existing = open.filter(issue =>
+              !issue.pull_request && issue.title === title &&
+              Number.isSafeInteger(issue.number) && issue.number > 0)
+              .sort((a, b) => a.number - b.number)[0];
+            if (existing) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: existing.number, per_page: 100,
+              });
+              if (!Array.isArray(comments)) throw new Error('Checkout incident comments unavailable');
+              if (String(existing.body || '').includes(marker) ||
+                  comments.some(comment => String(comment.body || '').includes(marker))) {
+                console.log('Checkout incident run already recorded in #' + existing.number);
+              } else {
+                const receipt = await github.rest.issues.createComment({
+                  owner, repo, issue_number: existing.number, body: note,
+                });
+                if (!Number.isSafeInteger(receipt?.data?.id) || receipt.data.id < 1) {
+                  throw new Error('Checkout incident comment was not confirmed by GitHub');
+                }
+                console.log('Checkout incident updated: #' + existing.number);
+              }
+            } else {
+              const receipt = await github.rest.issues.create({
+                owner, repo, title, body: note,
+              });
+              if (!Number.isSafeInteger(receipt?.data?.number) || receipt.data.number < 1) {
+                throw new Error('New checkout incident was not confirmed by GitHub');
+              }
+              console.log('Checkout incident opened: #' + receipt.data.number);
+            }
