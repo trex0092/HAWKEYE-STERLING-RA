@@ -110,7 +110,7 @@ check('GDELT: embedded name quotes and parentheses cannot break query grammar',
 check('GDELT: widened production query quotes the dual-use typology when included',
   gdeltQueryString('Acme Co', gdeltTerms('Acme Co')).includes('"dual-use"'));
 check('GDELT: smart quotes and newlines in an entity name cannot inject syntax',
-  gdeltQueryString('A “Sample”\\n(Business)', ['fraud']) ===
+  gdeltQueryString('A “Sample”\n(Business)', ['fraud']) ===
     '"A Sample Business" (fraud)');
 
 const gd = parseGdelt(JSON.stringify({ articles: [
