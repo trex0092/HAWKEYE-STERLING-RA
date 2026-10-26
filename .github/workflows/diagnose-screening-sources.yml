@@ -1,4 +1,5 @@
 name: PEP source reference diagnostics, not assurance
+# Re-run 2026-10-26: publicly sourced PEP identities and synthetic-only Google/GDELT provider checks.
 on:
   push:
     branches: ['diagnostics/screening-sources-20261021']
