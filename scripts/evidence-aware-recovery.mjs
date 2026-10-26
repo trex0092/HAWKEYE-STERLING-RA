@@ -12,6 +12,24 @@ const DAY = 86400000;
 const HOUR = 3600000;
 const PRODUCER = 'sanctions-screen.yml';
 const RECEIPT = 'data/screening-assurance.json';
+const SHARED_SCREEN_STATE_WRITERS = new Set(['weekly-adverse-media.yml', 'onboarding-screen.yml']);
+
+/* GitHub's concurrency group has ONE running and ONE pending workflow
+ * across the entire group. A new pending dispatch can supersede and CANCEL
+ * the earlier pending one even with cancel-in-progress:false.
+ * These two operational writers share group "screen-state" by design to
+ * protect the delta-state branch. The controller must not dispatch BOTH
+ * in one iteration or enqueue a second writer while a sibling is active.
+ * Deferring the second control is not a success or a waiver: subsequent
+ * scheduled/recovery passes still evaluate it independently. */
+export function competingScreenStateWriter(controlId, activeRuns, dispatchedIds = new Set()) {
+  if (!SHARED_SCREEN_STATE_WRITERS.has(controlId)) return false;
+  if (!Array.isArray(activeRuns) || !(dispatchedIds instanceof Set)) return true;
+  return [...SHARED_SCREEN_STATE_WRITERS].some(id => id !== controlId &&
+    (dispatchedIds.has(id) || activeRuns.some(r =>
+      r?.head_branch === 'main' &&
+      r?.path === '.github/workflows/' + id && ACTIVE.has(r.status))));
+}
 const time = r => Date.parse(r?.run_started_at || r?.created_at || '');
 const midnight = ms => Math.floor(ms / DAY) * DAY;
 const object = x => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -187,6 +205,7 @@ export async function main() {
   for (const status of ACTIVE) activeRuns.push(...await readRuns(api, '/actions/runs', { branch: 'main', status }));
   const controls = [...CONTROLS, ...HELPERS].filter((c, i, a) => a.findIndex(x => x.id === c.id) === i);
   const rows = [];
+  const screenStateDispatched = new Set();
   let dispatched = false;
   for (const control of controls) {
     try {
@@ -213,6 +232,15 @@ export async function main() {
       if (!decision) decision = control.id === PRODUCER
         ? screeningDecision(runs, evidence, { nowMs, currentSha, activeRuns: controlActive })
         : decide(control, runs, { nowMs, branch: 'main', activeRuns: controlActive, currentSha });
+      // GitHub concurrency keeps at most one PENDING screen-state writer;
+      // dispatching both writers together can cancel the first queued run.
+      // Re-check only dispatch decisions. A healthy/blocked/cooldown result
+      // from the original verifier is never silently rewritten.
+      if (decision.action === 'dispatch' &&
+          competingScreenStateWriter(control.id, activeRuns, screenStateDispatched)) {
+        decision = { action: 'wait',
+          reason: 'another shared screen-state writer is active or just dispatched; defer to prevent pending run cancellation' };
+      }
       if (decision.action === 'dispatch') {
         const mainRef = await read('/git/ref/heads/main');
         if (mainRef?.object?.sha !== currentSha) throw new Error('main moved; require a new controller invocation');
@@ -225,7 +253,10 @@ export async function main() {
         }
         const guarded = await dispatchOnce(api, path, { branch: 'main', nowMs: Date.now(), quietMs: HOUR });
         decision = { action: guarded.action, reason: decision.reason + '; ' + guarded.reason };
-        if (guarded.action === 'dispatched') dispatched = true;
+        if (guarded.action === 'dispatched') {
+          dispatched = true;
+          if (SHARED_SCREEN_STATE_WRITERS.has(control.id)) screenStateDispatched.add(control.id);
+        }
       }
       rows.push({ id: control.id, ...decision });
     } catch {
