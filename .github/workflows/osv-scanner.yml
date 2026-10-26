@@ -54,9 +54,40 @@ jobs:
             api.deps.dev:443
             *.githubapp.com:443
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # GitHub's checkout action already retries Git internally. A separate
+      # single retry helps a transient Actions-runner network refusal without
+      # bypassing the pinned action, read-only credentials, or blocked egress.
+      - name: Checkout repository (primary)
+        id: checkout_primary
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+
+      - name: Pause before one bounded GitHub checkout retry
+        if: steps.checkout_primary.outcome == 'failure'
+        run: |
+          echo "::warning::GitHub checkout failed; retrying once after a 20-second pause."
+          sleep 20
+
+      - name: Checkout repository (single retry)
+        id: checkout_retry
+        if: steps.checkout_primary.outcome == 'failure'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Require verified repository checkout before vulnerability scanning
+        env:
+          PRIMARY_OUTCOME: ${{ steps.checkout_primary.outcome }}
+          RETRY_OUTCOME: ${{ steps.checkout_retry.outcome }}
+        run: |
+          if [ "$PRIMARY_OUTCOME" != "success" ] && [ "$RETRY_OUTCOME" != "success" ]; then
+            echo "::error::Both GitHub checkouts failed; OSV scan was not run."
+            exit 1
+          fi
+          test -s scripts/gen-sbom.mjs || { echo "::error::SBOM generator missing after checkout."; exit 1; }
+          test -s package-lock.json || { echo "::error::Lockfile missing after checkout."; exit 1; }
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -72,9 +103,24 @@ jobs:
         run: go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
 
       - name: Scan the SBOM and the source tree
+        shell: bash
         run: |
+          # Fail closed on a provider error, incomplete scan, or any finding in
+          # EITHER the generated toolchain SBOM or the recursive repository.
+          # Explicit pipefail keeps tee from hiding scanner exit statuses.
+          # Do not stop after the first failed scan: retain both results.
+          set -uo pipefail
+          # GitHub's explicit Bash shell starts with errexit. Disable it only
+          # while collecting both independent scan statuses, then restore it.
+          set +e
           SCANNER="$(go env GOPATH)/bin/osv-scanner"
-          # --sbom: the toolchain provenance; the directory scan catches anything
-          # OSV can fingerprint in-tree. Non-zero exit on findings is surfaced.
-          "$SCANNER" --sbom=sbom.cdx.json || true
-          "$SCANNER" scan --recursive . | tee "$GITHUB_STEP_SUMMARY"
+          "$SCANNER" --sbom=sbom.cdx.json | tee -a "$GITHUB_STEP_SUMMARY"
+          sbom_status=$?
+          # OSV v1.9.2 CLI has no "scan" subcommand; use its documented flag.
+          "$SCANNER" --recursive . | tee -a "$GITHUB_STEP_SUMMARY"
+          tree_status=$?
+          set -e
+          if [ "$sbom_status" -ne 0 ] || [ "$tree_status" -ne 0 ]; then
+            echo "::error::OSV findings or incomplete scan: SBOM=$sbom_status; recursive=$tree_status. Both must pass."
+            exit 1
+          fi
