@@ -1,7 +1,8 @@
 /* Offline synthetic regression cases ONLY. No screening or provider evidence. */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { screeningDecision, qualifyEvidence, independentReady,
-  makeEvidenceReader, readPinnedEvidence } from './evidence-aware-recovery.mjs';
+  makeEvidenceReader, readPinnedEvidence, competingScreenStateWriter } from './evidence-aware-recovery.mjs';
 
 const sha = 'a'.repeat(40), oldSha = 'b'.repeat(40), stateSha = 'c'.repeat(40), blobSha = 'd'.repeat(40);
 const nowMs = Date.parse('2026-10-22T16:00:00Z');
@@ -142,4 +143,59 @@ await test('read API refuses redirects and masks response body', async () => {
   } });
   await assert.rejects(read('/git/ref/heads/main'), /HTTP 403/);
 });
+/* Shared screen-state writers used to collide in one recovery pass. GitHub
+   concurrency has a single pending slot; a later pending workflow evicts the
+   earlier pending run even when cancel-in-progress:false. This guard delays a
+   second recovery dispatch without marking either control healthy. */
+await test('both workflows still require one shared non-cancelling state-writer group', () => {
+  for (const id of ['weekly-adverse-media.yml', 'onboarding-screen.yml']) {
+    const text = readFileSync('.github/workflows/' + id, 'utf8');
+    assert.match(text, /group:\\s*screen-state/);
+    assert.match(text, /cancel-in-progress:\\s*false/);
+  }
+});
+const writerRun = (id, status = 'in_progress', branch = 'main') => ({
+  id: 900, head_branch: branch, status, path: '.github/workflows/' + id,
+});
+await test('an active daily writer prevents competing onboarding recovery dispatch', () =>
+  assert.equal(competingScreenStateWriter('onboarding-screen.yml',
+    [writerRun('weekly-adverse-media.yml')]), true));
+await test('queued/pending sibling also holds the one shared pending slot', () => {
+  for (const status of ['queued', 'pending', 'waiting', 'requested']) {
+    assert.equal(competingScreenStateWriter('onboarding-screen.yml',
+      [writerRun('weekly-adverse-media.yml', status)]), true);
+  }
+});
+await test('an active onboarding writer delays daily recovery in reverse order', () =>
+  assert.equal(competingScreenStateWriter('weekly-adverse-media.yml',
+    [writerRun('onboarding-screen.yml')]), true));
+await test('a writer dispatched earlier in the SAME controller pass reserves its sibling', () => {
+  assert.equal(competingScreenStateWriter('onboarding-screen.yml', [],
+    new Set(['weekly-adverse-media.yml'])), true);
+  assert.equal(competingScreenStateWriter('weekly-adverse-media.yml', [],
+    new Set(['onboarding-screen.yml'])), true);
+});
+await test('completed or foreign-branch writers do not suppress needed retries', () => {
+  assert.equal(competingScreenStateWriter('onboarding-screen.yml',
+    [writerRun('weekly-adverse-media.yml', 'completed')]), false);
+  assert.equal(competingScreenStateWriter('onboarding-screen.yml',
+    [writerRun('weekly-adverse-media.yml', 'in_progress', 'feature')]), false);
+});
+await test('other controls, including the current workflow itself, do not block writer recovery', () => {
+  assert.equal(competingScreenStateWriter('onboarding-screen.yml',
+    [writerRun('onboarding-screen.yml')]), false);
+  assert.equal(competingScreenStateWriter('sanctions-screen.yml',
+    [writerRun('weekly-adverse-media.yml')]), false);
+});
+await test('unverifiable shared-group history fails closed only for affected writers', () => {
+  assert.equal(competingScreenStateWriter('onboarding-screen.yml', null), true);
+  assert.equal(competingScreenStateWriter('site-currency.yml', null), false);
+});
+await test('production recovery actually checks sibling writers and logs a wait, not success', () => {
+  const text = readFileSync('scripts/evidence-aware-recovery.mjs', 'utf8');
+  assert.ok(text.includes('competingScreenStateWriter(control.id, activeRuns, screenStateDispatched)'));
+  assert.ok(text.includes("decision = { action: 'wait'"));
+  assert.ok(text.includes("if (SHARED_SCREEN_STATE_WRITERS.has(control.id)) screenStateDispatched.add(control.id)"));
+});
+
 console.log(`${passed} offline software checks passed. No live screening, provider, security-scan or deployment claim.`);
