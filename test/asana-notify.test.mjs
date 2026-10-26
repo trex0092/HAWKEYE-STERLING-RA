@@ -6,7 +6,8 @@ import {
   esc, buildHtmlBody, notifyAsana,
   fitAsanaHtml, ASANA_HTML_MAX_BYTES, fitAsanaText, fitAsanaName, ASANA_NAME_MAX_BYTES,
   listProjectTasks, ASANA_PAGE_CAP, asanaTextSize, asanaHtmlSize, appendOpenAlertEvidence,
-  findOpenMonitoringAlert, verifyNewMonitoringAlert, OPEN_ALERT_PAGE_CAP
+  findOpenMonitoringAlert, verifyNewMonitoringAlert, OPEN_ALERT_PAGE_CAP,
+  isRecurringAdvisorEvaluationOutage, refreshOpenAdvisorEvaluationOutage
 } from '../scripts/asana-notify.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,78 @@ let passed = 0, failed = 0;
 function check(name, cond) {
   if (cond) { passed++; console.log('  ok  ' + name); }
   else { failed++; console.error('  FAIL ' + name); }
+}
+
+/* Live model/bias evaluation outages are one persistent operational
+   condition. Keep their Asana alert task open, and record each new run receipt
+   without mutating the owner's status or hiding a real regression. */
+{
+  const live = 'Advisor eval incomplete — API errors (no regression evidence)';
+  const bias = 'Advisor bias eval incomplete — API errors (not bias evidence)';
+  check('only known Advisor provider-coverage outages are coalesced',
+    isRecurringAdvisorEvaluationOutage(live) &&
+    isRecurringAdvisorEvaluationOutage(bias) &&
+    !isRecurringAdvisorEvaluationOutage('Advisor guardrail regression detected') &&
+    !isRecurringAdvisorEvaluationOutage('Advisor bias eval — unexplained divergence') &&
+    !isRecurringAdvisorEvaluationOutage('Sanctions Watch — one new source') &&
+    !isRecurringAdvisorEvaluationOutage(live + ' changed'));
+
+  const gid = '123456789012';
+  const url = 'https://app.asana.com/0/1/123456789012';
+  const note = 'INCOMPLETE, no guardrail assurance. Workflow run: https://github.com/owner/repo/actions/runs/123';
+  const calls = [];
+  const makeCall = already => async (path, opts = {}) => {
+    calls.push({ path, method: opts.method || 'GET' });
+    if (path.startsWith('/tasks?project=')) return {
+      data: [{ gid, name: live, permalink_url: url }], next_page: null,
+    };
+    if (path.startsWith('/tasks/' + gid + '/stories?')) return {
+      data: already ? [{ gid: '987654321098', text: note }] : [], next_page: null,
+    };
+    if (path === '/tasks/' + gid + '/stories' && opts.method === 'POST') {
+      if (JSON.parse(opts.body).data.text !== note) throw new Error('unexpected body');
+      return { data: { gid: '987654321099' } };
+    }
+    throw new Error('unexpected remote operation');
+  };
+  const refreshed = await refreshOpenAdvisorEvaluationOutage(makeCall(false),
+    '1216203370612914', live, note);
+  check('repeat Advisor outage refreshes one open task and confirms a new story',
+    refreshed && refreshed.gid === gid && refreshed.url === url &&
+    refreshed.evidencePosted === true && refreshed.alreadyRecorded === false &&
+    calls.filter(c => c.method === 'POST').length === 1 &&
+    calls.some(c => c.path === '/tasks/' + gid + '/stories') &&
+    !calls.some(c => c.path === '/tasks' && c.method === 'POST'));
+
+  calls.length = 0;
+  const repeated = await refreshOpenAdvisorEvaluationOutage(makeCall(true),
+    '1216203370612914', live, note);
+  check('replay of an already recorded failure does not duplicate the story',
+    repeated && repeated.alreadyRecorded === true &&
+    repeated.evidencePosted === false && calls.every(c => c.method === 'GET'));
+
+  let bypassQueries = 0;
+  const bypass = await refreshOpenAdvisorEvaluationOutage(async () => { bypassQueries++; },
+    '1216203370612914', 'Advisor guardrail regression detected', note);
+  check('a REAL guardrail finding bypasses outage coalescing and still files normally',
+    bypass === null && bypassQueries === 0);
+  const absent = await refreshOpenAdvisorEvaluationOutage(async () => ({
+    data: [], next_page: null,
+  }), '1216203370612914', bias, note);
+  check('a new provider outage with no open task can create its first alert',
+    absent === null);
+  let lookupFailed = false;
+  try {
+    await refreshOpenAdvisorEvaluationOutage(async () => {
+      throw new Error('unverifiable Asana lookup');
+    }, '1216203370612914', live, note);
+  } catch (e) { lookupFailed = /unverifiable Asana lookup/.test(e.message); }
+  check('unverifiable Asana state cannot be falsely reported as delivered', lookupFailed);
+  const source = readFileSync(new URL('../scripts/watch-notify.mjs', import.meta.url), 'utf8');
+  check('watch-notify invokes the idempotent open-alert refresh before new task creation',
+    source.indexOf('await refreshOpenAdvisorEvaluationOutage(') >= 0 &&
+    source.indexOf('await refreshOpenAdvisorEvaluationOutage(') <
+      source.indexOf('await notifyAsana('));
 }
 
 /* ── retry classification ── */

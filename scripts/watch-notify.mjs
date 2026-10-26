@@ -18,7 +18,8 @@
         — the workflow then falls back to opening a labelled GitHub issue so the
         change is never lost. */
 import { readFileSync } from 'node:fs';
-import { notifyAsana, asanaEnabled, runUrl, buildHtmlBody, REG_PROJECT_GID } from './asana-notify.mjs';
+import { notifyAsana, asana, asanaEnabled, runUrl, buildHtmlBody, REG_PROJECT_GID,
+  refreshOpenAdvisorEvaluationOutage } from './asana-notify.mjs';
 import { REG_REVIEW_CHECKLIST } from './reg-watch.mjs';
 import { SECTIONS } from './asana-sections.mjs';
 
@@ -82,6 +83,28 @@ if (!asanaEnabled()) {
 }
 
 try {
+  /* Daily re-runs of a blocked live Advisor eval must refresh the same open
+     operational alert, not create another human-owned task. A successful
+     append is verified by Asana's story receipt. On lookup/post failure the
+     existing GitHub issue fallback is retained. Real regressions and actual
+     regulatory/list changes continue through notifyAsana unchanged. */
+  // A full per-case live model report may exceed Asana's 4 KB story limit.
+  // The existing task already holds the original report; each new run needs
+  // a compact outcome plus the unique workflow URL, never a silently dropped
+  // or truncated provider response.
+  const resultLine = (report.split(/\r?\n/).find(line => line.startsWith('**Result:')) ||
+    'Result unavailable in report; review workflow evidence.').slice(0, 1000);
+  const outageEvidence = [title, resultLine, link ? 'Workflow run: ' + link : '']
+    .filter(Boolean).join('\n');
+  const refreshed = await refreshOpenAdvisorEvaluationOutage(
+    asana, REG_PROJECT_GID, title, outageEvidence);
+  if (refreshed) {
+    console.log('watch-notify: ongoing Advisor evaluation outage (' + (refreshed.url || refreshed.gid)
+      + '); latest run evidence ' + (refreshed.evidencePosted ? 'attached' : 'already recorded')
+      + '; no duplicate task or disposition change');
+    process.exit(0);
+  }
+
   /* A Regulatory Watch card that reports ONLY unreachable sources carries no
      law change: it is a monitoring gap, filed under "AI & Platform Governance".
      Any card with a content change stays in its configured section. */

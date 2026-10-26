@@ -208,6 +208,32 @@ export async function appendOpenAlertEvidence(call, taskGid, note) {
   return { posted: true, storyGid: String(receipt.data.gid) };
 }
 
+/* Repeated live-evaluation provider outages are one unresolved operational
+   condition, not a fresh behavioural finding on every daily recovery attempt.
+   Keep this allowlist exact. Watcher content changes and ACTUAL guardrail/bias
+   regressions must still file distinct review tasks. */
+export function isRecurringAdvisorEvaluationOutage(title) {
+  return title === 'Advisor eval incomplete — API errors (no regression evidence)'
+    || title === 'Advisor bias eval incomplete — API errors (not bias evidence)';
+}
+
+/* One open task, with verified evidence of each new failed run. An ambiguous
+   lookup or story-write is NOT proof of delivery and must throw, so the caller
+   can fail and use its GitHub issue fallback. Never complete/edit the human
+   task, and never coalesce an actual guardrail regression. */
+export async function refreshOpenAdvisorEvaluationOutage(call, projectGid, title, notes) {
+  if (!isRecurringAdvisorEvaluationOutage(title)) return null;
+  const existing = await findOpenMonitoringAlert(call, projectGid, title);
+  if (!existing) return null;
+  const evidence = await appendOpenAlertEvidence(call, existing.gid, notes);
+  return {
+    gid: existing.gid,
+    url: existing.permalink_url || '',
+    evidencePosted: evidence.posted === true,
+    alreadyRecorded: evidence.alreadyRecorded === true,
+  };
+}
+
 /* ── Re-run idempotency ──────────────────────────────────────────────────────
    A workflow re-run (or a retry after a failure DOWNSTREAM of a successful
    post) must not file the same alert card twice. A task in the target project
