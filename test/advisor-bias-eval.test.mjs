@@ -6,6 +6,10 @@
    Usage: node test/advisor-bias-eval.test.mjs */
 import { level, DEFAULT_MODEL } from '../scripts/advisor-bias-eval.mjs';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import {
+  biasIssueTitle, biasRunEvidence, fileAdvisorBiasIssue, OUTAGE_TITLE, FINDING_TITLE,
+} from '../scripts/advisor-bias-issue.mjs';
 const require = createRequire(import.meta.url);
 const governed = require('../netlify/functions/brain-soul.js').__internals.MODEL_BY_MODE.balanced.model;
 
@@ -62,6 +66,115 @@ check('unnecessary EDD is excluded from the decision',
   level('EDD is unnecessary; CDD recommended') === 'CDD');
 check('live bias eval tracks governed balanced production model',
   DEFAULT_MODEL === governed);
+
+/* The old quarterly bias workflow created a new identical GitHub issue on
+   every HTTP 400. Four duplicates (#1033, #1036, #1039, #1042) were filed
+   22-25 October and human-closed on the 26th. A continued outage must be
+   appended to one open incident without suppressing a real divergence. */
+{
+  const incomplete = '# Synthetic report\n\n**Result: INCOMPLETE — provider unavailable; no pair evaluated.**';
+  const actualFinding = '**Result: 1 unexplained divergence(s) — review required.**';
+  const runUrl = 'https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/runs/123456/attempts/1';
+  const owner = 'trex0092', repo = 'HAWKEYE-STERLING-RA';
+  const issueNumber = 2026;
+  check('bias: provider error or unavailable report can NEVER be titled an actual finding',
+    biasIssueTitle(incomplete) === OUTAGE_TITLE &&
+    biasIssueTitle('') === OUTAGE_TITLE &&
+    biasIssueTitle('invalid report') === OUTAGE_TITLE &&
+    biasIssueTitle(actualFinding) === FINDING_TITLE);
+  check('bias: a failed run produces one uniquely linkable evidence marker',
+    biasRunEvidence(incomplete, runUrl).includes('Workflow run: ' + runUrl));
+
+  const mock = (initialIssues = [], initialComments = [], { failLookup = false, missingReceipt = false } = {}) => {
+    const actions = [];
+    const issues = [...initialIssues];
+    const comments = [...initialComments];
+    const listForRepo = () => {};
+    const listComments = () => {};
+    const github = {
+      rest: { issues: {
+        listForRepo, listComments,
+        create: async args => {
+          actions.push({ type: 'create', args });
+          return { data: missingReceipt ? {} : { number: issueNumber } };
+        },
+        createComment: async args => {
+          actions.push({ type: 'comment', args });
+          comments.push({ body: args.body });
+          return { data: missingReceipt ? {} : { id: 8787 } };
+        },
+      } },
+      paginate: async (fn, args) => {
+        actions.push({ type: 'list', fn, args });
+        if (failLookup) throw new Error('synthetic API lookup unavailable');
+        return fn === listForRepo ? issues : fn === listComments ? comments : null;
+      },
+    };
+    return { github, actions, issues, comments, listForRepo, listComments };
+  };
+  const open = { number: 123, title: OUTAGE_TITLE, labels: [{ name: 'advisor-bias' }] };
+  const staleClosed = { number: 124, title: 'unrelated', state: 'open' };
+
+  const client = mock([staleClosed, open]);
+  const one = await fileAdvisorBiasIssue({
+    github: client.github, owner, repo, report: incomplete, runUrl,
+  });
+  const two = await fileAdvisorBiasIssue({
+    github: client.github, owner, repo, report: incomplete, runUrl,
+  });
+  check('bias: repeated live outage reuses open GitHub issue with one verified comment',
+    one.action === 'commented' && one.number === 123 &&
+    two.action === 'already-recorded' && two.number === 123 &&
+    client.actions.filter(a => a.type === 'comment').length === 1 &&
+    client.actions.filter(a => a.type === 'create').length === 0 &&
+    client.comments[0].body.includes('not bias evidence'));
+  check('bias: issue and story scans request paginated OPEN advisor-bias evidence',
+    client.actions.some(a => a.fn === client.listForRepo &&
+      a.args.state === 'open' && a.args.labels === 'advisor-bias') &&
+    client.actions.some(a => a.fn === client.listComments &&
+      a.args.issue_number === 123));
+
+  const first = mock();
+  const created = await fileAdvisorBiasIssue({
+    github: first.github, owner, repo, report: incomplete, runUrl,
+  });
+  check('bias: a first or human-closed outage files a new issue with full report',
+    created.action === 'created' &&
+    first.actions.filter(a => a.type === 'create').length === 1 &&
+    first.actions.find(a => a.type === 'create').args.body.includes(incomplete) &&
+    first.actions.find(a => a.type === 'create').args.title === OUTAGE_TITLE);
+
+  const genuine = mock([open]);
+  const finding = await fileAdvisorBiasIssue({
+    github: genuine.github, owner, repo, report: actualFinding, runUrl,
+  });
+  check('bias: real unexplained divergence is a NEW issue, never merged into outage',
+    finding.action === 'created' &&
+    genuine.actions.filter(a => a.type === 'list').length === 0 &&
+    genuine.actions.find(a => a.type === 'create').args.title === FINDING_TITLE);
+  let invalidUrl = false, lookupFailed = false, noReceipt = false;
+  try {
+    await fileAdvisorBiasIssue({ github: first.github, owner, repo,
+      report: incomplete, runUrl: 'not-a-run-url' });
+  } catch (e) { invalidUrl = e.message.includes('run evidence URL'); }
+  try {
+    await fileAdvisorBiasIssue({ github: mock([], [], { failLookup: true }).github,
+      owner, repo, report: incomplete, runUrl });
+  } catch (e) { lookupFailed = e.message.includes('synthetic API lookup unavailable'); }
+  try {
+    await fileAdvisorBiasIssue({ github: mock([open], [], { missingReceipt: true }).github,
+      owner, repo, report: incomplete, runUrl });
+  } catch (e) { noReceipt = e.message.includes('not confirmed'); }
+  check('bias: malformed run ID, incomplete remote lookup, and absent receipts fail closed',
+    invalidUrl && lookupFailed && noReceipt);
+
+  const workflow = readFileSync(
+    new URL('../.github/workflows/advisor-bias-eval.yml', import.meta.url), 'utf8');
+  check('bias: production workflow actually uses idempotent reviewer and keeps fail-on-error',
+    workflow.includes('await fileAdvisorBiasIssue({') &&
+    workflow.includes("if: steps.eval.outcome == 'failure'") &&
+    workflow.includes('Fail the job if a divergence was found or the eval could not run'));
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
