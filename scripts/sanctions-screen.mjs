@@ -2052,6 +2052,23 @@ export async function runAmSecondPass(queue, {
 const BAND_RANK = { critical: 4, high: 3, medium: 2, low: 1, '': 0 };
 const strongerBand = (a, b) => ((BAND_RANK[a] || 0) >= (BAND_RANK[b] || 0) ? a : b);
 
+/* Launch the two independent external enrichment controls together.
+   Previously every subject waited for its entire worldwide news sweep before
+   even starting the separate Wikidata PEP lookup. On the 2026-10-26 run, the
+   991-subject loop reached its 106-minute budget and missed two enrichments.
+   Overlapping the independent calls does not remove either control, raise the
+   existing per-subject worker limit, or convert an upstream error to a hit or
+   a verified no-hit. The original assurance counters process both results.
+   Injectable services keep the orchestration independently testable offline. */
+export function fetchIndependentEnrichment(name, {
+  adverseMedia = false, pep = false, timeoutMs,
+} = {}, { mediaLookup = checkAdverseMedia, pepLookup = checkPep } = {}) {
+  return Promise.all([
+    adverseMedia ? mediaLookup(name, { timeoutMs }) : null,
+    pep ? pepLookup(name, { timeoutMs }) : null,
+  ]);
+}
+
 /* Screen every subject locally: sanctions name-match against the loaded lists,
    plus (optional) adverse-media and PEP signals. Produces the SAME normalised
    per-subject rows the engine path produced, so diff/alert/report are unchanged.
@@ -2181,8 +2198,14 @@ export async function screenLocally(subjects, cfg) {
         band = strongerBand(band, am.band); topScore = Math.max(topScore, am.score);
       }
     };
+    const [am, pp] = enrich
+      ? await fetchIndependentEnrichment(s.name, {
+        adverseMedia: cfg.adverseMedia,
+        pep: cfg.pep,
+        timeoutMs: cfg.checkTimeoutMs,
+      })
+      : [null, null];
     if (cfg.adverseMedia && enrich) {
-      const am = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
       if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
       if (!am.backbones?.bing) amBackboneFailures.bing++;
@@ -2214,7 +2237,6 @@ export async function screenLocally(subjects, cfg) {
       } else applyAm(am);
     }
     if (cfg.pep && enrich) {
-      const pp = await checkPep(s.name, { timeoutMs: cfg.checkTimeoutMs });
       if (pp.errored) { pepErrors++; enrichmentIncomplete = true; }
       else if (pp.hit) {
         lists.push({ list: 'PEP (Wikidata)', hitName: (pp.match && (pp.match.label + ' — ' + pp.match.description) || '').slice(0, 180), score: pp.score });
