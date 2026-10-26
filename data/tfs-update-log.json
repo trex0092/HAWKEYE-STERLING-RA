@@ -2802,6 +2802,19 @@
       "chainHash": "b56bbc5f485aaddfbc8c4d257f51e541179877e383d76b332b4cd9d531b59d79",
       "latencyHours": 0,
       "resolutionHash": "6aa75357f2003738203d3b72c441f29262c618e6a8548edb38feb66e97352aca"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-26T10:59:16.352Z",
+      "prevCount": 58610,
+      "newCount": 58646,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "b56bbc5f485aaddfbc8c4d257f51e541179877e383d76b332b4cd9d531b59d79",
+      "chainHash": "4cf7b180eeb822e2d93981d0fac523113a8c69cfbb0523d5045d4ab181a1831e"
     }
   ]
 }
