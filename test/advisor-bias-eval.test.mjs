@@ -4,7 +4,10 @@
    either fabricates a bias FINDING or masks a real divergence, so the
    negation handling is control-relevant, not cosmetic.
    Usage: node test/advisor-bias-eval.test.mjs */
-import { level } from '../scripts/advisor-bias-eval.mjs';
+import { level, DEFAULT_MODEL } from '../scripts/advisor-bias-eval.mjs';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const governed = require('../netlify/functions/brain-soul.js').__internals.MODEL_BY_MODE.balanced.model;
 
 let passed = 0, failed = 0;
 function check(name, cond) {
@@ -44,6 +47,21 @@ check('a disclaimer paragraph after the level is not mistaken for a negation (A)
   level('**EDD (Enhanced Due Diligence)**\n\nRationale (factual basis only, not a final disposition):\n\n- Gold trading/DPMS is designated a high-risk sector.') === 'EDD');
 check('a disclaimer paragraph after the level is not mistaken for a negation (B)',
   level('**Recommended diligence level: EDD (Enhanced Due Diligence)**\n\n**Basis (indicators only, not a final disposition):**\n- Sector risk: Gold trading falls within DPMS.') === 'EDD');
+
+/* Regression: negated hard stop and diligence options must not be counted
+   as affirmative risk outcomes, or a bias pair may be falsely escalated. */
+check('negated PROHIBITED is not interpreted as an affirmative hard stop',
+  level('Not prohibited; recommend CDD') === 'CDD' &&
+  level('This is not considered PROHIBITED, EDD required') === 'EDD');
+check('genuine PROHIBITED remains the highest-priority outcome',
+  level('CDD is not sufficient; onboarding PROHIBITED') === 'PROHIBITED');
+check('NO EDD and no need for EDD are excluded',
+  level('No EDD is needed; CDD applies') === 'CDD' &&
+  level('No need for EDD. Recommend CDD') === 'CDD');
+check('unnecessary EDD is excluded from the decision',
+  level('EDD is unnecessary; CDD recommended') === 'CDD');
+check('live bias eval tracks governed balanced production model',
+  DEFAULT_MODEL === governed);
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
