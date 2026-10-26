@@ -739,8 +739,17 @@ export function gdeltTerms(name, extra = GDELT_EXTRA_TERMS, max = GDELT_QUERY_MA
   return out;
 }
 
+/* GDELT's DOC grammar treats unquoted dashes as operators/illegal
+   characters (e.g. dual-use). Source names can also contain quote marks or
+   parentheses that would prematurely close the required exact-name phrase.
+   Keep every name token and every risk term, but make the DOC syntax valid.
+   Only query construction changes; no list, scorer or recall threshold does. */
 export function gdeltQueryString(name, terms) {
-  return '"' + String(name).trim() + '" (' + terms.map(t => t.includes(' ') ? '"' + t + '"' : t).join(' OR ') + ')';
+  const phrase = String(name).normalize('NFKC')
+    .replace(/["“”„‟()\\u0000-\\u001f\\u007f]/g, ' ')
+    .replace(/\\s+/g, ' ').trim();
+  const risk = terms.map(t => /[\\s-]/u.test(t) ? '"' + t + '"' : t);
+  return '"' + phrase + '" (' + risk.join(' OR ') + ')';
 }
 
 /* A provider outage is not an invalid long query. The legacy DOC endpoint
@@ -754,7 +763,7 @@ export function gdeltFailureClass(status, body = '') {
   if (status === 200) {
     const sample = String(body == null ? '' : body).slice(0, 1500);
     if (/please\s+limit\s+requests|rate[ -]?limit|too many requests|retry[ -]?after|exceeded.*requests/i.test(sample)) return 'throttle';
-    if (/invalid.*query|query.*(invalid|too long|malformed|syntax|unsupported|exceeds|not allowed)|syntax error|query length/i.test(sample)) return 'query-rejection';
+    if (/invalid.*query|query.*(invalid|too long|malformed|syntax|unsupported|exceeds|not allowed)|syntax error|query length|one or more of your (?:parenthetical clauses had an error|keywords contained an illegal character)|queries containing OR.d terms must be surrounded by/i.test(sample)) return 'query-rejection';
     return 'malformed';
   }
   if (status === 0) return 'transport';
