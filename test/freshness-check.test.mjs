@@ -324,5 +324,34 @@ check('sharded refresh dispatches only when the merge job actually published (no
   /SHARD_RUN_ID:\s*\$\{\{\s*github\.event\.workflow_run\.id\s*\}\}/.test(pepWatchdogWf)
   && /x\.name === "merge" && x\.conclusion === "success"/.test(pepWatchdogWf));
 
+/* A missing screening receipt must not hide an INDEPENDENT, read-only
+   Netlify parity check. Before the 26 Oct repair, evidence-aware recovery
+   blocked Site Currency until full screening source-quality assurance was
+   green, even while the live site was known to drift from main. */
+{
+  const recovery = readFileSync('scripts/evidence-aware-recovery.mjs', 'utf8');
+  const router = readFileSync('scripts/workflow-recovery.mjs', 'utf8');
+  const siteWorkflow = readFileSync('.github/workflows/site-currency.yml', 'utf8');
+  check('site parity recovery no longer requires an independent screening pass first',
+    !recovery.includes("if (control.id === 'site-currency.yml')") &&
+    !recovery.includes('production parity deferred until independent screening recovery'));
+  check('site parity is not invalidated by an unrelated screening state ref change',
+    recovery.includes('if (control.id === PRODUCER)') &&
+    !recovery.includes("[PRODUCER, 'site-currency.yml'].includes(control.id)"));
+  check('site parity retains the preflight wait for an ACTIVE current-main deploy',
+    recovery.includes('activePrerequisite(control, activeRuns, { branch: \'main\', currentSha })') &&
+    router.includes("control?.id !== 'site-currency.yml'") &&
+    router.includes(".github/workflows/netlify-production-deploy.yml"));
+  check('site parity remains an independent READ-ONLY byte-exact verifier',
+    siteWorkflow.includes('node scripts/site-currency.mjs') &&
+    siteWorkflow.includes('EXPECTED_DEPLOY_SHA: ${{ github.sha }}') &&
+    siteWorkflow.includes('workflow_dispatch:') &&
+    !/curl\s+-X\s+POST|npm\s+publish|netlify\s+deploy/m.test(siteWorkflow));
+  check('screening assurance still controls the overall recovery status and cannot be bypassed',
+    recovery.includes("if (evidence.state !== 'verified' || rows.some(") &&
+    recovery.includes("screeningDecision(runs, evidence,") &&
+    recovery.includes("throw new Error('screening evidence changed; re-evaluation required')"));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) process.exitCode = 1;
