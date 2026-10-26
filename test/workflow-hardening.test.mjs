@@ -488,6 +488,17 @@ if (pkg.private === true) {
   check('workflow lint retries the pinned actionlint INSTALL at most three times',
     lintWorkflow.includes('for attempt in 1 2 3; do') &&
     lintWorkflow.includes('if go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7; then'));
+  check('proxy refusal permits only one direct pinned actionlint install with checksum validation',
+    lintWorkflow.includes('if GOPROXY=direct GOSUMDB=sum.golang.org go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7; then') &&
+    lintWorkflow.includes('Go module proxy unavailable') &&
+    !/GOSUMDB=(?:off|sumdb\.off)/.test(lintWorkflow) &&
+    !/GOINSECURE=/.test(lintWorkflow));
+  const primary = lintWorkflow.indexOf('for attempt in 1 2 3; do');
+  const direct = lintWorkflow.indexOf('if GOPROXY=direct GOSUMDB=sum.golang.org');
+  const failed = lintWorkflow.indexOf('workflow lint did NOT run.');
+  const actualLint = lintWorkflow.indexOf('bin/actionlint" -color');
+  check('direct fallback occurs after the three proxy attempts and before mandatory lint',
+    primary >= 0 && direct > primary && failed > direct && actualLint > failed);
   check('actionlint cannot pass on exhausted installation retries',
     lintWorkflow.includes('if [ "$installed" != true ]; then') &&
     lintWorkflow.includes('workflow lint did NOT run.') &&

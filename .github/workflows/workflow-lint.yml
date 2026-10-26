@@ -72,8 +72,18 @@ jobs:
               sleep "$((attempt * 10))"
             fi
           done
+          # The default GOPROXY does not fall back to VCS on connection refusal
+          # (only on 404/410). Try one direct fetch of the same pinned version
+          # if all official-proxy attempts were refused. Keep the public
+          # checksum database enabled and REQUIRED; never bypass verification.
           if [ "$installed" != true ]; then
-            echo "::error::actionlint could not be installed after three attempts; workflow lint did NOT run."
+            echo "::warning::Go module proxy unavailable; trying one version-pinned direct GitHub fetch with the public checksum database still enforced."
+            if GOPROXY=direct GOSUMDB=sum.golang.org go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7; then
+              installed=true
+            fi
+          fi
+          if [ "$installed" != true ]; then
+            echo "::error::actionlint could not be installed through the official proxy or verified VCS path; workflow lint did NOT run."
             exit 1
           fi
           "$(go env GOPATH)/bin/actionlint" -color
