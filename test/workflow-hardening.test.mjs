@@ -479,5 +479,30 @@ if (pkg.private === true) {
     fortify.includes('if [ "$FORTIFY_SCAN_OUTCOME" != "success" ]'));
 }
 
+/* The Scorecard result can be computed and signed successfully while
+   actions/upload-artifact fails to CreateArtifact with ECONNREFUSED. An
+   unconditional "continue-on-error" would erase audit retention evidence.
+   Require an independent receipt from either a primary or one bounded retry,
+   and continue to upload the same SARIF to code scanning. */
+{
+  const scorecard = readFileSync(join(dir, 'scorecard.yml'), 'utf8');
+  check('Scorecard retains mandatory signed analysis and code scanning upload',
+    scorecard.includes('publish_results: true') &&
+    scorecard.includes('name: Upload SARIF to code scanning') &&
+    scorecard.includes('sarif_file: results.sarif'));
+  check('Scorecard artifact retry is bounded, conditional, and reuses pinned action',
+    (scorecard.match(/uses: actions\/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9/g) || []).length === 2 &&
+    scorecard.includes("if: steps.artifact_primary.outcome == 'failure'") &&
+    scorecard.includes("id: artifact_retry") &&
+    scorecard.includes("name: SARIF file retry"));
+  check('Scorecard refuses missing input SARIF rather than warning and succeeding',
+    (scorecard.match(/if-no-files-found: error/g) || []).length === 2);
+  check('Scorecard final gate is a hard failure unless one artifact upload passed',
+    scorecard.includes('if: always()') &&
+    scorecard.includes('"$PRIMARY_UPLOAD_OUTCOME" != "success"') &&
+    scorecard.includes('"$RETRY_UPLOAD_OUTCOME" != "success"') &&
+    scorecard.includes('exit 1'));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
