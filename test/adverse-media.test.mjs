@@ -97,6 +97,22 @@ check('gdeltUrl targets the GDELT DOC 2.0 artlist JSON API with the quoted name'
   decodeURIComponent(gdeltUrl('Acme Co')).includes('"Acme Co"') &&
   gdeltUrl('Acme Co').includes('format=json') && gdeltUrl('Acme Co').includes('mode=artlist'));
 
+/* GDELT DOC parser treats an unquoted dash as an illegal keyword
+   character. The production extra-terms set contains "dual-use": previously
+   every widened request that included it could be rejected at HTTP 200.
+   Quoting it preserves the exact term and the complete AML query. */
+check('GDELT: hyphenated and multiword risk terms are quoted without dropping recall',
+  gdeltQueryString('Acme Co', ['fraud', 'dual-use', 'money laundering']) ===
+    '"Acme Co" (fraud OR "dual-use" OR "money laundering")');
+check('GDELT: embedded name quotes and parentheses cannot break query grammar',
+  gdeltQueryString('  Acme ("Trading") Holdings  ', ['sanctions']) ===
+    '"Acme Trading Holdings" (sanctions)');
+check('GDELT: widened production query quotes the dual-use typology when included',
+  gdeltQueryString('Acme Co', gdeltTerms('Acme Co')).includes('"dual-use"'));
+check('GDELT: smart quotes and newlines in an entity name cannot inject syntax',
+  gdeltQueryString('A “Sample”\\n(Business)', ['fraud']) ===
+    '"A Sample Business" (fraud)');
+
 const gd = parseGdelt(JSON.stringify({ articles: [
   { title: 'Acme Co probed in money laundering case', url: 'http://g/1', domain: 'apnews.com', seendate: '20260601T000000Z' },
   { title: '', url: 'http://g/2' },
@@ -132,6 +148,15 @@ check('GDELT: HTTP 200 throttle messages are not mistaken for an invalid long qu
   && gdeltFailureClass(200, 'Service temporarily unavailable') === 'malformed'
   && gdeltFailureClass(200, 'Error: query syntax is invalid') === 'query-rejection'
   && gdeltFailureClass(200, '{"error":"unknown"}') === 'malformed');
+check('GDELT: real DOC API grammar rejection texts trigger only syntax fallback',
+  ['One or more of your parenthetical clauses had an error in it.',
+    'One or more of your keywords contained an illegal character. To use a dash in a word, place it in quotes like "f-16".',
+    "Queries containing OR'd terms must be surrounded by ()",
+    'Your query was too short or too long.']
+    .every(body => gdeltFailureClass(200, body) === 'query-rejection')
+  && gdeltFailureClass(200, 'Please limit requests to one every 5 seconds') === 'throttle'
+  && gdeltFailureClass(200, 'Service temporarily unavailable') === 'malformed');
+
 check('GDELT: genuine provider errors stay distinct from query syntax errors',
   gdeltFailureClass(0) === 'transport'
   && gdeltFailureClass(429) === 'throttle'
