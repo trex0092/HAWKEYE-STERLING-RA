@@ -128,6 +128,14 @@
   "h": "https://ofac.treasury.gov/contact-ofac"
  },
  {
+  "t": "Issuance of Amended Frequently Asked Questions Regarding Blocking and Rejecting Transactions and Filing Reports with OFAC",
+  "h": "https://ofac.treasury.gov/recent-actions/20261026"
+ },
+ {
+  "t": "Regulations and Guidance",
+  "h": "https://ofac.treasury.gov/recent-actions/regulations-and-guidance"
+ },
+ {
   "t": "Iran-related Designations; Belarus and North Korea Designations Removals; Issuance of Iran-related and Russia-related General Licenses and Amended Frequently Asked Questions",
   "h": "https://ofac.treasury.gov/recent-actions/20261021"
  },
@@ -176,10 +184,6 @@
   "h": "https://ofac.treasury.gov/recent-actions/20261009_33"
  },
  {
-  "t": "Iran-related Designations; Issuance of Iran-related General License; Issuance of Amended Russia-related General License",
-  "h": "https://ofac.treasury.gov/recent-actions/20261008"
- },
- {
   "t": "Current page 1",
   "h": "https://ofac.treasury.gov/recent-actions?page=0"
  },
@@ -190,10 +194,6 @@
  {
   "t": "Miscellaneous",
   "h": "https://ofac.treasury.gov/recent-actions/miscellaneous"
- },
- {
-  "t": "Regulations and Guidance",
-  "h": "https://ofac.treasury.gov/recent-actions/regulations-and-guidance"
  },
  {
   "t": "Sign up for OFAC Recent Actions e-mail updates",
@@ -230,10 +230,6 @@
  {
   "t": "Dealing with an \"OFAC Alert\"",
   "h": "https://ofac.treasury.gov/faqs/71"
- },
- {
-  "t": "List of Country-related Sanctions",
-  "h": "https://ofac.treasury.gov/sanctions-programs-and-country-information/where-is-ofacs-country-list-what-countries-do-i-need-to-worry-about-in-terms-of-us-sanctions"
  },
  {
   "t": "Appeal an OFAC designation or other listing",
