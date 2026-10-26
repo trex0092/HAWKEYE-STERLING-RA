@@ -15,10 +15,11 @@
         told to enforce (ZERO_TOLERANCE in brain-soul.js).
 
    Usage: node test/grc-metrics.test.mjs */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
-import { computeMetrics, SCANNERS } from '../scripts/grc-metrics.mjs';
+import { tmpdir } from 'node:os';
+import { computeMetrics, unjustifiedSuppressions, SCANNERS } from '../scripts/grc-metrics.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let passed = 0, failed = 0;
@@ -46,6 +47,34 @@ for (const m of METRICS) {
 /* A snapshot with a timestamp would drift on every run and train people to
    ignore the check. */
 check('snapshot carries no generation timestamp', !/\d{4}-\d{2}-\d{2}T/.test(JSON.stringify(snap)));
+
+/* ── 1a. TOML suppression parser distinguishes directives from comments ──
+   A note explaining why vulnerability ignores are prohibited must not
+   silently add one phantom, unjustified suppression to the GRC dashboard. */
+{
+  const testRoot = mkdtempSync(join(tmpdir(), 'hawkeye-grc-ignored-'));
+  const ciDir = join(testRoot, 'ci');
+  try {
+    mkdirSync(ciDir);
+    const policy = join(ciDir, 'osv-scanner.toml');
+    const evaluate = source => {
+      writeFileSync(policy, source, 'utf8');
+      return unjustifiedSuppressions(testRoot);
+    };
+    check('commented TOML directive is not a real vulnerability ignore',
+      evaluate('# No active ignores\n# [[IgnoredVulns]]\n# Please do not use [[IgnoredVulns]]\n') === 0);
+    check('active ignore with documented reason is counted as justified',
+      evaluate('[[IgnoredVulns]]\nid = "GHSA-example"\nreason = "documented"\n') === 0);
+    check('actual ignore without reason still violates KRI-07',
+      evaluate('[[IgnoredVulns]]\nid = "GHSA-example"\n') === 1);
+    check('mixed active, commented and inline-comment ignores retain correct counts',
+      evaluate('# [[IgnoredVulns]]\n[[IgnoredVulns]] # genuinely active\nid = "A"\n# reason = "comment-only"\n[[IgnoredVulns]]\nid = "B"\nreason = "approved"\n') === 1);
+    check('CRLF-terminated justified headers remain parsable',
+      evaluate('[[IgnoredVulns]]\r\nid = "A"\r\nreason = "reviewed"\r\n') === 0);
+  } finally {
+    rmSync(testRoot, { recursive: true, force: true });
+  }
+}
 
 /* ── 2-3. KRI wiring ────────────────────────────────────────────────────── */
 const appetite = json('data/risk-appetite.json');

@@ -163,8 +163,11 @@ export async function governanceDrift(root = ROOT) {
 /* Suppression is acceptable; silent suppression is not. */
 export function unjustifiedSuppressions(root = ROOT) {
   const toml = read(root, 'ci/osv-scanner.toml');
-  const entries = toml.split(/\[\[IgnoredVulns\]\]/).slice(1);
-  return entries.filter((e) => !/^\s*reason\s*=/m.test(e)).length;
+  // Parse only real TOML table headers. A comment documenting the policy
+  // (including the literal "[[IgnoredVulns]]") is not an active suppression.
+  // Keep the rule robust to CRLF, whitespace, and legitimate inline comments.
+  const entries = toml.split(/^[ \t]*\[\[IgnoredVulns\]\][ \t]*(?:#[^\r\n]*)?\r?$/gm).slice(1);
+  return entries.filter((e) => !/^[ \t]*reason[ \t]*=/m.test(e)).length;
 }
 
 export function obligationHygiene(root = ROOT) {
