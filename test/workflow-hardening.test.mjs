@@ -528,6 +528,13 @@ if (pkg.private === true) {
    no absent sources, scanner findings, or tee pipe can yield green assurance. */
 {
   const osv = readFileSync(join(dir, 'osv-scanner.yml'), 'utf8');
+  check('OSV push path filter includes every CI lockfile and suppression policy',
+    osv.includes("branches: [main]") &&
+    osv.includes("'ci/**'") &&
+    osv.includes("'package-lock.json'") &&
+    osv.includes("'scripts/gen-sbom.mjs'") &&
+    osv.includes('workflow_dispatch:') &&
+    osv.includes("- cron: '17 6 * * 1'"));
   check('OSV retries GitHub checkout once with the same pinned read-only action',
     (osv.match(/uses: actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/g) || []).length === 2 &&
     (osv.match(/persist-credentials: false/g) || []).length === 2 &&
