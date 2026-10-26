@@ -523,6 +523,47 @@ if (pkg.private === true) {
     /go install[\s\S]+?exit 1[\s\S]+?actionlint" -color/.test(lintWorkflow));
 }
 
+/* OSV dependency scanning must fail closed on both independent inputs.
+   A transient GitHub network failure may get one additional checkout, but
+   no absent sources, scanner findings, or tee pipe can yield green assurance. */
+{
+  const osv = readFileSync(join(dir, 'osv-scanner.yml'), 'utf8');
+  check('OSV retries GitHub checkout once with the same pinned read-only action',
+    (osv.match(/uses: actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/g) || []).length === 2 &&
+    (osv.match(/persist-credentials: false/g) || []).length === 2 &&
+    osv.includes('continue-on-error: true') &&
+    osv.includes("if: steps.checkout_primary.outcome == 'failure'") &&
+    osv.includes('id: checkout_retry'));
+  check('OSV refuses an absent checkout even if the first checkout was allowed to retry',
+    osv.includes('PRIMARY_OUTCOME: ${{ steps.checkout_primary.outcome }}') &&
+    osv.includes('RETRY_OUTCOME: ${{ steps.checkout_retry.outcome }}') &&
+    osv.includes('Both GitHub checkouts failed; OSV scan was not run.') &&
+    osv.includes('test -s scripts/gen-sbom.mjs') &&
+    osv.includes('test -s package-lock.json') &&
+    osv.includes('exit 1'));
+  check('OSV source tree and SBOM scans are both blocking despite tee',
+    osv.includes('set -uo pipefail') &&
+    osv.includes('set +e') && osv.includes('set -e') &&
+    osv.indexOf('set +e') < osv.indexOf('sbom_status=$?') &&
+    osv.indexOf('tree_status=$?') < osv.indexOf('set -e') &&
+    osv.includes('sbom_status=$?') &&
+    osv.includes('tree_status=$?') &&
+    osv.includes('if [ "$sbom_status" -ne 0 ] || [ "$tree_status" -ne 0 ]; then') &&
+    osv.includes('exit 1') &&
+    !osv.includes('|| true') &&
+    osv.includes('"$SCANNER" --recursive . | tee -a "$GITHUB_STEP_SUMMARY"') &&
+    osv.includes('--sbom=sbom.cdx.json'));
+  check('OSV invokes the documented v1.9.2 recursive CLI, not the newer scan subcommand',
+    osv.includes('go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2') &&
+    osv.includes('"$SCANNER" --recursive . | tee -a "$GITHUB_STEP_SUMMARY"') &&
+    !osv.includes('"$SCANNER" scan --recursive .'));
+  check('OSV keeps harden-runner egress blocking and pinned scanner version',
+    osv.includes('egress-policy: block') &&
+    osv.includes('api.osv.dev:443') &&
+    osv.includes('github.com:443') &&
+    osv.includes('go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2'));
+}
+
 /* The Scorecard result can be computed and signed successfully while
    actions/upload-artifact fails to CreateArtifact with ECONNREFUSED. An
    unconditional "continue-on-error" would erase audit retention evidence.
