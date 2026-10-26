@@ -313,8 +313,10 @@ console.log('\n— runtime worldwide screening assurance —\n');
     intro.includes('`operational`') &&
     intro.includes('/screen-state/data/screening-assurance.json'));
   check('README does not present green domain-runtime badges as independent assurance',
-    !/data\\/badges\\/(sanctions|adverse-media|pep)-operational\\.svg/.test(intro));
-  check('README keeps the operational badge inventory focused', (intro.match(/!\\[/g) || []).length <= 15);
+    ['sanctions', 'adverse-media', 'pep'].every(domain =>
+      !intro.includes('data/badges/' + domain + '-operational.svg')));
+  check('README keeps the operational badge inventory focused',
+    intro.split('![').length - 1 <= 15);
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
