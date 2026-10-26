@@ -58,21 +58,51 @@ jobs:
         with:
           persist-credentials: false
 
-      # No Fortify account is configured in this repo yet (neither an FoD tenant
-      # nor an SSC token secret is set), so the scan step below can never
-      # authenticate. Rather than let that surface as a red, unexplained fcli
-      # login crash on every push/PR/weekly run, skip it explicitly with a
-      # clear reason. Configure FOD_TENANT+FOD_USER+FOD_PAT (Fortify on Demand)
-      # or SSC_URL+SSC_TOKEN (Software Security Center) as real GitHub
-      # secrets/vars to turn this scan on.
+      # Validate a COMPLETE, unambiguous provider credential path before
+      # invoking Fortify. Previously a single FOD_TENANT or SSC_TOKEN was
+      # sufficient to start a scan even if its associated user/PAT or
+      # ScanCentral SAST auth were missing. That produced an opaque login
+      # failure rather than an actionable configuration diagnosis.
+      #
+      # Secrets must be passed through env, not interpolated into a shell
+      # expression: credentials can contain quotes/newlines/metacharacters.
+      # Never log their values, and never mark a skipped scan as certified.
       - name: Check Fortify credentials are configured
         id: fortify-creds
+        env:
+          FOD_TENANT: ${{ secrets.FOD_TENANT }}
+          FOD_USER: ${{ secrets.FOD_USER }}
+          FOD_PAT: ${{ secrets.FOD_PAT }}
+          SSC_URL: ${{ vars.SSC_URL }}
+          SSC_TOKEN: ${{ secrets.SSC_TOKEN }}
+          SC_CLIENT_AUTH_TOKEN: ${{ secrets.SC_CLIENT_AUTH_TOKEN }}
         run: |
-          if [ -n "${{ secrets.FOD_TENANT }}" ] || [ -n "${{ secrets.SSC_TOKEN }}" ]; then
+          set -eu
+          fod_present=false
+          ssc_present=false
+          fod_complete=false
+          ssc_complete=false
+          if [ -n "$FOD_TENANT" ] || [ -n "$FOD_USER" ] || [ -n "$FOD_PAT" ]; then
+            fod_present=true
+          fi
+          if [ -n "$SSC_URL" ] || [ -n "$SSC_TOKEN" ] || [ -n "$SC_CLIENT_AUTH_TOKEN" ]; then
+            ssc_present=true
+          fi
+          if [ -n "$FOD_TENANT" ] && [ -n "$FOD_USER" ] && [ -n "$FOD_PAT" ]; then
+            fod_complete=true
+          fi
+          if [ -n "$SSC_URL" ] && [ -n "$SSC_TOKEN" ] && [ -n "$SC_CLIENT_AUTH_TOKEN" ]; then
+            ssc_complete=true
+          fi
+          if [ "$fod_complete" = true ] && [ "$ssc_present" = false ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Complete Fortify on Demand credential path selected."
+          elif [ "$ssc_complete" = true ] && [ "$fod_present" = false ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Complete Fortify SSC/ScanCentral SAST credential path selected."
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Fortify AST Scan skipped::No FOD_TENANT or SSC_TOKEN secret is configured, so this scan cannot authenticate. Add Fortify on Demand credentials (FOD_TENANT, FOD_USER, FOD_PAT) or SSC credentials (SSC_URL as a var, SSC_TOKEN as a secret) under Settings > Secrets and variables > Actions to enable it."
+            echo "::warning title=Fortify credentials incomplete or ambiguous::Configure exactly one complete path: Fortify on Demand requires FOD_TENANT, FOD_USER and FOD_PAT secrets; SSC/ScanCentral SAST requires SSC_URL variable plus SSC_TOKEN and SC_CLIENT_AUTH_TOKEN secrets. Missing, partial, or mixed credentials never produce real scan evidence."
           fi
 
       # Perform SAST and/or SCA scan via Fortify on Demand/Fortify Hosted/ScanCentral SAST/Debricked. Based on
