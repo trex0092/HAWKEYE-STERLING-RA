@@ -6,7 +6,7 @@ A static web application for **AML/CFT customer (entity) risk assessment**, buil
 
 **Project:** [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [License](LICENSE) · [Support](SUPPORT.md) · [Roadmap](docs/executive/roadmap.md)
 
-**Technical & compliance:** [Architecture](docs/architecture/README.md) · [Methodology](docs/policies/README.md) · [Coverage](data/screening-country-coverage.json) · [Data Sources](data/README.md) · [Governance](docs/governance/README.md) · [AI Governance](docs/AI-GOVERNANCE.md) · [Operations](docs/security/deploy-rollback-runbook.md) · [Documentation](docs/README.md)
+**Technical & compliance:** [Architecture](docs/architecture/README.md) · [Methodology](docs/policies/README.md) · [Coverage](data/screening-country-coverage.json) · [Data Sources](data/README.md) · [Governance](docs/governance/README.md) · [AI Governance](docs/AI-GOVERNANCE.md) · [ISO 42001 Controls (Provisional)](data/iso42001-annex-a-evidence.json) · [Operations](docs/security/deploy-rollback-runbook.md) · [Documentation](docs/README.md)
 
 ## Live verification and assurance
 
