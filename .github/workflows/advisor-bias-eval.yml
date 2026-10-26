@@ -54,27 +54,30 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/advisor-bias-eval.mjs
 
-      - name: Open a GitHub issue on an unexplained divergence
+      - name: File independent bias findings or refresh an open provider-outage issue
         if: steps.eval.outcome == 'failure'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const fs = require('fs');
-            let report = 'Advisor bias eval reported an unexplained divergence. See the workflow run.';
-            try { report = fs.readFileSync('advisor-bias-eval-report.md', 'utf8'); } catch (e) {}
-            // The report's Result line distinguishes a bias FINDING from a run that
-            // could not evaluate (API errors) — the issue title must not claim a
-            // divergence when no pair was actually scored.
-            const incomplete = report.includes('**Result: INCOMPLETE');
+            const path = require('path');
+            const { pathToFileURL } = require('url');
+            // Reviewed repository helper, loaded after trusted main checkout.
+            // A missing report must NEVER fabricate an unexplained bias finding.
+            const { fileAdvisorBiasIssue } = await import(pathToFileURL(
+              path.join(process.env.GITHUB_WORKSPACE, 'scripts/advisor-bias-issue.mjs')).href);
+            let report = '';
+            try { report = fs.readFileSync('advisor-bias-eval-report.md', 'utf8'); }
+            catch (e) { console.warn('Advisor bias report unavailable: recording incomplete evaluation'); }
             const { owner, repo } = context.repo;
-            await github.rest.issues.create({
-              owner, repo,
-              title: incomplete
-                ? 'Advisor bias eval incomplete — API errors (not bias evidence)'
-                : 'Advisor bias eval — unexplained divergence',
-              body: report + '\n\n---\n> Triage per docs/governance/advisor-bias-review-2026.md.',
-              labels: ['advisor-bias'],
+            const runUrl = process.env.GITHUB_SERVER_URL + '/' + owner + '/' + repo
+              + '/actions/runs/' + process.env.GITHUB_RUN_ID
+              + '/attempts/' + (process.env.GITHUB_RUN_ATTEMPT || '1');
+            const receipt = await fileAdvisorBiasIssue({
+              github, owner, repo, report, runUrl,
             });
+            console.log('Advisor bias issue delivery verified: ' + receipt.action
+              + ' #' + receipt.number);
 
       - name: Fail the job if a divergence was found or the eval could not run
         if: steps.eval.outcome == 'failure'
