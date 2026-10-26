@@ -49,6 +49,12 @@ jobs:
         run: node test/brand-guard.test.mjs
       - name: Run workflow-hardening ratchet (SHA pins, harden-runner, timeouts, egress rationale)
         run: node test/workflow-hardening.test.mjs
+      # Recovery's own dispatch/receipt fixture previously ran only in its
+      # optional path-filtered PR workflow; a code change reached protected
+      # main before that check reported a broken assertion (26 Oct 2026).
+      # Make this an ordinary required CI suite, also discovered by npm test.
+      - name: Verify evidence-aware recovery and shared-writer admission offline
+        run: node test/evidence-aware-recovery.test.mjs
       - name: Guard bounded Chrome smoke commands and mandatory DOM assertions
         run: node test/browser-smoke-bounds.test.mjs
       - name: Run scoring model-validation golden set
