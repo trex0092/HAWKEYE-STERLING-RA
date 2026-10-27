@@ -15,7 +15,7 @@ for (const item of targets) {
     entry.httpStatus=response.status;
     const body=await response.text();
     if(body.length>250000) throw new Error('response_too_large');
-    if(item.kind==='rss') entry.responseKindVerified=/<rss(?:\\s|>)/i.test(body)&&/<channel(?:\\s|>)/i.test(body);
+    if(item.kind==='rss') entry.responseKindVerified=/<rss>/i.test(body)&&/<channel>/i.test(body);
     else { const data=JSON.parse(body); entry.responseKindVerified=!!data&&typeof data==='object'&&!data.error&&!data.errors; }
     entry.ok=response.ok&&entry.responseKindVerified;
   } catch(error) {
