@@ -2830,10 +2830,29 @@
       "detectedAt": "2026-10-26T19:08:38.583Z",
       "prevCount": 22485,
       "newCount": 22840,
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 40418659947,
+        "startedAt": "2026-10-26T23:16:55Z"
+      },
+      "status": "complete",
+      "chainPrev": "4cf7b180eeb822e2d93981d0fac523113a8c69cfbb0523d5045d4ab181a1831e",
+      "chainHash": "9a4eb483af5055097ba02a95dda8a8d4aa146c8da7ebe880e400d81dd6874ce0",
+      "latencyHours": 4.1,
+      "resolutionHash": "569753e52050abd09f2c608b5aee91e091649209534c96014dce1feac9f009eb"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-10-26",
+      "detectedAt": "2026-10-27T02:22:46.650Z",
+      "prevCount": 1007,
+      "newCount": 1007,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "4cf7b180eeb822e2d93981d0fac523113a8c69cfbb0523d5045d4ab181a1831e",
-      "chainHash": "9a4eb483af5055097ba02a95dda8a8d4aa146c8da7ebe880e400d81dd6874ce0"
+      "chainPrev": "9a4eb483af5055097ba02a95dda8a8d4aa146c8da7ebe880e400d81dd6874ce0",
+      "chainHash": "6716913d8e2866397d9aca9734f98649beb450fdb0146aaabcf459ed1783ccec"
     }
   ]
 }
