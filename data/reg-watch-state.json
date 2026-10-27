@@ -6,12 +6,10 @@
       "bytes": 10457,
       "checkedAt": "2026-10-27",
       "changedAt": "2026-10-23",
-      "contentAsOf": "2026-10-26",
-      "status": 404,
+      "contentAsOf": "2026-10-27",
+      "status": 200,
       "prevHash": "9fb135830be548e0ff99d2b1ba46ce0e1f59aba162e69ba9b24a5efa12fa2d77",
-      "fp": 2,
-      "error": "HTTP 404",
-      "errorStreak": 3
+      "fp": 2
     },
     "uae-fiu": {
       "hash": "7e067a5c918cf49ed2584aabd12bf981be702878d9826327b9087a962cc5c702",
@@ -31,7 +29,7 @@
       "contentAsOf": "2026-10-27",
       "status": 200,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261027022406"
+      "via": "web.archive.org save-page-now 20261027082913"
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -219,7 +217,7 @@
       "prevHash": "6ac70f5bf9cd6c497757effab0c759935c0b14f6de6cedc3b31842a84a46e94a",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 18
+      "errorStreak": 19
     }
   }
 }
