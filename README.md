@@ -12,9 +12,13 @@ A static web application for **AML/CFT customer (entity) risk assessment**, buil
 
 [![CI](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/ci.yml) [![CodeQL](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/codeql.yml) [![OpenSSF Scorecard](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/scorecard.yml/badge.svg?branch=main)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/scorecard.yml)
 
-These three badges report their named CI or security checks only. **Passing CI is not evidence that screening sources, third-party vendor security scans, Advisor model evaluations or production deployment are operational.** Mandatory control status remains independently verifiable below, including failures.
+**How to read this dashboard:** Each badge shows the latest result of its linked GitHub workflow, not an overall compliance verdict. A green workflow is **not** sufficient evidence that its underlying control passed. Red, cancelled, pending and unverified controls must never be counted as green. Check the required evidence in the right column and the linked run before interpreting any result.
 
-| Mandatory control | Live workflow result | Required evidence |
+**Acceptance rule:** All mandatory controls must be substantively verified at the same current-code checkpoint. CI, security scan wrappers, screening dispatches and provider probes cannot substitute for their required evidence. The table deliberately preserves real failed statuses rather than displaying a cosmetic all-green result.
+
+### Mandatory control verification
+
+| Control | Live workflow badge (not an assurance verdict) | Evidence required for PASS |
 | --- | --- | --- |
 | Worldwide screening assurance | [![screening assurance](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/screening-assurance.yml?branch=main&label=screening%20assurance)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/screening-assurance.yml) | [Persisted receipt](https://raw.githubusercontent.com/trex0092/HAWKEYE-STERLING-RA/screen-state/data/screening-assurance.json) must independently verify current-commit source quality |
 | Sanctions case screening | [![sanctions screen](https://img.shields.io/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/sanctions-screen.yml?branch=main&label=sanctions%20screen)](https://github.com/trex0092/HAWKEYE-STERLING-RA/actions/workflows/sanctions-screen.yml) | Completed authorized customer and employee screening, with run receipts |
