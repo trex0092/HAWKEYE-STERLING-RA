@@ -7,11 +7,11 @@
       "checkedAt": "2026-10-27",
       "changedAt": "2026-10-23",
       "contentAsOf": "2026-10-26",
-      "status": 503,
+      "status": 404,
       "prevHash": "9fb135830be548e0ff99d2b1ba46ce0e1f59aba162e69ba9b24a5efa12fa2d77",
       "fp": 2,
-      "error": "HTTP 503",
-      "errorStreak": 2
+      "error": "HTTP 404",
+      "errorStreak": 3
     },
     "uae-fiu": {
       "hash": "7e067a5c918cf49ed2584aabd12bf981be702878d9826327b9087a962cc5c702",
@@ -200,13 +200,13 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "2395774e7bdbf82e7eafb7dd8a914b81b704dd2d5c3b2ff930b451d9dd4b1282",
+      "hash": "7c74a150ba259e349914fa877f15fc865af5297ad041e47de50aa6e8b06ec08f",
       "bytes": 107755,
       "checkedAt": "2026-10-27",
-      "changedAt": "2026-10-26",
+      "changedAt": "2026-10-27",
       "contentAsOf": "2026-10-27",
       "status": 200,
-      "prevHash": "0f6fc30be948e351889702e0fb9efe103d8aa242abffc60520d441c5cfd84cc1",
+      "prevHash": "2395774e7bdbf82e7eafb7dd8a914b81b704dd2d5c3b2ff930b451d9dd4b1282",
       "fp": 2
     },
     "eu-ai-act": {
@@ -219,7 +219,7 @@
       "prevHash": "6ac70f5bf9cd6c497757effab0c759935c0b14f6de6cedc3b31842a84a46e94a",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 17
+      "errorStreak": 18
     }
   }
 }
