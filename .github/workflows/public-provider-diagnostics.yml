@@ -1,0 +1,40 @@
+name: Public Source Connectivity Diagnostics (not screening assurance)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: public-source-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  public-providers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Restrict diagnostic egress
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 nodejs.org:443 *.githubapp.com:443
+            news.google.com:443 api.gdeltproject.org:443 www.wikidata.org:443
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+      - name: Probe three original public provider endpoints
+        run: node scripts/public-provider-diagnostic.mjs
+      - name: Retain evidence even when a provider fails
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: public-provider-diagnostic-${{ github.run_id }}
+          path: evidence/public-provider-diagnostics/latest.json
+          if-no-files-found: error
+          retention-days: 7
