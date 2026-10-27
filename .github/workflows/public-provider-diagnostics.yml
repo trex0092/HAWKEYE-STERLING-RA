@@ -11,6 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
+      - name: Restrict diagnostic egress
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443 api.github.com:443 codeload.github.com:443
+            objects.githubusercontent.com:443 nodejs.org:443 *.githubapp.com:443
+            news.google.com:443 api.gdeltproject.org:443 www.wikidata.org:443
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
