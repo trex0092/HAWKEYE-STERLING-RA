@@ -64,7 +64,6 @@ export const EXEMPT = {
   'eocn-reconcile.yml': 'prepares the weekly EOCN review branch + files the sign-off task; the review duty itself is enforced by the daily screening review-age gate (exit 3 past 7 days), which is what this alarm monitors',
   'dast-zap.yml': 'security scan of the deployed site',
   'delivery-watchdog.yml': 'daily-report delivery probe (Asana task filed vs expected); self-alerting to Asana on a missing report, red badge is the alarm',
-  'fortify.yml': 'third-party SAST/SCA scanner (Fortify) requiring live FoD/SSC account credentials that are not currently configured in this repo; not a compliance-screening control with a regulatory ingestion/eval duty, so a failed or missing run has no freshness window to enforce',
   'freshness-check.yml': 'this alarm itself',
   'github-api-rate-dashboard.yml': 'read-only GitHub API quota observability; no regulatory screening, data ingestion or model evaluation duty, and its own scheduled run reports UNKNOWN on unavailable quota evidence',
   'function-health.yml': 'site operations probe; self-alerting',

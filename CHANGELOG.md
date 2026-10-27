@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Fortify AST scan removed from the repository.** Deleted `.github/workflows/fortify.yml` and its README vendor-SAST badge, and removed the tests, freshness-check entry and AI-controls evidence path that depended on it. Governance documents that cited Fortify as a control (ISO 27001 SoA row 8.8, AI control testing calendar, six-layer governance matrix, free-integration audit, workflow consolidation notes) no longer list it. Historical CHANGELOG entries are unchanged. Workflow count in the readiness addendum updated 80 to 79.
+
 - **Evidence-aware control recovery reports why it failed.** `scripts/evidence-aware-recovery.mjs` caught any error thrown by `main()` and printed only "Recovery failed; no operational pass is established.", so a failed Control Retry run (a missing token, an API error, or "main moved") could not be diagnosed from its log. The message now adds the cause, limited to 200 characters and excluding stacks and request objects so no credential is logged. The exit code is still 1 (fail closed). A source check in `scripts/evidence-aware-recovery-selftest.mjs` fails if the silent catch returns.
 
 - **Transaction monitoring groups a customer's payments regardless of case, spacing or dots in the name.** `txn_monitor.evaluate` grouped on the raw customer string, so three AED 52,000 cash payments in three days from "Acme LLC", "ACME  LLC " and "Acme L.L.C." were judged as three customers and raised no STRUCTURING alert. The grouping key now ignores case, dots, commas and extra spaces; alerts still show the name as recorded.

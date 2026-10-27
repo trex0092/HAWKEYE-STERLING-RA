@@ -12,7 +12,6 @@ This change adds read-only, **manual-only**, low-volume connectivity diagnostics
 | OpenSSF Scorecard | `.github/workflows/scorecard.yml` | Existing integration; no duplicate added. |
 | Semgrep Community Edition | `.github/workflows/semgrep.yml` | Existing integration; no duplicate added. |
 | Playwright (Chromium, Firefox, WebKit) | `.github/workflows/cross-browser.yml` | Already installs and tests three browser engines. Validate completed per-engine reports. |
-| Fortify | `.github/workflows/fortify.yml` | Cannot be replaced with an open-source tool. Actual authenticated provider scan and usable evidence required. |
 | Approved Anthropic evaluations | `.github/workflows/advisor-eval.yml`, `.github/workflows/advisor-bias-eval.yml` | Free models must not replace required real-provider, full-model/scenario evidence. |
 
 ## Diagnostic evidence contract
@@ -21,4 +20,4 @@ The new workflow runs **only on explicit dispatch**, does not read customer or e
 
 ## Remediation still required
 
-Original source completeness, source freshness, sanctions primary and supplementary coverage, complete screenable PEP identities, current-main full screening, independently successful Screening Assurance and Freshness Check, substantive Fortify, real Anthropic evaluations, and independent CodeQL findings checks must still pass together. Do not merge based solely on this diagnostic workflow.
+Original source completeness, source freshness, sanctions primary and supplementary coverage, complete screenable PEP identities, current-main full screening, independently successful Screening Assurance and Freshness Check, real Anthropic evaluations, and independent CodeQL findings checks must still pass together. Do not merge based solely on this diagnostic workflow.

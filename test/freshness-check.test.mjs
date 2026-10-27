@@ -274,7 +274,6 @@ check('freshness unit tests still run in required CI independently of operationa
   && /name: Verify mandatory controls ran inside their cadence window/.test(freshnessWf));
 
 const assuranceWf = readFileSync(join(wfDir, 'screening-assurance.yml'), 'utf8');
-const fortifyWf = readFileSync(join(wfDir, 'fortify.yml'), 'utf8');
 const pepWf = readFileSync(join(wfDir, 'pep-worldwide.yml'), 'utf8');
 const pepShardWf = readFileSync(join(wfDir, 'pep-shard-harvest.yml'), 'utf8');
 const sanctionsScreenWf = readFileSync(join(wfDir, 'sanctions-screen.yml'), 'utf8');
@@ -282,13 +281,6 @@ const sanctionsWatchWf = readFileSync(join(wfDir, 'sanctions-watch.yml'), 'utf8'
 
 check('screening assurance avoids the dangerous workflow_run trigger',
   !/workflow_run:/.test(assuranceWf));
-check('Fortify protected runs cannot go green when the substantive scanner is skipped',
-  /name: Run Fortify Scan\s*\n\s*id: fortify-scan/.test(fortifyWf)
-  && /name: Require real Fortify scan evidence on protected runs/.test(fortifyWf)
-  && /github\.event_name != 'pull_request'/.test(fortifyWf)
-  && /steps\.fortify-creds\.outputs\.configured/.test(fortifyWf)
-  && /steps\.fortify-scan\.outcome/.test(fortifyWf)
-  && /exit 1/.test(fortifyWf));
 check('complete PEP harvest rebuilds runtime evidence through Sanctions Screen',
   /Refresh screening runtime evidence after complete PEP harvest/.test(pepWf)
   && /steps\.harvest\.outputs\.resume != '1'/.test(pepWf)

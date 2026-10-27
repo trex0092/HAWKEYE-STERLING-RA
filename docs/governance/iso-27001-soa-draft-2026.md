@@ -136,7 +136,7 @@ repository's evidence.
 | 8.5 | Secure authentication | Applicable | RS256 OIDC verification against a pinned JWKS (`_identity.js`), default-off; shared bearer token meanwhile (open action 20) | 🟡 |
 | 8.6 | Capacity management | Applicable | Per-instance rate limiting (`_ratelimit.js`); shared quota adapter (`_shared-quota.js`) built but default-off (open action 22) | 🟡 |
 | 8.7 | Protection against malware | Applicable | Code and container scanning (CodeQL, Semgrep, `container-scan.yml`). No endpoint anti-malware evidenced (8.1) | 🟡 |
-| 8.8 | Management of technical vulnerabilities | Applicable | Dependabot, `osv-scanner.yml`, `dependency-review.yml`, `codeql.yml`, `fortify.yml`, `bandit.yml`; [`../security/code-scanning-triage-2026-07.md`](../security/code-scanning-triage-2026-07.md) | ✅ |
+| 8.8 | Management of technical vulnerabilities | Applicable | Dependabot, `osv-scanner.yml`, `dependency-review.yml`, `codeql.yml`, `bandit.yml`; [`../security/code-scanning-triage-2026-07.md`](../security/code-scanning-triage-2026-07.md) | ✅ |
 | 8.9 | Configuration management | Applicable | Configuration as code (`netlify.toml`, `.github/settings.yml`); `workflow-lint.yml` | ✅ |
 | 8.10 | Information deletion | Applicable | Stale-draft purge in `app.js`; [`data-retention.md`](data-retention.md); [`../aims/decommissioning.md`](../aims/decommissioning.md) | ✅ |
 | 8.11 | Data masking | Applicable | `ai.py` `redact_identifiers` masks identifiers before LLM prompts; the Advisor guard's *redact* mode is opt-in (default *audit*) | 🟡 |
