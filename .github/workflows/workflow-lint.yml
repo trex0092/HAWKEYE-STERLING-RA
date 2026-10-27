@@ -34,7 +34,7 @@ jobs:
         # (checkout + zizmor's advisory queries), the Go module proxy pair for
         # `go install actionlint` (storage.googleapis.com is the module CDN
         # behind the proxy), and PyPI for the hash-locked zizmor install.
-        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           disable-sudo: true
           egress-policy: block
@@ -112,7 +112,7 @@ jobs:
           fi
           "$(go env GOPATH)/bin/actionlint" -color
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.x'
 
