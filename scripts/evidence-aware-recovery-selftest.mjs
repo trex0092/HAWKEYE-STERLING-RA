@@ -197,5 +197,10 @@ await test('production recovery actually checks sibling writers and logs a wait,
   assert.ok(text.includes("decision = { action: 'wait'"));
   assert.ok(text.includes("if (SHARED_SCREEN_STATE_WRITERS.has(control.id)) screenStateDispatched.add(control.id)"));
 });
+await test('top-level recovery failure logs its cause instead of discarding it', () => {
+  const text = readFileSync('scripts/evidence-aware-recovery.mjs', 'utf8');
+  assert.ok(text.includes("'Recovery failed; no operational pass is established. Cause: ' + cause"));
+  assert.ok(!text.includes("main().catch(() =>"));
+});
 
 console.log(`${passed} offline software checks passed. No live screening, provider, security-scan or deployment claim.`);

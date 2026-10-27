@@ -282,5 +282,10 @@ export async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(() => { console.error('Recovery failed; no operational pass is established.'); process.exitCode = 1; });
+  main().catch(error => {
+    // Log only the message: stacks and request objects can carry credentials.
+    const cause = typeof error?.message === 'string' ? error.message.slice(0, 200) : 'unknown error';
+    console.error('Recovery failed; no operational pass is established. Cause: ' + cause);
+    process.exitCode = 1;
+  });
 }
