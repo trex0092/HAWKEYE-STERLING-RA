@@ -11,7 +11,7 @@ for (const item of targets) {
   const start = Date.now();
   const entry = {id:item.id, url:item.url, checkedAt:new Date().toISOString(), httpStatus:null, responseKindVerified:false, ok:false, elapsedMs:null, errorCode:null};
   try {
-    const response = await fetch(item.url,{headers:{'User-Agent':'HawkeyeSterling-PublicSourceDiagnostic/1.0 (https://github.com/trex0092/HAWKEYE-STERLING-RA)','Accept':item.kind==='rss'?'application/rss+xml,application/xml':'application/json'},redirect:'error',signal:AbortSignal.timeout(20000)});
+    const response = await fetch(item.url,{headers:{'User-Agent':'HawkeyeSterling-PublicSourceDiagnostic/1.0 (https://github.com/trex0092/HAWKEYE-STERLING-RA)','Accept':item.kind==='rss'?'application/rss+xml,application/xml':'application/json'},redirect:'error',signal:globalThis.AbortSignal.timeout(20000)});
     entry.httpStatus=response.status;
     const body=await response.text();
     if(body.length>250000) throw new Error('response_too_large');
