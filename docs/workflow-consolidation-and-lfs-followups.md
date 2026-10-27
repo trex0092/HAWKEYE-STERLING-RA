@@ -33,7 +33,7 @@ setup-node/setup-python) preamble into one or two reusable workflows
 - `egress-allowlist` (input string) -- confirmed genuinely variable: 53 job
   instances use `egress-policy: block` with a per-workflow allowlist, 13 use
   `egress-policy: audit` (tools with unpredictable egress, like Playwright
-  fetching browsers or Fortify's per-deployment endpoints). A reusable
+  fetching browsers). A reusable
   workflow needs to accept both modes, not assume one.
 - `needs-node` / `needs-python` (boolean inputs, or just always set up both
   since the marginal cost of an unused `setup-python` step is near zero).
@@ -47,7 +47,7 @@ its pre-change behavior, then roll out to the rest in batches.
 
 **What this does NOT save:** the 8 separate SAST/security-scanner workflows
 (`codeql.yml`, `semgrep.yml`, `gitleaks.yml`, `osv-scanner.yml`,
-`container-scan.yml`, `dast-zap.yml`, `fortify.yml`, `bandit.yml`) are
+`container-scan.yml`, `dast-zap.yml`, `bandit.yml`) are
 one-tool-per-file by design, matching common industry practice for exactly
 this reason: independent status badges, independent required-check gating,
 independent failure isolation. Merging them into fewer files would not reduce

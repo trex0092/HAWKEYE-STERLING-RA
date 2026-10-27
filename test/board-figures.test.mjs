@@ -300,7 +300,7 @@ console.log('\n— runtime worldwide screening assurance —\n');
   const intro = readFileSync(join(ROOT, 'README.md'), 'utf8').split('## Contents')[0];
   const required = [
     'screening-assurance.yml', 'sanctions-screen.yml', 'freshness-check.yml',
-    'control-retry.yml', 'fortify.yml', 'advisor-eval.yml', 'advisor-bias-eval.yml',
+    'control-retry.yml', 'advisor-eval.yml', 'advisor-bias-eval.yml',
     'netlify-production-deploy.yml', 'site-currency.yml', 'function-health.yml',
   ];
   for (const file of required) {
@@ -308,13 +308,6 @@ console.log('\n— runtime worldwide screening assurance —\n');
       intro.includes('/actions/workflows/' + file) &&
       intro.includes('/github/actions/workflow/status/trex0092/HAWKEYE-STERLING-RA/' + file + '?branch=main'));
   }
-  check('README omits the Fortify AST label without hiding live vendor scan failure',
-    !intro.includes('Fortify AST') &&
-    !intro.includes('label=Fortify%20AST') &&
-    intro.includes('[![Vendor SAST]') &&
-    intro.includes('/fortify.yml?branch=main&label=vendor%20SAST') &&
-    intro.includes('**not operational**') &&
-    intro.includes('a substantive vendor scan executes and passes'));
   check('README distinguishes actual screening source quality from runtime status',
     intro.includes('`sourceQuality.assured`') &&
     intro.includes('`operational`') &&

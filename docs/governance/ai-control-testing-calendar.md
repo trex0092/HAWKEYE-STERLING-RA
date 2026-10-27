@@ -17,7 +17,7 @@ This calendar consolidates the existing test cadences. It does not invent eviden
 | Enterprise control-register integrity and generated views | `node scripts/ai-governance-controls.mjs --check` |
 | Policy-register ownership/approval consistency | `test/policies.test.mjs` |
 | Obligation mapping, source-citation shape and legal-citation currency | `test/obligations.test.mjs`, `test/legal-citations.test.mjs` |
-| Security scanning | CodeQL, Semgrep, Fortify, gitleaks, dependency review |
+| Security scanning | CodeQL, Semgrep, gitleaks, dependency review |
 | Assurance evidence path integrity | GRC metrics + enterprise control-register validation |
 
 ## Daily

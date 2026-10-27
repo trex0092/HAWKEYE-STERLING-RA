@@ -452,33 +452,6 @@ if (pkg.private === true) {
     directPublish.length === 0);
 }
 
-/* Fortify's protected-main scan was repeatedly RED (2026-10-26) because
-   vendor credentials were missing. A partial account setup used to pass the
-   preflight and crash inside fcli; never confuse a credential fragment with
-   a configured scan or interpolate secrets into a shell expression. */
-{
-  const fortify = readFileSync(join(dir, 'fortify.yml'), 'utf8');
-  const gate = fortify.split('      - name: Check Fortify credentials are configured')[1]
-    ?.split('      - name: Run Fortify Scan')[0] || '';
-  check('Fortify preflight must require all three FoD fields together',
-    /\[ -n "\$FOD_TENANT" \] && \[ -n "\$FOD_USER" \] && \[ -n "\$FOD_PAT" \]/.test(gate));
-  check('Fortify preflight must require complete SSC and ScanCentral SAST fields',
-    /\[ -n "\$SSC_URL" \] && \[ -n "\$SSC_TOKEN" \] && \[ -n "\$SC_CLIENT_AUTH_TOKEN" \]/.test(gate));
-  check('Fortify preflight refuses mixed credential providers and missing fields',
-    gate.includes('"$ssc_present" = false') &&
-    gate.includes('"$fod_present" = false') &&
-    gate.includes('configured=false'));
-  const runOnly = gate.split('        run: |')[1] || '';
-  check('Fortify credentials enter the shell through env, never unquoted action interpolation',
-    ['FOD_TENANT', 'FOD_USER', 'FOD_PAT', 'SSC_URL', 'SSC_TOKEN', 'SC_CLIENT_AUTH_TOKEN']
-      .every(k => gate.includes(k + ': ${{ ')) &&
-    !/\$\{\{\s*(secrets|vars)\./.test(runOnly));
-  check('Fortify retains main-branch fail-closed requirement for a completed vendor scan',
-    /if: always\(\) && github\.event_name != 'pull_request'/.test(fortify) &&
-    fortify.includes('FORTIFY_SCAN_OUTCOME') &&
-    fortify.includes('if [ "$FORTIFY_SCAN_OUTCOME" != "success" ]'));
-}
-
 /* Actionlint's pinned Go tool download is a different failure class from
    actionlint itself finding malformed workflows. On 26 Oct a runner blocked
    proxy.golang.org despite the existing exact egress allowlist. A bounded

@@ -474,7 +474,6 @@
         "netlify.toml",
         ".github/workflows/codeql.yml",
         ".github/workflows/semgrep.yml",
-        ".github/workflows/fortify.yml",
         "docs/security/history-scrub-runbook.md",
         "docs/governance/open-actions-register.md"
       ],
