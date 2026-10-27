@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Harden the runner
-        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           disable-sudo: true
           egress-policy: audit  # Stays audit: the probe's targets are whichever registry sources the dispatch selects — a fixed allowlist would defeat the diagnostic; the audit log itself is part of the evidence
@@ -43,7 +43,7 @@ jobs:
       # 24-hour window with public-figure names only — measures files read,
       # articles, languages, runtime and matches before the daily run depends
       # on it. Nothing is screened against the customer base; nothing posted.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         if: inputs.source_id == 'gkg-sweep'
         with:
           python-version: '3.11'
