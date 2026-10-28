@@ -1,25 +1,5 @@
 [
  {
-  "t": "البحث المتقدم",
-  "h": "https://www.moet.gov.ae/web/guest/search-results?q=Ministory%20of%20Economy"
- },
- {
-  "t": "Ministory of Economy",
-  "h": "https://www.moet.gov.ae/web/guest/search-results?q=Ministory%20of%20Economy"
- },
- {
-  "t": "Promising Sector",
-  "h": "https://www.moet.gov.ae/web/guest/search-results?q=Promising%20Sector"
- },
- {
-  "t": "Invest in UAE",
-  "h": "https://www.moet.gov.ae/web/guest/search-results?q=Invest%20in%20UAE"
- },
- {
-  "t": "Future Economy",
-  "h": "https://www.moet.gov.ae/web/guest/search-results?q=Future%20Economy"
- },
- {
   "t": "الأهداف الاستراتيجية",
   "h": "https://www.moet.gov.ae/strategy-and-policies"
  },
@@ -170,58 +150,6 @@
  {
   "t": "أسس مشروعك الخاص",
   "h": "https://www.moet.gov.ae/women-entrepreneurs-in-the-uae"
- },
- {
-  "t": "تشريعات الجمعيات التعاونية والمخزون الاستراتيجي للسلع الغذائية",
-  "h": "https://www.moet.gov.ae/cooperative-associations-and-strategic-stock-of-food-commodities-legislations"
- },
- {
-  "t": "تشريعات الشركات",
-  "h": "https://www.moet.gov.ae/companies-legislations"
- },
- {
-  "t": "تشريعات المشاريع الصغيرة والمتوسطة",
-  "h": "https://www.moet.gov.ae/smes-legislations"
- },
- {
-  "t": "تشريعات تنظيم المنافسة",
-  "h": "https://www.moet.gov.ae/regulation-of-competition-legislations"
- },
- {
-  "t": "تشريعات المعاملات التجارية",
-  "h": "https://www.moet.gov.ae/commercial-transaction-legislations"
- },
- {
-  "t": "تشريعات الملكية الفكرية",
-  "h": "https://www.moet.gov.ae/intellectual-property-legislations"
- },
- {
-  "t": "تشريعات الوكالات التجارية",
-  "h": "https://www.moet.gov.ae/commercial-agency-and-auditors-legislations"
- },
- {
-  "t": "تشريعات حماية المستهلك",
-  "h": "https://www.moet.gov.ae/consumer-protection-legislations"
- },
- {
-  "t": "تشريعات مدققي الحسابات",
-  "h": "https://www.moet.gov.ae/auditing-accounts-legislations"
- },
- {
-  "t": "تشريعات مواجهة جرائم غسل الاموال",
-  "h": "https://www.moet.gov.ae/financial-crimes-legislations"
- },
- {
-  "t": "قرار مجلس الوزارء بشأن الهيكل التنظيمي لوزارة الاقتصاد",
-  "h": "https://www.moet.gov.ae/cabinet-resolution-on-the-organisational-structure-of-the-ministry-of-economy"
- },
- {
-  "t": "قرار مجلس الوزراء بشأن رسوم خدمات الوزارة",
-  "h": "https://www.moet.gov.ae/cabinet-resolution-on-moe-service-fees"
- },
- {
-  "t": "مشروع العقود الدارجة",
-  "h": "https://www.moet.gov.ae/common-contracts-projects"
  },
  {
   "t": "تنظيم الأعمال",
@@ -388,58 +316,6 @@
   "h": "https://www.moet.gov.ae/eparticipation-policy"
  },
  {
-  "t": "المركز الإعلامي",
-  "h": "https://www.moet.gov.ae/media-centre"
- },
- {
-  "t": "المبادرات الحكومية",
-  "h": "https://www.moet.gov.ae/government-initiatives"
- },
- {
-  "t": "مبادرات وزارة الاقتصاد",
-  "h": "https://www.moet.gov.ae/moe-initiatives"
- },
- {
-  "t": "التقارير السنوية",
-  "h": "https://www.moet.gov.ae/annual-reports"
- },
- {
-  "t": "مجلة اقتصاد الإمارات",
-  "h": "https://www.moet.gov.ae/uae-economy-magazine"
- },
- {
-  "t": "الملف الصحفي",
-  "h": "https://www.moet.gov.ae/press-materials"
- },
- {
-  "t": "التركز الاقتصادي",
-  "h": "https://www.moet.gov.ae/economic-concentration"
- },
- {
-  "t": "حماية المستهلك",
-  "h": "https://www.moet.gov.ae/consumer-protection1"
- },
- {
-  "t": "شكاوى المستهلك",
-  "h": "https://www.moet.gov.ae/consumer-complaints1"
- },
- {
-  "t": "طلب رفع الأسعار",
-  "h": "https://www.moet.gov.ae/request-for-price-increase"
- },
- {
-  "t": "استدعاءات السلع",
-  "h": "https://www.moet.gov.ae/product-recall1"
- },
- {
-  "t": "طلب استدعاء سلعة",
-  "h": "https://www.moet.gov.ae/request-for-product-recall"
- },
- {
-  "t": "الاستدعاءات المعلنة",
-  "h": "https://www.moet.gov.ae/product-recalls-announced"
- },
- {
   "t": "للتواصل عبر الواتساب",
   "h": "https://api.whatsapp.com/send?phone=9718001222"
  },
@@ -460,10 +336,6 @@
   "h": "https://msurvey.government.ae/survey/Ministry%20of%20Economy/gPm/ar"
  },
  {
-  "t": "شارك بمقترح أو فكرة جديدة وكن جزءاً من التغيير .. شارك الآن !",
-  "h": "https://innovation.economy.ae/UI/Innovation/Pages/Home.aspx?account=2"
- },
- {
   "t": "نشرة العلامات التجارية متوفرة الآن في صفحة الاصدارات",
   "h": "https://www.moet.gov.ae/web/guest/983"
  },
@@ -474,38 +346,6 @@
  {
   "t": "اقتصاد امارات",
   "h": "https://xn--mgbaiv2a0f.xn--mgbaam7a8h/"
- },
- {
-  "t": "المركز الإعلامي",
-  "h": "https://www.moet.gov.ae/web/guest/media-centre"
- },
- {
-  "t": "الأسئلة الشائعة",
-  "h": "https://www.moet.gov.ae/web/guest/faq"
- },
- {
-  "t": "إمكانية الوصول",
-  "h": "https://www.moet.gov.ae/web/guest/accessibility"
- },
- {
-  "t": "الشروط والأحكام",
-  "h": "https://www.moet.gov.ae/web/guest/terms-of-use"
- },
- {
-  "t": "إخلاء المسؤولية",
-  "h": "https://www.moet.gov.ae/web/guest/disclaimer"
- },
- {
-  "t": "وعد حكومة دولة الإمارات",
-  "h": "https://www.moet.gov.ae/web/guest/customer-happiness-charter"
- },
- {
-  "t": "معادلة إسعاد المتعاملين",
-  "h": "https://www.moet.gov.ae/web/guest/customer-happiness-equation"
- },
- {
-  "t": "سياسة الخصوصية",
-  "h": "https://www.moet.gov.ae/web/guest/privacy-policy"
  },
  {
   "t": "+971 800 1222",
