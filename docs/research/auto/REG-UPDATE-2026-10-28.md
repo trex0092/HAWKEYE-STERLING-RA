@@ -5,14 +5,11 @@
 ### UAE Ministry of Economy (MoE) — DNFBP / DPMS supervisor
 _AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.moet.gov.ae/_
 
+### Dubai Virtual Assets Regulatory Authority (VARA)
+_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.vara.ae/en/_
+
 ### LBMA — Responsible Sourcing
 _AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.lbma.org.uk/responsible-sourcing_
-
-### OECD — Responsible Mineral Supply Chains (CAHRA)
-_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.oecd.org/en/topics/responsible-business-conduct.html_
-
-### US OFAC — Recent Actions
-_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://ofac.treasury.gov/recent-actions_
 
 ### Responsible Jewellery Council (RJC)
 _AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.responsiblejewellery.com/_

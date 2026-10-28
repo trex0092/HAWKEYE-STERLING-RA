@@ -2,13 +2,13 @@
   "updated": "2026-10-28",
   "sources": {
     "uae-moe": {
-      "hash": "253a679417001425352a0d55f719684146f735fcc57a42daa434cf2c9dc8656e",
-      "bytes": 5893,
+      "hash": "e4309853159868cfe2188543158c749db444eda47f28abc68bde7b991df5cdbe",
+      "bytes": 10443,
       "checkedAt": "2026-10-28",
       "changedAt": "2026-10-28",
       "contentAsOf": "2026-10-28",
       "status": 200,
-      "prevHash": "17460e45cfcf674b988e461657ff828acafb48c360c637b5b2b8859eb2221594",
+      "prevHash": "253a679417001425352a0d55f719684146f735fcc57a42daa434cf2c9dc8656e",
       "fp": 2
     },
     "uae-fiu": {
@@ -29,7 +29,7 @@
       "contentAsOf": "2026-10-28",
       "status": 200,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261028011034"
+      "via": "web.archive.org save-page-now 20261028130242"
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -49,13 +49,13 @@
       "status": 200
     },
     "uae-vara": {
-      "hash": "2ab9b87f108f844f2b1a8fc0bf8a0dfa05510fcfbe1a1482ad19fc82c75827e5",
-      "bytes": 4151,
+      "hash": "603ba5cd16690ae4792be1b2a52b69e650a48126a8e7490e871f280785c3b71f",
+      "bytes": 4368,
       "checkedAt": "2026-10-28",
-      "changedAt": "2026-10-06",
+      "changedAt": "2026-10-28",
       "contentAsOf": "2026-10-28",
       "status": 200,
-      "prevHash": "c41e68daf6927cbed3f49060b81491cc289cb5634214996c6be372309a4e31cd",
+      "prevHash": "2ab9b87f108f844f2b1a8fc0bf8a0dfa05510fcfbe1a1482ad19fc82c75827e5",
       "fp": 2
     },
     "uae-jewellery": {
@@ -79,7 +79,7 @@
       "fp": 2,
       "via": "web.archive.org snapshot 20261004141918",
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "wolfsberg": {
       "hash": "575ebdfe1028c70db1de23dfd4f5f5ec3d9b6ed11ef6646943945d298c284815",
@@ -101,13 +101,13 @@
       "fp": 2
     },
     "lbma": {
-      "hash": "330af347a27568d5abeb1505a21bd6184434dd96852b8fb2330771c170a73cd5",
-      "bytes": 18260,
+      "hash": "f9da8813c62f954abef9be47c869fb30b9ee1bc45238a0236b749b9a01b3be25",
+      "bytes": 18364,
       "checkedAt": "2026-10-28",
       "changedAt": "2026-10-28",
       "contentAsOf": "2026-10-28",
       "status": 200,
-      "prevHash": "802428f83176504c950ddb4ad90b12ea494cbadbb924b099e285b2011fee23df",
+      "prevHash": "330af347a27568d5abeb1505a21bd6184434dd96852b8fb2330771c170a73cd5",
       "fp": 2
     },
     "oecd": {
@@ -119,7 +119,7 @@
       "status": 200,
       "prevHash": "a52d13ec128001f96c22b2d7599c3117595367c9ccec6e0b10d48af9509d7b9e",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261023071356"
+      "via": "web.archive.org snapshot 20261023164759"
     },
     "ofac": {
       "hash": "258dadbdb37d9fccf59674413c986370204bbc4228ac532b05868551c4421caf",
@@ -200,13 +200,13 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "534ff94256c55cd3cd22d62dccd37780680a8e81e0a8da64b096bc88bf29b414",
+      "hash": "d254118dc858d170661cc156340f8abab40e9cb504d7d95e282b3658d479b804",
       "bytes": 107664,
       "checkedAt": "2026-10-28",
       "changedAt": "2026-10-28",
       "contentAsOf": "2026-10-28",
       "status": 200,
-      "prevHash": "7c74a150ba259e349914fa877f15fc865af5297ad041e47de50aa6e8b06ec08f",
+      "prevHash": "534ff94256c55cd3cd22d62dccd37780680a8e81e0a8da64b096bc88bf29b414",
       "fp": 2
     },
     "eu-ai-act": {
@@ -214,12 +214,11 @@
       "bytes": 18099,
       "checkedAt": "2026-10-28",
       "changedAt": "2026-10-19",
-      "contentAsOf": "2026-10-21",
-      "status": 403,
+      "contentAsOf": "2026-10-23",
+      "status": 200,
       "prevHash": "6ac70f5bf9cd6c497757effab0c759935c0b14f6de6cedc3b31842a84a46e94a",
       "fp": 2,
-      "error": "HTTP 403",
-      "errorStreak": 21
+      "via": "web.archive.org snapshot 20261023185856"
     }
   }
 }
