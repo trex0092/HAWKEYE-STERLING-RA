@@ -2868,10 +2868,42 @@
       "detectedAt": "2026-10-27T10:24:51.452Z",
       "prevCount": 58646,
       "newCount": 58572,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 40488279799,
+        "startedAt": "2026-10-27T10:24:55Z"
+      },
+      "status": "complete",
+      "chainPrev": "6716913d8e2866397d9aca9734f98649beb450fdb0146aaabcf459ed1783ccec",
+      "chainHash": "c2de8ce2893533220e7fde6e24c0a3172d8e0af49d88bcf5ec911ecea8bacc75",
+      "latencyHours": 0,
+      "resolutionHash": "5a44792539685327c6581ffc9c2315a3dbcc97c241f88a3b95374fdad5f11702"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-28T01:11:15.752Z",
+      "prevCount": 58572,
+      "newCount": 58573,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "6716913d8e2866397d9aca9734f98649beb450fdb0146aaabcf459ed1783ccec",
-      "chainHash": "c2de8ce2893533220e7fde6e24c0a3172d8e0af49d88bcf5ec911ecea8bacc75"
+      "chainPrev": "c2de8ce2893533220e7fde6e24c0a3172d8e0af49d88bcf5ec911ecea8bacc75",
+      "chainHash": "37afa562a0b85627f225b4ae2aff480719c8e0afd7a4104d6eb932fa22d2dd91"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-28T01:11:15.752Z",
+      "prevCount": 22840,
+      "newCount": 22908,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "37afa562a0b85627f225b4ae2aff480719c8e0afd7a4104d6eb932fa22d2dd91",
+      "chainHash": "47cee0928ed2cf0eb500e5068cc144df752c2afd3925717706d1b201dabba587"
     }
   ]
 }
