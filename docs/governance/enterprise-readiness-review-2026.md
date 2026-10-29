@@ -344,7 +344,7 @@ runner. Watchman matching benchmark added beside the yente one: a dispatch-only,
 workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
 no government list. Measurement only — no scored control changed.*
 
-Verified at HEAD: 79 workflows · 204 markdown documents under docs/ (171 excluding docs/research/auto).
+Verified at HEAD: 79 workflows · 205 markdown documents under docs/ (172 excluding docs/research/auto).
 
 *Estate re-verification · 22 October 2026: a read-only GitHub CLI readiness workflow was added for GitHub-hosted Ubuntu runners. It verifies the runner-provided `gh` executable and scoped repository API authentication. One blocked-egress workflow/job was added; this is tooling verification only, not a screening, scoring, AI evaluation, security-scan, or production-deployment assurance claim.*
 
