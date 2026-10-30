@@ -2973,6 +2973,32 @@
       "chainHash": "40e2c34b8ccad1cd687f74a3050e7cbbebc25d281e086074ef26d6d9548612b6",
       "latencyHours": 0,
       "resolutionHash": "abe9e217d42771dec11bf22d0027ed9c43d435b7f4aad8fa7e12dabeb92bf7fe"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-10-29",
+      "detectedAt": "2026-10-30T02:52:56.318Z",
+      "prevCount": 1007,
+      "newCount": 1007,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "40e2c34b8ccad1cd687f74a3050e7cbbebc25d281e086074ef26d6d9548612b6",
+      "chainHash": "35520e576eb422de844b53c7999c77af91beb3c4c5beb5a78d34599f095cb845"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-10-30T02:52:56.318Z",
+      "prevCount": 58573,
+      "newCount": 58573,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "35520e576eb422de844b53c7999c77af91beb3c4c5beb5a78d34599f095cb845",
+      "chainHash": "0cbc0042a6fa22296b45adcbf4c6b2cf805c5291dcbd552dc3aacca99f299214"
     }
   ]
 }

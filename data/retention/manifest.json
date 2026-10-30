@@ -600,5 +600,12 @@
     "bytes": 2839,
     "updated": "2026-10-29",
     "recordedAt": "2026-10-29T02:17:31.728Z"
+  },
+  {
+    "file": "sanctions-state-2026-10-30-387f2cc7d2ae501b.json",
+    "sha256": "387f2cc7d2ae501b99814294dfeddf27a206fa810b9172a355486ac0752c3249",
+    "bytes": 2839,
+    "updated": "2026-10-30",
+    "recordedAt": "2026-10-30T02:53:07.497Z"
   }
 ]
