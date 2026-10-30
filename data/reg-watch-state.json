@@ -26,12 +26,10 @@
       "bytes": 6329,
       "checkedAt": "2026-10-30",
       "changedAt": "2026-09-21",
-      "contentAsOf": "2026-10-29",
-      "status": 403,
+      "contentAsOf": "2026-10-30",
+      "status": 200,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261029021826",
-      "error": "HTTP 403",
-      "errorStreak": 2
+      "via": "web.archive.org save-page-now 20261030130053"
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -61,13 +59,13 @@
       "fp": 2
     },
     "uae-jewellery": {
-      "hash": "e71fc05e807c29fc76e6c70486dc80544abdb62fc85f049f74d323d52f75efab",
-      "bytes": 10028,
+      "hash": "4e33f9ba18fa297b3573342d370a7155b29201254a43f7b2a00f69e2a1af56ab",
+      "bytes": 10109,
       "checkedAt": "2026-10-30",
       "changedAt": "2026-10-30",
       "contentAsOf": "2026-10-30",
       "status": 200,
-      "prevHash": "2eeaa6bc3491a15fe4fb696df814e9eb502356100195f841ca41dee5359bdc64",
+      "prevHash": "e71fc05e807c29fc76e6c70486dc80544abdb62fc85f049f74d323d52f75efab",
       "fp": 2
     },
     "fatf-guidance": {
@@ -116,12 +114,10 @@
       "checkedAt": "2026-10-30",
       "changedAt": "2026-10-28",
       "contentAsOf": "2026-10-23",
-      "status": 403,
+      "status": 200,
       "prevHash": "a52d13ec128001f96c22b2d7599c3117595367c9ccec6e0b10d48af9509d7b9e",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261023164759",
-      "error": "HTTP 403",
-      "errorStreak": 1
+      "via": "web.archive.org snapshot 20261023164759"
     },
     "ofac": {
       "hash": "80f6ff68be5965100f36748b32fcbc79f00ddc1f3706c20827c4f9e7015e4044",
@@ -202,23 +198,23 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "7fe5df255ef5acde4fa210fb91014ee565668220121d37cb1f69fff998405ffd",
+      "hash": "76b2fba7cd488d6c9b5a84421c08a7b39e8aac9ecbe1661e9ee7b2a0b32f6a71",
       "bytes": 107780,
       "checkedAt": "2026-10-30",
       "changedAt": "2026-10-30",
       "contentAsOf": "2026-10-30",
       "status": 200,
-      "prevHash": "8c9c314edd83632e77b4d67804701db31256780abd5976dbc8aacf33a4e736e1",
+      "prevHash": "7fe5df255ef5acde4fa210fb91014ee565668220121d37cb1f69fff998405ffd",
       "fp": 2
     },
     "eu-ai-act": {
-      "hash": "b527dd9f7659ca8215da7469414d0c06c538f38e782e6ca9e6b3515e18be401b",
-      "bytes": 18099,
+      "hash": "8a8d95673e4df3eb0cc05d7fddc53e4ff539f5bc3c6e6242de72dd61f7b24df0",
+      "bytes": 18059,
       "checkedAt": "2026-10-30",
-      "changedAt": "2026-10-19",
+      "changedAt": "2026-10-30",
       "contentAsOf": "2026-10-30",
       "status": 200,
-      "prevHash": "6ac70f5bf9cd6c497757effab0c759935c0b14f6de6cedc3b31842a84a46e94a",
+      "prevHash": "b527dd9f7659ca8215da7469414d0c06c538f38e782e6ca9e6b3515e18be401b",
       "fp": 2
     }
   }
