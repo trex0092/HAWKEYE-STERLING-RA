@@ -31,7 +31,7 @@
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
       "via": "web.archive.org save-page-now 20261030130053",
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -76,12 +76,10 @@
       "checkedAt": "2026-10-31",
       "changedAt": "2026-10-06",
       "contentAsOf": "2026-10-18",
-      "status": 403,
+      "status": 200,
       "prevHash": "f5359df5b816213005400e4196850dfc0d9ebdc8b09d6404f4dfc805a75a868a",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261018134107",
-      "error": "HTTP 403",
-      "errorStreak": 1
+      "via": "web.archive.org snapshot 20261018134107"
     },
     "wolfsberg": {
       "hash": "575ebdfe1028c70db1de23dfd4f5f5ec3d9b6ed11ef6646943945d298c284815",
