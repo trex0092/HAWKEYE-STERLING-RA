@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-31T01:49:04.996Z",
-  "githubRunId": "41157045550",
+  "generatedAt": "2026-10-31T12:06:07.216Z",
+  "githubRunId": "41199497646",
   "commit": "a7ebfde35c7ab9c6789ee8f41812374d557cd4f8",
   "screenedSubjects": 991,
   "sourceProjects": {
@@ -52,15 +52,15 @@
         "partial": false
       },
       {
-        "id": "eu-fsf",
-        "name": "EU — Consolidated financial sanctions list (CSV)",
-        "count": 31132,
-        "partial": false
-      },
-      {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
         "count": 22911,
+        "partial": false
+      },
+      {
+        "id": "eu-fsf",
+        "name": "EU — Consolidated financial sanctions list (CSV)",
+        "count": 31132,
         "partial": false
       }
     ],
