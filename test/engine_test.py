@@ -815,9 +815,9 @@ try:
     ai.LLM_TRIAGE = True
     ai.AI_TRIAGE_CACHE_PATH = os.path.join(_cache_dir, "ai-triage-cache.json")
     ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
-    _calls = []
+    _triage_calls = []
     def _fake_llm(*a, **k):
-        _calls.append(1)
+        _triage_calls.append(1)
         return '{"is_about_subject": true, "is_adverse": true, "severity": "LOW"}'
     ai.llm_complete = _fake_llm
     _art = {"title": "Cacheco gold smuggling probe", "source": "x", "date": "2026-10-01",
@@ -825,19 +825,19 @@ try:
     _t1 = ai.triage_adverse("Cacheco", _art)
     _t2 = ai.triage_adverse("Cacheco", dict(_art))
     check("an identical headline is sent to the model once, then served from cache",
-          len(_calls) == 1 and _t1 == _t2 and _t2["ai"] is True)
+          len(_triage_calls) == 1 and _t1 == _t2 and _t2["ai"] is True)
     _t3 = ai.triage_adverse("Othercorp", dict(_art))
-    check("a different subject is a different cache key (model asked again)", len(_calls) == 2)
+    check("a different subject is a different cache key (model asked again)", len(_triage_calls) == 2)
     _floor = ai.triage_adverse("Cacheco", dict(_art, categories=["Terrorism / CFT"]))
     check("a cached LOW verdict never lowers this run's deterministic floor",
-          len(_calls) == 2 and _floor["severity"] == "CRITICAL")
+          len(_triage_calls) == 2 and _floor["severity"] == "CRITICAL")
     ai.save_triage_cache()
     _raw = open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8").read()
     check("the persisted cache holds hashes and verdicts only (no names or headlines)",
           "Cacheco" not in _raw and "smuggling" not in _raw and '"entries"' in _raw)
     ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
     ai.triage_adverse("Cacheco", dict(_art))
-    check("a fresh run reloads the cache from disk", len(_calls) == 2)
+    check("a fresh run reloads the cache from disk", len(_triage_calls) == 2)
     _old = json.load(open(ai.AI_TRIAGE_CACHE_PATH, encoding="utf-8"))
     for _v in _old["entries"].values():
         _v["d"] = "2000-01-01"
@@ -850,7 +850,7 @@ try:
     open(ai.AI_TRIAGE_CACHE_PATH, "w").write("{not json")
     ai._TRIAGE_CACHE.update(loaded=False, entries={}, dirty=False)
     ai.triage_adverse("Cacheco", dict(_art))
-    check("an unreadable cache starts empty and the model is still asked", len(_calls) == 3)
+    check("an unreadable cache starts empty and the model is still asked", len(_triage_calls) == 3)
 finally:
     (ai.LLM_TRIAGE, ai.llm_complete, ai.AI_TRIAGE_CACHE_PATH) = _saved_cache[:3]
     ai._TRIAGE_CACHE.clear(); ai._TRIAGE_CACHE.update(_saved_cache[3])
@@ -4750,7 +4750,7 @@ try:
         ("missing population receipt", 200, True),
         (_r_now, 503, True),
     ]:
-        _stub, _calls = _rerun_report_stub(_old_notes, previous_status=_http_status)
+        _stub, _rerun_posts = _rerun_report_stub(_old_notes, previous_status=_http_status)
         screen.asana_request = _stub
         screen.UNIFIED_DELIVERY_FAILED["failed"] = False
         _dedup_gid = screen.post_unified_task(
@@ -4759,7 +4759,7 @@ try:
               + f" (prior HTTP {_http_status}, expected red {_expect_red})",
               _dedup_gid == "prior-1"
               and screen.UNIFIED_DELIVERY_FAILED["failed"] == _expect_red
-              and not any(method == "POST" for method, url in _calls))
+              and not any(method == "POST" for method, url in _rerun_posts))
 finally:
     screen.asana_request = _old_asana_rerun
     screen.UNIFIED_DELIVERY_FAILED["failed"] = _old_delivery_gate
