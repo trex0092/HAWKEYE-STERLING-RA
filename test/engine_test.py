@@ -6913,6 +6913,37 @@ check("read-only agent enforces a cumulative evidence budget across steps",
           verified_role="Admin", authorized_tools={"normalize_name"},
           tool_handlers={"normalize_name": lambda *_: {"data": "x" * 7000}})["status"] == "DEGRADED")
 
+# ── batching: per-batch delivery planning (pure; screen.py not yet wired) ────
+print("batching.py — daily screening batch planning")
+import batching as _bt
+_subj = [f"SUBJECT {i:04d}" for i in range(1017)]
+_plan = _bt.plan_batches(_subj)
+check("batching: 1017 subjects → 41 batches of at most 25",
+      len(_plan) == 41 and all(1 <= len(b) <= 25 for b in _plan))
+check("batching: no subject lost or duplicated when a run is split",
+      [s for b in _plan for s in b] == _subj)
+check("batching: exact multiple gives full batches, no empty tail",
+      [len(b) for b in _bt.plan_batches(list(range(50)))] == [25, 25])
+check("batching: empty run plans zero batches", _bt.plan_batches([]) == [])
+for _bad in (0, -1, 2.5, True, "25"):
+    try:
+        _bt.plan_batches(_subj, size=_bad)
+        _rejected = False
+    except ValueError:
+        _rejected = True
+    check(f"batching: invalid size {_bad!r} is rejected", _rejected)
+check("batching: dedup key is stable and per-batch",
+      _bt.batch_dedup_key("daily", "2026-11-03", 3, 41) == "daily|2026-11-03|batch 3/41")
+check("batching: distinct batches of one run never share a dedup key",
+      len({_bt.batch_dedup_key("daily", "2026-11-03", n, 41) for n in range(1, 42)}) == 41)
+for _args in ((0, 41), (42, 41), (1, 0)):
+    try:
+        _bt.batch_dedup_key("daily", "2026-11-03", *_args)
+        _rejected = False
+    except ValueError:
+        _rejected = True
+    check(f"batching: out-of-range batch {_args} is rejected", _rejected)
+
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
     sys.exit(1)
