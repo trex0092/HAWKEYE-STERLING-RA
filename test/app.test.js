@@ -36,6 +36,8 @@ for(const m of html.matchAll(/id="([^"]+)"/g)) register(m[1]);
 global.document = {
   getElementById(id){ return els[id] || null; },  // browser-accurate: null for unknown
   createElement(){ return makeEl(); },
+  createDocumentFragment(){ return makeEl(); },   // rdRender builds rows off-DOM (browser API)
+  createTextNode(t){ return { nodeType: 3, textContent: String(t) }; },
   addEventListener(){}  // event-delegation layer in app.js registers here
 };
 global.window = { addEventListener(){} };
