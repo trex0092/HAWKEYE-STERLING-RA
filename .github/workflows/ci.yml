@@ -22,7 +22,7 @@ jobs:
       - name: Harden the runner (egress block)
         # Tests run fully offline; the only egress is the toolchain download
         # (setup-node from nodejs.org, setup-python from the github release mirror).
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           disable-sudo: true
           egress-policy: block
@@ -353,7 +353,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden policy runner (egress block)
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           disable-sudo: true
           egress-policy: block
@@ -392,7 +392,7 @@ jobs:
         # (checkout), nodejs.org for setup-node on a toolchain-cache miss,
         # PyPI for the hash-locked hypothesis install, and the npm registry
         # for the lockfile-pinned fast-check toolchain.
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           disable-sudo: true
           egress-policy: block
