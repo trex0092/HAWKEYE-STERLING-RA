@@ -7,9 +7,11 @@
       "checkedAt": "2026-11-03",
       "changedAt": "2026-11-03",
       "contentAsOf": "2026-11-03",
-      "status": 200,
+      "status": "error",
       "prevHash": "23e5d1fdef0e62fdcc7662d47732a3ce3194d9206f6c549f2c557997ea739a33",
-      "fp": 2
+      "fp": 2,
+      "error": "fetch failed (UND_ERR_CONNECT_TIMEOUT)",
+      "errorStreak": 1
     },
     "uae-fiu": {
       "hash": "7e067a5c918cf49ed2584aabd12bf981be702878d9826327b9087a962cc5c702",
@@ -109,17 +111,15 @@
       "fp": 2
     },
     "oecd": {
-      "hash": "0126dd358e73e147d31270d801518227c9bfea69f64b4bc9010774c73b420e9a",
-      "bytes": 50347,
+      "hash": "6de47c792ad305275462005661517b67079e61a0bc2c0e1b15c12bfa13cd0962",
+      "bytes": 50363,
       "checkedAt": "2026-11-03",
-      "changedAt": "2026-10-28",
-      "contentAsOf": "2026-10-26",
-      "status": 403,
-      "prevHash": "a52d13ec128001f96c22b2d7599c3117595367c9ccec6e0b10d48af9509d7b9e",
+      "changedAt": "2026-11-03",
+      "contentAsOf": "2026-10-27",
+      "status": 200,
+      "prevHash": "0126dd358e73e147d31270d801518227c9bfea69f64b4bc9010774c73b420e9a",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261026213042",
-      "error": "HTTP 403",
-      "errorStreak": 1
+      "via": "web.archive.org snapshot 20261027015456"
     },
     "ofac": {
       "hash": "80f6ff68be5965100f36748b32fcbc79f00ddc1f3706c20827c4f9e7015e4044",
