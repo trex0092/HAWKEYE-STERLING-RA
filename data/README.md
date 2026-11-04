@@ -28,6 +28,7 @@ Actions from the URLs in `sanctions-sources.json`.
 |---|---|
 | `sanctions-sources.json` | The list-source registry (URLs, formats, floors) — its `_README` key is the in-file contract |
 | `reg-sources.json` | Regulatory-watch source registry + per-source narratives |
+| `schemas/*.schema.json` | JSON Schemas (draft 2020-12) for the committed data files named in each schema's `x-hawkeye-validates`. `test/data_schema_test.py` fails CI when a listed file is missing, malformed or off-shape, and checks natively that `count` equals the entries and that source ids are unique. Add a schema here when adding a data file |
 | `obligations.json` | Obligation register: instrument → owner → controls → evidence (guard: `test/obligations.test.mjs`) |
 | `policies.json` | Instrument register: owner, status, approval record (guard: `test/policies.test.mjs`; CI checks the *document*, not just the register) |
 | `risk-appetite.json` | Appetite positions, ceilings, KRIs (guard: `test/grc-metrics.test.mjs`) |

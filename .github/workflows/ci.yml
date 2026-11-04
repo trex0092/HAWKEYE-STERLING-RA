@@ -409,8 +409,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
-      - name: Install the hash-locked engine dependencies (incl. hypothesis)
-        run: python -m pip install --quiet --require-hashes -r ci/requirements.txt
+      - name: Install the hash-locked engine dependencies (incl. hypothesis) and the CI-only schema tool
+        # ci/schema-requirements.txt (jsonschema) is constrained to the engine
+        # lock and never imported by the engine, the app or the MCP server.
+        run: python -m pip install --quiet --require-hashes -r ci/requirements.txt -r ci/schema-requirements.txt
+      - name: Validate the committed data files against their JSON Schemas (data/schemas)
+        run: python test/data_schema_test.py
       - name: Run property-based fuzzing of the text-normalisation layer (hypothesis)
         run: python test/fuzz_properties.py
       - name: Run screening accuracy benchmark — Python rapidfuzz backend (authoritative floors)
