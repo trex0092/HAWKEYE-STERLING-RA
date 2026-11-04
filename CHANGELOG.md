@@ -590,6 +590,7 @@ bump merged to `main`.
 - **`kg-fiu` note updated** (`data/sanctions-extra.json`, commit `ea4c4bb`, pushed
   straight to `main` without a PR). Records that a 2026-09-27 probe got no HTTP
   response at all, where the 2026-08-05 probe got an HTML page.
+- **Nationality demonyms now resolve for every country, from a licensed dataset.** `kyc.nationality_country` consulted a hand-written map of 58 demonyms; a nationality written as any other demonym ("Peruvian", "Zimbabwean") was kept as written and compared as text, so the R.10 identity step could never find it equal to the designation's country. New generated table `data/demonyms.json` (236 English demonyms to common country names, from the mledoze/countries dataset pinned to one upstream commit and its SHA-256, licence ODbL-1.0 with attribution recorded in the file) extends the map; the hand-written map keeps precedence, four demonyms shared by several countries (Congolese, Dominican, Channel Islander, Virgin Islander) are listed as ambiguous and left unmapped, and a missing or unreadable table degrades to the hand map with one stderr line. Recall can only rise: mapping a demonym to its country can only make a nationality AGREE with a designation where it differed as text before, and exclusion still needs both axes to disagree. Generator `scripts/demonyms-from-countries.mjs` refuses to write when the download does not match the pin. Six checks added to `test/engine_test.py`.
 
 ## [4.0.0] - 2026-09-25
 
