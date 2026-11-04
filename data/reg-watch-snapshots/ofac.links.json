@@ -128,6 +128,14 @@
   "h": "https://ofac.treasury.gov/contact-ofac"
  },
  {
+  "t": "Iran-related Designations; Updates to Certain Iran-related Listings; Publication of Iran-related OFAC Alert; Issuance of Amended Venezuela-related General License and Frequently Asked Question",
+  "h": "https://ofac.treasury.gov/recent-actions/20261104"
+ },
+ {
+  "t": "Sanctions List Updates",
+  "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
+ },
+ {
   "t": "Issuance of Amended Iran-related General License",
   "h": "https://ofac.treasury.gov/recent-actions/20261029"
  },
@@ -138,10 +146,6 @@
  {
   "t": "North Korea Designations; Democratic Republic of the Congo-related Designations",
   "h": "https://ofac.treasury.gov/recent-actions/20261028"
- },
- {
-  "t": "Sanctions List Updates",
-  "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
  },
  {
   "t": "Settlement Agreement between the U.S. Department of the Treasury's Office of Foreign Assets Control and Extreme Networks, Inc.",
@@ -180,12 +184,8 @@
   "h": "https://ofac.treasury.gov/recent-actions/20261014"
  },
  {
-  "t": "Counter Narcotics and Counter Terrorism Designations",
-  "h": "https://ofac.treasury.gov/recent-actions/20261013"
- },
- {
   "t": "Current page 1",
-  "h": "https://ofac.treasury.gov/recent-actions?page=0"
+  "h": "https://ofac.treasury.gov/recent-actions?pulse_nocache=1793825442983-2&page=0"
  },
  {
   "t": "All Recent Actions",
