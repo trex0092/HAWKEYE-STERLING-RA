@@ -60,7 +60,6 @@ material change, and at the quarterly management review._
 | Consolidated sanction-list changes detected (OFAC/UN/EU/UK) | `sanctions-watch.yml` (+ `test/sanctions-watch.test.mjs`) | Daily 05:00 UTC | Card in *Ongoing Monitoring* → Sanctions updates; issue fallback |
 | Regulator source changes detected (22 UAE/global sources, incl. the EU AI Act page) | `regulatory-watch.yml` (+ `test/reg-watch.test.mjs`) | Daily 06:00 UTC | Card → Regulatory changes; issue fallback |
 | FATF black/grey list moves + affected-assessment digest | `fatf-watchdog.yml` (+ `test/watchdog.test.mjs`) | Daily 06:00 UTC (digest monthly) | Card → FATF list moves; review task |
-| Daily compliance brief composed from the monitoring projects | `daily-brief.yml` (+ `test/daily-brief.test.mjs`) | Daily 07:00 UTC | Brief card in *Ongoing Monitoring* |
 | Anomaly watch over watcher outputs | `anomaly-watch.yml` | Daily | Run log / alert |
 
 ### 1.5 Supply-chain & code security
@@ -74,7 +73,7 @@ material change, and at the quarterly management review._
 | Workflow security lint (incl. injection patterns) | `workflow-lint.yml` (actionlint + zizmor) | Push/PR | Check run |
 | Supply-chain posture score | `scorecard.yml` (OpenSSF) | Weekly | Scorecard dashboard / SARIF |
 | All third-party actions SHA-pinned; runners hardened (harden-runner on all 38 workflows) | `workflow-lint.yml` + audited 2026-07 | Continuous | This doc; audit trail in PRs #159/#161 |
-| Egress blocked with explicit allowlists on every `contents:write` job that fetches the internet | harden-runner `egress-policy: block` in `onboarding-screen`, `weekly-adverse-media`, `regulatory-watch`, `sanctions-watch`, `daily-sanctions-screen`, `fatf-watchdog`, `daily-brief`, `asana-reconcile`, `function-health`, `freshness-check` | Every run | Run logs (blocked-host = loud failure) |
+| Egress blocked with explicit allowlists on every `contents:write` job that fetches the internet | harden-runner `egress-policy: block` in `onboarding-screen`, `weekly-adverse-media`, `regulatory-watch`, `sanctions-watch`, `daily-sanctions-screen`, `fatf-watchdog`, `asana-reconcile`, `function-health`, `freshness-check` | Every run | Run logs (blocked-host = loud failure) |
 | Release artefacts signed (Sigstore keyless) + SBOM | `release.yml` / `auto-release.yml` (+ `test/sbom.test.mjs`) | Per release | Release attestations; `sbom.cdx.json` |
 | DAST baseline of the live site (image digest-pinned) | `dast-zap.yml` (OWASP ZAP) | Scheduled + dispatch | ZAP report artifact |
 
@@ -152,7 +151,7 @@ names it as evidence an examiner can demand.
 All monitoring/alert output converges on **two Asana projects**:
 **HAWKEYE STERLING APP** (assessment deliveries + register/log/risk-data mirrors +
 site/function-health alerts + FATF review digests) and **Ongoing Monitoring**
-(screening reports, watcher cards, daily brief, reconciliation). Every alerting
+(screening reports, watcher cards, reconciliation). Every alerting
 workflow has a loud failure path (red run, GitHub-issue fallback, or Asana alert)
 — **silence is never success**.
 

@@ -1,8 +1,8 @@
 name: Asana Delivery Verify (manual)
 
 # Verifies the GitHub-native delivery path to Asana: GitHub Actions -> Asana
-# REST API, directly. The scheduled compliance workflows (daily brief,
-# screening, weekly summary) all deliver to Asana straight from Actions with
+# REST API, directly. The scheduled compliance workflows (screening,
+# weekly summary) all deliver to Asana straight from Actions with
 # ASANA_ACCESS_TOKEN — no Netlify hop — and this workflow proves that path
 # end-to-end: it creates a throwaway task in the target project, confirms the
 # task landed there, then deletes it.

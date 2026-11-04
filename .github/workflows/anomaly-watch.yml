@@ -11,7 +11,7 @@ name: Anomaly Watch
 
 on:
   schedule:
-    - cron: '37 6 * * *'   # 06:37 UTC daily, just after the morning screening run (odd minute — see daily-brief.yml)
+    - cron: '37 6 * * *'   # 06:37 UTC daily, just after the morning screening run (odd minute)
   workflow_dispatch:
 
 # Least privilege: read the repo, write an issue. No other scope.

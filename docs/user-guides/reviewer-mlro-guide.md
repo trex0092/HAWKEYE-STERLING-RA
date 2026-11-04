@@ -42,7 +42,7 @@ call-for-action flag. Every override needs a reason, is audit-logged, and mirror
 to Asana (monthly git backup). Prefer **Import sheet** over re-keying.
 
 ## Monitoring you should read
-- Daily **Compliance Brief** (AML rollup) and daily **AI Governance Report**
+- Daily **AI Governance Report**
   (control health; a STALE flag means a control stopped running).
 - Any **Anomaly Watch** GitHub issue (sustained degradation) — investigate and
   record disposition.

@@ -46,7 +46,7 @@ re-freezes the current mix as the new baseline or records why not.
   same exclusion of onboarding runs).
 - The monthly PSI computation reads the last-frozen baseline from this pack's
   companion state (encrypted, state branch — same handling as
-  `run-metrics.json.enc`) and reports into the daily brief §⑤ block.
+  `run-metrics.json.enc`) and was reported in the Daily Compliance Brief §⑤ block, which is removed with the brief; the replacement destination is not yet decided.
 - `investigate`/`action` breaches raise through the existing Anomaly Watch
   escalation path (MLRO issue), severity mapped to the §1 bands.
 - Until the wiring lands, the computation runs manually at the quarterly
