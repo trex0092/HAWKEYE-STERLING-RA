@@ -86,7 +86,7 @@ case lifecycle, list SOPs and the evidence layer.
 |---|---|---|
 | Personnel trained on typologies, evasion, evolving norms | ✅ *closed 2026-07-28* | Competency baseline extended (TFS handling + sanctions-evasion typologies row) and an **annual refresh duty** added to [`data/compliance-calendar.json`](../../data/compliance-calendar.json) (`tfs-training-refresh-annual`, also after material system/list changes) |
 | Override/escalation guidelines documented & disseminated | ✅ | [Decision tree](../user-guides/alert-investigation-decision-tree.md) + [reviewer/MLRO guide](../user-guides/reviewer-mlro-guide.md) |
-| Senior management informed of recurring/critical lapses | ✅ | Daily brief + weekly summary + daily governance card (GovernanceScore) + red-run alerting; "silence is never success" ([coverage matrix §2](assurance-coverage-matrix.md)) |
+| Senior management informed of recurring/critical lapses | ✅ | Weekly summary + daily governance card (GovernanceScore) + red-run alerting; "silence is never success" ([coverage matrix §2](assurance-coverage-matrix.md)) |
 
 ## H. Tool capabilities & explainability
 

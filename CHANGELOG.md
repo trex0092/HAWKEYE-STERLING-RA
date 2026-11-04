@@ -10,6 +10,8 @@ bump merged to `main`.
 
 ## [Unreleased]
 
+- **Daily Compliance Brief workflow removed.** Deleted `.github/workflows/daily-brief.yml`, `scripts/daily-brief.mjs` and `test/daily-brief.test.mjs`, and removed the brief's CI step, freshness-check registry entry and references in the governance documents. The workflow count is now 78. No Asana task is changed; existing "Daily Compliance Brief" tasks are retained as records. The daily Asana record that monitoring ran is no longer created.
+
 - **Fortify AST scan removed from the repository.** Deleted `.github/workflows/fortify.yml` and its README vendor-SAST badge, and removed the tests, freshness-check entry and AI-controls evidence path that depended on it. Governance documents that cited Fortify as a control (ISO 27001 SoA row 8.8, AI control testing calendar, six-layer governance matrix, free-integration audit, workflow consolidation notes) no longer list it. Historical CHANGELOG entries are unchanged. Workflow count in the readiness addendum updated 80 to 79.
 
 - **Evidence-aware control recovery reports why it failed.** `scripts/evidence-aware-recovery.mjs` caught any error thrown by `main()` and printed only "Recovery failed; no operational pass is established.", so a failed Control Retry run (a missing token, an API error, or "main moved") could not be diagnosed from its log. The message now adds the cause, limited to 200 characters and excluding stacks and request objects so no credential is logged. The exit code is still 1 (fail closed). A source check in `scripts/evidence-aware-recovery-selftest.mjs` fails if the silent catch returns.

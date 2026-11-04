@@ -287,7 +287,7 @@ outside this plan.)*
 - [ ] DPIA §6 residual-risk acceptance signed by MLRO
 - [ ] Anthropic DPA execution record reconciled and evidenced, with any unresolved status stated on slide 1 (item 36; never discovered mid-meeting)
 - [ ] TEST-000 end-to-end evidence captured (screenshots in demo pack; task in HAWKEYE STERLING APP)
-- [ ] Daily Compliance Brief + AI Governance Report from *this week* exportable as evidence
+- [ ] AI Governance Report from *this week* exportable as evidence
 - [ ] Assurance Coverage Matrix reviewed — every row's proof ran green in the last cycle
 - [ ] Risk register: R-13 (transaction feed) status honestly current; key-person row present
 - [ ] Latest release tag matches deployed site; CHANGELOG current
@@ -344,7 +344,9 @@ runner. Watchman matching benchmark added beside the yente one: a dispatch-only,
 workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
 no government list. Measurement only — no scored control changed.*
 
-Verified at HEAD: 79 workflows · 204 markdown documents under docs/ (171 excluding docs/research/auto).
+Verified at HEAD: 78 workflows · 204 markdown documents under docs/ (171 excluding docs/research/auto).
+
+*Estate-count reconciliation · 4 November 2026: the Daily Compliance Brief workflow (`daily-brief.yml`) was removed. Workflow count 79 → 78; blocked-egress count 80 → 79. The Daily Compliance Brief no longer files its daily Asana record. No score, readiness approval, screening evidence or operating-assurance claim changes.*
 
 *Estate re-verification · 22 October 2026: a read-only GitHub CLI readiness workflow was added for GitHub-hosted Ubuntu runners. It verifies the runner-provided `gh` executable and scoped repository API authentication. One blocked-egress workflow/job was added; this is tooling verification only, not a screening, scoring, AI evaluation, security-scan, or production-deployment assurance claim.*
 
@@ -704,7 +706,7 @@ sign-off, `dpia-2026.md` §6); ISO/IEC 42001 mandatory-documents index added; wo
 - [x] DPIA §6 residual-risk acceptance signed by MLRO (2026-07-02)
 - [ ] Anthropic DPA execution record reconciled: the execution pack remains DRAFT with fields blank while a 2026-07-16 owner attestation reports execution (item 36; state the unresolved position on slide 1)
 - [ ] TEST-000 end-to-end evidence captured
-- [ ] Daily Compliance Brief + AI Governance Report from *this week* exportable as evidence
+- [ ] AI Governance Report from *this week* exportable as evidence
 - [ ] Assurance Coverage Matrix reviewed: every row's proof ran green in the last cycle
 - [x] Risk register: R-13 (transaction feed) status honestly current; key-person row present
 - [x] Latest release tag matches the released version line (v3.7.2 released 2026-07-11)

@@ -11,7 +11,7 @@ platform as built.*
 | **Analyst time saved** | Structured scoring + auto-assembled narrative replaces manual template work per assessment **[measure: minutes saved vs current process]**; screening runs unattended daily instead of ad-hoc manual checks. |
 | **Screening coverage** | Every customer × 5 sanctions lists × adverse media (2 feeds) × PEP, **daily** — coverage a manual team could not sustain. Standing matches recorded once; new/changed matches always alert. |
 | **Risk / incident avoidance** | A single missed sanctions designation or undetected PEP can mean regulatory penalty, remediation cost and reputational damage far exceeding the platform's near-zero running cost. The refuse-to-clear and degradation guards exist to prevent exactly that. |
-| **Audit preparation** | Evidence is pre-assembled: the Assurance Coverage Matrix, daily Compliance Brief, daily AI Governance Report and hash-chained activity log mean exam preparation is *retrieval*, not *reconstruction* **[measure: prep hours vs prior exam]**. |
+| **Audit preparation** | Evidence is pre-assembled: the Assurance Coverage Matrix, daily AI Governance Report and hash-chained activity log mean exam preparation is *retrieval*, not *reconstruction* **[measure: prep hours vs prior exam]**. |
 | **Operating cost** | Static site + serverless + free data feeds → hosting-only cost, no per-seat licences, no screening-vendor subscription (until/unless a commercial feed is chosen). |
 
 ## Operational improvements (observed in the build)

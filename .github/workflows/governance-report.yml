@@ -3,14 +3,13 @@ name: AI Governance Report
 # One consolidated Asana task each morning covering the non-AML control suite:
 # AI/advisor governance, security & supply-chain scans, CI/code quality,
 # app/site health and release/repo hygiene — the daily operating-effectiveness
-# evidence for ISO/IEC 42001 A.6/A.8 and NIST AI RMF MEASURE/MANAGE. Sibling of
-# the Daily Compliance Brief (which rolls up the AML monitoring). It always
+# evidence for ISO/IEC 42001 A.6/A.8 and NIST AI RMF MEASURE/MANAGE. It always
 # files — "all green" on a quiet day — and flags scheduled controls that have
 # silently stopped running (STALE), so silence is never evidence.
 # Needs the ASANA_ACCESS_TOKEN secret; reads run states with the runner token.
 on:
   schedule:
-    - cron: '51 7 * * *' # 07:51 UTC daily (11:51 UAE), after the Daily Compliance Brief (07:09)
+    - cron: '51 7 * * *' # 07:51 UTC daily (11:51 UAE), after the daily watchers
   workflow_dispatch:
 
 permissions:
