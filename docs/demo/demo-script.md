@@ -36,7 +36,7 @@ to Asana: the task appears in *HAWKEYE STERLING APP*, right risk-band section,
 custom fields populated, with the auto-backup mirror. Show the **Activity Log**
 line `asana.delivery.ok`.
 
-**8:30 — The assurance story (1 min).** Open the **daily AI Governance Report** task in Asana. Message: *it files itself every
+**8:30: The assurance story (1 min).** Open the **daily AI Governance Report** task in Asana. Message: *it files itself every
 day; a control that silently stops running is flagged STALE — silence is never
 evidence.*
 
