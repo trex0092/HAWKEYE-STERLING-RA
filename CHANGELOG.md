@@ -588,6 +588,7 @@ bump merged to `main`.
 - **`kg-fiu` note updated** (`data/sanctions-extra.json`, commit `ea4c4bb`, pushed
   straight to `main` without a PR). Records that a 2026-09-27 probe got no HTTP
   response at all, where the 2026-08-05 probe got an HTML page.
+- **Identity numbers are checked by their own check digits, natively.** `kyc.cdd_gaps` now raises a finding when a recorded Emirates ID number is not 15 digits, does not start with 784 (the UAE's ISO 3166-1 numeric code) or fails the Luhn mod-10 check (the rule data-classification tools apply to this number; the issuing authority publishes no algorithm), and when a dossier records the second passport MRZ line (new optional `MRZ:` field in customer blocks and HR dossiers) whose ICAO Doc 9303 check digits (document number, date of birth, expiry, optional data, composite; weights 7-3-1) do not recompute. Both algorithms are written from their public specifications in `kyc.py` (`luhn_ok`, `emirates_id_finding`, `mrz_check_digit`, `mrz_findings`), so no GPL code enters the repository; the ICAO specimen passport verifies with digits 6, 2, 9, 1 and composite 0. A failed digit is a finding to verify the number against the document, never evidence about the person, and findings never repeat the number. Five checks added to `test/engine_test.py`.
 
 ## [4.0.0] - 2026-09-25
 

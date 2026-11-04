@@ -3908,6 +3908,38 @@ check("'Indian / India' and 'Philippines' resolve to a country; unknown text is 
       and kyc.nationality_country("Philippines") == "Philippines"
       and kyc.nationality_country("Martian") == "Martian"
       and kyc.nationality_country("N/A") == "")
+# Native identity check digits (no library): Luhn for the 15-digit Emirates ID
+# number and ICAO 9303 for a recorded passport MRZ line. A failed digit is a
+# finding to verify the number, never evidence about the person.
+check("the HR fixture's Emirates ID passes its 15-digit, 784-prefix and Luhn checks (no finding)",
+      kyc.emirates_id_finding("784-1988-8425376-0") is None
+      and not any("Emirates ID number" in g for g in _emp["individuals"][0]["cdd_gaps"]))
+check("a mistyped Emirates ID digit, a 14-digit number and a wrong prefix each raise one finding without repeating the number",
+      "check digit" in kyc.emirates_id_finding("784-1988-8425376-1")
+      and "not 15 digits" in kyc.emirates_id_finding("784-1988-842537-0")
+      and "784" in kyc.emirates_id_finding("123-1988-8425376-0")
+      and "8425376" not in kyc.emirates_id_finding("784-1988-8425376-1")
+      and kyc.emirates_id_finding("NA") is None and kyc.emirates_id_finding("") is None)
+_MRZ2 = "L898902C36UTO7408122F1204159ZE184226B<<<<<10"   # ICAO Doc 9303 specimen, line 2
+check("ICAO 9303 check digits recompute on the specimen passport (6, 2, 9, 1, composite 0)",
+      [kyc.mrz_check_digit(f) for f in ("L898902C3", "740812", "120415", "ZE184226B<<<<<",
+                                        _MRZ2[0:10] + _MRZ2[13:20] + _MRZ2[21:43])] == ["6", "2", "9", "1", "0"]
+      and kyc.mrz_findings(_MRZ2) == [])
+check("a corrupted MRZ document number fails its own and the composite check; wrong length and bad alphabet are findings",
+      len(kyc.mrz_findings(_MRZ2[:9] + "7" + _MRZ2[10:])) == 2
+      and "not 44" in kyc.mrz_findings(_MRZ2[:-1])[0]
+      and "invalid character" in kyc.mrz_findings(_MRZ2[:5] + "?" + _MRZ2[6:])[0]
+      and kyc.mrz_findings("") == [] and kyc.mrz_findings(None) == [])
+check("an HR dossier that records the MRZ line gets it verified; a customer block does too",
+      kyc.parse_employee(_HR_NOTE + "\n    Passport MRZ: " + _MRZ2[:9] + "7" + _MRZ2[10:] + "\n",
+                         "SAMPLE EMPLOYEE")["individuals"][0]["cdd_gaps"].count(
+          "passport MRZ document number check digit does not verify — re-read the document") == 1
+      and kyc.parse_employee(_HR_NOTE + "\n    Passport MRZ: " + _MRZ2 + "\n", "SAMPLE EMPLOYEE")
+          ["individuals"][0]["mrz"] == _MRZ2
+      and any("MRZ" in g for g in kyc.parse_customer(
+          "SECTION 4 - IDENTIFICATION\nIndividual 1 - Director\nName: Test Person\nNationality: UTO\n"
+          "Date of Birth: 12/08/1974\nPassport / ID: L898902C3\nPassport Expiry: 15/04/2032\n"
+          "Emirates ID: 784-1974-1234567-1\nMRZ: " + _MRZ2[:-1] + "9\n")["individuals"][0]["cdd_gaps"]))
 check("proof of address is not raised as a CDD finding for staff; expired documents still are",
       all("proof of address" not in g for i in _emp["individuals"] for g in i["cdd_gaps"])
       and any("expired" in g for g in kyc.parse_employee(
