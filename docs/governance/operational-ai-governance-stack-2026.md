@@ -112,7 +112,7 @@ exactly the "prove who authorised it" question.
 |---|---|---|
 | Continuous assurance | ✅ | CI gate on every push; daily/weekly scheduled controls with STALE fail-safe; [coverage matrix](assurance-coverage-matrix.md) maps every claimed control to its proof |
 | Governance metrics (GovernanceScore) | ✅ | Composite 0–100 in the daily governance card's title and body, with Δ vs the previous report (`scripts/governance-report.mjs`, added 2026-07-28); KPI catalog in matrix §3 |
-| Executive reporting | ✅ | [Executive brief](../executive/executive-brief.md) + [KPI dashboard](../executive/kpi-dashboard.md); weekly summary card; daily governance + compliance briefs |
+| Executive reporting | ✅ | [Executive brief](../executive/executive-brief.md) + [KPI dashboard](../executive/kpi-dashboard.md); weekly summary card; daily governance report |
 | Continuous improvement | ✅ | CAPA loop ([`../aims/corrective-actions.md`](../aims/corrective-actions.md)); [open-actions register](open-actions-register.md); postmortem template; quarterly [management review](../aims/management-review.md) feeding stage 1 of the [operating loop](operational-ai-governance-lifecycle.md) |
 | Regulatory readiness | ✅ | NIST AI RMF / ISO 42001 / UAE AI Charter self-assessments; [readiness review](enterprise-readiness-review-2026.md); examiner-first design of the coverage matrix; [internal audit programme](../aims/internal-audit.md) tests the map itself |
 

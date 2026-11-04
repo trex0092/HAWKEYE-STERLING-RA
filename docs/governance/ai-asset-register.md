@@ -11,7 +11,7 @@
 
 > **Scope note.** The Hawkeye Sterling RA **scoring engine** (`index.html`), the operations console
 > (`console.html`), and every watcher (`fatf-watchdog`, `sanctions-watch`, `sanctions-screen`,
-> regulatory-watch *detection*, `daily-brief`, the expiry notifier) are **deterministic, rules-based
+> regulatory-watch *detection*, the expiry notifier) are **deterministic, rules-based
 > — not AI**, and are deliberately excluded from this register. Only generative-AI/LLM surfaces are
 > inventoried here.
 

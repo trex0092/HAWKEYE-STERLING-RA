@@ -110,7 +110,7 @@ check('previousScore picks the latest prior scored report and ignores today', ((
     'AI Governance & Platform Report — 30 Jun 2026 — ✅ all green · score 100',
     'AI Governance & Platform Report — 1 Jul 2026 — ❌ 1 failing · score 96',
     'AI Governance & Platform Report — 2 Jul 2026 — ✅ all green · score 100',
-    'Daily Compliance Brief — 1 Jul 2026'
+    'Unrelated task — 1 Jul 2026'
   ];
   const p = previousScore(names, '2 Jul 2026');
   return !!p && p.label === '1 Jul 2026' && p.score === 96;

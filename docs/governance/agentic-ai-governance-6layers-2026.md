@@ -22,7 +22,7 @@ Asana automation layer (GitHub Actions watchers + assessment delivery).
 
 The **RA scoring engine** (`index.html`), the **operations console** (`console.html`), and every
 **Asana watcher** (`fatf-watchdog`, `sanctions-watch`, `sanctions-screen`, regulatory-watch
-*detection*, `daily-brief`, the expiry notifier, assessment delivery via `asana-task.js`) are
+*detection*, the expiry notifier, assessment delivery via `asana-task.js`) are
 **deterministic, rules-based automations — not AI**. They are auditable code on schedules, not
 models. The only **AI surfaces** are the **MLRO Advisor** (`brain-soul.js` → Anthropic Claude) and
 the optional **Regulatory-Watch AI draft** (`reg-draft.mjs`) — both inventoried in the asset register.
@@ -132,7 +132,7 @@ gaps in the live tipping-off guard — reversed-order "a SAR was filed" and "we 
 | Turing FAST/SUM + responsible-AI | ✅ | Ethics-framework crosswalk: [`ai-frameworks-crosswalk-2026.md`](ai-frameworks-crosswalk-2026.md); lifecycle: [`pbg-lifecycle-map-2026.md`](pbg-lifecycle-map-2026.md); stakeholder impact: [`stakeholder-impact-assessment-2026.md`](stakeholder-impact-assessment-2026.md) |
 | EU AI Act | ✅ | Advisor classed **limited risk** (transparency) in the register; on-screen notice in `advisor.html`; not high-risk (human decides) |
 | Audit trails | ✅ | Tamper-evident hash-chained log (`index.html`); git + Asana trails; Advisor audit line |
-| Continuous assurance | ✅ | Daily brief; daily/weekly watchers; CI incl. assurance + register-schema tests; weekly live eval |
+| Continuous assurance | ✅ | Daily/weekly watchers; CI incl. assurance + register-schema tests; weekly live eval |
 | Incident response | ✅ | [`ai-incident-runbook.md`](ai-incident-runbook.md) + kill switch (unset `ANTHROPIC_API_KEY` → 503) |
 | Acceptable use | ✅ | [`ai-acceptable-use-policy.md`](ai-acceptable-use-policy.md) — **enforced in-app** via an acknowledgment gate (`hsra.aup.ack.v1`) |
 

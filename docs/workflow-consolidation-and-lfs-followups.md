@@ -71,9 +71,8 @@ around that):
 06:07 fatf-watchdog + weekly-adverse-media's 3rd retry pass
 06:19 regulatory-watch
 06:37 anomaly-watch          (after morning screening)
-07:09 daily-brief            (after the daily watchers)
 07:37 control-retry pass 1   (heals other daily controls)
-07:51 governance-report      (after daily-brief)
+07:51 governance-report      (after the daily watchers)
 08:07 site-currency
 09:09 freshness-check pass 1 (after sanctions-watch + regulatory-watch)
 10:07 control-retry pass 2   (catches a retry that itself died)
