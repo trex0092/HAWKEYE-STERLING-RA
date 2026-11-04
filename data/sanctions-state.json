@@ -2,37 +2,37 @@
   "updated": "2026-11-04",
   "sources": {
     "ofac-sdn": {
-      "hash": "7493322afc27b9e419322f744a457be4d91c36bd4964a2429603005315d103d3",
-      "bytes": 5563537,
+      "hash": "8ffc546a3c13d51c2a966f09d8f61d436b13aa93199499db62c9e79e32bbc3aa",
+      "bytes": 5627712,
       "checkedAt": "2026-11-04",
-      "changedAt": "2026-10-29",
+      "changedAt": "2026-11-04",
       "contentAsOf": "2026-11-04",
       "status": 200,
-      "prevHash": "961a771f8df1db6015184b429a749c2ce37bf646df7aa0c967ee6a72decd7aa9",
+      "prevHash": "7493322afc27b9e419322f744a457be4d91c36bd4964a2429603005315d103d3",
       "fp": 2,
-      "count": 19485,
+      "count": 19500,
       "errStreak": 0
     },
     "ofac-sdn-alt": {
-      "hash": "3bb9ed8e01376cc387ac71cc4b49e5904003d883a91df92e215aab9af5a8e309",
-      "bytes": 1023885,
+      "hash": "530246efe93dcf8ec98bba2688999644e94a9eefe5295fe2d17a2607fe1a0aa3",
+      "bytes": 1024063,
       "checkedAt": "2026-11-04",
-      "changedAt": "2026-10-29",
+      "changedAt": "2026-11-04",
       "contentAsOf": "2026-11-04",
       "status": 200,
-      "prevHash": "aa5970ffdb5457d8d175c1a9e93421824e34d391fd58e7a77c3a607baf919c15",
+      "prevHash": "3bb9ed8e01376cc387ac71cc4b49e5904003d883a91df92e215aab9af5a8e309",
       "fp": 2,
-      "count": 20205,
+      "count": 20209,
       "errStreak": 0
     },
     "ofac-consolidated": {
-      "hash": "d121314d1b9386289cb41c8353f5f8897e7312ccd310a734d43f3b9a2220b206",
-      "bytes": 355883,
+      "hash": "44f2f9a28a819e11b36477bc40c61e16fd69ed0a7803cba393aade4b040a3047",
+      "bytes": 355944,
       "checkedAt": "2026-11-04",
-      "changedAt": "2026-10-29",
+      "changedAt": "2026-11-04",
       "contentAsOf": "2026-11-04",
       "status": 200,
-      "prevHash": "2f47040592d3b701a7ea13da5c2b89493b29551f2c681d7fa909f4a25e56bc8c",
+      "prevHash": "d121314d1b9386289cb41c8353f5f8897e7312ccd310a734d43f3b9a2220b206",
       "fp": 2,
       "count": 442,
       "errStreak": 0
@@ -74,15 +74,15 @@
       "errStreak": 0
     },
     "fr-dgt": {
-      "hash": "6d6242ba777d66c4d4ba9264bca0fcd1964133bb1883b2d11c26dccbd22d45d7",
-      "bytes": 566660,
+      "hash": "fd2ce4429596c5ba676bc2343a81fc2827930d25cc4b9d7cfa9ce4ac377f844d",
+      "bytes": 567214,
       "checkedAt": "2026-11-04",
       "changedAt": "2026-11-04",
       "contentAsOf": "2026-11-04",
       "status": 200,
-      "prevHash": "32c22c06b60e94cf5508b613c7a2e1b2c311bb9002c3bfd79894ac433ce135f3",
+      "prevHash": "6d6242ba777d66c4d4ba9264bca0fcd1964133bb1883b2d11c26dccbd22d45d7",
       "fp": 2,
-      "count": 22908,
+      "count": 22918,
       "errStreak": 0
     }
   }

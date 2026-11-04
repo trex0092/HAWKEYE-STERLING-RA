@@ -3068,6 +3068,58 @@
       "chainHash": "4386e9d00caa15193bf24ba5f5ffb1f77a1d05ff164522399c7dd100659b0ae6",
       "latencyHours": 0,
       "resolutionHash": "2bd74cf0d480b344849f7c7444489f8794abe1bcecaccf71e26d060243cadd0d"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-04T20:54:33.794Z",
+      "prevCount": 19485,
+      "newCount": 19500,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "4386e9d00caa15193bf24ba5f5ffb1f77a1d05ff164522399c7dd100659b0ae6",
+      "chainHash": "1c64160e9ab186f8a8a10d6222249d82ef003caab1fea2dc77d2681c569f36aa"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-04T20:54:33.794Z",
+      "prevCount": 20205,
+      "newCount": 20209,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "1c64160e9ab186f8a8a10d6222249d82ef003caab1fea2dc77d2681c569f36aa",
+      "chainHash": "3590487b43747336c8c478f3ad65161d8776e1e5c69a075f5f5682ca84170333"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-04T20:54:33.794Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "3590487b43747336c8c478f3ad65161d8776e1e5c69a075f5f5682ca84170333",
+      "chainHash": "07daa0c282a38657b6b8ba83d591a8de8bfb310e988870e3858b9ffce81db153"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-04T20:54:33.794Z",
+      "prevCount": 22908,
+      "newCount": 22918,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "07daa0c282a38657b6b8ba83d591a8de8bfb310e988870e3858b9ffce81db153",
+      "chainHash": "408312c6f33841f6bdc03c7001c5b9d61ae7449fb192c9abda790a9f1a6238f2"
     }
   ]
 }

@@ -621,5 +621,12 @@
     "bytes": 2839,
     "updated": "2026-11-04",
     "recordedAt": "2026-11-04T00:49:54.159Z"
+  },
+  {
+    "file": "sanctions-state-2026-11-04-4cc4edcd76af51e0.json",
+    "sha256": "4cc4edcd76af51e09eb1517c158540b90eb6b524b1adc1f6512c032873915587",
+    "bytes": 2839,
+    "updated": "2026-11-04",
+    "recordedAt": "2026-11-04T20:54:46.978Z"
   }
 ]
