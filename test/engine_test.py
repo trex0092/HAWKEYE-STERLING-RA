@@ -6918,12 +6918,12 @@ print("batching.py — daily screening batch planning")
 import batching as _bt
 _subj = [f"SUBJECT {i:04d}" for i in range(1017)]
 _plan = _bt.plan_batches(_subj)
-check("batching: 1017 subjects → 41 batches of at most 25",
-      len(_plan) == 41 and all(1 <= len(b) <= 25 for b in _plan))
+check("batching: 1017 subjects → 51 batches of at most 20",
+      len(_plan) == 51 and all(1 <= len(b) <= 20 for b in _plan))
 check("batching: no subject lost or duplicated when a run is split",
       [s for b in _plan for s in b] == _subj)
 check("batching: exact multiple gives full batches, no empty tail",
-      [len(b) for b in _bt.plan_batches(list(range(50)))] == [25, 25])
+      [len(b) for b in _bt.plan_batches(list(range(40)))] == [20, 20])
 check("batching: empty run plans zero batches", _bt.plan_batches([]) == [])
 for _bad in (0, -1, 2.5, True, "25"):
     try:
