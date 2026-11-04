@@ -3030,6 +3030,32 @@
       "chainHash": "376ffd72c6c4774b8adbf7e992c015e3512e1ccac380ce08f462252f77c3a832",
       "latencyHours": 22.2,
       "resolutionHash": "97b7793567d7689c0de5878a2459059a73785c052055fe3b3012474782cbcc9e"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-04T00:49:44.307Z",
+      "prevCount": 58837,
+      "newCount": 58837,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "376ffd72c6c4774b8adbf7e992c015e3512e1ccac380ce08f462252f77c3a832",
+      "chainHash": "0b59f8f9429d9a0ba74b3ed0ad714a125d78bd5a4860efc53ccff280a3b2c315"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-04T00:49:44.307Z",
+      "prevCount": 22908,
+      "newCount": 22908,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "0b59f8f9429d9a0ba74b3ed0ad714a125d78bd5a4860efc53ccff280a3b2c315",
+      "chainHash": "4386e9d00caa15193bf24ba5f5ffb1f77a1d05ff164522399c7dd100659b0ae6"
     }
   ]
 }
