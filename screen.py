@@ -4679,6 +4679,14 @@ def get_all_customers():
                     continue
                 notes = t.get("notes") or ""
                 kyc_data = kyc.parse_customer(notes)
+                if not kyc_data.get("individuals"):
+                    # HR dossiers carry an "Employee Information" block, not
+                    # SECTION-4 individual blocks. Without this branch the
+                    # employee was screened on the short task name alone and
+                    # carried no identity, so the full name on the Emirates
+                    # ID / visa was never screened and the R.10 identity
+                    # step (DOB + nationality) never applied to staff.
+                    kyc_data = kyc.parse_employee(notes, t["name"])
                 individuals = _individuals_union(
                     [t["name"]] + [i["name"] for i in kyc_data.get("individuals", [])
                      if not i.get("unidentified")], notes)

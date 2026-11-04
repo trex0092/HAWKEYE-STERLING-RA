@@ -3858,6 +3858,87 @@ check("a MATCHING nationality never excludes, however far the years are",
           "KHAN, Mohammed", {"dob": "September 06, 1980", "nationality": "Afghanistan"}) is None)
 check("an entry with no published attributes at all is never excluded",
       screen.identity_exclusion_reason("Totally Unknown Entry", _cust) is None)
+# ── HR employee dossiers carry an identity too (4 Nov 2026 regression) ────────
+# The HR record has no SECTION-4 blocks: parse_customer() returned no
+# individuals, so staff were screened on the short task name only, with no DOB
+# or nationality attached. "HAMID ALI" (born 1988, Pakistani) was cased
+# CRITICAL against "AL-ALI, Hamid" (born 1960, Kuwait) because the identity
+# step had nothing to compare, and the full name on the Emirates ID / visa was
+# never screened at all.
+print("kyc.py — HR employee dossier identity (R.10 for staff)")
+_HR_NOTE = """EMPLOYEE COMPLIANCE DOSSIER
+
+Employee Information
+
+    Name: SAMPLE EMPLOYEE
+    Name on Emirates ID / visa: Sample Employee Liaqat Ali Khan
+    Nationality: Pakistani
+    Date of birth: March 13, 1988
+    Place of birth: Nowshera, Pakistan
+    Gender: Male
+    Passport number: VB1793553
+    Passport issue date: June 10, 2018
+    Passport place of issue: Pakistan
+    Passport expiry date: June 08, 2028
+    Emirates ID number: 784-1988-8425376-0
+    EID issue date: June 09, 2026
+    EID expiry date: June 24, 2027
+
+Screening Dates and Results
+
+World-Check / LSEG
+Screening Date: Ongoing Monitoring
+Result: 0 results found
+"""
+check("parse_customer still yields no individuals for an HR dossier (layout differs)",
+      kyc.parse_customer(_HR_NOTE)["individuals"] == [])
+_emp = kyc.parse_employee(_HR_NOTE, "SAMPLE EMPLOYEE", today=_dt.date(2026, 11, 4))
+_emp_names = [i["name"] for i in _emp["individuals"]]
+check("employee dossier yields the task name AND the full name on the Emirates ID / visa",
+      _emp_names == ["SAMPLE EMPLOYEE", "Sample Employee Liaqat Ali Khan"])
+check("both employee spellings carry the same DOB, passport and expiry dates",
+      all(i["dob"] == "March 13, 1988" and i["id_number"] == "VB1793553"
+          and i["passport_expiry"] == "June 08, 2028" and i["eid_expiry"] == "June 24, 2027"
+          for i in _emp["individuals"]))
+check("a demonym nationality compares as the country ('Pakistani' -> 'Pakistan')",
+      _emp["individuals"][0]["nationality"] == "Pakistan"
+      and _emp["individuals"][0]["nationality_recorded"] == "Pakistani")
+check("'Indian / India' and 'Philippines' resolve to a country; unknown text is kept",
+      kyc.nationality_country("Indian / India") == "India"
+      and kyc.nationality_country("Philippines") == "Philippines"
+      and kyc.nationality_country("Martian") == "Martian"
+      and kyc.nationality_country("N/A") == "")
+check("proof of address is not raised as a CDD finding for staff; expired documents still are",
+      all("proof of address" not in g for i in _emp["individuals"] for g in i["cdd_gaps"])
+      and any("expired" in g for g in kyc.parse_employee(
+          _HR_NOTE.replace("June 08, 2028", "June 08, 2024"), "SAMPLE EMPLOYEE",
+          today=_dt.date(2026, 11, 4))["individuals"][0]["cdd_gaps"]))
+check("an identical full name is not duplicated",
+      [i["name"] for i in kyc.parse_employee(
+          _HR_NOTE.replace("Sample Employee Liaqat Ali Khan", "sample employee"),
+          "SAMPLE EMPLOYEE")["individuals"]] == ["SAMPLE EMPLOYEE"])
+check("an HR dossier without a full-name line still yields the task-name identity",
+      [i["name"] for i in kyc.parse_employee(
+          "\n".join(l for l in _HR_NOTE.splitlines() if "Name on Emirates" not in l),
+          "SAMPLE EMPLOYEE")["individuals"]] == ["SAMPLE EMPLOYEE"])
+# With the identity attached, the engine's own exclusion rule now reaches staff:
+# a 1960-born Kuwaiti designation cannot be a 1988-born Pakistani employee.
+screen.LIST_ENTRY_ATTRS[screen.normalize("AL-ALI, Hamid")] = {
+    "dob": {"20 Jan 1960"}, "nationality": {"Kuwait"}}
+_emp_rec = _emp["individuals"][0]
+check("the identity rule demotes a designation born decades apart with another nationality",
+      "28-year gap" in (screen.identity_exclusion_reason("AL-ALI, Hamid", _emp_rec) or ""))
+screen.LIST_ENTRY_ATTRS[screen.normalize("SAME NATION")] = {
+    "dob": {"1960"}, "nationality": {"Pakistan"}}
+check("a designation of the SAME nationality is kept whatever the year gap (demonym bridged)",
+      screen.identity_exclusion_reason("SAME NATION", _emp_rec) is None)
+# The subject builder must screen BOTH spellings of the employee's name.
+_emp_customer = {"name": "SAMPLE EMPLOYEE", "kind": "employee",
+                 "individuals": _emp_names, "entity_owners": [], "kyc": _emp}
+check("both employee name spellings become natural-person screening subjects, with no fictitious company",
+      [(t, n, p) for t, n, p, _ in screen.build_screening_subjects([_emp_customer])]
+      == [("INDIVIDUAL", "SAMPLE EMPLOYEE", None),
+          ("INDIVIDUAL", "Sample Employee Liaqat Ali Khan", None)])
 # The demotion has to reach the CASE QUEUE, not just the report text. Cases are
 # capped per run, so an excluded candidate left in the queue could consume the
 # cap and push a genuine case into the backlog — demotion that stops at the

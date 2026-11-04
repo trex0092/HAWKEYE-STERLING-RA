@@ -353,6 +353,117 @@ def parse_customer(notes, today=None):
     return out
 
 
+# ── HR employee dossier (Employees Training/Workshops project) ────────────────
+# The HR record does not carry SECTION-4 "Individual N — Role" blocks, so
+# parse_customer() returns no individuals for it and the employee was screened
+# on the short task name alone, with NO identity attached: the full name on the
+# Emirates ID / visa was never screened, and identity_exclusion_reason() —
+# which needs the subject's DOB and nationality — could never demote a
+# candidate born decades apart with a different nationality (4 Nov 2026:
+# "HAMID ALI", born 1988, Pakistani, cased CRITICAL against "AL-ALI, Hamid",
+# born 1960, Kuwait). This parser reads the Employee Information block and
+# returns the same shape as parse_customer(), with one identity record per
+# screened spelling of the employee's name.
+_EMP_FIELDS = {
+    "full_name":       re.compile(r"Name\s+on\s+Emirates\s*ID\s*/?\s*visa\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "nationality":     re.compile(r"^\s*Nationality\s*[:\-][ \t]*(.+)", re.IGNORECASE | re.MULTILINE),
+    "dob":             re.compile(r"Date\s*of\s*birth\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "place_of_birth":  re.compile(r"Place\s*of\s*birth\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "gender":          re.compile(r"^\s*Gender\s*[:\-][ \t]*(.+)", re.IGNORECASE | re.MULTILINE),
+    "id_number":       re.compile(r"Passport\s*(?:number|no\.?)\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "passport_expiry": re.compile(r"Passport\s*expiry(?:\s*date)?\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "emirates_id":     re.compile(r"Emirates\s*ID\s*(?:number|no\.?)\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "eid_expiry":      re.compile(r"EID\s*expiry(?:\s*date)?\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+}
+
+# Demonym → country, so an HR "Nationality: Pakistani" compares against a
+# designation's "nationality Pakistan" instead of silently differing on the
+# adjective. Only the comparison copy is mapped; the recorded value is kept.
+# An unmapped value is left as written: _country_key() will then not equal any
+# list nationality, which KEEPS the candidate (exclusion needs both axes to
+# disagree), so an unknown demonym can never hide a match.
+_DEMONYMS = {
+    "afghan": "Afghanistan", "algerian": "Algeria", "american": "United States",
+    "australian": "Australia", "bahraini": "Bahrain", "bangladeshi": "Bangladesh",
+    "belgian": "Belgium", "brazilian": "Brazil", "british": "United Kingdom",
+    "canadian": "Canada", "chinese": "China", "colombian": "Colombia",
+    "egyptian": "Egypt", "emirati": "United Arab Emirates", "ethiopian": "Ethiopia",
+    "filipino": "Philippines", "filipina": "Philippines", "french": "France",
+    "german": "Germany", "ghanaian": "Ghana", "greek": "Greece", "indian": "India",
+    "indonesian": "Indonesia", "iranian": "Iran", "iraqi": "Iraq", "irish": "Ireland",
+    "italian": "Italy", "jordanian": "Jordan", "kenyan": "Kenya", "kuwaiti": "Kuwait",
+    "lebanese": "Lebanon", "libyan": "Libya", "malaysian": "Malaysia",
+    "moroccan": "Morocco", "nepalese": "Nepal", "nepali": "Nepal", "nigerian": "Nigeria",
+    "omani": "Oman", "pakistani": "Pakistan", "palestinian": "Palestine",
+    "qatari": "Qatar", "russian": "Russia", "saudi": "Saudi Arabia",
+    "singaporean": "Singapore", "somali": "Somalia", "south african": "South Africa",
+    "spanish": "Spain", "sri lankan": "Sri Lanka", "sudanese": "Sudan",
+    "swiss": "Switzerland", "syrian": "Syria", "tunisian": "Tunisia",
+    "turkish": "Turkey", "ugandan": "Uganda", "ukrainian": "Ukraine",
+    "uzbek": "Uzbekistan", "yemeni": "Yemen",
+}
+
+
+def nationality_country(value):
+    """Country name for a recorded nationality ("Pakistani" → "Pakistan",
+    "Indian / India" → "India"). Unmapped text is returned unchanged."""
+    raw = _clean(value)
+    if not _present(raw):
+        return ""
+    for part in re.split(r"\s*[/,;]\s*", raw):
+        key = _norm(part)
+        if key in _DEMONYMS:
+            return _DEMONYMS[key]
+    for part in re.split(r"\s*[/,;]\s*", raw):
+        if _present(part):
+            return _clean(part)
+    return raw
+
+
+def parse_employee(notes, task_name, today=None):
+    """Parse an HR employee dossier into the parse_customer() shape.
+
+    Returns one identity record for the task name and one for the full name on
+    the Emirates ID / visa when it differs, so that BOTH spellings are screened
+    and BOTH resolve to the same DOB / nationality / passport for the R.10
+    identity step. Proof of address is not an HR dossier field (employee due
+    diligence, Cabinet Resolution 134/2025), so that one finding is not raised.
+    """
+    notes = notes or ""
+    out = {
+        "country": "", "reg_no": "", "reg_date": "", "screened": "",
+        "license_expiry": "", "entity_pep": "", "individuals": [],
+        "is_arrangement": False, "arrangement_type": "",
+    }
+    fields = {}
+    for key, rx in _EMP_FIELDS.items():
+        m = rx.search(notes)
+        fields[key] = _clean(m.group(1)) if m else ""
+    base = _clean(task_name)
+    full = fields["full_name"] if _present(fields["full_name"]) else ""
+    names = [n for n in (base, full) if n]
+    if full and _norm(full) == _norm(base):
+        names = [base]
+    for nm in names:
+        rec = {
+            "role": "Employee", "name": nm,
+            "nationality": nationality_country(fields["nationality"]),
+            "nationality_recorded": fields["nationality"],
+            "shares": "", "share_pct": None,
+            "id_number": fields["id_number"],
+            "passport_expiry": fields["passport_expiry"],
+            "dob": fields["dob"], "gender": fields["gender"],
+            "place_of_birth": fields["place_of_birth"],
+            "emirates_id": fields["emirates_id"], "eid_expiry": fields["eid_expiry"],
+            "proof_of_address": "", "pep_status": "",
+            "arrangement_role": False, "employee": True,
+        }
+        rec["cdd_gaps"] = [g for g in cdd_gaps(rec, today)
+                           if g != "proof of address not obtained"]
+        out["individuals"].append(rec)
+    return out
+
+
 def jurisdiction_risk_for(country, nationalities, table=None):
     """Return (tier, reason) where tier in {'high','grey',None}. Uses the
     maintained jurisdiction list; empty table ⇒ (None, '')."""
