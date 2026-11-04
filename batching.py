@@ -7,7 +7,7 @@ post the same batch twice (the 17 Sep duplicate-posting incident this guards
 against), and no subject is dropped or duplicated when a run is split.
 """
 
-DEFAULT_BATCH_SIZE = 25
+DEFAULT_BATCH_SIZE = 20
 
 
 def plan_batches(subjects, size=DEFAULT_BATCH_SIZE):
