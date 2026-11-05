@@ -1,0 +1,6 @@
+# CI-only: JSON Schema validation of the committed data files
+# (scripts/validate_data_schemas.py, run by .github/workflows/ci.yml).
+# Never imported by the engine, the app or the MCP server. Constrained to the
+# engine lock so both files install together in one environment.
+-c requirements.txt
+jsonschema>=4.23
