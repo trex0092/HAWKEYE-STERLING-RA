@@ -737,6 +737,15 @@ for _ in range(200000):
     _cur["k"] = {}; _cur = _cur["k"]
 check("orchestrator: pathologically nested arguments are a WorkflowDenied, not a RecursionError (regression)",
       _denied(_plan([{"tool": "hawkeye_normalize_name", "arguments": _deep}])))
+try:
+    orch.preview(_plan([{"tool": "hawkeye_normalize_name", "arguments": {"k": float("nan")}}]))
+    _cause_kept = False
+except orch.WorkflowDenied as _e_chain:
+    _cause_kept = isinstance(_e_chain.__cause__, ValueError)
+except Exception:
+    _cause_kept = False
+check("orchestrator: an invalid-JSON denial keeps the original error as its cause",
+      _cause_kept)
 check("orchestrator: an over-budget argument payload is denied",
       _denied(_plan([{"tool": "hawkeye_normalize_name",
                       "arguments": {"name": "x" * (orch.MAX_ARG_BYTES + 1)}}])))

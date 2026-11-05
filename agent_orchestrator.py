@@ -52,9 +52,9 @@ def _validated(plan):
         try:
             arg_bytes = json.dumps(item["arguments"], ensure_ascii=False,
                                    sort_keys=True, allow_nan=False).encode("utf8")
-        except (TypeError, ValueError, RecursionError):
+        except (TypeError, ValueError, RecursionError) as exc:
             # RecursionError: pathologically nested arguments are a denial too.
-            raise WorkflowDenied("arguments not valid JSON")
+            raise WorkflowDenied("arguments not valid JSON") from exc
         if len(arg_bytes) > MAX_ARG_BYTES:
             raise WorkflowDenied("tool argument budget exceeded")
         # Return an immutable-in-practice JSON snapshot, not the original

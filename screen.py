@@ -41,7 +41,7 @@ import screen_gkg  # Pure GDELT GKG window/parser/index helpers (ADR-005 decompo
 try:
     from rapidfuzz import fuzz
     import pdfplumber
-except ImportError:
+except ImportError as _import_exc:
     # Missing engine deps. Installing them as a SIDE EFFECT of `import screen`
     # is a supply-chain smell for a compliance engine (network + code execution
     # the importer never asked for), so the self-install is OPT-IN via
@@ -61,7 +61,7 @@ except ImportError:
             "screen.py needs its pinned engine deps (rapidfuzz, pdfplumber). "
             "Install them first: python -m pip install -r ci/requirements.txt "
             "— or set HSRA_BOOTSTRAP_DEPS=1 to let the engine install the pinned set itself."
-        )
+        ) from _import_exc
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 # Asana credential — accept EITHER name. The .mjs scripts, every workflow and
@@ -2426,7 +2426,7 @@ def reset_feed_coverage():
         for k in _FEED_COVERAGE:
             _FEED_COVERAGE[k] = 0
 
-def search_adverse_media(name: str, max_results: int = None) -> list:
+def search_adverse_media(name: str, max_results: int | None = None) -> list:
     """
     Deep adverse-media search via Google News RSS.
       Pass 1 — exact name across the first ADVERSE_LOCALES worldwide locales
