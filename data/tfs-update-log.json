@@ -3077,10 +3077,16 @@
       "detectedAt": "2026-11-04T20:54:33.794Z",
       "prevCount": 19485,
       "newCount": 19500,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 41940601846,
+        "startedAt": "2026-11-05T00:20:31Z"
+      },
+      "status": "complete",
       "chainPrev": "4386e9d00caa15193bf24ba5f5ffb1f77a1d05ff164522399c7dd100659b0ae6",
-      "chainHash": "1c64160e9ab186f8a8a10d6222249d82ef003caab1fea2dc77d2681c569f36aa"
+      "chainHash": "1c64160e9ab186f8a8a10d6222249d82ef003caab1fea2dc77d2681c569f36aa",
+      "latencyHours": 3.4,
+      "resolutionHash": "94060bd6624651eb3ec993c0a85a8484d29c3bafca116f7e861e0134fa48055c"
     },
     {
       "id": "ofac-sdn-alt",
@@ -3090,10 +3096,16 @@
       "detectedAt": "2026-11-04T20:54:33.794Z",
       "prevCount": 20205,
       "newCount": 20209,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 41940601846,
+        "startedAt": "2026-11-05T00:20:31Z"
+      },
+      "status": "complete",
       "chainPrev": "1c64160e9ab186f8a8a10d6222249d82ef003caab1fea2dc77d2681c569f36aa",
-      "chainHash": "3590487b43747336c8c478f3ad65161d8776e1e5c69a075f5f5682ca84170333"
+      "chainHash": "3590487b43747336c8c478f3ad65161d8776e1e5c69a075f5f5682ca84170333",
+      "latencyHours": 3.4,
+      "resolutionHash": "8688ed37b6c527070487f85951971c9638c94554a822cf3a0531fb7288609460"
     },
     {
       "id": "ofac-consolidated",
@@ -3103,10 +3115,16 @@
       "detectedAt": "2026-11-04T20:54:33.794Z",
       "prevCount": 442,
       "newCount": null,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 41940601846,
+        "startedAt": "2026-11-05T00:20:31Z"
+      },
+      "status": "complete",
       "chainPrev": "3590487b43747336c8c478f3ad65161d8776e1e5c69a075f5f5682ca84170333",
-      "chainHash": "07daa0c282a38657b6b8ba83d591a8de8bfb310e988870e3858b9ffce81db153"
+      "chainHash": "07daa0c282a38657b6b8ba83d591a8de8bfb310e988870e3858b9ffce81db153",
+      "latencyHours": 3.4,
+      "resolutionHash": "3162a34fc31ea181a161acdf16b8de73093c469ad2ecafdf7bc3ed4817850c49"
     },
     {
       "id": "fr-dgt",
@@ -3116,10 +3134,16 @@
       "detectedAt": "2026-11-04T20:54:33.794Z",
       "prevCount": 22908,
       "newCount": 22918,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "weekly-adverse-media.yml",
+        "runId": 41940601846,
+        "startedAt": "2026-11-05T00:20:31Z"
+      },
+      "status": "complete",
       "chainPrev": "07daa0c282a38657b6b8ba83d591a8de8bfb310e988870e3858b9ffce81db153",
-      "chainHash": "408312c6f33841f6bdc03c7001c5b9d61ae7449fb192c9abda790a9f1a6238f2"
+      "chainHash": "408312c6f33841f6bdc03c7001c5b9d61ae7449fb192c9abda790a9f1a6238f2",
+      "latencyHours": 3.4,
+      "resolutionHash": "c5a1c7a997e915f15ff490ac1864b06368df1fe8e15b30b48cecf055a1c49f3e"
     }
   ]
 }
