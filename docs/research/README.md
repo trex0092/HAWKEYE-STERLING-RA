@@ -13,6 +13,7 @@ app content changes).
 | [2026-06-aml-regulatory-update.md](2026-06-aml-regulatory-update.md) | June 2026 deep-dive: FDL 10/2025, Cabinet 134/2025, FATF plenary, MoET/DPMS actions (fully cited) |
 | [2026-07-cbuae-april-2026-update.md](2026-07-cbuae-april-2026-update.md) | July 2026 note: CBUAE April 2026 update and PF risk-area follow-ups |
 | [open-source-candidates-2026.md](open-source-candidates-2026.md) | 20 open-source repositories checked against this repo's recorded gaps, with licence evidence and the zero-runtime-dependency adoption mode; nothing adopted |
+| [open-source-candidates-2026-11-04.md](open-source-candidates-2026-11-04.md) | Second evaluation: 27 further repositories (name handling, identity data quality, adverse media, networks, OCR, assurance tooling) with licence evidence read on 2026-11-04 and the same three adoption modes; nothing adopted, one explicit do-not-adopt |
 | [auto/](auto/) | Dated Regulatory Watch notes (`REG-UPDATE-YYYY-MM-DD.md`) |
 
 **Citation policy:** every claim carries its source URL; pages that block

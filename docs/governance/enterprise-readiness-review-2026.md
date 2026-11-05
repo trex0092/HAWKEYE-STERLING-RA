@@ -344,7 +344,9 @@ runner. Watchman matching benchmark added beside the yente one: a dispatch-only,
 workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
 no government list. Measurement only — no scored control changed.*
 
-Verified at HEAD: 78 workflows · 204 markdown documents under docs/ (171 excluding docs/research/auto).
+Verified at HEAD: 78 workflows · 205 markdown documents under docs/ (172 excluding docs/research/auto).
+
+*Document-count reconciliation · 4 November 2026: research note `docs/research/open-source-candidates-2026-11-04.md` added (second open-source candidate evaluation, 27 repositories, nothing adopted). Document count 204 → 205 (171 → 172 excluding docs/research/auto). No score, readiness approval, screening evidence or operating-assurance claim changes.*
 
 *Estate-count reconciliation · 4 November 2026: the Daily Compliance Brief workflow (`daily-brief.yml`) was removed. Workflow count 79 → 78; blocked-egress count 80 → 79. The Daily Compliance Brief no longer files its daily Asana record. No score, readiness approval, screening evidence or operating-assurance claim changes.*
 
