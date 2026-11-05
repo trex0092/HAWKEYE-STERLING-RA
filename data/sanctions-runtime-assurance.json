@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-05T01:27:08.760Z",
-  "githubRunId": "41948518969",
-  "commit": "4639dc78f8dc175c41f1c315d9efbfc31a72d840",
+  "generatedAt": "2026-11-05T14:30:11.405Z",
+  "githubRunId": "42045439948",
+  "commit": "74b208b84d2367f80550d8504b833c361b43c52b",
   "screenedSubjects": 991,
   "sourceProjects": {
     "customer": {
@@ -60,7 +60,7 @@
       {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
-        "count": 22921,
+        "count": 22902,
         "partial": false
       }
     ],
