@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hawkeye:data/schemas/sanctions-source-registry.schema.json",
+  "title": "Sanctions list source registry",
+  "description": "Shared shape of data/sanctions-sources.json (core lists) and data/sanctions-extra.json (curated additions). Every source has a lowercase id, a name, a jurisdiction, a type and a parser; urls are https. Source ids must be unique within a file (checked natively). A source url over plain http is reported by the test as a warning, not a failure.",
+  "x-hawkeye-validates": [
+    "data/sanctions-sources.json",
+    "data/sanctions-extra.json"
+  ],
+  "type": "object",
+  "required": [
+    "_README",
+    "sources"
+  ],
+  "properties": {
+    "_README": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "jurisdiction",
+          "type",
+          "parser"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "jurisdiction": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https?://"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "curated",
+              "json",
+              "xlsx",
+              "xls",
+              "xml",
+              "html",
+              "ods"
+            ]
+          },
+          "parser": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "minNames": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1000
+          },
+          "fetchAttempts": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "fallbackSourceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "charset": {
+            "type": "string",
+            "minLength": 1
+          },
+          "_note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

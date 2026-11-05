@@ -149,7 +149,7 @@
       "_note": "Activation switch the curated file's _README points at: paste the official designations into data/seco-curated-list.json (name/aliases rows), set its count/lastReviewed, then set enabled:true here. Kept disabled while entries is empty so an empty list can never read as screened coverage."
     },
     {
-      "id": "au-dfat-opensanctions",
+      "id": "au-dfat-opensanctions-retired-2026-08-05",
       "name": "Australia — DFAT Consolidated (OpenSanctions mirror)",
       "jurisdiction": "Australia",
       "url": "https://data.opensanctions.org/datasets/latest/au_dfat_sanctions/targets.simple.csv",
