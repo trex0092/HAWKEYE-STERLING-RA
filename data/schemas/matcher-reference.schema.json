@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hawkeye:data/schemas/matcher-reference.schema.json",
+  "title": "Matcher reference data (recall-relevant)",
+  "description": "Shared shape of the versioned matcher reference files: corporate-stopwords (tokens), translit-groups (groups of equivalent spellings) and source-credibility (tier lists). Each carries an integer version and a description; the lists hold non-empty strings.",
+  "x-hawkeye-validates": [
+    "data/corporate-stopwords.json",
+    "data/translit-groups.json",
+    "data/source-credibility.json"
+  ],
+  "type": "object",
+  "required": [
+    "version",
+    "description"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tokens": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "tier1": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "tier2": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": true
+}

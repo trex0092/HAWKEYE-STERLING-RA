@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hawkeye:data/schemas/board-figures.schema.json",
+  "title": "Generated board figures snapshot",
+  "x-hawkeye-validates": [
+    "data/board-figures.json"
+  ],
+  "type": "object",
+  "required": [
+    "_README",
+    "figures",
+    "definitions"
+  ],
+  "properties": {
+    "_README": {
+      "type": "string",
+      "minLength": 1
+    },
+    "figures": {
+      "type": "object",
+      "required": [
+        "workflows",
+        "docsTotal",
+        "docsCurated",
+        "egressBlock",
+        "egressAudit"
+      ],
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "definitions": {
+      "type": "object",
+      "required": [
+        "workflows",
+        "docsTotal",
+        "docsCurated",
+        "egressBlock",
+        "egressAudit"
+      ],
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hawkeye:data/schemas/curated-list.schema.json",
+  "title": "Curated designation list supplement",
+  "description": "Shared shape of the in-repo curated lists (internal watchlist, DFAT and SECO supplements): a README, a review date, a count and the entries. count must equal the number of entries (checked natively). An empty, never-populated template may carry an empty lastReviewed; a list with entries must carry an ISO review date.",
+  "x-hawkeye-validates": [
+    "data/internal-watchlist.json",
+    "data/dfat-curated-list.json",
+    "data/seco-curated-list.json"
+  ],
+  "type": "object",
+  "required": [
+    "_README",
+    "lastReviewed",
+    "count",
+    "entries"
+  ],
+  "properties": {
+    "_README": {
+      "type": "string",
+      "minLength": 1
+    },
+    "list": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "jurisdiction": {
+      "type": "string",
+      "minLength": 1
+    },
+    "populated": {
+      "type": "boolean"
+    },
+    "lastReviewed": {
+      "type": "string",
+      "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": true,
+  "if": {
+    "properties": {
+      "entries": {
+        "minItems": 1
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "lastReviewed": {
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      }
+    }
+  }
+}
