@@ -439,10 +439,13 @@ payload = {
     }
 }
 
+ASANA_TIMEOUT_SECONDS = 30  # bounded wait: a hung Asana connection must fail loudly, not stall the job
+
 r = requests.post(
     "https://app.asana.com/api/1.0/tasks",
     headers=headers,
-    json=payload
+    json=payload,
+    timeout=ASANA_TIMEOUT_SECONDS
 )
 
 if r.status_code == 400 and "Section must be in project" in r.text:
@@ -458,7 +461,8 @@ if r.status_code == 400 and "Section must be in project" in r.text:
     r = requests.post(
         "https://app.asana.com/api/1.0/tasks",
         headers=headers,
-        json=payload
+        json=payload,
+        timeout=ASANA_TIMEOUT_SECONDS
     )
 
 if r.status_code == 201:
@@ -489,11 +493,18 @@ for h in confirmed:
         f"Action Required: IMMEDIATE ESCALATION TO MLRO\n"
         f"Screening Record: {task_url}"
     )
-    rc = requests.post(
-        f"https://app.asana.com/api/1.0/tasks/{h['customer_gid']}/stories",
-        headers=headers,
-        json={"data": {"text": comment}}
-    )
+    try:
+        rc = requests.post(
+            f"https://app.asana.com/api/1.0/tasks/{h['customer_gid']}/stories",
+            headers=headers,
+            json={"data": {"text": comment}},
+            timeout=ASANA_TIMEOUT_SECONDS
+        )
+    except requests.exceptions.RequestException as exc:
+        # One unreachable comment must not cancel the comments on the other
+        # confirmed hits; it is reported loudly and the run goes on.
+        print(f"   Comment failed on: {h['customer']} — {type(exc).__name__}")
+        continue
     if rc.status_code == 201:
         print(f"   Comment posted on: {h['customer']}")
     else:

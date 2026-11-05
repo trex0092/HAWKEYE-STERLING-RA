@@ -5659,13 +5659,15 @@ check("the report renders the statement section",
 # because actually exercising pip in CI is exactly what the gate forbids.
 print("\nscreen.py — bootstrap gate")
 _src = open(os.path.join(ROOT, "screen.py"), encoding="utf-8").read()
-_fallback = _src.split("except ImportError:", 1)[1].split("# ── CONFIG", 1)[0]
+_fallback = _src.split("except ImportError", 1)[1].split("# ── CONFIG", 1)[0]
 check("the pip fallback is gated behind HSRA_BOOTSTRAP_DEPS=1",
       'os.environ.get("HSRA_BOOTSTRAP_DEPS") == "1"' in _fallback
       and _fallback.index('HSRA_BOOTSTRAP_DEPS') < _fallback.index('subprocess.run'))
 check("the ungated branch raises with the exact install command",
       "raise ImportError" in _fallback
       and "pip install -r ci/requirements.txt" in _fallback)
+check("the ungated ImportError keeps the original missing-module error as its cause",
+      "from _import_exc" in _fallback)
 
 # ── screen.py: run-progress forensics ────────────────────────────────────────
 # The breadcrumb that survives a lost runner. Its whole value is that it is
@@ -7092,6 +7094,24 @@ for _args in ((0, 41), (42, 41), (1, 0)):
     except ValueError:
         _rejected = True
     check(f"batching: out-of-range batch {_args} is rejected", _rejected)
+
+# Outbound HTTP must never wait forever. Every `requests.<verb>(...)` call in the
+# repository's Python files carries an explicit timeout (a hung Asana or feed
+# connection would otherwise stall the scheduled job until the 30-minute limit).
+import ast as _ast_to, glob as _glob_to
+_no_timeout = []
+_root_to = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+for _f_to in sorted(_glob_to.glob(os.path.join(_root_to, "**", "*.py"), recursive=True)):
+    if "node_modules" in _f_to or os.sep + "." in _f_to:
+        continue
+    for _n_to in _ast_to.walk(_ast_to.parse(open(_f_to, encoding="utf8").read())):
+        if (isinstance(_n_to, _ast_to.Call) and isinstance(_n_to.func, _ast_to.Attribute)
+                and isinstance(_n_to.func.value, _ast_to.Name) and _n_to.func.value.id == "requests"
+                and _n_to.func.attr in ("get", "post", "put", "delete", "patch", "head", "request")
+                and not any(k.arg == "timeout" or k.arg is None for k in _n_to.keywords)):
+            _no_timeout.append(f"{os.path.relpath(_f_to, _root_to)}:{_n_to.lineno}")
+check("every requests call in the repository's Python files sets a timeout "
+      + (f"(missing: {_no_timeout})" if _no_timeout else ""), not _no_timeout)
 
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")

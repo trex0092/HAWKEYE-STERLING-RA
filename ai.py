@@ -445,7 +445,7 @@ def _variant_cap() -> int:
     print(f"TRANSLIT_VARIANT_CAP={raw!r} is not a positive integer — using default 32")
     return 32
 
-def name_variants(name: str, cap: int = None):
+def name_variants(name: str, cap: int | None = None):
     """Return a small set of transliteration-equivalent spellings of `name`
     (including itself). Used to widen sanctions matching recall."""
     if cap is None:
