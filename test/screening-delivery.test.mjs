@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { publishDailyScreening, buildReports, splitEvidence, textSize, validateEvidence,
-  PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName } from '../scripts/screening-delivery.mjs';
+  PROJECT, DESTINATIONS, buildFindingsCsv, csvCell, findingsAttachmentName, deliveryRequest } from '../scripts/screening-delivery.mjs';
 
 const NOW = Date.parse('2026-09-30T10:00:00Z');
 function fixture() {
@@ -366,4 +366,16 @@ test('a same-run re-attempt keeps a single findings table', async () => {
   for (const report of first.reports) {
     assert.equal([...fake.attachments.values()].filter(a => a.parent === report.taskGid).length, 1);
   }
+});
+
+test('delivery requests never repeat a write whose outcome is unknown, and never share one timeout', async () => {
+  const seen = [];
+  const request = deliveryRequest(async (path, options) => { seen.push({ path, options }); return { data: {} }; });
+  await request('/tasks', { method: 'POST', body: '{}' });
+  await request('/tasks/1/subtasks', { method: 'POST', body: '{}' });
+  await request('/tasks/1', { method: 'PUT', body: '{}' });
+  await request('/projects/1/tasks');
+  await request('/tasks/1', { method: 'GET' });
+  assert.deepEqual(seen.map(s => s.options.noRetryOnUnknownOutcome), [true, true, true, false, false]);
+  assert.ok(seen.every(s => s.options.signal === undefined), 'asana() owns the per-attempt timeout');
 });
