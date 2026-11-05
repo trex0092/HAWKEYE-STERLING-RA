@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-05T00:31:03.419Z",
+  "generatedAt": "2026-11-05T02:21:49.009Z",
   "run": {
-    "date": "2026-11-04",
-    "githubRunId": "41911057195",
+    "date": "2026-11-05",
+    "githubRunId": "41943159163",
     "commit": "4639dc78f8dc175c41f1c315d9efbfc31a72d840",
     "screenedSubjects": 991
   },
@@ -16,9 +16,9 @@
       "adverse-media backbone not evidenced: Google News RSS",
       "adverse-media backbone not evidenced: GDELT global index",
       "adverse-media backbone not evidenced: Bing News",
-      "adverse-media backbone failures: googleNews=954",
+      "adverse-media backbone failures: googleNews=946",
       "adverse-media backbone failures: gdelt=991",
-      "adverse-media backbone failures: bing=9",
+      "adverse-media backbone failures: bing=11",
       "adverse-media subjects with reduced source redundancy: 991",
       "PEP source records without screenable identity: 5"
     ],
@@ -58,9 +58,9 @@
       "fallbackSourcesUsed": [],
       "adverseMediaPartialSubjects": 991,
       "adverseMediaBackboneFailures": {
-        "googleNews": 954,
+        "googleNews": 946,
         "gdelt": 991,
-        "bing": 9
+        "bing": 11
       },
       "pepUnscreenableSourceRecords": 5
     }
@@ -82,15 +82,15 @@
             "partial": false
           },
           {
-            "id": "ofac-consolidated",
-            "name": "US OFAC — Consolidated (non-SDN) list (XML)",
-            "count": 1674,
-            "partial": false
-          },
-          {
             "id": "uk-ofsi",
             "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
             "count": 58644,
+            "partial": false
+          },
+          {
+            "id": "ofac-consolidated",
+            "name": "US OFAC — Consolidated (non-SDN) list (XML)",
+            "count": 1674,
             "partial": false
           },
           {
@@ -130,9 +130,9 @@
             "partial": false
           },
           {
-            "id": "ua-nsdc",
-            "name": "Ukraine — NSDC State Register of Sanctions",
-            "count": 91834,
+            "id": "eu-fsf",
+            "name": "EU — Consolidated financial sanctions list (CSV)",
+            "count": 31132,
             "partial": false
           },
           {
@@ -142,15 +142,9 @@
             "partial": false
           },
           {
-            "id": "eu-fsf",
-            "name": "EU — Consolidated financial sanctions list (CSV)",
-            "count": 31132,
-            "partial": false
-          },
-          {
-            "id": "us-csl",
-            "name": "US Trade.gov — Consolidated Screening List (11 export-control + sanctions lists)",
-            "count": 13289,
+            "id": "ua-nsdc",
+            "name": "Ukraine — NSDC State Register of Sanctions",
+            "count": 91834,
             "partial": false
           },
           {
@@ -160,9 +154,9 @@
             "partial": false
           },
           {
-            "id": "lk-ca-1373",
-            "name": "Sri Lanka — Competent Authority UNSCR 1373 National Designations (individuals)",
-            "count": 206,
+            "id": "us-csl",
+            "name": "US Trade.gov — Consolidated Screening List (11 export-control + sanctions lists)",
+            "count": 13289,
             "partial": false
           },
           {
@@ -172,15 +166,9 @@
             "partial": false
           },
           {
-            "id": "mc-gels",
-            "name": "Monaco — National Fund-Freezing List (Gel des fonds, JSON)",
-            "count": 17435,
-            "partial": false
-          },
-          {
-            "id": "sa-pcct",
-            "name": "Saudi Arabia — PCCT National Terrorism List (XLSX)",
-            "count": 379,
+            "id": "lk-ca-1373",
+            "name": "Sri Lanka — Competent Authority UNSCR 1373 National Designations (individuals)",
+            "count": 206,
             "partial": false
           },
           {
@@ -190,9 +178,15 @@
             "partial": false
           },
           {
-            "id": "tr-wanted",
-            "name": "Türkiye — Ministry of Interior Terrorist Wanted List",
-            "count": 2551,
+            "id": "qa-nctc",
+            "name": "Qatar — NCTC Unified Sanction List (JSON)",
+            "count": 2273,
+            "partial": false
+          },
+          {
+            "id": "ch-seco",
+            "name": "Switzerland — SECO sanctions list (XML)",
+            "count": 45033,
             "partial": false
           },
           {
@@ -202,9 +196,15 @@
             "partial": false
           },
           {
-            "id": "fr-dgt",
-            "name": "France — Registre national des gels (DGT)",
-            "count": 22921,
+            "id": "mc-gels",
+            "name": "Monaco — National Fund-Freezing List (Gel des fonds, JSON)",
+            "count": 17435,
+            "partial": false
+          },
+          {
+            "id": "jo-amlu",
+            "name": "Jordan — AMLU National Sanctions List",
+            "count": 112,
             "partial": false
           },
           {
@@ -214,9 +214,9 @@
             "partial": false
           },
           {
-            "id": "jo-amlu",
-            "name": "Jordan — AMLU National Sanctions List",
-            "count": 112,
+            "id": "sa-pcct",
+            "name": "Saudi Arabia — PCCT National Terrorism List (XLSX)",
+            "count": 379,
             "partial": false
           },
           {
@@ -232,9 +232,9 @@
             "partial": false
           },
           {
-            "id": "qa-nctc",
-            "name": "Qatar — NCTC Unified Sanction List (JSON)",
-            "count": 2273,
+            "id": "tr-wanted",
+            "name": "Türkiye — Ministry of Interior Terrorist Wanted List",
+            "count": 2551,
             "partial": false
           },
           {
@@ -244,27 +244,27 @@
             "partial": false
           },
           {
-            "id": "br-tcu-inidoneos",
-            "name": "Brazil — TCU Debarred Companies (Licitantes Inidôneos)",
-            "count": 83,
-            "partial": false
-          },
-          {
             "id": "br-tcu-inabilitados",
             "name": "Brazil — TCU Disqualified Individuals (Inabilitados)",
             "count": 617,
             "partial": false
           },
           {
-            "id": "ng-nigsac",
-            "name": "Nigeria — NSC Sanctions List (NigSAC)",
-            "count": 77,
+            "id": "br-tcu-inidoneos",
+            "name": "Brazil — TCU Debarred Companies (Licitantes Inidôneos)",
+            "count": 83,
             "partial": false
           },
           {
             "id": "ke-frc",
             "name": "Kenya — FRC Domestic Terrorism List",
             "count": 27,
+            "partial": false
+          },
+          {
+            "id": "ng-nigsac",
+            "name": "Nigeria — NSC Sanctions List (NigSAC)",
+            "count": 77,
             "partial": false
           },
           {
@@ -280,9 +280,9 @@
             "partial": false
           },
           {
-            "id": "nz-mfat-russia",
-            "name": "New Zealand — MFAT Russia Sanctions Register",
-            "count": 4923,
+            "id": "fr-dgt",
+            "name": "France — Registre national des gels (DGT)",
+            "count": 22921,
             "partial": false
           },
           {
@@ -298,6 +298,18 @@
             "partial": false
           },
           {
+            "id": "az-fiu",
+            "name": "Azerbaijan: FMS Domestic List (OpenSanctions)",
+            "count": 70,
+            "partial": false
+          },
+          {
+            "id": "nz-mfat-russia",
+            "name": "New Zealand — MFAT Russia Sanctions Register",
+            "count": 4923,
+            "partial": false
+          },
+          {
             "id": "mx-sat-69b",
             "name": "Mexico — SAT Art. 69-B EFOS list (tax-integrity signal, not sanctions)",
             "count": 12256,
@@ -310,9 +322,9 @@
             "partial": false
           },
           {
-            "id": "az-fiu",
-            "name": "Azerbaijan: FMS Domestic List (OpenSanctions)",
-            "count": 70,
+            "id": "my-moha",
+            "name": "Malaysia — MOHA Sanctions List",
+            "count": 164,
             "partial": false
           },
           {
@@ -340,12 +352,6 @@
             "partial": false
           },
           {
-            "id": "my-moha",
-            "name": "Malaysia — MOHA Sanctions List",
-            "count": 164,
-            "partial": false
-          },
-          {
             "id": "th-designated",
             "name": "Thailand — Designated Persons List",
             "count": 776,
@@ -364,15 +370,15 @@
             "partial": false
           },
           {
-            "id": "qa-nctc-opensanctions",
-            "name": "Qatar: NCTC Unified Sanction Record",
-            "count": 2331,
-            "partial": false
-          },
-          {
             "id": "ma-cnasnu",
             "name": "Morocco: CNASNU Local Terrorist List",
             "count": 28,
+            "partial": false
+          },
+          {
+            "id": "qa-nctc-opensanctions",
+            "name": "Qatar: NCTC Unified Sanction Record",
+            "count": 2331,
             "partial": false
           },
           {
@@ -394,15 +400,15 @@
             "partial": false
           },
           {
-            "id": "idb-sanctions",
-            "name": "Inter-American Development Bank: Sanctioned Firms & Individuals (OpenSanctions mirror)",
-            "count": 1311,
-            "partial": false
-          },
-          {
             "id": "cz-mzv-national",
             "name": "Czechia — MFA National Sanctions List (Vnitrostátní sankční seznam, CSV)",
             "count": 34,
+            "partial": false
+          },
+          {
+            "id": "idb-sanctions",
+            "name": "Inter-American Development Bank: Sanctioned Firms & Individuals (OpenSanctions mirror)",
+            "count": 1311,
             "partial": false
           },
           {
@@ -412,21 +418,15 @@
             "partial": false
           },
           {
-            "id": "lt-migracija-magnitsky",
-            "name": "Lithuania — Migration Department: Designated Persons (Magnitsky amendments, entry bans)",
-            "count": 285,
-            "partial": false
-          },
-          {
             "id": "ee-vm-human-rights",
             "name": "Estonia — MFA: Sanction of the Government of the Republic to ensure following of human rights (entry bans)",
             "count": 193,
             "partial": false
           },
           {
-            "id": "pl-mswia-sanctions",
-            "name": "Poland — Ministry of the Interior and Administration (MSWiA): List of persons and entities subject to sanctions",
-            "count": 461,
+            "id": "ee-vm-belarus",
+            "name": "Estonia — MFA: Sanctions of the Government of the Republic in view of the situation in Belarus (entry bans)",
+            "count": 615,
             "partial": false
           },
           {
@@ -448,9 +448,15 @@
             "partial": false
           },
           {
-            "id": "bg-dans-mft",
-            "name": "Bulgaria — National Terrorism Financing List (Law on Measures against the Financing of Terrorism)",
-            "count": 29,
+            "id": "lt-migracija-magnitsky",
+            "name": "Lithuania — Migration Department: Designated Persons (Magnitsky amendments, entry bans)",
+            "count": 285,
+            "partial": false
+          },
+          {
+            "id": "pl-mswia-sanctions",
+            "name": "Poland — Ministry of the Interior and Administration (MSWiA): List of persons and entities subject to sanctions",
+            "count": 461,
             "partial": false
           },
           {
@@ -484,9 +490,21 @@
             "partial": false
           },
           {
-            "id": "ee-vm-belarus",
-            "name": "Estonia — MFA: Sanctions of the Government of the Republic in view of the situation in Belarus (entry bans)",
-            "count": 615,
+            "id": "iq-aml-freeze",
+            "name": "Iraq — AML/CFT Office Terrorist Fund Freezing Lists",
+            "count": 14803,
+            "partial": false
+          },
+          {
+            "id": "bg-dans-mft",
+            "name": "Bulgaria — National Terrorism Financing List (Law on Measures against the Financing of Terrorism)",
+            "count": 29,
+            "partial": false
+          },
+          {
+            "id": "ch-fiaa-pep-freezes",
+            "name": "Switzerland — FDFA asset freezes of foreign politically exposed persons (FIAA)",
+            "count": 70,
             "partial": false
           },
           {
@@ -496,21 +514,9 @@
             "partial": false
           },
           {
-            "id": "iq-aml-freeze",
-            "name": "Iraq — AML/CFT Office Terrorist Fund Freezing Lists",
-            "count": 14803,
-            "partial": false
-          },
-          {
             "id": "ca-facfoa",
             "name": "Canada — Freezing Assets of Corrupt Foreign Officials Act designations",
             "count": 11,
-            "partial": false
-          },
-          {
-            "id": "ch-fiaa-pep-freezes",
-            "name": "Switzerland — FDFA asset freezes of foreign politically exposed persons (FIAA)",
-            "count": 70,
             "partial": false
           },
           {
@@ -556,15 +562,9 @@
             "partial": false
           },
           {
-            "id": "ch-seco",
-            "name": "Switzerland — SECO sanctions list (XML)",
-            "count": 45033,
-            "partial": false
-          },
-          {
             "id": "adb-debarment",
             "name": "ADB — Published Debarment & Suspension Register (cross-debarments incl.)",
-            "count": 1509,
+            "count": 1508,
             "partial": false
           }
         ],
@@ -598,11 +598,10 @@
       "reasons": [],
       "warnings": [
         "991 subjects had reduced adverse-media source redundancy",
-        "Google News unavailable for 954 subject(s)",
+        "Google News unavailable for 946 subject(s)",
         "GDELT unavailable for 991 subject(s)",
-        "Bing News unavailable for 9 subject(s)",
-        "last-resort backbone retry attempted for 142 subject(s), recovered 141",
-        "post-sweep second pass re-checked 1 zero-coverage subject(s), recovered 1"
+        "Bing News unavailable for 11 subject(s)",
+        "last-resort backbone retry attempted for 124 subject(s), recovered 124"
       ],
       "evidence": {
         "screenedSubjects": 991,
@@ -611,16 +610,16 @@
         "rotationCycleDays": 26,
         "globalBackbones": [],
         "backboneFailures": {
-          "googleNews": 954,
+          "googleNews": 946,
           "gdelt": 991,
-          "bing": 9
+          "bing": 11
         },
         "errors": 0,
         "partialSubjects": 991,
-        "retryAttempted": 142,
-        "retryRecovered": 141,
-        "secondPassAttempted": 1,
-        "secondPassRecovered": 1,
+        "retryAttempted": 124,
+        "retryRecovered": 124,
+        "secondPassAttempted": 0,
+        "secondPassRecovered": 0,
         "skippedSubjects": 0
       }
     },
@@ -629,7 +628,7 @@
       "reasons": [],
       "warnings": [
         "5 current PEP source item(s) expose no screenable identity after all supported name fields; retained as explicit source-quality exceptions",
-        "34 supplementary live PEP lookup(s) errored"
+        "44 supplementary live PEP lookup(s) errored"
       ],
       "evidence": {
         "persons": 418248,
@@ -644,13 +643,13 @@
         ],
         "partial": false,
         "harvestedAt": "2026-11-04T09:41:43.046Z",
-        "ageHours": 14.8,
+        "ageHours": 16.7,
         "floor": 5000,
         "dailyScreenActive": true,
         "dailyScreenCount": 418248,
         "dailyScreenHarvestedAt": "2026-11-04T09:41:43.046Z",
         "liveLookupEnabled": true,
-        "liveLookupErrors": 34,
+        "liveLookupErrors": 44,
         "skippedSubjects": 0
       }
     }
