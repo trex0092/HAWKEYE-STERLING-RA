@@ -231,6 +231,9 @@ _FIELDS = {
     "eid_expiry":  re.compile(r"EID\s*Expiry\s*[:\-][ \t]*(.+)", re.IGNORECASE),
     "proof_of_address": re.compile(r"Proof\s*of\s*Address\s*[:\-][ \t]*(.+)", re.IGNORECASE),
     "pep_status":  re.compile(r"PEP\s*Status\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    # Optional: the second machine-readable line of a passport (ICAO 9303 TD3,
+    # 44 characters). When recorded, its check digits are verified natively.
+    "mrz":         re.compile(r"(?:Passport\s*)?MRZ(?:\s*line\s*2)?\s*[:\-][ \t]*(.+)", re.IGNORECASE),
 }
 
 _SHARE_NUM = re.compile(r"(\d+(?:\.\d+)?)\s*%")
@@ -280,6 +283,100 @@ def parse_individual(role, block):
     return rec
 
 
+# ── Identity-number check digits (native, no dependency) ─────────────────────
+# Two public algorithms, written from their specifications rather than taken
+# from any library, so no GPL code enters this repository:
+#   - Luhn (ISO/IEC 7812-1 mod-10) for the 15-digit Emirates ID number, which
+#     starts with 784 (the ISO 3166-1 numeric code of the United Arab Emirates).
+#     The Luhn check is the rule data-classification tools apply to this number
+#     (Microsoft Purview, "U.A.E. identity card number": fifteen digits, must
+#     pass the Luhn check); the issuing authority publishes no algorithm.
+#   - ICAO Doc 9303 Part 3 check digits (weights 7, 3, 1; digits as themselves,
+#     letters A to Z as 10 to 35, the filler "<" as 0) for the second line of a
+#     TD3 passport MRZ, verified only when a dossier records that line.
+# A failed check digit is a FINDING to verify the number against the document,
+# never proof of anything about the person; a passed check proves only that
+# the number was transcribed consistently. Findings never repeat the number.
+
+def luhn_ok(value):
+    """True when the digits of value satisfy the Luhn mod-10 check."""
+    d = [int(c) for c in str(value or "") if c.isdigit()]
+    if len(d) < 2:
+        return False
+    total = 0
+    for i, n in enumerate(reversed(d)):
+        if i % 2:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return total % 10 == 0
+
+
+def emirates_id_finding(value):
+    """One finding about a recorded Emirates ID number, or None when it is
+    absent or passes every structural check (15 digits, 784 prefix, Luhn)."""
+    raw = _clean(value)
+    if not _present(raw):
+        return None
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) != 15:
+        return f"Emirates ID number is not 15 digits ({len(digits)} recorded) — verify against the card"
+    if not digits.startswith("784"):
+        return "Emirates ID number does not start with 784 (the UAE's ISO 3166-1 numeric code) — verify against the card"
+    if not luhn_ok(digits):
+        return "Emirates ID number fails its check digit (Luhn) — a digit is mistyped, verify against the card"
+    return None
+
+
+_MRZ_WEIGHTS = (7, 3, 1)
+
+
+def mrz_check_digit(field):
+    """ICAO 9303 check digit (a single digit, as a string) for an MRZ field."""
+    total = 0
+    for i, ch in enumerate(str(field or "").upper()):
+        if ch.isdigit():
+            v = int(ch)
+        elif "A" <= ch <= "Z":
+            v = ord(ch) - ord("A") + 10
+        elif ch == "<":
+            v = 0
+        else:
+            raise ValueError(f"character {ch!r} is not valid in an MRZ")
+        total += v * _MRZ_WEIGHTS[i % 3]
+    return str(total % 10)
+
+
+def mrz_findings(line2):
+    """Findings for the second line of a TD3 passport MRZ (44 characters):
+    document number, date of birth, expiry, optional data and composite check
+    digits are each recomputed. An absent line yields no finding; a line of
+    the wrong length or alphabet is itself a finding."""
+    raw = re.sub(r"\s+", "", str(line2 or "")).upper()
+    if not raw:
+        return []
+    if len(raw) != 44:
+        return [f"passport MRZ line 2 is {len(raw)} characters, not 44 — re-read the document"]
+    try:
+        checks = (
+            ("document number", raw[0:9], raw[9]),
+            ("date of birth", raw[13:19], raw[19]),
+            ("expiry date", raw[21:27], raw[27]),
+            ("optional data", raw[28:42], raw[42]),
+            ("composite", raw[0:10] + raw[13:20] + raw[21:43], raw[43]),
+        )
+        out = []
+        for label, field, given in checks:
+            if label == "optional data" and given == "<" and set(field) == {"<"}:
+                continue  # an empty optional field may carry a filler instead of a digit
+            if mrz_check_digit(field) != given:
+                out.append(f"passport MRZ {label} check digit does not verify — re-read the document")
+        return out
+    except ValueError as exc:
+        return [f"passport MRZ line 2 contains an invalid character ({exc}) — re-read the document"]
+
+
 def cdd_gaps(rec, today=None):
     """R.10 verification gaps for one identified person. Returns a list of
     human-readable gaps the MLRO must close. 'Missing' is always a finding."""
@@ -306,6 +403,10 @@ def cdd_gaps(rec, today=None):
             gaps.append(f"{label} document expired ({raw})")
         elif _present(raw) and d is None:
             gaps.append(f"{label} expiry date unreadable ({raw}) — verify manually")
+    eid = emirates_id_finding(rec.get("emirates_id"))
+    if eid:
+        gaps.append(eid)
+    gaps.extend(mrz_findings(rec.get("mrz")))
     return gaps
 
 
@@ -374,6 +475,7 @@ _EMP_FIELDS = {
     "passport_expiry": re.compile(r"Passport\s*expiry(?:\s*date)?\s*[:\-][ \t]*(.+)", re.IGNORECASE),
     "emirates_id":     re.compile(r"Emirates\s*ID\s*(?:number|no\.?)\s*[:\-][ \t]*(.+)", re.IGNORECASE),
     "eid_expiry":      re.compile(r"EID\s*expiry(?:\s*date)?\s*[:\-][ \t]*(.+)", re.IGNORECASE),
+    "mrz":             re.compile(r"(?:Passport\s*)?MRZ(?:\s*line\s*2)?\s*[:\-][ \t]*(.+)", re.IGNORECASE),
 }
 
 # Demonym → country, so an HR "Nationality: Pakistani" compares against a
@@ -490,6 +592,7 @@ def parse_employee(notes, task_name, today=None):
             "dob": fields["dob"], "gender": fields["gender"],
             "place_of_birth": fields["place_of_birth"],
             "emirates_id": fields["emirates_id"], "eid_expiry": fields["eid_expiry"],
+            "mrz": fields.get("mrz", ""),
             "proof_of_address": "", "pep_status": "",
             "arrangement_role": False, "employee": True,
         }
