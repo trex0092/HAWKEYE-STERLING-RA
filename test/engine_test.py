@@ -3940,6 +3940,42 @@ check("an HR dossier that records the MRZ line gets it verified; a customer bloc
           "SECTION 4 - IDENTIFICATION\nIndividual 1 - Director\nName: Test Person\nNationality: UTO\n"
           "Date of Birth: 12/08/1974\nPassport / ID: L898902C3\nPassport Expiry: 15/04/2032\n"
           "Emirates ID: 784-1974-1234567-1\nMRZ: " + _MRZ2[:-1] + "9\n")["individuals"][0]["cdd_gaps"]))
+# The generated demonym table (data/demonyms.json, from mledoze/countries under
+# ODbL-1.0) extends the hand-written map to every country; the hand map keeps
+# precedence, ambiguous demonyms stay unmapped, and a missing file degrades to
+# the hand map alone (fail-safe: an unmapped nationality keeps the candidate).
+import re as _re_dem
+_dem = kyc.demonym_table()
+_dem_meta = json.load(open(kyc._DEMONYM_DATA_FILE, encoding="utf-8"))["_meta"]
+check("the demonym table loads with its provenance (source commit, SHA-256, ODbL-1.0 licence, attribution)",
+      len(_dem.get("demonyms") or {}) >= 200
+      and _dem_meta["source"] == "mledoze/countries"
+      and _re_dem.fullmatch(r"[0-9a-f]{40}", _dem_meta["commit"]) is not None
+      and _re_dem.fullmatch(r"[0-9a-f]{64}", _dem_meta["sourceSha256"]) is not None
+      and _dem_meta["licence"] == "ODbL-1.0"
+      and "Open Database License" in _dem_meta["attribution"])
+check("a demonym the hand map never met resolves through the table ('Peruvian' -> 'Peru', 'Zimbabwean' -> 'Zimbabwe')",
+      kyc.nationality_country("Peruvian") == "Peru"
+      and kyc.nationality_country("ZIMBABWEAN") == "Zimbabwe"
+      and kyc.nationality_country("Vietnamese / Viet Nam") == "Vietnam")
+check("the hand-written map keeps precedence over the table ('Turkish' -> 'Turkey', 'American' -> 'United States')",
+      kyc.nationality_country("Turkish") == "Turkey"
+      and kyc.nationality_country("American") == "United States"
+      and all(kyc.nationality_country(k) == v for k, v in kyc._DEMONYMS.items()))
+check("a demonym shared by several countries is listed as ambiguous and kept as written ('Congolese')",
+      "congolese" in _dem.get("ambiguous", {})
+      and "congolese" not in _dem.get("demonyms", {})
+      and kyc.nationality_country("Congolese") == "Congolese")
+check("no table value is empty and no table key is also a hand-map key with a different value",
+      all(v for v in _dem["demonyms"].values())
+      and all(_dem["demonyms"].get(k, v) == v or k in kyc._DEMONYMS for k, v in kyc._DEMONYMS.items()))
+_saved_dem, _saved_path = kyc._demonym_data, kyc._DEMONYM_DATA_FILE
+kyc._demonym_data, kyc._DEMONYM_DATA_FILE = None, os.path.join(os.path.dirname(kyc._DEMONYM_DATA_FILE), "no-such-demonyms.json")
+check("without the table the engine degrades to the hand map and keeps unmapped text (fail-safe)",
+      kyc.demonym_table() == {}
+      and kyc.nationality_country("Pakistani") == "Pakistan"
+      and kyc.nationality_country("Peruvian") == "Peruvian")
+kyc._demonym_data, kyc._DEMONYM_DATA_FILE = _saved_dem, _saved_path
 check("proof of address is not raised as a CDD finding for staff; expired documents still are",
       all("proof of address" not in g for i in _emp["individuals"] for g in i["cdd_gaps"])
       and any("expired" in g for g in kyc.parse_employee(

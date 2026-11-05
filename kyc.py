@@ -506,9 +506,39 @@ _DEMONYMS = {
 }
 
 
+_DEMONYM_DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "demonyms.json")
+_demonym_data = None   # lazily loaded: {"demonyms": {...}, "ambiguous": {...}} or {} when unavailable
+
+
+def demonym_table():
+    """The generated demonym table (data/demonyms.json, from mledoze/countries
+    under ODbL-1.0; see scripts/demonyms-from-countries.mjs). The hand-written
+    _DEMONYMS map takes precedence; this table only extends it. A missing or
+    unreadable file degrades to an empty table and says so once on stderr: the
+    engine then behaves exactly as before the table existed, keeping every
+    unmapped nationality as written (which keeps the candidate)."""
+    global _demonym_data
+    if _demonym_data is None:
+        try:
+            with open(_DEMONYM_DATA_FILE, encoding="utf-8") as fh:
+                loaded = json.load(fh)
+            table = loaded.get("demonyms") or {}
+            if not isinstance(table, dict):
+                raise ValueError("demonyms is not an object")
+            _demonym_data = {"demonyms": {str(k).lower(): str(v) for k, v in table.items()},
+                             "ambiguous": loaded.get("ambiguous") or {}}
+        except (OSError, ValueError) as exc:
+            print(f"kyc: demonym table unavailable ({exc.__class__.__name__}: {exc}); "
+                  f"hand-written map only", file=sys.stderr)
+            _demonym_data = {}
+    return _demonym_data
+
+
 def nationality_country(value):
     """Country name for a recorded nationality ("Pakistani" → "Pakistan",
-    "Indian / India" → "India"). Unmapped text is returned unchanged."""
+    "Indian / India" → "India"). The hand-written _DEMONYMS map is consulted
+    first, then the generated table from data/demonyms.json. Unmapped text,
+    including a demonym the table lists as ambiguous, is returned unchanged."""
     raw = _clean(value)
     if not _present(raw):
         return ""
@@ -516,6 +546,11 @@ def nationality_country(value):
         key = _norm(part)
         if key in _DEMONYMS:
             return _DEMONYMS[key]
+    extended = demonym_table().get("demonyms") or {}
+    for part in re.split(r"\s*[/,;]\s*", raw):
+        key = _norm(part)
+        if key in extended:
+            return extended[key]
     for part in re.split(r"\s*[/,;]\s*", raw):
         if _present(part):
             return _clean(part)
