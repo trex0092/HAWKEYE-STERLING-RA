@@ -4366,6 +4366,26 @@ print("hardening — kyc jurisdiction-risk loud degrade")
 # Absent optional file → silent {} (the expected no-op).
 check("kyc: an absent jurisdiction file degrades to {} silently",
       kyc.load_jurisdiction_risk(os.path.join(_hdir, "nope.json")) == {})
+# The default table must not depend on the current directory (an MCP client or job
+# started elsewhere used to get {} and silently lose every HIGH_RISK_GEO alert).
+_jr_root = kyc.load_jurisdiction_risk()
+_jr_cwd = os.getcwd()
+try:
+    os.chdir(_hdir)
+    _jr_elsewhere = kyc.load_jurisdiction_risk()
+finally:
+    os.chdir(_jr_cwd)
+check("kyc: the default jurisdiction table loads the same from any working directory",
+      bool(_jr_root) and _jr_elsewhere == _jr_root and _jr_elsewhere.get("iran") == "high")
+# A MISSING default file (broken install) is loud; an explicitly named absent file stays quiet.
+_jr_saved_path = kyc.JURISDICTION_RISK_PATH
+kyc.JURISDICTION_RISK_PATH = os.path.join(_hdir, "missing-default.json")
+_err = _io.StringIO()
+with _ctx.redirect_stderr(_err):
+    _jr_missing = kyc.load_jurisdiction_risk()
+kyc.JURISDICTION_RISK_PATH = _jr_saved_path
+check("kyc: a missing default jurisdiction file returns {} AND warns loudly",
+      _jr_missing == {} and "WARN" in _err.getvalue() and "not found" in _err.getvalue())
 # Present-but-corrupt file → {} AND a loud stderr warning (a real risk-input loss).
 _bad = os.path.join(_hdir, "bad.json")
 with open(_bad, "w") as _f:

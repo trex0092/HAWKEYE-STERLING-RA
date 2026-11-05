@@ -25,7 +25,7 @@ THRESHOLDS (UAE DPMS context — tune in config):
   • AED 15,000  — CDD trigger for occasional transactions.
 No third-party dependencies. Deterministic. Human (MLRO) reviews & files.
 """
-import os, re, json, math, datetime
+import os, re, json, math, datetime, sys
 from collections import defaultdict
 
 import txn_feed  # stdlib-only validation; never fetches or stores customer data
@@ -247,8 +247,11 @@ def rule_high_risk_counterparty(txns, jurisdiction_table=None):
         try:
             import kyc
             jurisdiction_table = kyc.load_jurisdiction_risk()
-        except Exception:
+        except Exception as exc:
             jurisdiction_table = {}
+            print(f"[txn_monitor] WARN jurisdiction table unavailable "
+                  f"({type(exc).__name__}) - HIGH_RISK_GEO alerts are disabled this run",
+                  file=sys.stderr, flush=True)
     out = []
     for t in txns:
         tier = jurisdiction_table.get(_norm(t.get("counterparty_country")))

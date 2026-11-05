@@ -93,8 +93,12 @@ _ARRANGEMENT_ENTITY_TOKENS = {
 # latest FATF plenary statement. It only NUDGES a deterministic risk score
 # (decision-support); it never decides. Missing/empty file ⇒ no jurisdiction bump
 # (degrade to neutral, logged by the caller).
+# The default is resolved from this module's own location, never from the current
+# directory: an MCP client or a scheduled job that starts the engine from another
+# directory used to load an empty table and silently drop every jurisdiction alert.
 JURISDICTION_RISK_PATH = os.environ.get(
-    "JURISDICTION_RISK_PATH", "data/jurisdiction-risk.json")
+    "JURISDICTION_RISK_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "jurisdiction-risk.json"))
 
 # Common short/variant spellings for entries the maintained list stores under
 # the app baseline's FORMAL names ({alias: listed name}, both in _norm form).
@@ -148,6 +152,11 @@ def load_jurisdiction_risk(path=None):
     spellings (_JURISDICTION_ALIASES) resolve to their listed entry's tier."""
     p = path or JURISDICTION_RISK_PATH
     if not os.path.exists(p):
+        if path is None:
+            # The default file ships in the repository: its absence is a broken
+            # install or a wrong JURISDICTION_RISK_PATH, not an optional no-op.
+            _warn(f"jurisdiction-risk file '{p}' not found - jurisdiction risk "
+                  "bump and HIGH_RISK_GEO alerts are disabled this run")
         return {}
     try:
         with open(p) as f:
