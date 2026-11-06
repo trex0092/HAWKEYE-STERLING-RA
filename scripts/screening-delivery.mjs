@@ -319,6 +319,20 @@ async function uploadAttachment(parent, name, text, type) {
   return data?.data?.gid;
 }
 
+/* The request function handed to publishDailyScreening. Two rules, both about not
+ * creating a second card or evidence page when Asana already committed the first:
+ *  - a write (anything but GET) is never repeated after a network failure or a 5xx,
+ *    because the first attempt may have committed (a confirmed 429 still retries);
+ *  - no signal is created here: asana() gives every attempt its own timeout. A single
+ *    signal made once per call is already expired when the retry starts, so a slow
+ *    first response left no real retry for reads. */
+export function deliveryRequest(asanaFn) {
+  return (path, options = {}) => asanaFn(path, {
+    ...options,
+    noRetryOnUnknownOutcome: String(options.method || 'GET').toUpperCase() !== 'GET',
+  });
+}
+
 async function main() {
   if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN is required for daily results delivery');
   const read = file => JSON.parse(readFileSync(file, 'utf8'));
@@ -329,7 +343,7 @@ async function main() {
     state: read('data/sanctions-screen-state.json'),
     runId: process.env.GITHUB_RUN_ID,
     assignee: process.env.ASANA_CASE_ASSIGNEE_GID || '1213645083721304',
-    request: (path, options = {}) => asana(path, { ...options, signal: globalThis.AbortSignal.timeout(30000) }),
+    request: deliveryRequest(asana),
     upload: uploadAttachment,
   });
   writeFileSync('screening-delivery-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
