@@ -107,7 +107,13 @@ const incompletePep = makePep();
 incompletePep.sourceUnscreenable = ['synthetic-unlabelled-QID'];
 checked = assess(makeResults(), incompletePep);
 assert.equal(checked.operational, true, 'PEP identity exception is tracked separately');
-assert.equal(checked.sourceQuality.assured, false, 'unscreenable public-office records block full assurance');
+assert.equal(checked.sourceQuality.assured, true, 'a handful of nameless public-office records is a disclosed warning, not a blocker');
+assert(checked.domains.pep.warnings.some(x => x.includes('source item')), 'the nameless records stay disclosed');
+
+const manyUnscreenable = makePep();
+manyUnscreenable.sourceUnscreenable = Array.from({ length: 5000 }, (_, i) => 'Q' + i);
+checked = assess(makeResults(), manyUnscreenable);
+assert.equal(checked.sourceQuality.assured, false, 'an unusually large nameless share still blocks assurance');
 assert(checked.sourceQuality.reasons.some(x => x.includes('PEP source records')));
 
 const oldEvidence = assess();

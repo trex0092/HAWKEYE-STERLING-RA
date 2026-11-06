@@ -79,6 +79,12 @@ function domain(ok, reasons, evidence, warnings = []) {
   return { operational: !!ok, reasons: reasons.filter(Boolean), warnings: warnings.filter(Boolean), evidence };
 }
 
+/* Largest number of nameless live PEP source items tolerated as a disclosed
+   warning: 0.1% of the source population, never fewer than 25. */
+export function pepUnscreenableLimit(sourceTotal) {
+  return Math.max(25, Math.floor(num(sourceTotal) * 0.001));
+}
+
 export function assessRuntime({
   results,
   pepDataset,
@@ -300,7 +306,14 @@ export function assessRuntime({
     if (num(failed) > 0) sourceQualityReasons.push('adverse-media backbone failures: ' + name + '=' + num(failed));
   }
   if (num(e.amPartial) > 0) sourceQualityReasons.push('adverse-media subjects with reduced source redundancy: ' + num(e.amPartial));
-  if (pepSourceUnscreenable.length) sourceQualityReasons.push('PEP source records without screenable identity: ' + pepSourceUnscreenable.length);
+  /* A Wikidata item that exists but carries no label, alias, sitelink or name
+     claim has no identity a screening can match against, and it is already
+     excluded from the denominator, so no screenable person is missed. A handful
+     of them stays a disclosed warning (see pepWarnings). Only an unusually
+     large share, which would point at a harvest fault, blocks assurance. */
+  if (pepSourceUnscreenable.length > pepUnscreenableLimit(pepSourceExpected || pepExpected || pepCount)) {
+    sourceQualityReasons.push('PEP source records without screenable identity: ' + pepSourceUnscreenable.length);
+  }
   const sourceQuality = {
     assured: sourceQualityReasons.length === 0,
     reasons: sourceQualityReasons,
