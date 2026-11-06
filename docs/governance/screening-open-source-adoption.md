@@ -40,6 +40,7 @@ All 12 capabilities are implemented without adding a runtime dependency. The mai
 7. The yente comparison remains shadow/benchmark-only; it is not the operative matcher.
 8. opensanctions/rigour (MIT) is benchmark-only too: `.github/workflows/arabic-name-bench.yml` measures its cross-script name symbols on UN Latin/Arabic gold pairs. It is installed only in that CI job (its dependency python-stdnum is LGPL-2.1, used unmodified as a library) and is never imported by the engine.
 9. moov-io/watchman (Apache-2.0) is a second shadow benchmark engine beside yente: `.github/workflows/watchman-bench.yml` scores it on the repo's own fixtures with no government list loaded. It is not the operative matcher.
+10. The graph idea behind networkx (BSD-3-Clause, row 20 of the 4 November 2026 candidate note) is answered without the dependency: `.github/workflows/related-party-graph.yml` runs `scripts/related-party-graph.py`, a standard-library breadth-first search over customers and their owners. It shows chains of shared owners and the customers within a few links of a flagged customer, which the live pairwise check (`ai.related_parties`) cannot. It uses the same name folding as the live check, is dispatch-only, reads a book file in the repository (a synthetic fixture by default) and changes no screening result.
 
 ## Licensing and supply-chain boundary
 
