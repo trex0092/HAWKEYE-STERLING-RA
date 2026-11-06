@@ -24,11 +24,8 @@
    Needs the runner's GITHUB_TOKEN (actions:read). Asana delivery retired 2026-11-06:
    the report is published in the workflow run's job summary. */
 
-/* Shared Asana client: bounded retry on 429/5xx so a transient blip never
-   drops the day's report (idempotency is by title-prefix check in main). */
-import { SECTIONS, requireApprovedSection } from './asana-sections.mjs';
+import { SECTIONS } from './asana-sections.mjs';
 import { readFileSync, appendFileSync } from 'node:fs';
-import { asana } from './asana-notify.mjs';
 
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
@@ -40,7 +37,6 @@ export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '12162033706
    time; while no live gid was registered (#701/#703) these reports were filed
    under "Regulatory Changes". */
 export const GOV_SECTION_NAME = SECTIONS.governance.name;
-const GOV_SECTION_GID = process.env.ASANA_GOV_SECTION_GID || '';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export function dateLabel(d) { return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
@@ -304,27 +300,6 @@ async function countAlerts(repo, token, kind) {
     const d = await gh('/repos/' + repo + '/' + kind + '/alerts?state=open&per_page=100', token);
     return Array.isArray(d) ? (d.length === 100 ? '100+' : d.length) : null;
   } catch { return null; }
-}
-
-async function listTaskNames(projectGid) {
-  const names = [];
-  const base = '/projects/' + projectGid + '/tasks?limit=100&opt_fields=name';
-  let path = base;
-  while (path) {
-    const d = await asana(path);
-    for (const t of (d.data || [])) names.push(String(t.name || ''));
-    path = d.next_page ? base + '&offset=' + d.next_page.offset : null;
-  }
-  return names;
-}
-
-/* The governance section is pinned to an approved destination: never resolve
-   it by name and never create a section in the monitoring project. An
-   unapproved override is refused (the caller logs it; the task itself is still
-   created) instead of being honoured or recreated. */
-async function ensureSection(projectGid) {
-  const section = GOV_SECTION_GID || SECTIONS.governance.gid;
-  return requireApprovedSection(projectGid, section);
 }
 
 function runUrl() {
