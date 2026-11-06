@@ -137,7 +137,7 @@ export function makeApi({ repo, token, fetchImpl = fetch, wait = sleep }) {
 }
 
 /* MORNING DISPATCH — the on-time start for the daily screening, so its results
- * are in Asana before 09:00 UAE (05:00 UTC). GitHub starts this repo's
+ * are in Asana before 08:00 UAE (04:00 UTC). GitHub starts this repo's
  * scheduled runs 4-6h late (sanctions-screen's 05:37 slot started 09:41-11:57
  * UTC, 19-30 Sep 2026) and drops most firings of a frequent cron, but a
  * workflow_dispatch starts at once. screening-morning-dispatch.yml is
@@ -230,9 +230,9 @@ async function morning() {
 /* DEADLINE GUARD -- the dispatch above is only an on-time START. A screen run
  * killed mid-flight (12 of 18 sampled attempts of the daily run, Sep 2026) was
  * healed only by Control Retry, whose own cron GitHub starts 4-6h late: the
- * report then reached Asana around midday UTC, hours after 09:00 UAE. The guard
- * job starts right after the dispatch, watches both screens until the 05:00 UTC
- * (09:00 UAE) deadline, re-dispatches a screen whose run ended without its
+ * report then reached Asana around midday UTC, hours after 08:00 UAE. The guard
+ * job starts right after the dispatch, watches both screens until the 04:00 UTC
+ * (08:00 UAE) deadline, re-dispatches a screen whose run ended without its
  * evidence (bounded), and fails red -- alerting in Asana -- when the deadline
  * passes without full delivery. Evidence, never run state alone:
  *   - weekly-adverse-media.yml: today's Daily AML/CFT Screening Report WITH both
@@ -242,7 +242,7 @@ async function morning() {
  *   - sanctions-screen.yml: a successful run today (its delivery gates fail the
  *     run when Asana delivery fails).
  * guardStep / guardWindow / guardVerdict are pure and offline-tested. */
-export const GUARD_DEADLINE_UTC_MIN = 5 * 60;        // 05:00 UTC = 09:00 UAE
+export const GUARD_DEADLINE_UTC_MIN = 4 * 60;        // 04:00 UTC = 08:00 UAE
 export const GUARD_POLL_MS = 10 * 60000;
 export const GUARD_MAX_REDISPATCH = 2;               // per screen per day
 export const GUARD_DISPATCH_GRACE_MS = 15 * 60000;   // a dispatch not listed as a run by then was lost
@@ -292,8 +292,8 @@ export function guardVerdict(states, deadlineMs) {
   const degraded = states.filter(s => s.degraded);
   const note = degraded.length ? `; coverage DEGRADED (delivered, but the run failed its runtime-assurance gate): ${degraded.map(s => s.id).join(', ')}` : '';
   if (missing.length) return { ok: false, degraded: degraded.length > 0, reason: `not delivered: ${missing.map(s => s.id).join(', ')}${note}` };
-  if (late.length) return { ok: false, degraded: degraded.length > 0, reason: `delivered AFTER 09:00 UAE: ${late.map(s => s.id).join(', ')}${note}` };
-  return { ok: true, degraded: degraded.length > 0, reason: `every screen evidenced delivery before 09:00 UAE${note}` };
+  if (late.length) return { ok: false, degraded: degraded.length > 0, reason: `delivered AFTER 08:00 UAE: ${late.map(s => s.id).join(', ')}${note}` };
+  return { ok: true, degraded: degraded.length > 0, reason: `every screen evidenced delivery before 08:00 UAE${note}` };
 }
 
 /* Sanctions Screen delivery evidence from today's runs (newest first). A run
@@ -370,7 +370,7 @@ async function guard() {
   }
   const verdict = guardVerdict(states, deadlineMs);
   const cell = value => String(value).replaceAll('|', '/').replace(/[\r\n]/g, ' ');
-  const report = [`# 09:00 UAE deadline guard -- ${day}`, '', `**${verdict.ok ? 'OK' : 'FAILED'}:** ${verdict.reason}`, '',
+  const report = [`# 08:00 UAE deadline guard -- ${day}`, '', `**${verdict.ok ? 'OK' : 'FAILED'}:** ${verdict.reason}`, '',
     '| Workflow | Delivered at (UTC) | Re-dispatches | Last observation |', '| --- | --- | --- | --- |',
     ...states.map(s => `| ${cell(s.id)} | ${Number.isFinite(s.doneAtMs) ? new Date(s.doneAtMs).toISOString().slice(11, 16) : 'NOT delivered'} | ${s.redispatches} | ${cell(s.last)} |`), ''].join('\n');
   console.log(report);
@@ -581,17 +581,17 @@ export async function selfTest() {
   assert.equal(morningDecision([r({ created_at: '2026-10-02T01:00:00Z', event: 'push' })], target).action, 'dispatch');
   assert.equal(morningDecision(null, target).action, 'unknown');
   assert.deepEqual(MORNING_CONTROLS, ['sanctions-screen.yml', 'weekly-adverse-media.yml']);
-  // Deadline guard: supervises from the dispatch to 05:00 UTC (09:00 UAE).
+  // Deadline guard: supervises from the dispatch to 04:00 UTC (08:00 UAE).
   const day2 = Date.parse('2026-10-02T00:00:00Z');
-  const deadline = day2 + 5 * 3600000;
-  assert.equal(guardWindow(day2 + 5 * 60000, day2).endMs, deadline, 'an on-time guard watches until 09:00 UAE');
+  const deadline = day2 + 4 * 3600000;
+  assert.equal(guardWindow(day2 + 5 * 60000, day2).endMs, deadline, 'an on-time guard watches until 08:00 UAE');
   assert.equal(guardWindow(day2 + 6 * 3600000, day2).endMs, day2 + 6 * 3600000 + GUARD_LATE_START_MS,
     'a guard started after the deadline still supervises the recovery');
   assert.ok(guardWindow(day2 - 3600000, day2).endMs - (day2 - 3600000) <= GUARD_MAX_RUN_MS, 'never outlives the job');
   const g = (runs, extra = {}) => guardStep(runs, { targetDayMs: day2, nowMs: day2 + 2 * 3600000, delivered: false, ...extra }).action;
   const failedToday = r({ created_at: '2026-10-02T00:05:30Z', conclusion: 'failure' });
   assert.equal(g([failedToday], { delivered: true }), 'done', 'evidence wins over a red run (EOCN gate)');
-  assert.equal(g([failedToday]), 'redispatch', 'a killed run without evidence is re-dispatched before 09:00 UAE');
+  assert.equal(g([failedToday]), 'redispatch', 'a killed run without evidence is re-dispatched before 08:00 UAE');
   assert.equal(g([failedToday], { delivered: null }), 'unknown', 'unreadable evidence never triggers a blind dispatch');
   assert.equal(g([r({ created_at: '2026-10-02T00:05:30Z', status: 'in_progress', conclusion: null })]), 'wait');
   assert.equal(g([failedToday], { redispatches: GUARD_MAX_REDISPATCH }), 'exhausted', 'bounded');

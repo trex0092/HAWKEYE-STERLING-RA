@@ -67,7 +67,7 @@ management review; failures surface via the monitoring/escalation path.
 ## §Communication — internal & external AI communication process (closes item 12)
 
 - **To the MLRO (daily, operational):** the unified screening report delivered to
-  Asana by 09:00 UAE — findings, module statuses, monitoring, QA gate,
+  Asana by 08:00 UAE — findings, module statuses, monitoring, QA gate,
   attestation, sign-off block. Escalations additionally as MLRO case subtasks.
 - **To engineering/ops (event-driven):** GitHub issues opened by the watchers
   (anomaly-watch, link-check, sanctions/reg watch fallbacks) — each now closes

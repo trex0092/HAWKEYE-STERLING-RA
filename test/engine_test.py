@@ -7202,6 +7202,12 @@ check("regulator bulletins: an Atom entry is read with its title, link and date"
       len(_rb_items2) == 1 and _rb_items2[0]["url"] == "http://x/1"
       and _rb_items2[0]["date"] == "2026-11-01" and "bullion street" in _rb_items2[0]["text"])
 
+# The MLRO's daily delivery deadline is 08:00 UAE time = 04:00 UTC.
+check("delivery target: the default is 04:00 UTC (08:00 UAE) unless the environment overrides it",
+      screen.DELIVERY_TARGET_UTC == os.environ.get("DELIVERY_TARGET_UTC", "04:00"))
+check("delivery target: the weekly-adverse-media workflow default matches (04:00 UTC)",
+      "vars.DELIVERY_TARGET_UTC || '04:00'" in open(".github/workflows/weekly-adverse-media.yml", encoding="utf-8").read())
+
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
     sys.exit(1)

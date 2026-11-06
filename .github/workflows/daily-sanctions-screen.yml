@@ -19,7 +19,7 @@ name: Daily Sanctions Screening
 on:
   # RETIRED (schedule removed): superseded by the single unified "Daily Screening
   # (Sanctions + Adverse Media + PEP)" workflow (weekly-adverse-media.yml,
-  # RUN_MODE=unified), delivered daily by 09:00 UAE. Kept as manual-only so it can
+  # RUN_MODE=unified), delivered daily by 08:00 UAE. Kept as manual-only so it can
   # still be re-run on demand; no longer posts a duplicate daily task. Its
   # screening step now runs through the REAL engine matcher (screen.py
   # screen_name) — the weak inline top-3 token_sort matcher it used to carry
