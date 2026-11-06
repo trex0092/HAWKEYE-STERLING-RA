@@ -893,8 +893,29 @@ _server = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mcp_se
 # tool cache and finds its shared library through LD_LIBRARY_PATH). Every other
 # variable, including any ASANA_ / ANTHROPIC_ credential, is deliberately left out.
 _child_env = {k: v for k, v in os.environ.items()
-              if k in ("PATH", "LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH", "HOME",
+              if k in ("PATH", "LD_LIBRARY_PATH", "PYTHONHOME", "HOME",
                        "TMPDIR", "LANG", "LC_ALL", "SYSTEMROOT")}
+_child_env["ASANA_TOKEN"] = "dummy"   # placeholder the engine requires at import; not a credential
+# This CI job installs no third-party packages (the file stubs them in-process at the
+# top). The child process cannot see those in-process stubs, so write the same three
+# shims to a scratch directory and put it on the child's path, only for a package that
+# is not installed, so a machine with the real packages exercises the real ones.
+import importlib.machinery
+_stubdir = tempfile.mkdtemp(prefix="mcp-smoke-stubs-")
+_stub_src = {
+    "requests": "utils = type('U', (), {'quote': staticmethod(lambda s: s)})()\n"
+                "def get(*a, **k): return None\n"
+                "def post(*a, **k): return None\n",
+    "pdfplumber": "",
+    "rapidfuzz": "import difflib\n"
+                 "def _r(a, b): return difflib.SequenceMatcher(None, ' '.join(sorted(a.split())), ' '.join(sorted(b.split()))).ratio() * 100\n"
+                 "class fuzz:\n    token_sort_ratio = staticmethod(_r)\n    token_set_ratio = staticmethod(_r)\n",
+}
+for _mod, _src in _stub_src.items():
+    if importlib.machinery.PathFinder.find_spec(_mod) is None:   # sys.path only: ignores this file's in-process stubs
+        with open(os.path.join(_stubdir, _mod + ".py"), "w") as _f:
+            _f.write(_src)
+_child_env["PYTHONPATH"] = _stubdir
 with tempfile.TemporaryDirectory() as _elsewhere:
     _proc = subprocess.run(
         [sys.executable, os.path.abspath(_server)],
@@ -903,6 +924,8 @@ with tempfile.TemporaryDirectory() as _elsewhere:
         env=_child_env)
 if _proc.returncode != 0:   # evidence for a failing run: why the child died
     print("  (child exit code %s; stderr tail: %s)" % (_proc.returncode, _proc.stderr[-400:].strip()))
+import shutil
+shutil.rmtree(_stubdir, ignore_errors=True)
 _out_lines = [x for x in _proc.stdout.splitlines() if x.strip()]
 try:
     _frames_real = [json.loads(x) for x in _out_lines]
