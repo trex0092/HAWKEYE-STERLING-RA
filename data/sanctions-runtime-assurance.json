@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-05T14:30:11.405Z",
-  "githubRunId": "42045439948",
+  "generatedAt": "2026-11-06T01:47:09.623Z",
+  "githubRunId": "42145995164",
   "commit": "74b208b84d2367f80550d8504b833c361b43c52b",
   "screenedSubjects": 991,
   "sourceProjects": {
@@ -48,7 +48,7 @@
       {
         "id": "ofac-sdn",
         "name": "US OFAC — SDN list (CSV)",
-        "count": 19480,
+        "count": 19536,
         "partial": false
       },
       {
@@ -60,7 +60,7 @@
       {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
-        "count": 22902,
+        "count": 22920,
         "partial": false
       }
     ],
