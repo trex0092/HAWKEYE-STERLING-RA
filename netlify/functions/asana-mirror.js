@@ -136,20 +136,34 @@ const handle = async (event) => {
   catch (e) { return resp(400, { ok: false, error: 'invalid JSON' }); }
 
   const project = process.env.ASANA_PROJECT_GID || DEFAULT_PROJECT_GID;
-  const action = payload.action === 'read' ? 'read' : 'write';
+  /* The action must be named exactly. Anything else (a typo, a missing field, an
+     empty body) used to fall through to a WRITE, and a write with no register
+     replaced the off-device backup with an empty one. Refuse instead. */
+  const action = payload && payload.action;
+  if (action !== 'read' && action !== 'write') {
+    return resp(400, { ok: false, error: "action must be 'read' or 'write'" });
+  }
 
   try {
     if (action === 'read') {
       const reg = await findTask(token, project, REG_TASK);
       const log = await findTask(token, project, LOG_TASK);
-      return resp(200, {
-        ok: true,
-        register: reg ? (parseSheet(reg.notes) || []) : [],
-        audit: log ? (parseSheet(log.notes) || []) : []
-      });
+      /* A task that does not exist is "no backup yet" (empty). A task that exists
+         but cannot be parsed (edited, truncated) is NOT an empty backup: say so, so
+         the Console reports a failed refresh instead of an all-clear. */
+      const regRows = reg ? parseSheet(reg.notes) : [];
+      const logRows = log ? parseSheet(log.notes) : [];
+      if (!Array.isArray(regRows) || !Array.isArray(logRows)) {
+        return resp(502, { ok: false, error: 'backup note in Asana is unreadable (edited or truncated)' });
+      }
+      return resp(200, { ok: true, register: regRows, audit: logRows });
     }
 
-    /* write */
+    /* write: both lists must be present. A body without them is not a backup. */
+    const registerOk = Array.isArray(payload.register) || (payload.register && typeof payload.register === 'object');
+    if (!registerOk || !Array.isArray(payload.audit)) {
+      return resp(400, { ok: false, error: 'write requires a register and an audit list' });
+    }
     const register = normalizeRegister(payload.register);
     const audit = normalizeAudit(payload.audit);
     const regNotes = buildNotes('assessment register', register);
