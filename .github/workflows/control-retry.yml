@@ -98,14 +98,14 @@ jobs:
             sourceQuality: { assured: true, reasons: [], evidence: {
               sanctionsFloors: [{ id: 'fixture', minimum: 1, observed: 1, primaryComplete: true }],
               fallbackSourcesUsed: [], adverseMediaPartialSubjects: 0, pepUnscreenableSourceRecords: 0,
-              adverseMediaBackboneFailures: { googleNews: 0, gdelt: 0, bing: 0 } } },
+              adverseMediaBackboneFailures: { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 } } },
             domains: {
               sanctions: { operational: true, evidence: { sourcePopulation: {
                 customer: { projectGid: '1214107620220121', screenedSubjects: 971 },
                 employee: { projectGid: '1216239131596624', screenedSubjects: 20 } } } },
               adverseMedia: { operational: true, evidence: { screenedSubjects: 991, skippedSubjects: 0,
-                partialSubjects: 0, globalBackbones: ['Google News RSS', 'GDELT global index', 'Bing News'],
-                backboneFailures: { googleNews: 0, gdelt: 0, bing: 0 } } },
+                partialSubjects: 0, globalBackbones: ['Google News RSS', 'GDELT global index', 'Bing News', 'Yahoo News'],
+                backboneFailures: { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 } } },
               pep: { operational: true, evidence: { sourceUnscreenable: [] } } } };
           const producer = { ...run, id: 123, head_sha: expectedSha, path: '.github/workflows/sanctions-screen.yml' };
           const verify = () => qualifyEvidence(fixture, producer, expectedSha,
