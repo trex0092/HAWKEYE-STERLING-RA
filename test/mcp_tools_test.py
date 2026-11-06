@@ -83,6 +83,48 @@ expect_valueerror("screen_name refuses a watchlist with no screenable entry",
                   lambda: mcp_tools.screen_name("Viktor Bout", ["  ", "!!!"]))
 
 # ── mcp_tools.monitor_transactions (FATF R.16 boundaries) ───────────────────────
+print("mcp_tools — a long-lived server must not accumulate per-call screening indexes")
+import screen as _scr
+# The index caches are only filled when rapidfuzz is installed (the production
+# engine); this suite stubs it. Wrap the matcher so every call also builds the two
+# indexes exactly as the real prefilter does, then count what is left behind.
+_real_screen_name = _scr.screen_name
+def _indexing_screen_name(name, all_lists):
+    for _ents in all_lists.values():
+        _scr._entry_norms(_ents)
+        _scr._phonetic_postings(_ents)
+    return _real_screen_name(name, all_lists)
+_n0, _p0 = len(_scr._NORMS_CACHE), len(_scr._PHON_IDX_CACHE)
+_scr.screen_name = _indexing_screen_name
+try:
+    for _i in range(120):
+        mcp_tools.screen_name("Hamid Al Ali", ["HAMID ALI", "SOME OTHER CO %d" % _i])
+        mcp_tools.screen_payment(["HAMID ALI"], parties=[{"role": "beneficiary", "name": "Hamid Al Ali", "country": "AE"}])
+finally:
+    _scr.screen_name = _real_screen_name
+check("120 screen_name and 120 screen_payment calls leave the index caches the size they were",
+      (len(_scr._NORMS_CACHE), len(_scr._PHON_IDX_CACHE)) == (_n0, _p0))
+check("the screening result is unchanged by releasing the cache",
+      mcp_tools.screen_name("Petropars International FZE", ["PETROPARS INTERNATIONAL FZE"])["hit_count"] == 1)
+_saved_max = _scr.INDEX_CACHE_MAX
+try:
+    _scr.INDEX_CACHE_MAX = 8
+    _keep = []
+    for _i in range(40):                       # a caller that never releases, as a library user might
+        _e = [(_scr.normalize("Name Number %d" % _i), "Name Number %d" % _i)]
+        _keep.append(_e)
+        _scr._entry_norms(_e)                  # the two builders directly, so the check does
+        _scr._phonetic_postings(_e)            # not depend on which matcher path a run takes
+    check("past INDEX_CACHE_MAX the oldest indexes are dropped (40 lists, limit 8)",
+          len(_scr._NORMS_CACHE) == 8 and len(_scr._PHON_IDX_CACHE) == 8)
+    check("the newest list keeps its index, so a run in progress never rebuilds what it just built",
+          id(_keep[-1]) in _scr._NORMS_CACHE and id(_keep[-1]) in _scr._PHON_IDX_CACHE
+          and id(_keep[0]) not in _scr._NORMS_CACHE)
+finally:
+    _scr.INDEX_CACHE_MAX = _saved_max
+    for _e in _keep:
+        _scr.release_entry_caches(_e)
+
 print("mcp_tools — monitor_transactions")
 def _tx(*amts, method="cash"):
     return [{"customer": "C", "date": f"2026-01-{i+1:02d}", "amount": a, "direction": "in", "method": method}
