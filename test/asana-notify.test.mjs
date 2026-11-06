@@ -997,8 +997,10 @@ check('a sectionless mirror still joins the project',
     ['PRODUCTION DRIFT: the live site is serving an older build than main', 'WORKFLOW RECOVERY BLOCKED: a registered control needs intervention',
       'CONTROL STALE: a mandatory scheduled compliance control missed its cadence window', 'FUNCTION DOWN: Netlify functions failed health check',
       'ADVISOR DEPENDENCY DOWN: upstream model unavailable', 'SITE DOWN: hawkeye-sterling-ra.netlify.app failed its health check',
-      'CODE SCAN FAILED: HAWKEYE STERLING CodeQL run could not complete', 'DAILY SCREENING NOT FULLY DELIVERED BY 08:00 UAE (2026-10-03)',
-      'MORNING SCREENING DISPATCH FAILED: today\'s screening may reach Asana after 08:00 UAE'].every(t => alertSection(t) === S.governance.gid));
+      'CODE SCAN FAILED: HAWKEYE STERLING CodeQL run could not complete'].every(t => alertSection(t) === null && isPlatformAlert(t)));
+  check('screening delivery and dispatch failures stay with Screening Adverse Media & PEP\u2019s Update',
+    ['DAILY SCREENING NOT FULLY DELIVERED BY 08:00 UAE (2026-10-03)',
+      'MORNING SCREENING DISPATCH FAILED: today\'s screening may reach Asana after 08:00 UAE'].every(t => alertSection(t) === S.media.gid && !isPlatformAlert(t)));
   check('screening, document and list/law alerts keep their own sections',
     alertSection('SCREENING ASSURANCE DEGRADED: worldwide sanctions / adverse media / PEP evidence failed') === S.media.gid
     && alertSection('DAILY SCREENING REPORT NOT FULLY DELIVERED FOR A DUE DAY -- mandatory sanctions/PEP/adverse-media obligation') === S.media.gid

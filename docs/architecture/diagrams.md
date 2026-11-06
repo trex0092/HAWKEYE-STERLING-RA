@@ -117,7 +117,6 @@ Why every action is defensible.
 flowchart LR
     ACT[Any action:<br/>score · override · role · complete] --> LOG[Hash-chained activity log<br/>tamper-evident, encrypted]
     LOG --> MIR[Asana mirror<br/>register + log backup]
-    MIR --> REC[asana-reconcile<br/>drift check, PII-free]
     LOG --> DEL[Delivery outcome<br/>asana.delivery.ok / failed]
     DEL --> RETRY[Failed → retry-all queue]
 ```
