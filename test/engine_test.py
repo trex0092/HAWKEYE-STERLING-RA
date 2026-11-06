@@ -7264,6 +7264,50 @@ check("delivery target: the default is 04:00 UTC (08:00 UAE) unless the environm
 check("delivery target: the weekly-adverse-media workflow default matches (04:00 UTC)",
       "vars.DELIVERY_TARGET_UTC || '04:00'" in open(".github/workflows/weekly-adverse-media.yml", encoding="utf-8").read())
 
+# ── cross-list reconciliation (experimental, shadow-only, standard library) ───
+print("\nscripts/cross-list-reconcile.py — declared counts and overlaps")
+import tempfile
+_clr_spec = importlib.util.spec_from_file_location("cross_list_reconcile", os.path.join(ROOT, "scripts", "cross-list-reconcile.py"))
+_clr = importlib.util.module_from_spec(_clr_spec)
+_clr_spec.loader.exec_module(_clr)
+check("reconcile fold: word order, case, accents and punctuation do not hide a match",
+      _clr.fold("AL-ALI, Hamid") == _clr.fold("hamíd al ali"))
+check("reconcile fold: an Arabic name folds to itself, never to nothing",
+      _clr.fold("يوسف عبد الله") != "")
+check("reconcile fold: a blank or missing name folds to nothing", _clr.fold(None) == "" and _clr.fold("  ") == "")
+with tempfile.TemporaryDirectory() as _clr_dir:
+    def _clr_put(name, doc):
+        with open(os.path.join(_clr_dir, name), "w", encoding="utf-8") as f:
+            json.dump(doc, f)
+    for _lbl, (_fn, _rd) in _clr.LISTS.items():
+        _clr_put(_fn, {"count": 0, "entries": []})
+    _clr_put("bh-gazette-curated-list.json", {"count": 2, "entries": [
+        {"ref": "B1", "type": "x", "name": "Hamid AL-ALI"}, {"ref": "B2", "type": "x", "name": "Other Person"}]})
+    _clr_put("eocn-local-terrorist-list.json", {"count": 2, "entries": [
+        "ali, hamid al", {"name": "Third Name", "aliases": ["Other Person"]}]})
+    _clr_put("ci-centif-curated-list.json", {"count": 2, "entries": [
+        {"ref": "C1", "name": "Moussa Sangare"}, {"ref": "C2", "name": "SANGARE Moussa"}]})
+    _clr_rows, _clr_status = _clr.load(_clr_dir)
+    _clr_res = _clr.reconcile(_clr_rows)
+    check("reconcile: counts agree, so no list is flagged", not [s for s in _clr_status if s["problem"]])
+    check("reconcile: strings and objects both load (a string entry is a name)",
+          sum(1 for r in _clr_rows if r[0] == "UAE Local Terrorist List") == 3)
+    check("reconcile: a name in two lists is found even when the word order differs",
+          {a[0] for a in _clr_res["across"]} == {_clr.fold("Hamid Al-Ali"), _clr.fold("Other Person")})
+    check("reconcile: the same name under two references in one list is reported",
+          [(w[0], w[2]) for w in _clr_res["within"]] == [("Cote d'Ivoire CENTIF list", 2)])
+    _clr_put("bh-gazette-curated-list.json", {"count": 3, "entries": [{"ref": "B1", "name": "Hamid AL-ALI"}]})
+    _, _clr_bad = _clr.load(_clr_dir)
+    check("reconcile: a list holding fewer entries than it declares fails loudly",
+          [s["problem"] for s in _clr_bad if s["problem"]] == ["declares 3 entries but holds 1"])
+    os.remove(os.path.join(_clr_dir, "ma-cnasnu-curated-list.json"))
+    _, _clr_gone = _clr.load(_clr_dir)
+    check("reconcile: a missing list file fails loudly, not silently",
+          any("cannot read" in s["problem"] for s in _clr_gone))
+_clr_real, _clr_real_status = _clr.load(os.path.join(ROOT, "data"))
+check("reconcile: every committed list holds exactly the entries it declares",
+      not [s for s in _clr_real_status if s["problem"]])
+
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
     sys.exit(1)

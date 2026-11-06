@@ -1,0 +1,63 @@
+name: Cross-list reconciliation
+
+# EXPERIMENTAL, shadow-only, dispatch-only, standard library only. This is a
+# reporting instrument, not a control.
+#
+# What it does: loads every committed national list in data/ into an in-memory
+# SQLite database (the SQLite that ships with Python) and reports (1) whether each
+# list holds as many entries as it declares, (2) names found in more than one list,
+# and (3) names repeated inside one list under different reference numbers. It is
+# the question DuckDB would answer (row 27 of the candidate note) with no dependency.
+#
+# Scope: reads only files already in the repository. No data is downloaded and
+# nothing touches screening state, cases or Asana. A match is a lead for the MLRO,
+# never a finding. The run fails (red) only when a list file is missing, unreadable
+# or holds a different number of entries than it declares.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            *.githubapp.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Build the report
+        run: |
+          set +e
+          python3 scripts/cross-list-reconcile.py data
+          rc=$?
+          cat cross-list-reconcile-report.md >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cross-list-reconcile-report
+          path: cross-list-reconcile-report.md
+          if-no-files-found: ignore
+          retention-days: 30
