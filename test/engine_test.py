@@ -982,6 +982,27 @@ SECTION 5 — PF
 _k = kyc.parse_customer(_NOTE, today=_dt.date(2026, 6, 29))
 check("kyc parses structured individuals", len(_k["individuals"]) == 2 and _k["individuals"][0]["name"] == "Huseyin Kursat Yamac")
 check("kyc parses DOB / nationality / share%", _k["individuals"][0]["nationality"] == "Turkey" and _k["individuals"][0]["share_pct"] == 100.0)
+import datetime as _kdt
+check("kyc dates: common day-first spellings parse (05 Jan 2020, 05-01-2020, 05.01.2020, 2020/01/05)",
+      all(kyc.parse_date(x) == _kdt.date(2020, 1, 5)
+          for x in ("05 Jan 2020", "05-01-2020", "05.01.2020", "2020/01/05", "January 5 2020", "5 Jan, 2020")))
+check("kyc dates: an ISO timestamp and 'Sept' are read",
+      kyc.parse_date("2020-01-05T00:00:00Z") == _kdt.date(2020, 1, 5)
+      and kyc.parse_date("Sept 5, 2020") == _kdt.date(2020, 9, 5))
+check("kyc dates: ambiguous or impossible dates stay unreadable (a loud gap), never guessed",
+      kyc.parse_date("05/01/20") is None and kyc.parse_date("12/25/2020") is None
+      and kyc.parse_date("31 Feb 2020") is None)
+check("kyc: an unreadable expiry is still a gap, a now-readable expired one is an expired gap",
+      any("unreadable" in g for g in kyc.cdd_gaps({"id_number": "X1", "passport_expiry": "05/01/20"}))
+      and any("expired" in g for g in kyc.cdd_gaps({"id_number": "X1", "passport_expiry": "05 Jan 2020"},
+                                                     today=_kdt.date(2026, 11, 6))))
+check("kyc shares: a decimal comma is a decimal (27,5% is 27.5, not 5)",
+      kyc._share_pct("27,5%") == 27.5 and kyc._share_pct("12.5 %") == 12.5 and kyc._share_pct("50％") == 50.0
+      and kyc._share_pct("100") is None)
+check("kyc shares: a fractional holding stays visible in the identity line",
+      "0.5% holding" in kyc.identity_dossier({"share_pct": 0.5})
+      and "27.5% holding" in kyc.identity_dossier({"share_pct": 27.5})
+      and "50% holding" in kyc.identity_dossier({"share_pct": 50.0}))
 check("R.25 detects a legal-arrangement role (Trustee)", _k["is_arrangement"] and "Trustee" in _k["arrangement_type"])
 check("R.10 CDD gaps surfaced for incomplete party", any("identification" in g for g in _k["individuals"][1]["cdd_gaps"]))
 check("R.10 complete party with proof-of-address has no doc gap", not any("proof of address" in g for g in _k["individuals"][0]["cdd_gaps"]))
@@ -1424,6 +1445,22 @@ check("RED_FLAG: a bare 'ML-11' is the STR register's; HIGH with its text; a TF 
       and _rfa_by["STR-TF-07"]["severity"] == "CRITICAL" and "POL-07" in _rfa_by["STR-TF-07"]["detail"])
 check("RED_FLAG: an unknown code is reported, never dropped",
       any("unknown red-flag code 'XX-99'" in a["detail"] for a in _rfa))
+# Red flags written as text, or as a stray scalar, must be read as codes and must
+# never crash the rule: a crash would skip every other record of the customer,
+# including a CRITICAL terrorist-financing flag recorded on a different payment.
+_rf_txt = txn_monitor.rule_red_flag_recorded([{"customer": _c, "date": "2026-10-01", "amount": 1,
+                                               "red_flags": "ML-11, tf-07;SAR-CB-3"}])
+check("RED_FLAG: codes written as text are split on commas, semicolons and spaces, not read letter by letter",
+      sorted(a["detail"].split(" ")[0] for a in _rf_txt) == ["SAR-CB-03", "STR-ML-11", "STR-TF-07"])
+_rf_errs = {}
+_rf_mix = txn_monitor.evaluate_customer(
+    [{"customer": _c, "date": "2026-10-01", "amount": 1, "red_flags": 5},
+     {"customer": _c, "date": "2026-10-02", "amount": 1, "red_flags": ["TF-07"]}], None, rule_errors=_rf_errs)
+check("RED_FLAG: a malformed value on one record is reported as an unknown code and does not crash the rule",
+      "rule_red_flag_recorded" not in _rf_errs
+      and any(a["rule"] == "RED_FLAG" and "unknown red-flag code '5'" in a["detail"] for a in _rf_mix))
+check("RED_FLAG: the terrorist-financing flag on the other record is still raised as CRITICAL",
+      any(a["rule"] == "RED_FLAG" and a["severity"] == "CRITICAL" and a["detail"].startswith("STR-TF-07") for a in _rf_mix))
 _rf_path = txn_monitor.RED_FLAGS_PATH
 try:
     txn_monitor.RED_FLAGS_PATH = os.path.join(ROOT, "data", "no-such-red-flags.json")
@@ -4659,6 +4696,38 @@ check("building an invalid case raises instead of producing a broken dossier", _
 check("a case with no transactions renders the SAR fallback line",
       "No transaction rows supplied" in str_dossier.build_dossier(
           {**str_dossier.EXAMPLE_CASE, "transactions": []}, today="2026-07-16"))
+# Wrong-typed fields must come back as validation errors, never as an
+# AttributeError or TypeError out of the builder (found by feeding every field
+# None, a number, a list, an object, a string and a boolean).
+_wt_ok = str_dossier.EXAMPLE_CASE
+def _wt(**over):
+    return {**_wt_ok, **over}
+def _wt_outcome(case):
+    try:
+        str_dossier.build_dossier(case, today="2026-07-16")
+        return "built"
+    except ValueError:
+        return "rejected"
+    except Exception as e:  # noqa: BLE001 - the point of the check
+        return "CRASH " + type(e).__name__
+check("a numeric customer name is rejected, not an AttributeError",
+      _wt_outcome(_wt(customer={**_wt_ok["customer"], "name": 5})) == "rejected")
+check("a hit with no score still builds (shown as 0%), a null or text score is rejected",
+      _wt_outcome(_wt(hits=[{"list": "UN", "matched_entry": "X"}])) == "built"
+      and _wt_outcome(_wt(hits=[{"list": "UN", "score": None}])) == "rejected"
+      and _wt_outcome(_wt(hits=[{"list": "UN", "score": "90"}])) == "rejected"
+      and _wt_outcome(_wt(hits=[{"list": "UN", "score": True}])) == "rejected")
+check("indicators that are not a list are rejected; a null indicators field still builds",
+      _wt_outcome(_wt(indicators=5)) == "rejected" and _wt_outcome(_wt(indicators="x")) == "rejected"
+      and _wt_outcome(_wt(indicators=None)) == "built")
+check("adverse_articles must be a list of objects",
+      _wt_outcome(_wt(adverse_articles=5)) == "rejected"
+      and _wt_outcome(_wt(adverse_articles="abc")) == "rejected"
+      and _wt_outcome(_wt(adverse_articles=[None])) == "rejected"
+      and _wt_outcome(_wt(adverse_articles=[])) == "built")
+check("a numeric identification number or type is printed, not a TypeError",
+      "id: 12345" in str_dossier.build_dossier(
+          _wt(subject={"id_number": 12345}), today="2026-07-16"))
 # A literal '|' in a trade description / counterparty must not split its row
 # into extra markdown columns (regression: unescaped pipes garbled the table).
 _pipe_case = {**str_dossier.EXAMPLE_CASE,
