@@ -107,9 +107,8 @@ real incidents.
 
 ### Worth a human confirming, not confidently deleting
 
-- `netlify-probe.yml` and `netlify-deploy.yml` -- both `workflow_dispatch`-only,
-  worth confirming they're not superseded by `netlify-production-deploy.yml`'s
-  automatic push-triggered deploy.
+- `netlify-probe.yml` -- `workflow_dispatch`-only, worth confirming it is not
+  superseded by `netlify-production-deploy.yml`'s automatic push-triggered deploy.
 
 I did not check usage/run history for these three (that's a `GITHUB_LIST_WORKFLOW_RUNS_FOR_A_REPOSITORY` query away, filtered by workflow and date, if useful as a next step) -- flagging them as candidates, not confirmed dead weight.
 

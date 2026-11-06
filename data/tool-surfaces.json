@@ -245,7 +245,7 @@
         "ASANA_TOKEN",
         "ASANA_ACCESS_TOKEN"
       ],
-      "credential_note": "Two names by runtime, one workspace: the Python engine reads ASANA_TOKEN (screen.py requires it at import — the engine refuses to start rather than degrade silently), while the Node scripts and Netlify functions read ASANA_ACCESS_TOKEN. .github/workflows/netlify-deploy.yml bridges them (ASANA_TOKEN: secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN). Both are repository/site secrets; neither ever reaches the browser.",
+      "credential_note": "Two names by runtime, one workspace: the Python engine reads ASANA_TOKEN (screen.py requires it at import — the engine refuses to start rather than degrade silently), while the Node scripts and Netlify functions read ASANA_ACCESS_TOKEN. the screening workflows bridge them (ASANA_TOKEN: secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN). Both are repository/site secrets; neither ever reaches the browser.",
       "callers": [
         "screen.py",
         "str_dossier.py",
