@@ -198,7 +198,7 @@ const verifiedClean = {
   alerts:[],failures:[],lists:[{name:'UN',count:500,partial:false}],
   enrichment:{amErrors:0,amPartial:0,pepErrors:0,skipped:0,
     pepLookupEnabled:true,amLocalesPerSubject:8,
-    amBackboneFailures:{googleNews:0,gdelt:0,bing:0}}
+    amBackboneFailures:{googleNews:0,gdelt:0,bing:0,yahoo:0}}
 };
 check('explicit clean-day gate is true only with verified health of every enabled source',
   isHealthyCleanRun(verifiedClean) &&
@@ -213,7 +213,7 @@ check('unknown coverage does not enable a cheap but misleading clean-day shortcu
   !isHealthyCleanRun({...verifiedClean,enrichment:{...verifiedClean.enrichment,
     pepLookupEnabled:false}}) &&
   !isHealthyCleanRun({...verifiedClean,enrichment:{...verifiedClean.enrichment,
-    amBackboneFailures:{googleNews:0,gdelt:1,bing:0}}}));
+    amBackboneFailures:{googleNews:0,gdelt:0,bing:0,yahoo:1}}}));
 check('adaptive ceiling reserves more space only for complex runs',
   adaptiveOutputTokens({alerts:[]},1800)===850 &&
   adaptiveOutputTokens({alerts:Array(6).fill({})},1800)===1100 &&
