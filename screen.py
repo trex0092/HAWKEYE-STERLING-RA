@@ -7607,6 +7607,52 @@ def heal_full_results(existing_gid, narrative, rebuild, register, run_time,
         log(f"FAIL full results: self-heal upload to {existing_gid} failed")
         FULL_RESULTS_FAILED["failed"] = True
 
+def amendment_request():
+    """(amendment, refusal) for a changed same-day population.
+
+    An amendment is a human act. It is accepted only when a PERSON started the
+    run by hand (workflow_dispatch by a non-bot account) and typed a reason
+    (REPORT_AMENDMENT_REASON, the workflow's amendment_reason input). A schedule,
+    the Control Retry dispatcher or any other bot can never amend a report, so
+    the reconciliation stays a stop for automation. Returns ((actor, reason),
+    "") when accepted, (None, why) when a reason was given but refused, and
+    (None, "") when nobody asked for an amendment.
+    """
+    reason = re.sub(r"\s+", " ", os.environ.get("REPORT_AMENDMENT_REASON", "")).strip()[:500]
+    if not reason:
+        return None, ""
+    actor = os.environ.get("GITHUB_ACTOR", "").strip()
+    if os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch" or not actor or actor.endswith("[bot]"):
+        return None, "an amendment is accepted only from a run started by hand by a person"
+    return (actor, reason), ""
+
+
+def record_population_amendment(existing_gid, issue, amendment, run_time, tallies):
+    """Add a clearly labelled amendment note to today's existing report task.
+
+    The report and its attachments are not touched. The note says what the two
+    populations were, who started the run and the reason they typed. It records
+    that an amendment was requested; it is not an approval or a sign-off.
+    True only when Asana accepted the note.
+    """
+    actor, reason = amendment
+    run_url = ""
+    if os.environ.get("GITHUB_RUN_ID") and os.environ.get("GITHUB_REPOSITORY"):
+        run_url = (f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/"
+                   f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}")
+    n_s, n_a, n_p = tallies
+    text = (f"AMENDMENT NOTE - {run_time.strftime('%d %b %Y %H:%M')} UTC\n"
+            f"A later run on the same day screened a different population: {issue}.\n"
+            "The report on this task and its attachments are unchanged.\n"
+            f"Later run results: Sanctions {n_s} · Adverse Media {n_a} · PEP {n_p}.\n"
+            f"Run started by hand by {actor}. Reason given: {reason}\n"
+            + (f"Run: {run_url}\n" if run_url else "")
+            + "This note records that an amendment was requested. It is not an approval or sign-off.")
+    r = asana_request("POST", f"https://app.asana.com/api/1.0/tasks/{existing_gid}/stories",
+                      json={"data": {"text": text}})
+    return r is not None and r.status_code in (200, 201)
+
+
 def post_unified_task(narrative, run_time, possible_matches, adverse_findings, pep_findings, mode="daily",
                       rebuild=None, customer_gids=None, register=None):
     dt = run_time.strftime("%d %b %Y")
@@ -7621,9 +7667,19 @@ def post_unified_task(narrative, run_time, possible_matches, adverse_findings, p
                 # Keep original evidence immutable; a changed denominator
                 # requires an explicit human-reviewed amendment, not a silent
                 # reuse of earlier attachments or a second identical card.
-                log(f"FAIL same-day screening report population reconciliation: {issue}. "
-                    "Existing report retained; request a reviewed amendment.")
-                UNIFIED_DELIVERY_FAILED["failed"] = True
+                # The amendment is a note ON the existing task (see
+                # record_population_amendment); it never replaces the report.
+                amendment, refusal = amendment_request()
+                if amendment and record_population_amendment(
+                        existing_gid, issue, amendment, run_time,
+                        (len(possible_matches), len(adverse_findings), len(pep_findings))):
+                    log(f"AMENDMENT recorded on {existing_gid}: {issue}. Original report unchanged.")
+                else:
+                    if refusal:
+                        log(f"  amendment NOT recorded: {refusal}")
+                    log(f"FAIL same-day screening report population reconciliation: {issue}. "
+                        "Existing report retained; request a reviewed amendment.")
+                    UNIFIED_DELIVERY_FAILED["failed"] = True
         heal_full_results(existing_gid, narrative, rebuild, register, run_time,
                           possible_matches, adverse_findings, pep_findings)
         progress("delivered", task_gid=existing_gid)
