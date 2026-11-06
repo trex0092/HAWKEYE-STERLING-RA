@@ -414,6 +414,31 @@ except KeyError:
 check("every registered tool has a callable, description and inputSchema",
       all(callable(v[0]) and isinstance(v[1], str) and isinstance(v[2], dict) for v in mcp_tools.TOOLS.values()))
 
+# The published schema is a contract: an argument it does not declare must never
+# reach the tool function. These three used to be accepted: `path` made the
+# internal-watchlist tool read an arbitrary JSON file, `jurisdiction_table` ({})
+# switched off HIGH_RISK_GEO while the result still read clean, `today` overrode
+# the date.
+def _rejected(tool, args):
+    try:
+        mcp_tools.call_tool(tool, args)
+    except ValueError:
+        return True
+    except Exception:
+        return False
+    return False
+check("call_tool rejects an undeclared 'path' on the internal-watchlist tool",
+      _rejected("hawkeye_screen_internal_watchlist",
+                {"name": "Test Person", "path": os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "eocn-local-terrorist-list.json")}))
+check("call_tool rejects an undeclared 'jurisdiction_table' on the transaction monitor",
+      _rejected("hawkeye_monitor_transactions", {"transactions": [], "jurisdiction_table": {}}))
+check("call_tool rejects an undeclared 'today' on the KYC note analyser",
+      _rejected("hawkeye_analyze_kyc_note", {"note": "x", "today": "2020-01-01"}))
+check("no registered tool function accepts an argument its schema does not declare through call_tool",
+      all(_rejected(n, {"__undeclared__": 1}) for n in mcp_tools.TOOLS))
+check("call_tool still dispatches declared arguments after the schema check",
+      mcp_tools.call_tool("hawkeye_screen_internal_watchlist", {"name": "Test Person"})["subject"] == "Test Person")
+
 # Serialisation guard: EVERY tool's output must be JSON-serialisable, because the
 # server hands it back as JSON text — a tool returning a set/tuple/etc. crashes
 # the call at runtime (regression: name_variants returned a set). Call each tool

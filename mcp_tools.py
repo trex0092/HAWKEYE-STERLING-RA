@@ -806,6 +806,16 @@ def call_tool(name, arguments):
     # invalid tool inputs; reject the original shape explicitly.
     if not isinstance(arguments, dict):
         raise ValueError("tool arguments must be an object")
+    # Enforce the contract the schema already publishes (additionalProperties:
+    # false). Without this, an argument the schema does not declare reached the
+    # Python function: `path` made the internal-watchlist tool read an arbitrary
+    # JSON file, `jurisdiction_table` ({}) switched off the high-risk-country
+    # rule while the result still said clean, and `today` overrode the date.
+    schema = TOOLS[name][2]
+    if schema.get("additionalProperties") is False:
+        undeclared = sorted(set(arguments) - set(schema.get("properties", {})))
+        if undeclared:
+            raise ValueError("undeclared tool argument(s): " + ", ".join(map(str, undeclared)))
     return fn(**arguments)
 
 
