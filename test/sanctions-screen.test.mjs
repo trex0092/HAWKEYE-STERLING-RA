@@ -1025,6 +1025,35 @@ check('yente: report renders the threshold table and per-mechanism recall',
 check('yente: report frames adoption as governed by the recall-monotone invariant',
   _ybMd.includes('recall-monotone') && _ybMd.includes('baseline.json'));
 
+/* ── Aho-Corasick benchmark (experimental, shadow-only, dependency-free) ── */
+const ac = await import('./../scripts/aho-corasick-bench.mjs');
+const _acSets = (pats, text) => {
+  const a = ac.buildAutomaton(pats);
+  return [...ac.scan(a, text)].map(id => a.patterns[id]).sort();
+};
+check('aho-corasick: finds overlapping and suffix names ("ab" and "b" inside "cabd")',
+  JSON.stringify(_acSets(['ab', 'b', 'cabd', 'bd'], 'xcabdx')) === JSON.stringify(['ab', 'b', 'bd', 'cabd']));
+check('aho-corasick: ignores empty and duplicate names and is case and space insensitive',
+  JSON.stringify(_acSets(['', 'Acme  Gold', 'acme gold'], 'The ACME GOLD LLC')) === JSON.stringify(['acme gold']));
+check('aho-corasick: finds Arabic-script names',
+  JSON.stringify(_acSets(['محمد علي'], 'قال محمد علي إن')) === JSON.stringify(['محمد علي']));
+check('aho-corasick: no match when the name is absent',
+  _acSets(['alpha beta'], 'alpha gamma beta').length === 0);
+const _acNames = ac.loadNames();
+const _acCorpus = ac.buildCorpus(_acNames, 300);
+check('aho-corasick: the synthetic corpus is deterministic',
+  JSON.stringify(_acCorpus) === JSON.stringify(ac.buildCorpus(_acNames, 300)));
+const _acEval = ac.evaluate(_acNames, _acCorpus);
+check('aho-corasick: on the benchmark corpus it finds exactly what one-name-at-a-time search finds',
+  _acEval.differing === 0 && _acEval.matches > 0);
+check('aho-corasick: every planted name is found',
+  _acEval.planted > 0 && _acEval.plantedFound === _acEval.planted);
+check('aho-corasick: the report states the result and that timings are information only',
+  ac.report(_acEval).includes('found exactly what the plain search found')
+  && ac.report(_acEval).includes('information only'));
+check('aho-corasick: a disagreement is reported as a failure',
+  ac.report({ ..._acEval, differing: 1 }).includes('FAILED'));
+
 /* ── watchman benchmark (experimental, shadow-only — pure functions) ── */
 const wb = await import('./../scripts/watchman-bench.mjs');
 const _wbCsv = wb.buildCsv(new Map([['Acme "Gold" LLC', 'r1'], ['Jane Doe', 'r2']]));
