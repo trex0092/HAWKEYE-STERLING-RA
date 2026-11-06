@@ -79,8 +79,8 @@ jobs:
           }
           mx_http=$(probe "Mexico SAT 69-B" "http://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv" | tail -1)
           mx_https=$(probe "Mexico SAT 69-B" "https://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv" | tail -1)
-          az_http=$(probe "Azerbaijan FMS page" "http://hms.gov.az/en/olkedaxili-siyahi" | tail -1)
-          az_https=$(probe "Azerbaijan FMS page" "https://hms.gov.az/en/olkedaxili-siyahi" | tail -1)
+          probe "Azerbaijan FMS page" "http://hms.gov.az/en/olkedaxili-siyahi" > /dev/null
+          probe "Azerbaijan FMS page" "https://hms.gov.az/en/olkedaxili-siyahi" > /dev/null
           {
             echo
             if [ -s "$mx_http" ] && [ -s "$mx_https" ] && cmp -s "$mx_http" "$mx_https"; then
