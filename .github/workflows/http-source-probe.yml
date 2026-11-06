@@ -1,0 +1,112 @@
+name: Plain-http source probe
+
+# EXPERIMENTAL, read-only, runs by hand (or once on the pull request that
+# changes this file). It changes nothing.
+#
+# Question it answers: do the two sources still configured with a plain http
+# address (Mexico SAT Article 69-B, Azerbaijan FMS) also answer over https with
+# a valid certificate, and do they serve the SAME bytes? The shell of the
+# assistant sessions cannot reach these hosts, so the evidence has to come from a
+# GitHub runner. Certificates are always verified (no -k, no insecure flag).
+# Nothing is committed, posted to Asana or written to screening state.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/http-source-probe.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            *.githubapp.com:443
+            omawww.sat.gob.mx:443
+            omawww.sat.gob.mx:80
+            hms.gov.az:443
+            hms.gov.az:80
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Probe both addresses of each source
+        run: |
+          set +e
+          out=http-source-probe-report.md
+          {
+            echo "# Plain-http source probe"
+            echo
+            echo "Certificates verified. Same bytes means identical SHA-256 of the whole body."
+            echo
+            echo "| Source | Address | HTTP status | TLS verify | Bytes | SHA-256 (first 16) |"
+            echo "|---|---|---|---|---|---|"
+          } > "$out"
+          probe() {
+            label="$1"; url="$2"; f="body-$(echo "$url" | tr -c 'A-Za-z0-9' _).bin"
+            code=$(curl -sS -L --max-redirs 3 -m 120 -A "Mozilla/5.0" -o "$f" \
+              -w '%{http_code} %{ssl_verify_result} %{url_effective}' "$url" 2> curl.err)
+            rc=$?
+            read -r status verify eff <<< "$code"
+            bytes=$(wc -c < "$f" 2>/dev/null || echo 0)
+            sha=$(sha256sum "$f" 2>/dev/null | cut -c1-16)
+            if [ $rc -ne 0 ]; then
+              status="curl exit $rc"; verify="-"; sha="-"
+              echo "$label $url: $(head -c 200 curl.err)"
+            fi
+            [ "$verify" = "0" ] && verify="valid"
+            echo "| $label | $url | $status | $verify | $bytes | $sha |" >> "$out"
+            echo "$label $url -> $status verify=$verify bytes=$bytes sha=$sha final=$eff"
+            echo "$f"
+          }
+          mx_http=$(probe "Mexico SAT 69-B" "http://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv" | tail -1)
+          mx_https=$(probe "Mexico SAT 69-B" "https://omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv" | tail -1)
+          az_http=$(probe "Azerbaijan FMS page" "http://hms.gov.az/en/olkedaxili-siyahi" | tail -1)
+          az_https=$(probe "Azerbaijan FMS page" "https://hms.gov.az/en/olkedaxili-siyahi" | tail -1)
+          {
+            echo
+            if [ -s "$mx_http" ] && [ -s "$mx_https" ] && cmp -s "$mx_http" "$mx_https"; then
+              echo "**Mexico: the https address serves exactly the same bytes as http.**"
+            elif [ -s "$mx_https" ]; then
+              echo "**Mexico: https answered but the bytes differ from http. Do not switch without review.**"
+            else
+              echo "**Mexico: https did not return the file.**"
+            fi
+            echo
+            echo "First 3 lines of the https body (Mexico):"
+            echo '```'
+            head -n 3 "$mx_https" 2>/dev/null | iconv -f latin1 -t utf-8 2>/dev/null | cut -c1-160
+            echo '```'
+          } >> "$out"
+          cat "$out" >> "$GITHUB_STEP_SUMMARY"
+          cat "$out"
+          # Report only; the verdict is read by a person. Fail only if neither
+          # address of the Mexico source answered at all.
+          [ -s "$mx_http" ] || [ -s "$mx_https" ]
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: http-source-probe-report
+          path: http-source-probe-report.md
+          if-no-files-found: ignore
+          retention-days: 30
