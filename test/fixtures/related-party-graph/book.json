@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic customer book for the related-party graph report. Every name is invented. 'flagged' lists the customers a reviewer already treats as high concern.",
+  "customers": [
+    {"name": "Alpha Bullion Trading FZE", "individuals": ["Omar Hadid Rahman", "Selim Karaoglu Demir"]},
+    {"name": "Bravo Refining DMCC", "individuals": ["Selim Karaoglu Demir", "Priya Natarajan Iyer"]},
+    {"name": "Charlie Jewels LLC", "individuals": ["Priya Natarajan Iyer", "Tomas Brandt Weiss"]},
+    {"name": "Delta Metals FZCO", "individuals": ["Tomas Brandt Weiss"]},
+    {"name": "Echo Assay Services LLC", "individuals": ["Lena Voronova Petrova"]},
+    {"name": "Foxtrot Holdings Ltd", "individuals": ["Omar Hadid Rahman"]},
+    {"name": "Omar Hadid Rahman", "individuals": []},
+    {"name": "Golf Vaults LLC", "individuals": []}
+  ],
+  "flagged": ["Alpha Bullion Trading FZE"]
+}

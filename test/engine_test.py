@@ -5456,6 +5456,48 @@ _dd_counts, _dd_af, _dd_pf = screen.tally_enrichment([_dd_ind, _dd_co], {}, True
 check("with no worldwide net the deferred individual degrades PEP loudly (pep_errors=1)",
       _dd_counts["pep_errors"] == 1 and _dd_counts["am_skipped"] == 2)
 
+# ── related-party graph report (experimental, shadow-only, standard library) ───
+print("\nscripts/related-party-graph.py — networks and paths")
+_rpg_spec = importlib.util.spec_from_file_location("related_party_graph", os.path.join(ROOT, "scripts", "related-party-graph.py"))
+rpg = importlib.util.module_from_spec(_rpg_spec); _rpg_spec.loader.exec_module(rpg)
+_rpg_book = json.load(open(os.path.join(ROOT, "test", "fixtures", "related-party-graph", "book.json"), encoding="utf-8"))
+_rpg = rpg.analyse(_rpg_book)
+_rpg_pairs = ai.related_parties(_rpg_book["customers"])
+check("graph: a chain of shared owners is one network (the pairwise check lists only pairs)",
+      len(_rpg["networks"]) == 1 and len(_rpg["networks"][0]["customers"]) == 6
+      and max(len(c["members"]) for c in _rpg_pairs) < 6)
+_rpg_net = set(_rpg["networks"][0]["customers"])
+check("graph: every cluster the existing related-party check reports sits inside one network",
+      all(set(c["members"]) <= _rpg_net for c in _rpg_pairs))
+check("graph: unlinked customers are not placed in a network",
+      "Echo Assay Services LLC" not in _rpg_net and "Golf Vaults LLC" not in _rpg_net)
+_rpg_by = {f["customer"]: f for f in _rpg["flagged_links"]}
+check("graph: a flagged customer reaches a customer two owners away in 4 links, by the shortest path",
+      _rpg_by["Charlie Jewels LLC"]["links"] == 4
+      and _rpg_by["Bravo Refining DMCC"]["path"] == ["Alpha Bullion Trading FZE", "Selim Karaoglu Demir", "Bravo Refining DMCC"])
+check("graph: the hop limit is respected (Delta Metals is 6 links away)",
+      "Delta Metals FZCO" not in _rpg_by
+      and any(f["customer"] == "Delta Metals FZCO" and f["links"] == 6 for f in rpg.analyse(_rpg_book, 6)["flagged_links"]))
+_rpg_short = rpg.analyse({"customers": [{"name": "First Customer Ltd", "individuals": ["Chen"]},
+                                        {"name": "Second Customer Ltd", "individuals": ["Chen"]}]})
+check("graph: a name shorter than 5 characters never joins customers (same rule as the live check)",
+      _rpg_short["networks"] == [])
+_rpg_accent = rpg.analyse({"customers": [{"name": "Accent One Ltd", "individuals": ["José Álvarez Núñez"]},
+                                         {"name": "Accent Two Ltd", "individuals": ["Jose Alvarez Nunez"]}]})
+check("graph: accents and punctuation do not hide a shared owner", len(_rpg_accent["networks"]) == 1)
+_rpg_tr = rpg.analyse({"customers": [{"name": "Turk One Ltd", "individuals": ["Mehmet Kılıç Yıldız"]},
+                                     {"name": "Turk Two Ltd", "individuals": ["MEHMET KILIC YILDIZ"]}]})
+check("graph: it folds names exactly like the live check (Turkish dotless i joins the same owner)",
+      len(_rpg_tr["networks"]) == 1 and len(ai.related_parties(
+          [{"name": "Turk One Ltd", "individuals": ["Mehmet Kılıç Yıldız"]},
+           {"name": "Turk Two Ltd", "individuals": ["MEHMET KILIC YILDIZ"]}])) == 1
+      and rpg.fold("Kılıç İbrahim") == ai._ascii_fold("Kılıç İbrahim"))
+check("graph: an unknown flagged name gives no links and no error",
+      rpg.analyse({"customers": _rpg_book["customers"], "flagged": ["Nobody Listed"]})["flagged_links"] == [])
+_rpg_md = rpg.render(_rpg)
+check("graph: the report calls a link a lead, never a finding, and counts links in the singular",
+      "never a finding" in _rpg_md and "1 link via" in _rpg_md)
+
 # ── Regulator-bulletin net + identity cross-check ─────────────────────────────
 print("\nscreen.py — regulator bulletins & identity cross-check")
 check("significant tokens drop corporate boilerplate",

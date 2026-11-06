@@ -1,0 +1,70 @@
+name: Related-party graph report
+
+# EXPERIMENTAL, shadow-only, dispatch-only, standard library only. This is a
+# reporting instrument, not a control.
+#
+# What it does: builds a graph of customers and their owners from a book file and
+# reports the networks of customers joined through shared owners and the customers
+# within a few links of a flagged customer. The live check (ai.related_parties)
+# lists pairs only; this shows chains. The default book is the synthetic fixture in
+# test/fixtures/related-party-graph; nothing is read from Asana.
+#
+# Scope: no data is downloaded and nothing touches screening state, cases or
+# Asana. A link is a lead for the MLRO to investigate, never a finding.
+
+on:
+  workflow_dispatch:
+    inputs:
+      book:
+        description: 'Path to a book JSON file in the repository'
+        required: false
+        default: 'test/fixtures/related-party-graph/book.json'
+      max_hops:
+        description: 'Largest number of links to follow from a flagged customer'
+        required: false
+        default: '4'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            *.githubapp.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Build the report
+        env:
+          BOOK: ${{ inputs.book }}
+          MAX_HOPS: ${{ inputs.max_hops }}
+        run: |
+          python3 scripts/related-party-graph.py "$BOOK" "$MAX_HOPS"
+          cat related-party-graph-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: related-party-graph-report
+          path: related-party-graph-report.md
+          if-no-files-found: ignore
+          retention-days: 30
