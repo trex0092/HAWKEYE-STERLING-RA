@@ -4680,6 +4680,38 @@ check("building an invalid case raises instead of producing a broken dossier", _
 check("a case with no transactions renders the SAR fallback line",
       "No transaction rows supplied" in str_dossier.build_dossier(
           {**str_dossier.EXAMPLE_CASE, "transactions": []}, today="2026-07-16"))
+# Wrong-typed fields must come back as validation errors, never as an
+# AttributeError or TypeError out of the builder (found by feeding every field
+# None, a number, a list, an object, a string and a boolean).
+_wt_ok = str_dossier.EXAMPLE_CASE
+def _wt(**over):
+    return {**_wt_ok, **over}
+def _wt_outcome(case):
+    try:
+        str_dossier.build_dossier(case, today="2026-07-16")
+        return "built"
+    except ValueError:
+        return "rejected"
+    except Exception as e:  # noqa: BLE001 - the point of the check
+        return "CRASH " + type(e).__name__
+check("a numeric customer name is rejected, not an AttributeError",
+      _wt_outcome(_wt(customer={**_wt_ok["customer"], "name": 5})) == "rejected")
+check("a hit with no score still builds (shown as 0%), a null or text score is rejected",
+      _wt_outcome(_wt(hits=[{"list": "UN", "matched_entry": "X"}])) == "built"
+      and _wt_outcome(_wt(hits=[{"list": "UN", "score": None}])) == "rejected"
+      and _wt_outcome(_wt(hits=[{"list": "UN", "score": "90"}])) == "rejected"
+      and _wt_outcome(_wt(hits=[{"list": "UN", "score": True}])) == "rejected")
+check("indicators that are not a list are rejected; a null indicators field still builds",
+      _wt_outcome(_wt(indicators=5)) == "rejected" and _wt_outcome(_wt(indicators="x")) == "rejected"
+      and _wt_outcome(_wt(indicators=None)) == "built")
+check("adverse_articles must be a list of objects",
+      _wt_outcome(_wt(adverse_articles=5)) == "rejected"
+      and _wt_outcome(_wt(adverse_articles="abc")) == "rejected"
+      and _wt_outcome(_wt(adverse_articles=[None])) == "rejected"
+      and _wt_outcome(_wt(adverse_articles=[])) == "built")
+check("a numeric identification number or type is printed, not a TypeError",
+      "id: 12345" in str_dossier.build_dossier(
+          _wt(subject={"id_number": 12345}), today="2026-07-16"))
 # A literal '|' in a trade description / counterparty must not split its row
 # into extra markdown columns (regression: unescaped pipes garbled the table).
 _pipe_case = {**str_dossier.EXAMPLE_CASE,
