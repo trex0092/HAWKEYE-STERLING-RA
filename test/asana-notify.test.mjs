@@ -988,10 +988,12 @@ check('a sectionless mirror still joins the project',
 
 /* ── AI / platform cards go to "AI & Platform Governance", not "Regulatory Changes" ── */
 {
-  const { SECTIONS: S, alertSection } = await import('../scripts/asana-sections.mjs');
-  check('"AI & Platform Governance" is an approved section with its live gid',
-    S.governance && S.governance.gid === '1218985347982681' && S.governance.name === 'AI & Platform Governance');
-  check('platform alerts route to AI & Platform Governance',
+  const { SECTIONS: S, alertSection, isPlatformAlert } = await import('../scripts/asana-sections.mjs');
+  /* Removed 2026-11-06 at the MLRO's request: only the four live sections are approved. */
+  check('"AI & Platform Governance" is no longer an approved section; only the four live sections remain',
+    !S.governance && Object.values(S).map(x => x.name).sort().join('|')
+      === ['Follow Ups', 'Regulatory Changes', 'Screening Adverse Media & PEP\u2019s Update', 'Screening Sanctions Update'].sort().join('|'));
+  check('platform alerts are not filed in Asana (alertSection is null)',
     ['PRODUCTION DRIFT: the live site is serving an older build than main', 'WORKFLOW RECOVERY BLOCKED: a registered control needs intervention',
       'CONTROL STALE: a mandatory scheduled compliance control missed its cadence window', 'FUNCTION DOWN: Netlify functions failed health check',
       'ADVISOR DEPENDENCY DOWN: upstream model unavailable', 'SITE DOWN: hawkeye-sterling-ra.netlify.app failed its health check',
@@ -1013,13 +1015,13 @@ check('a sectionless mirror still joins the project',
   check('Advisor Eval no longer files to Asana',
     !readFileSync(join(root, '.github/workflows/advisor-eval.yml'), 'utf8').includes('ASANA_SECTION_GID'));
   const fatf = readFileSync(join(root, 'scripts/fatf-watchdog.mjs'), 'utf8');
-  check('FATF monitoring GAP → AI & Platform Governance; FATF list change → Regulatory Changes',
-    fatf.includes("ASANA_FATF_GAP_SECTION_GID || '" + S.governance.gid + "'")
+  check('FATF monitoring GAP and FATF list change → Regulatory Changes',
+    fatf.includes("ASANA_FATF_GAP_SECTION_GID || '" + S.regulatory.gid + "'")
     && /monitoring GAP[\s\S]{0,800}FATF_GAP_SECTION_GID\)/.test(fatf)
     && /'FATF list change: '[^\n]*REG_FATF_SECTION_GID\)/.test(fatf));
   const wn = readFileSync(join(root, 'scripts/watch-notify.mjs'), 'utf8');
-  check('a Regulatory Watch card with only unreachable sources is a monitoring gap (governance section, not mirrored)',
-    /changes\.every\(c => c\.status === 'unreachable'\)/.test(wn) && /gapOnly \? SECTIONS\.governance\.gid/.test(wn)
+  check('a Regulatory Watch card with only unreachable sources is a monitoring gap (Regulatory Changes, not mirrored)',
+    /changes\.every\(c => c\.status === 'unreachable'\)/.test(wn) && /gapOnly \? SECTIONS\.regulatory\.gid/.test(wn)
     && /ASANA_MIRROR_PROJECT_GID && !gapOnly/.test(wn));
 }
 

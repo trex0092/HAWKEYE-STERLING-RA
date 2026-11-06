@@ -90,32 +90,9 @@ jobs:
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          # "AI & Platform Governance" section, gid 1216782693874840. FIXED
-          # 2026-09-16: the literal fallback here (1216229252787647) no longer
-          # existed in the live project -- likely stale from an earlier Asana
-          # reorganization. There was no repo variable of this name set, so
-          # this had been silently posting to no section at all. Created the
-          # ASANA_WEEKLY_SECTION_GID repo variable and corrected the literal,
-          # both verified against the live Asana API.
-          # RE-FIXED 2026-09-24: 1216782693874840 itself no longer existed in the
-          # live project (Asana 400 "Unknown object", confirmed via a downstream
-          # Advisor Eval run) -- deleted sometime after 09-17 during an unrelated
-          # section cleanup. The live "AI & Platform Governance" section is now
-          # 1218785568483509 (same name, re-provisioned gid, verified against the
-          # live Asana API just now). Updated the repo variable to match and
-          # corrected this literal fallback for defense-in-depth.
-          # REPOINTED 2026-10-01: "AI & Platform Governance" is not one of the
-          # four approved HAWKEYE STERLING APP sections (scripts/asana-sections.mjs,
-          # #701/#703), so every alert routed there was refused ("an explicit
-          # approved section is required"). #703 moved the other governance
-          # reports to "Regulatory Changes"; this follows it. Pinned, not read
-          # from a repo variable: a stale variable cannot misroute an approved
-          # destination, and test/asana-notify.test.mjs fails CI on any
-          # unapproved section literal.
-          # RESTORED 2026-10-03: "AI & Platform Governance" is an approved section
-          # again (1218985347982681, asana-sections.mjs), so the weekly summary
-          # returns to it instead of sitting among law changes.
-          ASANA_WEEKLY_SECTION_GID: '1218985347982681'
+          # Pinned to "Regulatory Changes" (1218451992088222, scripts/asana-sections.mjs).
+          # The "AI & Platform Governance" section was removed on 2026-11-06.
+          ASANA_WEEKLY_SECTION_GID: '1218451992088222'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Don't fail the run if Asana is unreachable; the issue fallback covers it.
         continue-on-error: true
