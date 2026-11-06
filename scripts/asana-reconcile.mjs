@@ -152,11 +152,19 @@ async function main() {
   if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN is not configured');
   const tasks = await listTasks(RISK_PROJECT_GID);
   const regTask = tasks.find(t => String(t.name || '') === REG_TASK);
-  let register = [];
-  if (regTask) {
-    const full = await api('/tasks/' + regTask.gid + '?opt_fields=notes');
-    register = parseSheet(full.data && full.data.notes);
+  /* The register mirror task was removed from Asana on 2026-11-06. Without it there is
+     nothing to compare against, so every per-assessment task would be reported as an
+     orphan. Skip the comparison and say so instead of reporting false discrepancies. */
+  if (!regTask) {
+    const note = 'Reconciliation skipped: the ' + REG_TASK + ' task is not present in the Asana project, so there is no register to compare against. No discrepancies reported.';
+    console.log(note);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## RA <-> Asana reconciliation - skipped\n\n' + note + '\n'); } catch (e) { /* summary only */ }
+    }
+    return;
   }
+  const full = await api('/tasks/' + regTask.gid + '?opt_fields=notes');
+  const register = parseSheet(full.data && full.data.notes);
   const diff = reconcile(register, tasks);
   const report = renderReport(diff);
   console.log(report);
