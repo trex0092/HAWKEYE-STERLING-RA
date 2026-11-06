@@ -67,19 +67,6 @@
       ]
     },
     {
-      "id": "secret-rotation-asana",
-      "title": "Rotate ASANA_ACCESS_TOKEN (GitHub secret + Netlify env)",
-      "anchor": "2026-10-25",
-      "everyMonths": 3,
-      "leadDays": 7,
-      "owner": "Compliance Officer",
-      "notes": [
-        "This token powers EVERY delivery path: daily screening, freshness/currency alarms, briefs, reconciliations — expiry or revocation without rotation reds the whole control estate on the same day.",
-        "Generate a new PAT in the Asana developer console, update the ASANA_ACCESS_TOKEN repository secret (GitHub -> Settings -> Secrets and variables -> Actions) AND the Netlify site environment variable, then dispatch 'Asana Delivery Verify (manual)' to prove the path end-to-end.",
-        "Revoke the old token only after the verify run passes."
-      ]
-    },
-    {
       "id": "secret-rotation-anthropic",
       "title": "Rotate ANTHROPIC_API_KEY (GitHub secret + Netlify env)",
       "anchor": "2026-10-25",
