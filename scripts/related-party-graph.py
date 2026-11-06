@@ -126,9 +126,10 @@ def analyse(book, max_hops=MAX_HOPS):
 
 
 def render(result, max_hops=MAX_HOPS):
+    intro = ("Customers and their owners are linked as a graph. A link is a lead for the MLRO to "
+             "investigate, never a finding. No data leaves the runner and screening is unchanged.")
     L = ["# Related-party graph report (experimental, shadow-only)", "",
-         "Customers and their owners are linked as a graph. A link is a lead for the MLRO to "
-         "investigate, never a finding. No data leaves the runner and screening is unchanged.", "",
+         intro, "",
          f"Customers read: {result['customers']}", "",
          f"## Networks (two or more customers joined through owners): {len(result['networks'])}", ""]
     for i, n in enumerate(result["networks"], 1):
