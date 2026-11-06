@@ -109,9 +109,11 @@ def reconcile(rows):
 
 
 def render(status, result):
-    L = ["# Cross-list reconciliation (experimental, shadow-only)", "",
-         "The committed national lists are loaded into an in-memory SQLite database and compared. "
-         "A match is a lead for the MLRO, never a finding. Nothing is downloaded and screening is unchanged.", "",
+    intro = (
+        "The committed national lists are loaded into an in-memory SQLite database and compared. "
+        + "A match is a lead for the MLRO, never a finding. Nothing is downloaded and screening is unchanged."
+    )
+    L = ["# Cross-list reconciliation (experimental, shadow-only)", "", intro, "",
          "## Entries declared and entries held", "",
          "| List | Declared | Held | Result |", "|---|---|---|---|"]
     for st in status:
