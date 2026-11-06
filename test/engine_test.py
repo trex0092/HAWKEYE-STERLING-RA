@@ -5002,6 +5002,71 @@ finally:
     screen.asana_request = _old_asana_rerun
     screen.UNIFIED_DELIVERY_FAILED["failed"] = _old_delivery_gate
 
+# A reviewed amendment: only a person who started the run by hand and typed a
+# reason can turn the changed-population stop into a note on the existing task.
+def _amend_stub(previous_notes, post_status=200):
+    base_stub, calls = _rerun_report_stub(previous_notes)
+    posts = []
+    def _stub(method, url, **kw):
+        if method == "POST":
+            posts.append((url, kw.get("json")))
+            return types.SimpleNamespace(status_code=post_status, json=lambda: {"data": {}})
+        return base_stub(method, url, **kw)
+    return _stub, posts, calls
+
+def _amend_run(env, previous_notes=_r_old, post_status=200):
+    keys = ("REPORT_AMENDMENT_REASON", "GITHUB_EVENT_NAME", "GITHUB_ACTOR", "GITHUB_RUN_ID", "GITHUB_REPOSITORY")
+    saved = {k: os.environ.get(k) for k in keys}
+    for k in keys:
+        os.environ.pop(k, None)
+    os.environ.update(env)
+    stub, posts, calls = _amend_stub(previous_notes, post_status)
+    old_req, old_flag = screen.asana_request, screen.UNIFIED_DELIVERY_FAILED["failed"]
+    screen.asana_request = stub
+    screen.UNIFIED_DELIVERY_FAILED["failed"] = False
+    try:
+        gid = screen.post_unified_task(_r_now, _dt.datetime(2026, 10, 20, 12), [{"n": 1}], [], [], mode="daily")
+        return gid, screen.UNIFIED_DELIVERY_FAILED["failed"], posts, calls
+    finally:
+        screen.asana_request, screen.UNIFIED_DELIVERY_FAILED["failed"] = old_req, old_flag
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+_person = {"REPORT_AMENDMENT_REASON": "Two customers were onboarded after the 04:00 run",
+           "GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_ACTOR": "trex0092",
+           "GITHUB_RUN_ID": "99", "GITHUB_REPOSITORY": "owner/repo"}
+_g, _red, _posts, _calls = _amend_run(_person)
+_note = (_posts[0][1] or {}).get("data", {}).get("text", "") if _posts else ""
+check("amendment: a person's typed reason on a manual run adds ONE note to the existing task and the run is not red",
+      _g == "prior-1" and _red is False and len(_posts) == 1 and _posts[0][0].endswith("/tasks/prior-1/stories"))
+check("amendment: the note names both populations, the person, their reason and says it is not an approval",
+      "13 subjects" in _note and "12 subjects" in _note and "trex0092" in _note
+      and "Two customers were onboarded" in _note and "not an approval or sign-off" in _note
+      and "Sanctions 1" in _note and "owner/repo/actions/runs/99" in _note)
+check("amendment: the original report is never edited, replaced or re-attached",
+      not any(m in ("PUT", "DELETE") for m, u in _calls)
+      and all(u.endswith("/stories") for u, _ in _posts))
+for _label, _env in [
+        ("a bot (the Control Retry dispatcher)", {**_person, "GITHUB_ACTOR": "github-actions[bot]"}),
+        ("a schedule", {**_person, "GITHUB_EVENT_NAME": "schedule"}),
+        ("a manual run with no reason typed", {**_person, "REPORT_AMENDMENT_REASON": "   "}),
+        ("a manual run with no actor", {**_person, "GITHUB_ACTOR": ""})]:
+    _g2, _red2, _posts2, _ = _amend_run(_env)
+    check("amendment: refused for " + _label + " - the run stays red and nothing is posted",
+          _g2 == "prior-1" and _red2 is True and not _posts2)
+_g3, _red3, _posts3, _ = _amend_run(_person, previous_notes=_r_now)
+check("amendment: an unchanged population needs none - nothing is posted and the run is not red",
+      _red3 is False and not _posts3)
+_g4, _red4, _posts4, _ = _amend_run(_person, post_status=500)
+check("amendment: if Asana does not accept the note the run stays red (never green on an unrecorded amendment)",
+      _red4 is True and len(_posts4) == 1)
+_g5, _red5, _posts5, _ = _amend_run({**_person, "REPORT_AMENDMENT_REASON": "x" * 900})
+check("amendment: the typed reason is capped at 500 characters",
+      "x" * 500 in (_posts5[0][1]["data"]["text"]) and "x" * 501 not in (_posts5[0][1]["data"]["text"]))
+
 _pj1, _mb1 = screen._mlro_queue_targets()
 check("queue targets are exactly one project and the approved media section",
       _pj1 == [screen.ASANA_ONGOING_MON_GID]

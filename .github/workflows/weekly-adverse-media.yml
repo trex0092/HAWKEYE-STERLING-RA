@@ -31,6 +31,16 @@ on:
     - cron: '7 3 * * *'    # 03:07 UTC self-healing retry — the 24 & 25 Jul 00:07 runs died to runner-VM shutdowns mid-sweep and stayed red until someone manually re-ran hours later. On days when today already has a successful run this firing becomes a COVERAGE MAKE-UP pass (AM_COVERAGE_RETRY=1): the engine consults the committed run-metrics counts and exits in seconds if the earlier run had full news+PEP coverage, or re-sweeps the full book from this runner's FRESH egress IP if the free feeds' per-IP rate limits cost part of the book its coverage (5 Aug: both GDELT and Google News circuits opened mid-run). Delta-state suppresses already-reported findings, so a make-up sweep cases only what it recovers.
     - cron: '7 6 * * *'    # 06:07 UTC last-chance retry — the first two slots are 3h apart, so a single 3-4h outage window (GitHub Actions or an upstream source) could still cost the whole day. Same make-up semantics; when it has to screen from scratch, delivery lands ~11:30 UAE — late, but a late daily screening beats a missing one for a mandatory control.
   workflow_dispatch:        # Manual trigger
+    inputs:
+      amendment_reason:
+        description: >-
+          Optional. Only when today's report was already delivered and this run
+          screened a different number of subjects: type the reason here and the
+          run adds an amendment note to the existing task instead of failing.
+          The original report is not changed. Ignored for schedules and bots.
+        required: false
+        type: string
+        default: ''
 
 # Results are posted to Asana via the screen's own token. contents:write is used
 # only to commit the delta-state file (what has already been reported) so the
@@ -384,6 +394,9 @@ jobs:
           EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
           ASANA_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN || secrets.ASANA_TOKEN }}
           TRIGGER_TYPE: schedule
+          # A person's typed reason for an amendment note (manual runs only;
+          # the engine refuses it from a schedule or a bot).
+          REPORT_AMENDMENT_REASON: ${{ inputs.amendment_reason }}
           # Both approved Asana projects are mandatory screening populations.
           # Pin HR here: a non-empty stale repository variable would otherwise
           # redirect the Python engine to an unapproved or missing project.
