@@ -24,20 +24,10 @@
    Needs the runner's GITHUB_TOKEN (actions:read). Asana delivery retired 2026-11-06:
    the report is published in the workflow run's job summary. */
 
-import { SECTIONS } from './asana-sections.mjs';
 import { readFileSync } from 'node:fs';
 
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
-/* Section resolved BY NAME at runtime (created if missing); GID overrides it. */
-/* Governance reports file under the approved "AI & Platform Governance"
-   section of HAWKEYE STERLING APP (scripts/asana-sections.mjs). It is pinned
-   by gid and never resolved by name or created: an earlier version created the
-   section by name when absent, which re-provisioned it under a new gid each
-   time; while no live gid was registered (#701/#703) these reports were filed
-   under "Regulatory Changes". */
-export const GOV_SECTION_NAME = SECTIONS.governance.name;
-
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export function dateLabel(d) { return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
 

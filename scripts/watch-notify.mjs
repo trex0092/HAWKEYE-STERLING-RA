@@ -106,11 +106,11 @@ try {
   }
 
   /* A Regulatory Watch card that reports ONLY unreachable sources carries no
-     law change: it is a monitoring gap, filed under "AI & Platform Governance".
+     law change: it is a monitoring gap, filed under "Regulatory Changes" (the AI & Platform Governance section was removed 2026-11-06).
      Any card with a content change stays in its configured section. */
   const gapOnly = /^Regulatory Watch/.test(title) && changes && changes.length
     && changes.every(c => c.status === 'unreachable');
-  const section = gapOnly ? SECTIONS.governance.gid : (process.env.ASANA_SECTION_GID || undefined);
+  const section = gapOnly ? SECTIONS.regulatory.gid : (process.env.ASANA_SECTION_GID || undefined);
   /* Also file the law-change card in the queue it is actually worked from (see
      the MIRROR note in asana-notify). Unset ASANA_MIRROR_PROJECT_GID to stop. */
   const mirror = process.env.ASANA_MIRROR_PROJECT_GID && !gapOnly
