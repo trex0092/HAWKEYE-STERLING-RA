@@ -41,8 +41,8 @@ become false; this page and `data/tool-surfaces.json` were reconciled to the
 shipped surface on 2026-08-04. Maintainers may still reconcile the Asana
 workspace through MCP tooling in their own assistant (see
 [`asana-integration-audit.md`](../asana-integration-audit.md)); that acts as the
-human, under the human's own credential, and any drift it creates is caught by
-`scripts/asana-reconcile.mjs` like any other manual edit. **No repository secret
+human, under the human's own credential. The weekly drift check that once covered such edits
+was retired on 2026-11-06. **No repository secret
 is ever handed to the local MCP client.** The optional Composio orchestration
 surface can mint a hosted Composio MCP session only after an authenticated
 server-side admin request. Hawkeye does not consume that MCP endpoint itself,

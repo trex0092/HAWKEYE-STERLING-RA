@@ -36,7 +36,6 @@ material change, and at the quarterly management review._
 | Edited re-submissions are written through (no lost update) | `test/asana-functions.test.js` | Every push/PR | CI run log |
 | Delivery outcomes recorded in the tamper-evident activity log | `test/app.test.js` (`asana.delivery.ok/failed` cases) | Every push/PR | CI run log + in-app log |
 | Failed deliveries visible and retryable across assessments | `test/app.test.js` (retry-all + status chips) | Every push/PR | CI run log |
-| App ↔ Asana drift detected (gaps / orphans / duplicates / mismatches) | `asana-reconcile.yml` → `scripts/asana-reconcile.mjs`; logic in `test/asana-reconcile.test.mjs` | Weekly (Mon 10:00 UTC) + per-push tests | PII-free card in *Ongoing Monitoring*; issue fallback |
 | Delivery functions deployed and required upstream credentials/configuration reachable through the health path; this is not end-user authentication evidence | `function-health.yml` | Daily 05:23 UTC | Run log; Asana alert on failure; a configured app-token gate can prevent the read-only Asana-token probe and is reported as `gated` |
 
 ### 1.3 Sanctions / AM / PEP screening
@@ -73,7 +72,6 @@ material change, and at the quarterly management review._
 | Workflow security lint (incl. injection patterns) | `workflow-lint.yml` (actionlint + zizmor) | Push/PR | Check run |
 | Supply-chain posture score | `scorecard.yml` (OpenSSF) | Weekly | Scorecard dashboard / SARIF |
 | All third-party actions SHA-pinned; runners hardened (harden-runner on all 38 workflows) | `workflow-lint.yml` + audited 2026-07 | Continuous | This doc; audit trail in PRs #159/#161 |
-| Egress blocked with explicit allowlists on every `contents:write` job that fetches the internet | harden-runner `egress-policy: block` in `onboarding-screen`, `weekly-adverse-media`, `regulatory-watch`, `sanctions-watch`, `daily-sanctions-screen`, `fatf-watchdog`, `asana-reconcile`, `function-health`, `freshness-check` | Every run | Run logs (blocked-host = loud failure) |
 | Release artefacts signed (Sigstore keyless) + SBOM | `release.yml` / `auto-release.yml` (+ `test/sbom.test.mjs`) | Per release | Release attestations; `sbom.cdx.json` |
 | DAST baseline of the live site (image digest-pinned) | `dast-zap.yml` (OWASP ZAP) | Scheduled + dispatch | ZAP report artifact |
 
@@ -93,7 +91,6 @@ material change, and at the quarterly management review._
 |---|---|---|---|
 | PII-minimised delivery available (tokenised mode: ref/tier/score only) | `test/app.test.js` (tokenised payload cases) | Every push/PR | CI run log |
 | Tokenised (pseudonymised) audit-log export | `test/app.test.js`, `test/export-integrity.test.js` | Every push/PR | CI run log |
-| Reconciliation is PII-free by construction | `test/asana-reconcile.test.mjs` ("leaks no entity names") | Every push/PR | CI run log |
 | Tamper-evident (hash-chained) activity log | `test/app.test.js` (chain verify) | Every push/PR | CI run log |
 | Client-side encryption of stored records; retention purge honours filed records | `test/crypto-b64.test.mjs`, `test/app.test.js` (retention cases) | Every push/PR | CI run log; [`data-retention.md`](data-retention.md) |
 | Off-device backups (register/log/risk-data) with monthly commit to git | `risk-backup` fn + `fatf-watchdog.yml` backup step | Continuous / monthly | `data/risk-overrides-backup.json` history |

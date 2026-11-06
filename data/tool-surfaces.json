@@ -251,7 +251,6 @@
         "str_dossier.py",
         "scripts/asana-notify.mjs",
         "scripts/asana-alert.mjs",
-        "scripts/asana-reconcile.mjs",
         "netlify/functions/asana-task.js",
         "netlify/functions/asana-mirror.js",
         "netlify/functions/risk-backup.js"
