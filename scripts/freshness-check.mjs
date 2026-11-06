@@ -53,7 +53,6 @@ export const CONTROLS = [
 export const EXEMPT = {
   'a11y.yml': 'accessibility scan; quality gate, not an ingestion/eval duty',
   'anomaly-watch.yml': 'meta-monitor over run metrics; opens its own issues on anomaly',
-  'asana-reconcile.yml': 'mirror reconciliation; self-alerting on divergence',
   'attestation-verify.yml': 'supply-chain posture verification of the published image; red badge is the alarm, no ingestion duty',
   'codeql.yml': 'security scanner; also gates every push/PR',
   'compliance-calendar.yml': 'dated reminder feed from data/compliance-calendar.json; occurrences are title-deduped, due-dated Asana tasks filed inside a ≥14-day lead window with a 7-day grace tail — a missed weekly run delays a reminder inside its window and the overdue task surfaces in Asana; no ingestion duty',
