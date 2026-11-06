@@ -3443,15 +3443,31 @@ def fetch_regulator_bulletins(path=None):
                         "http 403 — this feed requires a declared contact point; "
                         "set the REGULATOR_UA_CONTACT env/repo variable")
                 raise RuntimeError(f"http {code if code is not None else 'none'}")
-            root = safe_xml_fromstring(r.content)
-            for item in root.findall(".//item")[:200]:
-                title = (item.findtext("title") or "").strip()
+            # An HTTP 200 that is not a feed (throttle page, error document)
+            # must count as a failed source, not an empty clean one.
+            root = require_feed_root(safe_xml_fromstring(r.content), s.get("name", "bulletin feed"))
+            atom_ns = "{http://www.w3.org/2005/Atom}"
+            entries = [(e, True) for e in root.findall(f".//{atom_ns}entry")] or \
+                      [(e, False) for e in root.findall(".//item")]
+            for item, is_atom in entries[:200]:
+                if is_atom:
+                    title = (item.findtext(f"{atom_ns}title") or "").strip()
+                    desc_raw = (item.findtext(f"{atom_ns}summary")
+                                or item.findtext(f"{atom_ns}content") or "")
+                    link_el = item.find(f"{atom_ns}link")
+                    link = (link_el.get("href") or "") if link_el is not None else ""
+                    date = (item.findtext(f"{atom_ns}updated")
+                            or item.findtext(f"{atom_ns}published") or "")[:16]
+                else:
+                    title = (item.findtext("title") or "").strip()
+                    desc_raw = item.findtext("description") or ""
+                    link = item.findtext("link") or ""
+                    date = (item.findtext("pubDate") or "")[:16]
                 if not title:
                     continue
-                desc = _strip_rss_description(item.findtext("description") or "")
+                desc = _strip_rss_description(desc_raw)
                 items.append({"title": title, "source": s.get("name", "regulator bulletin"),
-                              "date": (item.findtext("pubDate") or "")[:16],
-                              "url": item.findtext("link") or "",
+                              "date": date, "url": link,
                               "text": (title + " " + desc).lower()})
         except Exception as e:
             failures.append(f"{s.get('name', s.get('url', '?'))}: {str(e)[:80]}")
