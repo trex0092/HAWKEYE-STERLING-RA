@@ -344,11 +344,13 @@ runner. Watchman matching benchmark added beside the yente one: a dispatch-only,
 workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
 no government list. Measurement only — no scored control changed.*
 
-Verified at HEAD: 75 workflows · 205 markdown documents under docs/ (172 excluding docs/research/auto).
+Verified at HEAD: 76 workflows · 205 markdown documents under docs/ (172 excluding docs/research/auto).
 
 *Document-count reconciliation · 4 November 2026: research note `docs/research/open-source-candidates-2026-11-04.md` added (second open-source candidate evaluation, 27 repositories, nothing adopted). Document count 204 → 205 (171 → 172 excluding docs/research/auto). No score, readiness approval, screening evidence or operating-assurance claim changes.*
 
-*Estate-count reconciliation · 6 November 2026: the dispatch-only related-party graph report workflow (`related-party-graph.yml`) was added. Workflow count 74 → 75; blocked-egress count 75 → 76. It reads a book file in the repository, downloads nothing and has no effect on screening, so no score, readiness approval, screening evidence or operating-assurance claim changes.*
+*Estate-count reconciliation · 6 November 2026: the dispatch-only Aho-Corasick benchmark workflow (`aho-corasick-bench.yml`) was added. Workflow count 74 → 75; blocked-egress count 75 → 76. It is a measurement instrument with no data download and no effect on screening, so no score, readiness approval, screening evidence or operating-assurance claim changes.*
+
+*Estate-count reconciliation · 6 November 2026: the dispatch-only related-party graph report workflow (`related-party-graph.yml`) was added. Workflow count 75 → 76; blocked-egress count 76 → 77. It reads a book file in the repository, downloads nothing and has no effect on screening, so no score, readiness approval, screening evidence or operating-assurance claim changes.*
 
 *Estate-count reconciliation · 6 November 2026: the manual Asana Delivery Verify workflow (`netlify-deploy.yml`) was removed at the MLRO's request, together with the quarterly Asana token rotation duty in the compliance calendar that referred to it. Workflow count 75 → 74; blocked-egress count 76 → 75. No score, readiness approval, screening evidence or operating-assurance claim changes.*
 
