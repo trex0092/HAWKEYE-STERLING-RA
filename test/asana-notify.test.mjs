@@ -976,8 +976,10 @@ check('a sectionless mirror still joins the project',
      engine's own daily TM report goes there — screen.py post_tm_report). */
   const { PAYMENTS_SECTION, MONITORING_PROJECT, requireApprovedSection } = await import('../scripts/asana-sections.mjs');
   const wf = readFileSync(join(root, '.github/workflows/weekly-adverse-media.yml'), 'utf8');
-  check('the daily run reads the registered Transaction Monitoring (payments) section',
-    wf.includes("ASANA_PAYMENTS_SECTION_GID || '" + PAYMENTS_SECTION + "'"));
+  /* Retired 2026-11-06 at the MLRO's request: the Transaction Monitoring section was
+     removed from HAWKEYE STERLING APP, so the daily run no longer sets it. */
+  check('the daily run no longer sets the retired Transaction Monitoring (payments) section',
+    !/^\s+ASANA_PAYMENTS_SECTION_GID:/m.test(wf));
   let refused = false;
   try { requireApprovedSection(MONITORING_PROJECT, PAYMENTS_SECTION); } catch { refused = true; }
   check('the Transaction Monitoring section is refused to the JS notifiers', refused);
@@ -1003,10 +1005,13 @@ check('a sectionless mirror still joins the project',
     && alertSection('EOCN weekly review prepared — one click to sign off') === S.regulatory.gid);
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const gov = readFileSync(join(root, 'scripts/governance-report.mjs'), 'utf8');
-  check('the AI Governance & Platform Report files under AI & Platform Governance',
-    /const section = GOV_SECTION_GID \|\| SECTIONS\.governance\.gid;/.test(gov) && /GOV_SECTION_NAME = SECTIONS\.governance\.name/.test(gov));
-  check('Advisor Eval files under AI & Platform Governance',
-    readFileSync(join(root, '.github/workflows/advisor-eval.yml'), 'utf8').includes("ASANA_SECTION_GID: '" + S.governance.gid + "'"));
+  /* Retired 2026-11-06 at the MLRO's request: the report is published in the run summary. */
+  check('the AI Governance & Platform Report no longer files to Asana',
+    !/asana-notify\.mjs/.test(gov) && !/requireApprovedSection/.test(gov)
+    && /GITHUB_STEP_SUMMARY/.test(readFileSync(join(root, '.github/workflows/governance-report.yml'), 'utf8')));
+  /* Retired 2026-11-06 at the MLRO's request: Advisor Eval now publishes in the run summary. */
+  check('Advisor Eval no longer files to Asana',
+    !readFileSync(join(root, '.github/workflows/advisor-eval.yml'), 'utf8').includes('ASANA_SECTION_GID'));
   const fatf = readFileSync(join(root, 'scripts/fatf-watchdog.mjs'), 'utf8');
   check('FATF monitoring GAP → AI & Platform Governance; FATF list change → Regulatory Changes',
     fatf.includes("ASANA_FATF_GAP_SECTION_GID || '" + S.governance.gid + "'")

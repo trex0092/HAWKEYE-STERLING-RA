@@ -717,9 +717,9 @@ const LIMIT_MSG = 'You have reached your specified API usage limits. You will re
   /* Regression for the 2026-10-26 incident: all three Netlify function
      probes passed, but the provider billing error and a failed Asana alert
      incorrectly triggered a second FUNCTION DOWN incident. */
-  const advisorAlert = HEALTH.split('      - name: Alert in Asana when Advisor upstream is unavailable')[1]
-    ?.split('      - name: Alert in Asana on function infrastructure failure')[0] || '';
-  const infraAlert = HEALTH.split('      - name: Alert in Asana on function infrastructure failure')[1]
+  const advisorAlert = HEALTH.split('      - name: Report Advisor upstream unavailable in the run (Asana delivery retired 2026-11-06)')[1]
+    ?.split('      - name: Report function infrastructure failure in the run (Asana delivery retired 2026-11-06)')[0] || '';
+  const infraAlert = HEALTH.split('      - name: Report function infrastructure failure in the run (Asana delivery retired 2026-11-06)')[1]
     ?.split('      - name: Require real Advisor upstream evidence')[0] || '';
   const finalGate = HEALTH.split('      - name: Require real Advisor upstream evidence')[1] || '';
   check('Advisor outage still emits its own incident even after another probe fails',
@@ -733,7 +733,7 @@ const LIMIT_MSG = 'You have reached your specified API usage limits. You will re
     !infraAlert.includes("steps.brain_soul_e2e.outcome == 'failure'"));
   check('live Advisor evidence stays mandatory even if outage alert delivery succeeds',
     HEALTH.indexOf('      - name: Require real Advisor upstream evidence') >
-      HEALTH.indexOf('      - name: Alert in Asana on function infrastructure failure') &&
+      HEALTH.indexOf('      - name: Report function infrastructure failure in the run (Asana delivery retired 2026-11-06)') &&
     finalGate.includes("if: '!cancelled()'") &&
     finalGate.includes('steps.brain_soul_e2e.outcome') &&
     finalGate.includes('"$ADVISOR_PROBE_OUTCOME" != "success"') &&

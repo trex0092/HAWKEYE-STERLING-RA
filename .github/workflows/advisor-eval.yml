@@ -72,77 +72,27 @@ jobs:
 
       - name: Run Advisor behavioural eval
         id: eval
-        # Don't fail the whole job here; we want to route a regression to Asana/issue first.
+        # Don't fail the whole job here; we want the result published in the run summary first.
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/advisor-eval.mjs
 
-      - name: Notify Asana on regression — Ongoing Monitoring project
-        id: asana
-        continue-on-error: true
+      # Asana delivery retired 2026-11-06 at the MLRO's request (the "AI & Platform
+      # Governance" section of HAWKEYE STERLING APP was removed). The result is now
+      # published in the run's job summary, and the job still fails red below.
+      - name: Publish the eval result in the run summary
         if: steps.eval.outcome == 'failure'
-        env:
-          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          # Repointed 2026-09-17 to "AI & Platform Governance" (1216782693874840),
-          # the same section weekly-summary.yml already uses for AI/Advisor
-          # governance content. Unlike the sanctions/regulatory/FATF fixes, there
-          # was no pre-existing repo variable proving this is the intended
-          # destination for advisor-eval specifically -- this is the best-supported
-          # inference (an Advisor guardrail failure is AI/Advisor governance
-          # content), not confirmed intent. Reuses ASANA_WEEKLY_SECTION_GID rather
-          # than adding a new variable for the same physical section.
-          # RE-FIXED 2026-09-24: 1216782693874840 no longer existed in the live
-          # project (Asana 400 "Unknown object", confirmed on run 35868429817) --
-          # deleted sometime after the 09-17 fix during an unrelated section
-          # cleanup. The live project's "AI & Platform Governance" section is now
-          # 1218785568483509 (same name, re-provisioned gid, verified against the
-          # live Asana API just now). Updated the repo variable to match and
-          # corrected this literal fallback for defense-in-depth.
-          # REPOINTED 2026-10-01: "AI & Platform Governance" is not one of the
-          # four approved HAWKEYE STERLING APP sections (scripts/asana-sections.mjs,
-          # #701/#703), so every alert routed there was refused ("an explicit
-          # approved section is required"). #703 moved the other governance
-          # reports to "Regulatory Changes"; this follows it. Pinned, not read
-          # from a repo variable: a stale variable cannot misroute an approved
-          # destination, and test/asana-notify.test.mjs fails CI on any
-          # unapproved section literal.
-          # REPOINTED 2026-10-03: "AI & Platform Governance" is now an approved
-          # section (1218985347982681, registered in asana-sections.mjs against
-          # the live project), so the Advisor guardrail result is filed there.
-          ASANA_SECTION_GID: '1218985347982681'
-        # Title must not claim a regression when the eval could not run (e.g. the
-        # API returned 400s on a billing lapse) — the report's Result line is the
-        # discriminator, written by scripts/advisor-eval.mjs.
         run: |
           TITLE="Advisor guardrail regression detected"
           if grep -q '^\*\*Result: INCOMPLETE' advisor-eval-report.md; then
-            TITLE="Advisor eval incomplete — API errors (no regression evidence)"
+            TITLE="Advisor eval incomplete - API errors (no regression evidence)"
           fi
-          node scripts/watch-notify.mjs "$TITLE" advisor-eval-report.md
-
-      - name: Fallback to a GitHub issue if Asana delivery failed
-        if: steps.eval.outcome == 'failure' && steps.asana.outcome == 'failure'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          script: |
-            const fs = require('fs');
-            let report = 'Advisor eval reported a guardrail regression. See the workflow run.';
-            try { report = fs.readFileSync('advisor-eval-report.md', 'utf8'); } catch (e) {}
-            const incomplete = report.includes('**Result: INCOMPLETE');
-            const { owner, repo } = context.repo;
-            await github.rest.issues.create({
-              owner, repo,
-              title: incomplete
-                ? 'Advisor eval incomplete — API errors (no regression evidence)'
-                : 'Advisor guardrail regression detected',
-              body: report + '\n\n---\n> Filed because the Asana delivery was unavailable. Set the `ASANA_ACCESS_TOKEN` secret to route future regressions to Asana.',
-              labels: ['advisor-eval'],
-            });
+          echo "::error title=$TITLE::see the run summary and advisor-eval-report.md"
+          { echo "## $TITLE"; echo; cat advisor-eval-report.md; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail the job if a guardrail regressed or the eval could not run
         if: steps.eval.outcome == 'failure'
         run: |
-          echo "Advisor eval reported a guardrail regression or could not complete — see advisor-eval-report.md and the alert above."
+          echo "Advisor eval reported a guardrail regression or could not complete — see advisor-eval-report.md and the run summary above."
           exit 1
