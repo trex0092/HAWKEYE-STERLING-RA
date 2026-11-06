@@ -889,12 +889,20 @@ _msgs = [
      "params": {"name": "hawkeye_normalize_name", "arguments": {"name": "Acme", "undeclared": "x"}}},
 ]
 _server = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mcp_server.py")
+# Only what a Python process needs to start (the interpreter on a CI runner sits in a
+# tool cache and finds its shared library through LD_LIBRARY_PATH). Every other
+# variable, including any ASANA_ / ANTHROPIC_ credential, is deliberately left out.
+_child_env = {k: v for k, v in os.environ.items()
+              if k in ("PATH", "LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH", "HOME",
+                       "TMPDIR", "LANG", "LC_ALL", "SYSTEMROOT")}
 with tempfile.TemporaryDirectory() as _elsewhere:
     _proc = subprocess.run(
         [sys.executable, os.path.abspath(_server)],
         input="".join(json.dumps(m) + "\n" for m in _msgs),
         capture_output=True, text=True, timeout=60, cwd=_elsewhere,
-        env={"PATH": os.environ.get("PATH", "")})
+        env=_child_env)
+if _proc.returncode != 0:   # evidence for a failing run: why the child died
+    print("  (child exit code %s; stderr tail: %s)" % (_proc.returncode, _proc.stderr[-400:].strip()))
 _out_lines = [x for x in _proc.stdout.splitlines() if x.strip()]
 try:
     _frames_real = [json.loads(x) for x in _out_lines]
@@ -908,7 +916,7 @@ check("one reply per request and none for the notification (ids 1, 2, 3, 4 in or
 check("real process lists every registered tool",
       _frames_real is not None and len(_frames_real) >= 2
       and len(_frames_real[1]["result"]["tools"]) == len(mcp_tools.TOOLS))
-check("real process runs a tool call from another directory with a bare environment",
+check("real process runs a tool call from another directory with a minimal environment",
       _frames_real is not None and len(_frames_real) >= 3
       and _frames_real[2]["result"]["structuredContent"]["normalized"] == "ACME")
 check("real process rejects an undeclared argument in-band (isError=true, no value echoed)",
