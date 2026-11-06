@@ -7158,6 +7158,27 @@ check("dedup lookup: daily cut-off is UAE midnight expressed as UTC (2026-11-05T
 check("dedup lookup: onboarding window subtracts the UAE offset before labelling UTC",
       screen._uae_to_asana_utc(_dt_ut.datetime(2026, 11, 6, 12, 0, 0)) == "2026-11-06T08:00:00.000Z")
 
+# A broken core list must keep alarming. Recording the collapsed count in the
+# baseline made it the median after about half the window, so the alarm went
+# silent (reproduced: alarmed 16 days, then silent) while the source was still broken.
+import datetime as _dt_cov
+_cov_p = os.path.join(_dir, "c_persist.json")
+_cov_b = _dt_cov.date(2026, 1, 1)
+def _cov_day(n, count):
+    return monitoring.check_source_coverage({"un": {"count": count, "tier": "core"}},
+                                            str(_cov_b + _dt_cov.timedelta(n)), _cov_p)
+for _i in range(30):
+    _cov_day(_i, 1000)
+for _i in range(30, 70):
+    _cov_r = _cov_day(_i, 300)
+check("coverage alarm: a collapsed core list is still alarming 40 days later and counts the days",
+      bool(_cov_r["alarms"]) and "unresolved for 40 day(s)" in _cov_r["alarms"][0])
+check("coverage alarm: clears as soon as the count recovers",
+      not _cov_day(70, 1000)["alarms"])
+check("coverage alarm: a supplementary list still adapts to its new level (soft note only)",
+      (lambda p: [monitoring.check_source_coverage({"ca": {"count": 1000, "tier": "supplementary"}}, str(_cov_b + _dt_cov.timedelta(i)), p) for i in range(5)]
+       and not monitoring.check_source_coverage({"ca": {"count": 300, "tier": "supplementary"}}, "2026-03-01", p)["alarms"])(os.path.join(_dir, "c_supp.json")))
+
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
     sys.exit(1)

@@ -360,6 +360,7 @@ def check_source_coverage(list_meta, today, path=None):
     for key, meta in (list_meta or {}).items():
         count = int(meta.get("count", 0) or 0)
         tier = meta.get("tier", "core")
+        quarantined = False
         hist = state.get(key, {}).get("history", [])
         med = _median([h["count"] for h in hist if isinstance(h.get("count"), (int, float))])
         if med and med > 0:
@@ -369,12 +370,29 @@ def check_source_coverage(list_meta, today, path=None):
                        f"({count:,} now vs trailing median {med:,.0f})")
                 drops.append(msg)
                 if tier == "core":
-                    alarms.append(msg + " — possible bad parse / truncated source; treat sanctions as DEGRADED until verified")
+                    quarantined = True
+                    since = state.get(key, {}).get("alarm_since") or today
+                    try:
+                        days = (datetime.date.fromisoformat(today)
+                                - datetime.date.fromisoformat(since)).days + 1
+                    except ValueError:
+                        days = 1
+                    alarms.append(msg + f" — possible bad parse / truncated source (unresolved for {days} day(s)); "
+                                  "treat sanctions as DEGRADED until verified")
         # update history (skip zero counts — those are handled by degrade-loudly elsewhere)
         entry = state.setdefault(key, {"history": []})
         entry["history"] = [h for h in entry["history"] if h.get("date") != today]
-        if count > 0:
-            entry["history"].append({"date": today, "count": count})
+        # A core-list count that triggered the alarm is NOT fed into the baseline:
+        # recorded, it becomes the median after about half the window and the
+        # alarm goes silent while the source is still broken. The alarm now
+        # persists until the count recovers (which clears it) or the baseline
+        # is deliberately reset by deleting this list's entry from the state file.
+        if quarantined:
+            entry.setdefault("alarm_since", today)
+        else:
+            entry.pop("alarm_since", None)
+            if count > 0:
+                entry["history"].append({"date": today, "count": count})
         entry["history"] = entry["history"][-HISTORY_KEEP:]
         entry["tier"] = tier
     updated = _save(p, state)
