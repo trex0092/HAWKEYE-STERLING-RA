@@ -1,0 +1,64 @@
+name: Aho-Corasick benchmark
+
+# EXPERIMENTAL, shadow-only, dispatch-only, dependency-free. This is a
+# measurement instrument, not a control.
+#
+# What it does: scans a deterministic synthetic corpus built from this repo's own
+# frozen screening benchmark names, once with a single-pass Aho-Corasick automaton
+# written in scripts/aho-corasick-bench.mjs and once with one substring search per
+# name. The run fails if the two ever disagree. Timings are reported for
+# information only.
+#
+# Scope: nothing here downloads data or touches screening state, cases or Asana.
+# Using the automaton inside the live matchers would be a separate change governed
+# by the recall-monotone invariant and the Python/JS matcher parity test.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            nodejs.org:443
+            *.githubapp.com:443
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Run the benchmark
+        run: |
+          node scripts/aho-corasick-bench.mjs 20000
+          cat aho-corasick-bench-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aho-corasick-bench-report
+          path: aho-corasick-bench-report.md
+          if-no-files-found: ignore
+          retention-days: 30
