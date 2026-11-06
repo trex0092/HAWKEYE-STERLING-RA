@@ -778,6 +778,22 @@ def red_flag_refs(rule):
     return [c for c, f in load_red_flags().items() if rule in f.get("detected_by", [])]
 
 
+def _flag_codes(value):
+    """The red-flag codes recorded on one record, whatever shape they arrived in.
+    A list is used as is; text ("STR-ML-11, SAR-CB-03") is split on commas,
+    semicolons and spaces, not read letter by letter; any other single value is
+    one code to be reported as unknown. One malformed record must not crash the
+    rule, because the rule would then skip every other record of the customer,
+    including a CRITICAL terrorist-financing flag."""
+    if not value:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    if isinstance(value, str):
+        return [c for c in re.split(r"[,;\s]+", value) if c]
+    return [value]
+
+
 def rule_red_flag_recorded(txns):
     """Red flags a person recorded on a payment or activity task ('Red flags:
     STR-ML-11, SAR-CB-03'; a bare 'ML-11' is the STR register's). STR TF / PF /
@@ -786,7 +802,7 @@ def rule_red_flag_recorded(txns):
     catalogue = load_red_flags()
     out = []
     for t in txns:
-        for code in t.get("red_flags") or []:
+        for code in _flag_codes(t.get("red_flags")):
             f = catalogue.get(normalise_flag_code(code))
             if f is None:
                 out.append(_alert("RED_FLAG", "HIGH", t,
