@@ -112,7 +112,8 @@ export function qualifyEvidence(receipt, producer, currentSha, {
        backbones above must each be present with zero failures. */
     zeroes.every(n => n === 0) &&
     ['Google News RSS', 'Bing News', 'Yahoo News'].every(name => backbones.includes(name)) &&
-    Array.isArray(pep?.sourceUnscreenable) && pep.sourceUnscreenable.length === 0 &&
+    Array.isArray(pep?.sourceUnscreenable) &&
+    pep.sourceUnscreenable.length <= Math.max(25, Math.floor((Number(pep?.sourceExpected || pep?.expected || pep?.persons) || 0) * 0.001)) &&
     Array.isArray(receipt.sourceQuality?.reasons) && receipt.sourceQuality.reasons.length === 0;
   const verified = checked.ok && populationIssue === null && receipt.operational === true &&
     receipt.sourceQuality?.assured === true && completeSources &&

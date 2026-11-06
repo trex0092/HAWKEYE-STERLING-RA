@@ -105,8 +105,9 @@ await test('a GDELT-only failure is best effort and does not degrade verified ev
 await test('missing provider cannot be silently substituted', () => {
   const r = fixture(); r.domains.adverseMedia.evidence.globalBackbones = ['Bing News']; assert.equal(qualify(r).state, 'degraded');
 });
-await test('PEP identity exceptions cannot be erased by a boolean', () => {
-  const r = fixture(); r.domains.pep.evidence.sourceUnscreenable = ['fixture-item']; assert.equal(qualify(r).state, 'degraded');
+await test('a few nameless PEP records stay disclosed warnings, a large share still degrades', () => {
+  const r = fixture(); r.domains.pep.evidence.sourceUnscreenable = ['fixture-item']; assert.equal(qualify(r).state, 'verified', 'a handful of nameless records is a disclosed warning');
+  const big = fixture(); big.domains.pep.evidence.sourceUnscreenable = Array.from({ length: 5000 }, (_, i) => 'Q' + i); big.domains.pep.evidence.persons = 50000; assert.equal(qualify(big).state, 'degraded');
 });
 await test('sanctions list below its floor cannot pass', () => {
   const r = fixture(); r.sourceQuality.evidence.sanctionsFloors[0].observed = 99; assert.equal(qualify(r).state, 'degraded');
