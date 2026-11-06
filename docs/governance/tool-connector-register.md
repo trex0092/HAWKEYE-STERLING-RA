@@ -100,7 +100,7 @@ stops — that is what makes it non-agentic in the asset register.
 Two names, one workspace: the Python engine reads `ASANA_TOKEN` (required at
 import — the engine refuses to start rather than degrade silently) while Node
 and the Netlify functions read `ASANA_ACCESS_TOKEN`;
-`.github/workflows/netlify-deploy.yml` bridges them. Both are secrets; neither
+the screening workflows bridge them (`ASANA_TOKEN` is set from `ASANA_ACCESS_TOKEN`). Both are secrets; neither
 reaches the browser.
 
 The Composio bridge is documented in [`../composio-integration.md`](../composio-integration.md). It remains an **outer, disabled-by-default orchestration layer**. Named tool execution is now default-denied without `COMPOSIO_READ_TOOL_SLUGS`; mutations, hosted MCP, remote attaches and presigned links require independent high-privilege gates. The optional local MCP `hawkeye_assess_connected_evidence` accepts only operator-normalised evidence-reference metadata and performs no network, model or customer data access. It does not change sanctioned/PEP/CDD decisions and is covered by the pre-existing local `mcp.tool` read-only authorization. `APP_SHARED_TOKEN` still lacks per-user identity (OA-20); this is not resolved by tool allowlisting. Provider approval remains OA-29.

@@ -82,6 +82,7 @@ jobs:
             www.international.gc.ca:443
             news.google.com:443
             www.bing.com:443
+            news.search.yahoo.com:443
             api.gdeltproject.org:443
             data.gdeltproject.org:443
             www.wikidata.org:443

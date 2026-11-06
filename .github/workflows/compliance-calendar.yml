@@ -9,7 +9,7 @@ name: Compliance Calendar
 # ("reviewed annually") that nobody re-reads. Weekly Monday cron; each
 # occurrence is filed ONCE — the task title embeds the occurrence date and an
 # exact-title check across the project dedups re-fires (same forever-dedup as
-# scorecard-milestone.yml). The registry is the MLRO-editable surface: move a
+# the former Scorecard milestone reminder). The registry is the MLRO-editable surface: move a
 # provisional date or add duties (EWRA refresh, goAML renewal anniversary)
 # by editing the JSON, not this workflow. Needs the ASANA_ACCESS_TOKEN secret.
 

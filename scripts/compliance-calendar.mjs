@@ -20,7 +20,7 @@
    Recurring occurrences are computed FROM THE ANCHOR (month-end clamped), so
    Jan 31 yields Feb 28 then Mar 31, never a chained-clamp drift to Mar 28.
 
-   Idempotent like scorecard-milestone.mjs: the task title embeds the
+   Idempotent like the former Scorecard milestone reminder: the task title embeds the
    occurrence date and an exact-title check across the whole project skips
    anything already filed, so weekly re-fires inside a window never duplicate.
 
