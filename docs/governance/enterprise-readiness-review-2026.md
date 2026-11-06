@@ -344,9 +344,11 @@ runner. Watchman matching benchmark added beside the yente one: a dispatch-only,
 workflow that scores moov-io/watchman (Apache-2.0) on the repo's own benchmark fixtures, loading
 no government list. Measurement only — no scored control changed.*
 
-Verified at HEAD: 77 workflows · 205 markdown documents under docs/ (172 excluding docs/research/auto).
+Verified at HEAD: 75 workflows · 205 markdown documents under docs/ (172 excluding docs/research/auto).
 
 *Document-count reconciliation · 4 November 2026: research note `docs/research/open-source-candidates-2026-11-04.md` added (second open-source candidate evaluation, 27 repositories, nothing adopted). Document count 204 → 205 (171 → 172 excluding docs/research/auto). No score, readiness approval, screening evidence or operating-assurance claim changes.*
+
+*Estate-count reconciliation · 6 November 2026: the Scorecard 9.0 milestone reminder (`scorecard-milestone.yml`) and the Asana Live Delivery Diagnostic (`asana-delivery-diag.yml`) were removed at the MLRO's request. Workflow count 77 → 75; blocked-egress count 78 → 76. No score, readiness approval, screening evidence or operating-assurance claim changes.*
 
 *Estate-count reconciliation · 6 November 2026: the weekly Asana Reconciliation workflow (`asana-reconcile.yml`) was removed at the MLRO's request. Workflow count 78 → 77; blocked-egress count 79 → 78. No score, readiness approval, screening evidence or operating-assurance claim changes.*
 

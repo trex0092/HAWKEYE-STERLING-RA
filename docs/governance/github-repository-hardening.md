@@ -160,7 +160,7 @@ deliberately split:
 - **`egress-policy: block`** (enforced, with a pinned allow-list) — the sensitive
   or predictable-egress jobs: all token-handling AML/Asana workflows, the
   high-frequency CI gates **`ci` (both jobs), `lint`, `gitleaks`,
-  `dependency-review`**, `netlify-deploy` / `asana-delivery-diag`, and — promoted
+  `dependency-review`**, `netlify-deploy`, and — promoted
   2026-07-15 with allow-lists read from their own egress-audit logs —
   **`scorecard`, `workflow-lint`, `semgrep`, `osv-scanner`** and ci's `fuzz` job.
   A compromised dependency here cannot reach an unlisted host — the run fails
