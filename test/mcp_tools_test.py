@@ -869,6 +869,54 @@ check("orchestrator: proposal digest is canonical (key order) and binds the exac
       orch.proposal_digest(_plan()) == orch.proposal_digest(_reordered)
       and orch.proposal_digest(_plan()) != orch.proposal_digest(_plan(objective="Screen another subject")))
 
+# ── mcp_server as a REAL process — the way an MCP client launches it ──────────────
+# Everything above drives dispatch()/serve() in-process. A client starts
+# `python mcp_server.py`, possibly from another directory with a bare
+# environment, and reads newline-delimited JSON-RPC on stdout. This pins that
+# whole path: the __main__ entry, imports resolved from the module location,
+# stdout carrying ONLY protocol frames (logs belong on stderr), and clean
+# shutdown when stdin closes.
+print("mcp_server — real stdio process")
+import subprocess, tempfile
+_msgs = [
+    {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+     "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "smoke", "version": "1"}}},
+    {"jsonrpc": "2.0", "method": "notifications/initialized"},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+    {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+     "params": {"name": "hawkeye_normalize_name", "arguments": {"name": "Acme"}}},
+    {"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+     "params": {"name": "hawkeye_normalize_name", "arguments": {"name": "Acme", "undeclared": "x"}}},
+]
+_server = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mcp_server.py")
+with tempfile.TemporaryDirectory() as _elsewhere:
+    _proc = subprocess.run(
+        [sys.executable, os.path.abspath(_server)],
+        input="".join(json.dumps(m) + "\n" for m in _msgs),
+        capture_output=True, text=True, timeout=60, cwd=_elsewhere,
+        env={"PATH": os.environ.get("PATH", "")})
+_out_lines = [x for x in _proc.stdout.splitlines() if x.strip()]
+try:
+    _frames_real = [json.loads(x) for x in _out_lines]
+except ValueError:
+    _frames_real = None
+check("real process exits 0 when stdin closes", _proc.returncode == 0)
+check("stdout carries only JSON-RPC 2.0 frames (no log lines on stdout)",
+      _frames_real is not None and all(f.get("jsonrpc") == "2.0" for f in _frames_real))
+check("one reply per request and none for the notification (ids 1, 2, 3, 4 in order)",
+      _frames_real is not None and [f.get("id") for f in _frames_real] == [1, 2, 3, 4])
+check("real process lists every registered tool",
+      _frames_real is not None and len(_frames_real) >= 2
+      and len(_frames_real[1]["result"]["tools"]) == len(mcp_tools.TOOLS))
+check("real process runs a tool call from another directory with a bare environment",
+      _frames_real is not None and len(_frames_real) >= 3
+      and _frames_real[2]["result"]["structuredContent"]["normalized"] == "ACME")
+check("real process rejects an undeclared argument in-band (isError=true, no value echoed)",
+      _frames_real is not None and len(_frames_real) >= 4
+      and _frames_real[3].get("result", {}).get("isError") is True
+      and "undeclared" not in json.dumps(_frames_real[3]))
+check("logs go to stderr", "ready on stdio" in _proc.stderr and "ready on stdio" not in _proc.stdout)
+
 total_fail = len(_fail)
 print("\n" + ("ALL MCP TESTS PASSED" if not total_fail else f"{total_fail} MCP TEST(S) FAILED"))
 sys.exit(1 if total_fail else 0)
