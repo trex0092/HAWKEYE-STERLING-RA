@@ -197,6 +197,39 @@ const event = (body) => ({ httpMethod: 'POST', headers: {}, body: JSON.stringify
     check('asana-mirror: read with an expired token surfaces 401 (not an empty success)', res6.statusCode === 401 && b.ok === false && /ASANA_ACCESS_TOKEN|unauthoriz/i.test(b.error));
   }
 
+  /* Mirror safety (web-app review): the action must be named exactly, and a write
+     must carry both lists. Before, any other body (an empty object, a typo such as
+     "Read") fell through to a WRITE that replaced the off-device register and
+     activity log with empty ones. No Asana call may happen for these requests. */
+  {
+    let asanaCalls = 0;
+    setFetch(async () => { asanaCalls++; return { ok: true, status: 200, json: () => Promise.resolve({ data: [] }) }; });
+    const noAction = await asanaMirror.handler(event({}));
+    const typo = await asanaMirror.handler(event({ action: 'Read' }));
+    const noLists = await asanaMirror.handler(event({ action: 'write' }));
+    const noAudit = await asanaMirror.handler(event({ action: 'write', register: [] }));
+    check('asana-mirror: a body with no action is refused (400), never treated as a write',
+      noAction.statusCode === 400 && JSON.parse(noAction.body).ok === false);
+    check('asana-mirror: a mistyped action ("Read") is refused (400)', typo.statusCode === 400);
+    check('asana-mirror: a write without register and audit is refused (400)', noLists.statusCode === 400);
+    check('asana-mirror: a write without an audit list is refused (400)', noAudit.statusCode === 400);
+    check('asana-mirror: refused requests make no Asana call (the backup is untouched)', asanaCalls === 0);
+  }
+  /* An existing backup note that cannot be parsed is NOT an empty backup. */
+  {
+    setFetch(async (url) => ({ ok: true, status: 200, json: () => Promise.resolve(
+      { data: [{ gid: '1', name: 'ASSESSMENT REGISTER (auto-backup)', notes: 'edited by hand, markers removed' }] }) }));
+    const bad = await asanaMirror.handler(event({ action: 'read' }));
+    const bb = JSON.parse(bad.body);
+    check('asana-mirror: a corrupt backup note is reported as an error, not an empty register',
+      bad.statusCode === 502 && bb.ok === false && /unreadable/i.test(bb.error));
+    setFetch(async () => ({ ok: true, status: 200, json: () => Promise.resolve({ data: [] }) }));
+    const none = await asanaMirror.handler(event({ action: 'read' }));
+    const nb = JSON.parse(none.body);
+    check('asana-mirror: no backup tasks yet is still an empty success',
+      none.statusCode === 200 && nb.ok === true && nb.register.length === 0 && nb.audit.length === 0);
+  }
+
   /* ── New capabilities (2026-07): external-id idempotency, custom fields,
      429 backoff, content-type strictness ─────────────────────────────────────── */
 
