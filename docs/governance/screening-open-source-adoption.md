@@ -40,6 +40,7 @@ All 12 capabilities are implemented without adding a runtime dependency. The mai
 7. The yente comparison remains shadow/benchmark-only; it is not the operative matcher.
 8. opensanctions/rigour (MIT) is benchmark-only too: `.github/workflows/arabic-name-bench.yml` measures its cross-script name symbols on UN Latin/Arabic gold pairs. It is installed only in that CI job (its dependency python-stdnum is LGPL-2.1, used unmodified as a library) and is never imported by the engine.
 9. moov-io/watchman (Apache-2.0) is a second shadow benchmark engine beside yente: `.github/workflows/watchman-bench.yml` scores it on the repo's own fixtures with no government list loaded. It is not the operative matcher.
+10. The Aho-Corasick idea (WojciechMula/pyahocorasick, BSD-3-Clause, row 19 of the 4 November 2026 candidate note) is measured, not adopted: `.github/workflows/aho-corasick-bench.yml` runs a dependency-free automaton written in `scripts/aho-corasick-bench.mjs` against one substring search per name, on a deterministic corpus built from the repo's own benchmark names, and fails if the two ever differ. No third-party code is used and the live matchers are unchanged.
 
 ## Licensing and supply-chain boundary
 
