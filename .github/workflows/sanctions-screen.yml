@@ -235,12 +235,18 @@ jobs:
           EU_FSF_TOKEN: ${{ secrets.EU_FSF_TOKEN }}
           SCREEN_ADVERSE_MEDIA: ${{ vars.SCREEN_ADVERSE_MEDIA }}
           # Google News locales swept per subject (pinned core + daily rotation).
-          # 8 is the empirical per-IP ceiling from a GitHub runner — the Python
-          # engine's record (weekly-adverse-media.yml, ADVERSE_LOCALES note):
-          # 14 locales tripped the limiter and 805/838 subjects got ZERO
-          # adverse-media coverage; a small budget swept the full book clean.
-          # Same env name/semantics as the Python engine; 'all' = full matrix.
-          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '8' }}
+          # The daily run asks Google for ONE edition per subject (the required
+          # worldwide en-US backbone), paced slowly. On 2026-11-06 the previous
+          # 8-edition sweep (about 7,900 requests at 2.5 per second from one
+          # shared runner address) made Google refuse with HTTP 503 after ~280
+          # requests; its breaker then stayed open and 954 of 991 subjects got
+          # no Google coverage. 991 requests at 4.5 s apiece take about 74 min,
+          # inside the 106-minute enrichment budget. GDELT (global, multilingual)
+          # and Bing run alongside, and the regional Google editions are swept
+          # by weekly-adverse-media.yml. Same env name/semantics as the Python
+          # engine; 'all' = full matrix.
+          ADVERSE_LOCALES: ${{ vars.ADVERSE_LOCALES || '1' }}
+          GNEWS_MIN_INTERVAL_MS: ${{ vars.GNEWS_MIN_INTERVAL_MS || '4500' }}
           # Third global news backbone (independent rate-limit pool — worldwide
           # recall needs three simultaneous refusals to go dark). '0' disables.
           BING_NEWS: ${{ vars.BING_NEWS || '1' }}
