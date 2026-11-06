@@ -115,7 +115,10 @@ def screen_name(name, watchlist, list_name="watchlist"):
         # Nothing to compare against: "cleared" here would be a clear no list
         # ever produced.
         raise ValueError("'watchlist' has no screenable entry — nothing was screened")
-    hits = [_hit_view(h) for h in screen.screen_name(subject, {lname: entries})]
+    try:
+        hits = [_hit_view(h) for h in screen.screen_name(subject, {lname: entries})]
+    finally:
+        screen.release_entry_caches(entries)   # a per-call list is never reused
     if screen._unscreenable(subject):
         # The matcher skips a name with < 4 matchable characters (and loses
         # non-Latin script letters), so "Ali" against ["Ali"] came back CLEARED.
@@ -181,11 +184,14 @@ def screen_payment(watchlist, message=None, parties=None, remittance_info=None,
         raise ValueError("no payment party could be read from the input")
     if not entries:
         raise ValueError("'watchlist' has no screenable entry — nothing was screened")
-    results = [payment_screen.screen_payment(p, {lname: entries},
-                                             jurisdiction_table=kyc.load_jurisdiction_risk(),
-                                             matcher=screen.screen_name, normalizer=screen.normalize,
-                                             unscreenable=screen._unscreenable)
-               for p in payments]
+    try:
+        results = [payment_screen.screen_payment(p, {lname: entries},
+                                                 jurisdiction_table=kyc.load_jurisdiction_risk(),
+                                                 matcher=screen.screen_name, normalizer=screen.normalize,
+                                                 unscreenable=screen._unscreenable)
+                   for p in payments]
+    finally:
+        screen.release_entry_caches(entries)   # a per-call list is never reused
     for r in results:
         for party in r["parties"]:
             party["hits"] = [_hit_view(h) for h in party["hits"]]
@@ -211,7 +217,10 @@ def screen_internal_watchlist(name, path=None):
         raise ValueError("internal watchlist could not be parsed — nothing was screened; "
                          "fix data/internal-watchlist.json")
     entries = [(screen.normalize(x), x) for x in names if screen.normalize(x)]
-    hits = screen.screen_name(subject, {"Internal Watchlist": entries}) if entries else []
+    try:
+        hits = screen.screen_name(subject, {"Internal Watchlist": entries}) if entries else []
+    finally:
+        screen.release_entry_caches(entries)   # rebuilt on every call, never reused
     if entries and screen._unscreenable(subject):
         hits.append(screen._manual_review_hit("SUBJECT", subject, False))
     return {

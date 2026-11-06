@@ -4953,6 +4953,30 @@ try:
 except Exception:
     _rf_process = None
 _NORMS_CACHE = {}
+# Both index caches below (_NORMS_CACHE, _PHON_IDX_CACHE) are keyed by id(entries)
+# and pin the list with a strong reference. A one-shot run loads each list once,
+# so they stay small. A long-lived process that builds a fresh list per call (the
+# MCP server screens a caller-supplied watchlist on every call) would otherwise
+# grow them without limit: 300 calls left 300 pinned lists. The oldest entry is
+# dropped past this size; the default is far above the number of lists a
+# production run screens, so a run never rebuilds an index it still needs.
+INDEX_CACHE_MAX = int(os.environ.get("SCREEN_INDEX_CACHE_MAX", "512"))
+
+
+def _index_cache_store(cache, key, value):
+    cache[key] = value
+    while len(cache) > INDEX_CACHE_MAX:
+        cache.pop(next(iter(cache)))
+
+
+def release_entry_caches(entries):
+    """Forget the indexes built for one entries list. For callers that build a
+    list, screen against it once and discard it."""
+    key = id(entries)
+    _NORMS_CACHE.pop(key, None)
+    _PHON_IDX_CACHE.pop(key, None)
+
+
 # One-shot latch so the blocking-disabled notice is logged once per run, not once
 # per subject per list.
 _BLOCKING_STATE = {"warned": False}   # id(entries) -> (entries, [norm, ...]) — strong ref pins the id
@@ -4969,7 +4993,7 @@ def _entry_norms(entries):
     cached = _NORMS_CACHE.get(key)
     if cached is None or cached[0] is not entries or len(cached[1]) != len(entries):
         cached = (entries, [e[0] for e in entries])
-        _NORMS_CACHE[key] = cached
+        _index_cache_store(_NORMS_CACHE, key, cached)
     return cached[1]
 
 def _survivor_indices(variants, entries):
@@ -5047,7 +5071,7 @@ def _phonetic_postings(entries):
             for k in {p[0] for p in prof}:
                 postings.setdefault(k, []).append(i)
         cached = (entries, postings, len(entries))
-        _PHON_IDX_CACHE[key] = cached
+        _index_cache_store(_PHON_IDX_CACHE, key, cached)
     return cached[1]
 
 def _phonetic_candidates(variant_profiles, entries):
