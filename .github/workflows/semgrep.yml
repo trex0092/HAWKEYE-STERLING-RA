@@ -54,7 +54,11 @@ jobs:
       - name: Install Semgrep (hash-locked)
         # Exact version + hashes (ci/semgrep-requirements.txt, pip-compile
         # --generate-hashes) so the SAST gate itself is supply-chain pinned.
-        run: python -m pip install --quiet --require-hashes -r ci/semgrep-requirements.txt
+        # --no-deps: every package is pinned with hashes in the lock, so pip
+        # must not re-resolve. Semgrep still declares mcp==1.29.0 and
+        # opentelemetry~=1.37 (both flagged by OSV); the lock pins the patched
+        # mcp 1.30.0 and opentelemetry 1.45.2 (see ci/osv-scanner.toml).
+        run: python -m pip install --quiet --require-hashes --no-deps -r ci/semgrep-requirements.txt
 
       - name: Semgrep — app invariants (blocking)
         # Targets = the executable JS surface + the Python screening engine

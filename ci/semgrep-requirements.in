@@ -1,3 +1,5 @@
 # Semgrep SAST tool pin for .github/workflows/semgrep.yml — hash-locked.
 # Regenerate: pip-compile --generate-hashes --output-file=ci/semgrep-requirements.txt ci/semgrep-requirements.in
 semgrep>=1.183.0,<2
+# Hand-edited after pip-compile: mcp 1.30.0 and opentelemetry 1.45.2 / 0.66b2 override
+# Semgrep's own pins (OSV advisories). Installed with --no-deps; see ci/osv-scanner.toml.

@@ -7,8 +7,12 @@
 #
 # On 2026-10-26 the previous five ignored IDs were retired because the pinned
 # click==8.4.2 and mcp==1.29.0 already exceed their affected version ranges.
-# A separate pair of newly reported advisories remains UNSUPPRESSED:
-# GHSA-84m7-p3x7-pcfv (mcp) and GHSA-xcq7-p3pf-p88h (opentelemetry-api).
-# The upstream Semgrep v1.181/1.182 dependency constraints currently block
-# a supported metadata-consistent upgrade, so OSV MUST remain red until fixed.
+# Two newly reported advisories, GHSA-84m7-p3x7-pcfv (mcp, fixed in 1.30.0) and
+# GHSA-xcq7-p3pf-p88h (opentelemetry-api, fixed in 1.45.1), are fixed by
+# upgrading, not by suppression: ci/semgrep-requirements.txt pins mcp 1.30.0 and
+# opentelemetry 1.45.2 and is installed with --no-deps because Semgrep still
+# declares the older ranges. OSV (api.osv.dev) returned no vulnerabilities for
+# those versions, and the gate's own Semgrep rules gave identical results
+# (0 findings, 7 rules, 123 targets) before and after. Do not use
+# [[IgnoredVulns]] to paper over findings or missing upstream patches.
 # Incident: https://github.com/trex0092/HAWKEYE-STERLING-RA/issues/1068
