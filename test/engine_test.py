@@ -982,6 +982,27 @@ SECTION 5 — PF
 _k = kyc.parse_customer(_NOTE, today=_dt.date(2026, 6, 29))
 check("kyc parses structured individuals", len(_k["individuals"]) == 2 and _k["individuals"][0]["name"] == "Huseyin Kursat Yamac")
 check("kyc parses DOB / nationality / share%", _k["individuals"][0]["nationality"] == "Turkey" and _k["individuals"][0]["share_pct"] == 100.0)
+import datetime as _kdt
+check("kyc dates: common day-first spellings parse (05 Jan 2020, 05-01-2020, 05.01.2020, 2020/01/05)",
+      all(kyc.parse_date(x) == _kdt.date(2020, 1, 5)
+          for x in ("05 Jan 2020", "05-01-2020", "05.01.2020", "2020/01/05", "January 5 2020", "5 Jan, 2020")))
+check("kyc dates: an ISO timestamp and 'Sept' are read",
+      kyc.parse_date("2020-01-05T00:00:00Z") == _kdt.date(2020, 1, 5)
+      and kyc.parse_date("Sept 5, 2020") == _kdt.date(2020, 9, 5))
+check("kyc dates: ambiguous or impossible dates stay unreadable (a loud gap), never guessed",
+      kyc.parse_date("05/01/20") is None and kyc.parse_date("12/25/2020") is None
+      and kyc.parse_date("31 Feb 2020") is None)
+check("kyc: an unreadable expiry is still a gap, a now-readable expired one is an expired gap",
+      any("unreadable" in g for g in kyc.cdd_gaps({"id_number": "X1", "passport_expiry": "05/01/20"}))
+      and any("expired" in g for g in kyc.cdd_gaps({"id_number": "X1", "passport_expiry": "05 Jan 2020"},
+                                                     today=_kdt.date(2026, 11, 6))))
+check("kyc shares: a decimal comma is a decimal (27,5% is 27.5, not 5)",
+      kyc._share_pct("27,5%") == 27.5 and kyc._share_pct("12.5 %") == 12.5 and kyc._share_pct("50％") == 50.0
+      and kyc._share_pct("100") is None)
+check("kyc shares: a fractional holding stays visible in the identity line",
+      "0.5% holding" in kyc.identity_dossier({"share_pct": 0.5})
+      and "27.5% holding" in kyc.identity_dossier({"share_pct": 27.5})
+      and "50% holding" in kyc.identity_dossier({"share_pct": 50.0}))
 check("R.25 detects a legal-arrangement role (Trustee)", _k["is_arrangement"] and "Trustee" in _k["arrangement_type"])
 check("R.10 CDD gaps surfaced for incomplete party", any("identification" in g for g in _k["individuals"][1]["cdd_gaps"]))
 check("R.10 complete party with proof-of-address has no doc gap", not any("proof of address" in g for g in _k["individuals"][0]["cdd_gaps"]))
