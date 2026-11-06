@@ -77,8 +77,8 @@ def validate_case(case):
             errors.append(f"missing required field: {k}")
     cust = case.get("customer")
     if isinstance(cust, dict):
-        if not (cust.get("name") or "").strip():
-            errors.append("customer.name is required")
+        if not isinstance(cust.get("name"), str) or not cust["name"].strip():
+            errors.append("customer.name is required and must be text")
     elif "customer" in case:
         errors.append("customer must be an object")
     subj = case.get("subject")
@@ -100,6 +100,21 @@ def validate_case(case):
             for i, h in enumerate(hits):
                 if not isinstance(h, dict):
                     errors.append(f"hits[{i}] must be an object")
+                    continue
+                # A missing score is shown as 0%; a present one must be a number,
+                # otherwise the draft would crash or print a wrong percentage.
+                sc = h.get("score", 0)
+                if isinstance(sc, bool) or not isinstance(sc, (int, float)):
+                    errors.append(f"hits[{i}].score must be a number")
+    for k in ("indicators", "adverse_articles"):
+        v = case.get(k)
+        if v is not None and not isinstance(v, list):
+            errors.append(f"{k} must be a list")
+    arts = case.get("adverse_articles")
+    if isinstance(arts, list):
+        for i, a in enumerate(arts):
+            if not isinstance(a, dict):
+                errors.append(f"adverse_articles[{i}] must be an object")
     txns = case.get("transactions") or []
     if not isinstance(txns, list):
         errors.append("transactions must be a list")
@@ -157,7 +172,7 @@ def build_dossier(case, today=None):
     A(_kv("Customer record:", cust.get("permalink") or "n/a"))
     A(_kv("Subject DOB:", subj.get("dob") or "unknown - complete from CDD record"))
     A(_kv("Subject nationality:", subj.get("nationality") or "unknown - complete from CDD record"))
-    A(_kv("Identification:", (subj.get("id_type") or "id") + ": " + (subj.get("id_number") or "__________")))
+    A(_kv("Identification:", str(subj.get("id_type") or "id") + ": " + str(subj.get("id_number") or "__________")))
     A(_kv("Address:", subj.get("address") or "complete from CDD record"))
     A("")
     A("## 4. Transactions / activity (goAML: Transaction(s))")

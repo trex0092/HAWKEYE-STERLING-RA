@@ -194,13 +194,22 @@ def mask_id(raw):
 _KV = lambda label: re.compile(
     rf"^\s*{label}\s*[:\-]\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 
-_DOB_FORMATS = ("%B %d, %Y", "%b %d, %Y", "%d %B %Y", "%Y-%m-%d", "%d/%m/%Y")
+_DOB_FORMATS = ("%B %d, %Y", "%b %d, %Y", "%d %B %Y", "%Y-%m-%d", "%d/%m/%Y",
+                # Common spellings seen in CDD notes. All day-first, matching the
+                # existing "%d/%m/%Y"; a two-digit year or a month-first numeric
+                # date stays unreadable (a loud gap) because it is ambiguous.
+                "%d %b %Y", "%d-%m-%Y", "%d.%m.%Y", "%Y/%m/%d",
+                "%B %d %Y", "%b %d %Y", "%d %B, %Y", "%d %b, %Y")
 
 
 def parse_date(s):
     s = _clean(s)
     if not s or s.upper() in ("NA", "N/A", "PENDING", "-"):
         return None
+    # An ISO timestamp ("2020-01-05T00:00:00") is the date it starts with;
+    # "Sept" is the common spelling of September.
+    s = re.sub(r"^(\d{4}-\d{2}-\d{2})[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$", r"\1", s)
+    s = re.sub(r"\bSept\b", "Sep", s, flags=re.IGNORECASE)
     for fmt in _DOB_FORMATS:
         try:
             return datetime.datetime.strptime(s, fmt).date()
@@ -245,12 +254,14 @@ _FIELDS = {
     "mrz":         re.compile(r"(?:Passport\s*)?MRZ(?:\s*line\s*2)?\s*[:\-][ \t]*(.+)", re.IGNORECASE),
 }
 
-_SHARE_NUM = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+# A decimal comma ("27,5%") is a decimal, not a thousands separator: reading it
+# as "5%" would show a 27.5% owner as a 5% holder.
+_SHARE_NUM = re.compile(r"(\d+(?:[.,]\d+)?)\s*[%％]")
 
 
 def _share_pct(s):
     m = _SHARE_NUM.search(str(s or ""))
-    return float(m.group(1)) if m else None
+    return float(m.group(1).replace(",", ".")) if m else None
 
 
 def is_arrangement_role(role):
@@ -772,7 +783,9 @@ def identity_dossier(individual):
     if _present(rec.get("dob")):
         bits.append(f"DOB {rec['dob']}")
     if rec.get("share_pct") is not None:
-        bits.append(f"{rec['share_pct']:.0f}% holding")
+        # Keep a fractional holding visible: "0.5% holding" must not read "0%".
+        pct = f"{rec['share_pct']:.2f}".rstrip("0").rstrip(".")
+        bits.append(f"{pct}% holding")
     mid = mask_id(rec.get("id_number"))
     if mid:
         bits.append(f"ID {mid}")
