@@ -7179,6 +7179,29 @@ check("coverage alarm: a supplementary list still adapts to its new level (soft 
       (lambda p: [monitoring.check_source_coverage({"ca": {"count": 1000, "tier": "supplementary"}}, str(_cov_b + _dt_cov.timedelta(i)), p) for i in range(5)]
        and not monitoring.check_source_coverage({"ca": {"count": 300, "tier": "supplementary"}}, "2026-03-01", p)["alarms"])(os.path.join(_dir, "c_supp.json")))
 
+# Regulator bulletin feeds: a 200 that is not a feed is a FAILED source (it
+# used to read as swept-and-clean), and an Atom feed is read, not silently empty.
+import json as _json_rb, tempfile as _tf_rb
+class _RbResp:
+    status_code = 200
+    def __init__(self, c): self.content = c
+_rb_cfg = os.path.join(_tf_rb.mkdtemp(), "c.json")
+_json_rb.dump({"sources": [{"name": "Throttled", "url": "http://x/a"},
+                           {"name": "AtomFeed", "url": "http://x/b"}]}, open(_rb_cfg, "w"))
+_rb_bodies = {"http://x/a": b"<html><body><p>Rate limited</p></body></html>",
+              "http://x/b": b'<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Enforcement action against Bullion Street Gold Trading</title><summary>fine</summary><link href="http://x/1"/><updated>2026-11-01</updated></entry></feed>'}
+_rb_orig_get = screen.requests.get
+try:
+    screen.requests.get = lambda u, **k: _RbResp(_rb_bodies[u])
+    _rb_items2, _rb_fails2 = screen.fetch_regulator_bulletins(path=_rb_cfg)
+finally:
+    screen.requests.get = _rb_orig_get
+check("regulator bulletins: an HTTP 200 that is not a feed is reported as a failed source",
+      len(_rb_fails2) == 1 and _rb_fails2[0].startswith("Throttled"))
+check("regulator bulletins: an Atom entry is read with its title, link and date",
+      len(_rb_items2) == 1 and _rb_items2[0]["url"] == "http://x/1"
+      and _rb_items2[0]["date"] == "2026-11-01" and "bullion street" in _rb_items2[0]["text"])
+
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
     sys.exit(1)
