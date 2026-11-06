@@ -1,12 +1,13 @@
 name: AI Governance Report
 
-# One consolidated Asana task each morning covering the non-AML control suite:
+# One consolidated report each morning (published in the run's job summary;
+# Asana task delivery retired 2026-11-06) covering the non-AML control suite:
 # AI/advisor governance, security & supply-chain scans, CI/code quality,
 # app/site health and release/repo hygiene — the daily operating-effectiveness
 # evidence for ISO/IEC 42001 A.6/A.8 and NIST AI RMF MEASURE/MANAGE. It always
 # files — "all green" on a quiet day — and flags scheduled controls that have
 # silently stopped running (STALE), so silence is never evidence.
-# Needs the ASANA_ACCESS_TOKEN secret; reads run states with the runner token.
+# Reads run states with the runner token; needs no Asana secret.
 on:
   schedule:
     - cron: '51 7 * * *' # 07:51 UTC daily (11:51 UAE), after the daily watchers
@@ -46,10 +47,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - name: Compose and file the governance report
+      - name: Compose and publish the governance report
         env:
-          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
-          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          ASANA_GOV_SECTION_GID: ${{ vars.ASANA_GOV_SECTION_GID }}
         run: node scripts/governance-report.mjs

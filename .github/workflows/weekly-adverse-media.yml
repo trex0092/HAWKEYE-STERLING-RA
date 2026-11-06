@@ -407,11 +407,10 @@ jobs:
           # OFF unless the repository variable is set — CC-BY-NC data, see
           # docs/aims/third-party-register.md before enabling.
           ADVERSE_WATCHLIST_EXTRA: ${{ vars.ADVERSE_WATCHLIST_EXTRA }}
-          # "Transaction Monitoring" section of HAWKEYE STERLING APP: one task per
-          # payment (open tasks only) + the engine's daily Transaction Monitoring
-          # report, filed there once a day. Unset = payment screening reports
-          # INACTIVE, never clear.
-          ASANA_PAYMENTS_SECTION_GID: ${{ vars.ASANA_PAYMENTS_SECTION_GID || '1219097494676108' }}
+          # Payment-screening / Transaction Monitoring Asana section: RETIRED 2026-11-06
+          # (the "Transaction Monitoring" section of HAWKEYE STERLING APP was removed),
+          # so ASANA_PAYMENTS_SECTION_GID is no longer set. Unset = payment screening
+          # reports INACTIVE, never clear (screen.py).
           # '1' only on a retry firing when today already succeeded: the engine
           # then re-sweeps ONLY if that run lost news/PEP coverage (fresh
           # runner = fresh egress IP wins back rate-limited coverage), else
