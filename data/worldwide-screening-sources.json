@@ -81,9 +81,17 @@
           "required": true,
           "implementation": "scripts/adverse-media.mjs",
           "endpoint": "https://www.bing.com/news/search"
+        },
+        {
+          "id": "yahoo-news-rss",
+          "name": "Yahoo News RSS",
+          "kind": "public-rss",
+          "required": true,
+          "implementation": "scripts/adverse-media.mjs",
+          "endpoint": "https://news.search.yahoo.com/rss"
         }
       ],
-      "availabilityRule": "all three backbones are implemented by default; per-run failures must surface as partial/degraded rather than clean"
+      "availabilityRule": "all four backbones are implemented by default; per-run failures must surface as partial/degraded rather than clean. GDELT is best effort for source-quality assurance (it returned no valid response to GitHub runners in eight consecutive daily runs); Google News, Bing and Yahoo are the evidenced requirement"
     },
     "pep": {
       "required": true,

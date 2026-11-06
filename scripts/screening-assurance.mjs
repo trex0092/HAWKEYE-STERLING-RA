@@ -185,6 +185,9 @@ export function assessRuntime({
   if (!backbones.has('Bing News') || num(backboneFailures.bing) > 0) {
     adverseWarnings.push('Bing News unavailable for ' + num(backboneFailures.bing) + ' subject(s)');
   }
+  if (!backbones.has('Yahoo News') || num(backboneFailures.yahoo) > 0) {
+    adverseWarnings.push('Yahoo News unavailable for ' + num(backboneFailures.yahoo) + ' subject(s)');
+  }
   if (num(e.amRetryAttempted) > 0) {
     adverseWarnings.push('last-resort backbone retry attempted for ' + num(e.amRetryAttempted)
       + ' subject(s), recovered ' + num(e.amRetryRecovered));
@@ -204,6 +207,7 @@ export function assessRuntime({
       googleNews: num(backboneFailures.googleNews),
       gdelt: num(backboneFailures.gdelt),
       bing: num(backboneFailures.bing),
+      yahoo: num(backboneFailures.yahoo),
     },
     errors: num(e.amErrors),
     partialSubjects: num(e.amPartial),
@@ -280,12 +284,19 @@ export function assessRuntime({
   if (results?.degraded === true) sourceQualityReasons.push('supplementary sanctions coverage degraded');
   for (const [label, present] of [
     ['Google News RSS', backbones.has('Google News RSS')],
-    ['GDELT global index', backbones.has('GDELT global index')],
     ['Bing News', backbones.has('Bing News')],
+    ['Yahoo News', backbones.has('Yahoo News')],
   ]) {
     if (!present) sourceQualityReasons.push('adverse-media backbone not evidenced: ' + label);
   }
-  for (const [name, failed] of Object.entries(backboneFailures)) {
+  /* GDELT is best effort: it returned zero valid answers to GitHub runners in
+     every one of the eight daily runs before 2026-11-06, so it cannot be a
+     required evidence source. Its failures stay visible as a warning above and
+     in the evidence block; GDELT_REQUIRED=1 restores it as a hard requirement. */
+  const requiredFailureNames = process.env.GDELT_REQUIRED === '1'
+    ? Object.keys(backboneFailures) : Object.keys(backboneFailures).filter(name => name !== 'gdelt');
+  for (const name of requiredFailureNames) {
+    const failed = backboneFailures[name];
     if (num(failed) > 0) sourceQualityReasons.push('adverse-media backbone failures: ' + name + '=' + num(failed));
   }
   if (num(e.amPartial) > 0) sourceQualityReasons.push('adverse-media subjects with reduced source redundancy: ' + num(e.amPartial));

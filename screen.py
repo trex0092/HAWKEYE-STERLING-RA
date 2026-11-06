@@ -8202,6 +8202,21 @@ def enrichment_deadline_ts(now_ts, target_hhmm, reserve_min):
         + hh * 3600 + mm * 60 - reserve_min * 60
     return deadline_ts if deadline_ts > now_ts else None
 
+def mark_deadline_deferred(r):
+    """Mark one enrichment result as deferred by the delivery-deadline budget.
+
+    The news sweep is skipped and disclosed (am_skipped). An INDIVIDUAL also
+    skipped its live PEP lookup, so it is recorded as an errored PEP lookup:
+    the worldwide PEP/RCA net then resolves it. If no net loaded, it stays
+    errored and is counted in pep_errors, so the PEP control degrades loudly
+    instead of the person being reported as covered without ever having been
+    screened. Pure, so it is tested offline."""
+    r["am_skipped"] = True
+    if r.get("type") == "INDIVIDUAL" and r.get("pep") is None:
+        r["pep"] = {"errored": True, "deferred": True,
+                    "error": "live PEP lookup deferred by the delivery deadline"}
+    return r
+
 def enrichment_rotation(n, today_ordinal, retry_pass=False):
     """Deterministic daily start-offset for the enrichment order.
 
@@ -8258,8 +8273,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
         r = {"type": subj_type, "name": subj_name, "parent": parent,
              "permalink": c.get("permalink", ""), "adverse": None, "pep": None, "am_error": False}
         if _deadline and time.time() > _deadline:
-            r["am_skipped"] = True
-            return r
+            return mark_deadline_deferred(r)
         try:
             articles = search_adverse_media(subj_name, max_results=ADVERSE_MAX_RESULTS)
             r["adverse"] = [a for a in articles if a["flagged"]]
@@ -8471,7 +8485,7 @@ def screen_subject_set(customers, all_lists, list_meta, run_time, mode="daily"):
     pep_nets = {}
     if _pep_individuals:
         if _pep_errored:
-            log(f"  PEP: {len(_pep_errored)} live lookup(s) failed — the worldwide net re-covers them")
+            log(f"  PEP: {len(_pep_errored)} live lookup(s) failed or were deferred by the delivery deadline — the worldwide net re-covers them")
         _nets = []
         pep_index = load_pep_mirror()
         pep_nets["OpenSanctions PEP/RCA dataset"] = (

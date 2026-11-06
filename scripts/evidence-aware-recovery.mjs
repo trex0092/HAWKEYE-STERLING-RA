@@ -97,17 +97,21 @@ export function qualifyEvidence(receipt, producer, currentSha, {
   const pep = receipt.domains?.pep?.evidence;
   const quality = receipt.sourceQuality?.evidence;
   const zeroes = [quality?.adverseMediaPartialSubjects, quality?.pepUnscreenableSourceRecords,
-    quality?.adverseMediaBackboneFailures?.googleNews, quality?.adverseMediaBackboneFailures?.gdelt,
-    quality?.adverseMediaBackboneFailures?.bing, am?.skippedSubjects, am?.partialSubjects,
-    am?.backboneFailures?.googleNews, am?.backboneFailures?.gdelt, am?.backboneFailures?.bing];
+    quality?.adverseMediaBackboneFailures?.googleNews,
+    quality?.adverseMediaBackboneFailures?.bing,
+    quality?.adverseMediaBackboneFailures?.yahoo, am?.skippedSubjects, am?.partialSubjects,
+    am?.backboneFailures?.googleNews, am?.backboneFailures?.bing,
+    am?.backboneFailures?.yahoo];
   const backbones = Array.isArray(am?.globalBackbones) ? am.globalBackbones : [];
   const floors = quality?.sanctionsFloors;
   const completeSources = Array.isArray(floors) && floors.length > 0 && floors.every(f =>
     f?.primaryComplete === true && Number.isSafeInteger(f.minimum) && f.minimum > 0 &&
     Number.isSafeInteger(f.observed) && f.observed >= f.minimum) &&
     Array.isArray(quality?.fallbackSourcesUsed) && quality.fallbackSourcesUsed.length === 0 &&
+    /* GDELT is best effort (see screening-assurance.mjs); the three evidenced
+       backbones above must each be present with zero failures. */
     zeroes.every(n => n === 0) &&
-    ['Google News RSS', 'GDELT global index', 'Bing News'].every(name => backbones.includes(name)) &&
+    ['Google News RSS', 'Bing News', 'Yahoo News'].every(name => backbones.includes(name)) &&
     Array.isArray(pep?.sourceUnscreenable) && pep.sourceUnscreenable.length === 0 &&
     Array.isArray(receipt.sourceQuality?.reasons) && receipt.sourceQuality.reasons.length === 0;
   const verified = checked.ok && populationIssue === null && receipt.operational === true &&

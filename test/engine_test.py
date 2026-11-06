@@ -5442,6 +5442,20 @@ d = monitoring.makeup_decision("2026-08-05", path=_p)
 check("deadline-deferred subjects trigger the same-day make-up sweep",
       d["sweep"] is True and d["uncovered"] == 40 and "deferred" in d["reason"])
 
+# Deadline-deferred individuals must never be reported as PEP-covered unscreened.
+_dd_ind = screen.mark_deadline_deferred({"type": "INDIVIDUAL", "name": "Test Person", "parent": "",
+                                         "permalink": "", "adverse": None, "pep": None, "am_error": False})
+_dd_co = screen.mark_deadline_deferred({"type": "COMPANY", "name": "Test Co", "parent": "",
+                                        "permalink": "", "adverse": None, "pep": None, "am_error": False})
+check("deadline deferral skips the news sweep and is disclosed",
+      _dd_ind["am_skipped"] is True and _dd_co["am_skipped"] is True)
+check("a deferred individual is an errored PEP lookup, so the worldwide net resolves it",
+      _dd_ind["pep"].get("errored") is True and _dd_ind["pep"].get("deferred") is True)
+check("a deferred company gets no PEP placeholder", _dd_co["pep"] is None)
+_dd_counts, _dd_af, _dd_pf = screen.tally_enrichment([_dd_ind, _dd_co], {}, True)
+check("with no worldwide net the deferred individual degrades PEP loudly (pep_errors=1)",
+      _dd_counts["pep_errors"] == 1 and _dd_counts["am_skipped"] == 2)
+
 # ── Regulator-bulletin net + identity cross-check ─────────────────────────────
 print("\nscreen.py — regulator bulletins & identity cross-check")
 check("significant tokens drop corporate boilerplate",

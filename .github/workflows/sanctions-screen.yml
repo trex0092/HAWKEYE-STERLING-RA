@@ -123,6 +123,7 @@ jobs:
             news.google.com:443
             api.gdeltproject.org:443
             www.bing.com:443
+            news.search.yahoo.com:443
             www.wikidata.org:443
             ws-public.interpol.int:443
             www.international.gc.ca:443

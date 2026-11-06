@@ -12,14 +12,14 @@ const baseRun = { id: 111, head_branch: 'main', event: 'workflow_dispatch',
 const fixture = () => ({ version: 1, generatedAt: '2026-10-22T15:00:00Z', operational: true,
   run: { githubRunId: '111', commit: sha, screenedSubjects: 991 },
   sourceQuality: { assured: true, reasons: [], evidence: { adverseMediaPartialSubjects: 0,
-    pepUnscreenableSourceRecords: 0, adverseMediaBackboneFailures: { googleNews: 0, gdelt: 0, bing: 0 },
+    pepUnscreenableSourceRecords: 0, adverseMediaBackboneFailures: { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 },
     sanctionsFloors: [{ id: 'fixture-list', minimum: 100, observed: 101, primaryComplete: true }],
     fallbackSourcesUsed: [] } },
   domains: { sanctions: { operational: true, evidence: { sourcePopulation: {
     customer: { screenedSubjects: 971 }, employee: { screenedSubjects: 20 } } } },
   adverseMedia: { operational: true, evidence: { screenedSubjects: 991, skippedSubjects: 0,
-    partialSubjects: 0, backboneFailures: { googleNews: 0, gdelt: 0, bing: 0 },
-    globalBackbones: ['Google News RSS', 'GDELT global index', 'Bing News'] } },
+    partialSubjects: 0, backboneFailures: { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 },
+    globalBackbones: ['Google News RSS', 'GDELT global index', 'Bing News', 'Yahoo News'] } },
   pep: { operational: true, evidence: { sourceUnscreenable: [] } } } });
 // These collaborators are isolated in unit tests. Production imports the
 // repository's real checkStored and approvedSourcePopulationIssue unchanged.
@@ -95,8 +95,12 @@ await test('83 skipped enrichments cannot pass through an assured boolean', () =
 await test('Google News failures cannot pass through an assured boolean', () => {
   const r = fixture(); r.sourceQuality.evidence.adverseMediaBackboneFailures.googleNews = 877; assert.equal(qualify(r).state, 'degraded');
 });
-await test('GDELT failures cannot pass through an assured boolean', () => {
-  const r = fixture(); r.domains.adverseMedia.evidence.backboneFailures.gdelt = 908; assert.equal(qualify(r).state, 'degraded');
+await test('Yahoo News failures cannot pass through an assured boolean', () => {
+  const r = fixture(); r.domains.adverseMedia.evidence.backboneFailures.yahoo = 908; assert.equal(qualify(r).state, 'degraded');
+});
+await test('a GDELT-only failure is best effort and does not degrade verified evidence', () => {
+  const r = fixture(); r.domains.adverseMedia.evidence.backboneFailures.gdelt = 908;
+  r.sourceQuality.evidence.adverseMediaBackboneFailures.gdelt = 908; assert.equal(qualify(r).state, 'verified');
 });
 await test('missing provider cannot be silently substituted', () => {
   const r = fixture(); r.domains.adverseMedia.evidence.globalBackbones = ['Bing News']; assert.equal(qualify(r).state, 'degraded');
