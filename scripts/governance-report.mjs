@@ -25,7 +25,7 @@
    the report is published in the workflow run's job summary. */
 
 import { SECTIONS } from './asana-sections.mjs';
-import { readFileSync, appendFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
@@ -340,11 +340,8 @@ async function main() {
   const title = buildTaskName(label, summary);
   const notes = buildReportNotes({ label, summary, alerts, runLink: runUrl(), prev: previousScore([], label) });
   const report = '## ' + title + '\n\n' + notes + '\n';
+  /* Printed to stdout; the workflow tees it into the job summary (no file write here). */
   console.log(report);
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, report); } catch (e) { console.warn('governance-report: could not write the job summary (' + (e && e.message || e) + ')'); }
-  }
-  console.log('governance report published in the run summary (' + summary.verdict + ')');
 }
 
 if (process.argv[1] && process.argv[1].endsWith('governance-report.mjs')) {

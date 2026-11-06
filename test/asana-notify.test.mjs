@@ -1007,7 +1007,8 @@ check('a sectionless mirror still joins the project',
   const gov = readFileSync(join(root, 'scripts/governance-report.mjs'), 'utf8');
   /* Retired 2026-11-06 at the MLRO's request: the report is published in the run summary. */
   check('the AI Governance & Platform Report no longer files to Asana',
-    !/asana-notify\.mjs/.test(gov) && !/requireApprovedSection/.test(gov) && /GITHUB_STEP_SUMMARY/.test(gov));
+    !/asana-notify\.mjs/.test(gov) && !/requireApprovedSection/.test(gov)
+    && /GITHUB_STEP_SUMMARY/.test(readFileSync(join(root, '.github/workflows/governance-report.yml'), 'utf8')));
   /* Retired 2026-11-06 at the MLRO's request: Advisor Eval now publishes in the run summary. */
   check('Advisor Eval no longer files to Asana',
     !readFileSync(join(root, '.github/workflows/advisor-eval.yml'), 'utf8').includes('ASANA_SECTION_GID'));

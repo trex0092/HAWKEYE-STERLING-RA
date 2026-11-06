@@ -50,4 +50,6 @@ jobs:
       - name: Compose and publish the governance report
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/governance-report.mjs
+        run: |
+          set -o pipefail
+          node scripts/governance-report.mjs | tee -a "$GITHUB_STEP_SUMMARY"
