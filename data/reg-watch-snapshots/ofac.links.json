@@ -128,12 +128,16 @@
   "h": "https://ofac.treasury.gov/contact-ofac"
  },
  {
-  "t": "Iran-related Designations; Updates to Certain Iran-related Listings; Publication of Iran-related OFAC Alert; Issuance of Amended Venezuela-related General License and Frequently Asked Question",
-  "h": "https://ofac.treasury.gov/recent-actions/20261104"
+  "t": "Cyber-related and Transnational Criminal Organizations Designations; Cuba Designations; Publication of Cuba-related Determination",
+  "h": "https://ofac.treasury.gov/recent-actions/20261105"
  },
  {
   "t": "Sanctions List Updates",
   "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
+ },
+ {
+  "t": "Iran-related Designations; Updates to Certain Iran-related Listings; Publication of Iran-related OFAC Alert; Issuance of Amended Venezuela-related General License and Frequently Asked Question",
+  "h": "https://ofac.treasury.gov/recent-actions/20261104"
  },
  {
   "t": "Issuance of Amended Iran-related General License",
@@ -180,12 +184,8 @@
   "h": "https://ofac.treasury.gov/recent-actions/20261015"
  },
  {
-  "t": "Venezuela-related Designation Removal",
-  "h": "https://ofac.treasury.gov/recent-actions/20261014"
- },
- {
   "t": "Current page 1",
-  "h": "https://ofac.treasury.gov/recent-actions?pulse_nocache=1793889700770-2&page=0"
+  "h": "https://ofac.treasury.gov/recent-actions?page=0"
  },
  {
   "t": "All Recent Actions",
