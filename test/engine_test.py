@@ -1445,6 +1445,22 @@ check("RED_FLAG: a bare 'ML-11' is the STR register's; HIGH with its text; a TF 
       and _rfa_by["STR-TF-07"]["severity"] == "CRITICAL" and "POL-07" in _rfa_by["STR-TF-07"]["detail"])
 check("RED_FLAG: an unknown code is reported, never dropped",
       any("unknown red-flag code 'XX-99'" in a["detail"] for a in _rfa))
+# Red flags written as text, or as a stray scalar, must be read as codes and must
+# never crash the rule: a crash would skip every other record of the customer,
+# including a CRITICAL terrorist-financing flag recorded on a different payment.
+_rf_txt = txn_monitor.rule_red_flag_recorded([{"customer": _c, "date": "2026-10-01", "amount": 1,
+                                               "red_flags": "ML-11, tf-07;SAR-CB-3"}])
+check("RED_FLAG: codes written as text are split on commas, semicolons and spaces, not read letter by letter",
+      sorted(a["detail"].split(" ")[0] for a in _rf_txt) == ["SAR-CB-03", "STR-ML-11", "STR-TF-07"])
+_rf_errs = {}
+_rf_mix = txn_monitor.evaluate_customer(
+    [{"customer": _c, "date": "2026-10-01", "amount": 1, "red_flags": 5},
+     {"customer": _c, "date": "2026-10-02", "amount": 1, "red_flags": ["TF-07"]}], None, rule_errors=_rf_errs)
+check("RED_FLAG: a malformed value on one record is reported as an unknown code and does not crash the rule",
+      "rule_red_flag_recorded" not in _rf_errs
+      and any(a["rule"] == "RED_FLAG" and "unknown red-flag code '5'" in a["detail"] for a in _rf_mix))
+check("RED_FLAG: the terrorist-financing flag on the other record is still raised as CRITICAL",
+      any(a["rule"] == "RED_FLAG" and a["severity"] == "CRITICAL" and a["detail"].startswith("STR-TF-07") for a in _rf_mix))
 _rf_path = txn_monitor.RED_FLAGS_PATH
 try:
     txn_monitor.RED_FLAGS_PATH = os.path.join(ROOT, "data", "no-such-red-flags.json")
