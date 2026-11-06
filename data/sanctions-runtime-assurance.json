@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-06T06:07:57.229Z",
-  "githubRunId": "42172364864",
-  "commit": "a6b7205a2ee86ce49f52dd02576d91f714323015",
-  "screenedSubjects": 991,
+  "generatedAt": "2026-11-06T07:14:28.434Z",
+  "githubRunId": "42179410994",
+  "commit": "9ed49465c916540650b037217e616ebb43cfd041",
+  "screenedSubjects": 1006,
   "sourceProjects": {
     "customer": {
       "projectGid": "1214107620220121",
-      "screenedSubjects": 971
+      "screenedSubjects": 986
     },
     "employee": {
       "projectGid": "1216239131596624",
@@ -25,7 +25,7 @@
   "reasons": [],
   "warnings": [],
   "evidence": {
-    "screenedSubjects": 991,
+    "screenedSubjects": 1006,
     "loadedSources": [
       {
         "id": "uk-ofsi",
@@ -74,7 +74,7 @@
     "sourcePopulation": {
       "customer": {
         "projectGid": "1214107620220121",
-        "screenedSubjects": 971
+        "screenedSubjects": 986
       },
       "employee": {
         "projectGid": "1216239131596624",
