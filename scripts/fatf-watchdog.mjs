@@ -27,9 +27,9 @@ const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
    Report" sections no longer exist in HAWKEYE STERLING APP. */
 const REG_FATF_SECTION_GID = process.env.ASANA_FATF_SECTION_GID || '1218451992088222';
 /* A monitoring GAP (the lists could not be verified) is a platform-health
-   alert, filed under "AI & Platform Governance"; a list CHANGE stays under
-   "Regulatory Changes". */
-const FATF_GAP_SECTION_GID = process.env.ASANA_FATF_GAP_SECTION_GID || '1218985347982681';
+   alert, filed under "Regulatory Changes" (the AI & Platform Governance section
+   was removed 2026-11-06), as is a list CHANGE. */
+const FATF_GAP_SECTION_GID = process.env.ASANA_FATF_GAP_SECTION_GID || '1218451992088222';
 const FATF_SKIP_ALERT = Number(process.env.FATF_SKIP_ALERT) || 2; /* consecutive unreachable runs before a monitoring-gap alert */
 
 /* FATF naming → the app's baseline naming */

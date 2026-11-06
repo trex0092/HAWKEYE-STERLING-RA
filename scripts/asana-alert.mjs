@@ -29,16 +29,31 @@
    always the SAME still-unresolved problem, not a new occurrence of it, so
    there's no time window to age out of — skip while it stays open, file
    again the first run after it's closed. */
+import { appendFileSync } from 'node:fs';
 import { asana, appendOpenAlertEvidence, findOpenMonitoringAlert, verifyNewMonitoringAlert } from './asana-notify.mjs';
-import { requireApprovedSection, verifySection, alertSection } from './asana-sections.mjs';
+import { requireApprovedSection, verifySection, alertSection, isPlatformAlert } from './asana-sections.mjs';
 
 const PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914'; /* HAWKEYE STERLING APP */
 const title = process.argv[2];
 const notes = process.argv[3] || '';
 
-/* Section by title (asana-sections.mjs alertSection): platform-health alerts
-   go to "AI & Platform Governance", not "Regulatory Changes". */
+/* Section by title (asana-sections.mjs alertSection). Platform-health alerts
+   (site/function down, stale control, production drift, code scan failed,
+   workflow recovery blocked) are no longer filed in Asana (2026-11-06, MLRO
+   request: the AI & Platform Governance section was removed). They are reported
+   in the workflow run as an annotation and in the job summary; the calling job
+   keeps its own red/green verdict, so nothing is silently reported green. */
 const SECTION_GID = process.env.ASANA_SECTION_GID || alertSection(title);
+
+if (title && !process.env.ASANA_SECTION_GID && isPlatformAlert(title)) {
+  const line = title + (notes ? ' - ' + notes : '');
+  console.log('::error title=' + title.replace(/[\r\n:,]+/g, ' ').slice(0, 120) + '::' + line.replace(/[\r\n]+/g, ' ').slice(0, 900));
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## ' + title + '\n\n' + notes + '\n\n_Platform alerts are reported in the run only; Asana delivery retired 2026-11-06._\n'); } catch (e) { /* summary only */ }
+  }
+  console.log('asana-alert: platform-health alert reported in the run, not filed in Asana');
+  process.exit(0);
+}
 
 if (!process.env.ASANA_ACCESS_TOKEN) { console.error('ASANA_ACCESS_TOKEN missing'); process.exit(1); }
 if (!title) { console.error('usage: node scripts/asana-alert.mjs "<title>" "<notes>"'); process.exit(1); }
