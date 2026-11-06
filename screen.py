@@ -7300,6 +7300,13 @@ NARRATIVE_SHRINK_RUNGS = (
     {"candidates": 1, "articles": 1, "subjects": 8, "matches": 8},
 )
 
+def _uae_to_asana_utc(uae_naive):
+    """Format a naive UAE wall-clock datetime (what now_uae() returns) as the
+    real UTC instant Asana's modified_since expects. Stamping UAE wall time
+    with a literal Z shifted every cut-off four hours late."""
+    return (uae_naive - datetime.timedelta(hours=UAE_TZ_OFFSET)
+            ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
 def _onboarding_batch_key(customer_gids):
     """Short, stable fingerprint of a customer-gid set, used only to recognise
     a REPEAT of the exact same onboarding batch (not to identify customers)."""
@@ -7349,8 +7356,8 @@ def _existing_report_task(mode, run_time, customer_gids=None):
         if not customer_gids:
             return ""
         marker = f"onboarding-batch:{_onboarding_batch_key(customer_gids)}"
-        since = (run_time - datetime.timedelta(hours=ONBOARDING_MARKER_LOOKBACK_HOURS)
-                 ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        since = _uae_to_asana_utc(
+            run_time - datetime.timedelta(hours=ONBOARDING_MARKER_LOOKBACK_HOURS))
         params = {"project": ASANA_ONGOING_MON_GID, "modified_since": since,
                   "opt_fields": "gid,name,notes", "limit": 100}
         name_prefix = "Onboarding Screening Report — "
@@ -7359,7 +7366,8 @@ def _existing_report_task(mode, run_time, customer_gids=None):
         name_prefix = ("Daily AML/CFT Screening Report (coverage make-up) — "
                        if mode == "makeup" else "Daily AML/CFT Screening Report — ")
         suffix = f"— {dt}"
-        since = run_time.strftime("%Y-%m-%dT00:00:00.000Z")
+        since = _uae_to_asana_utc(
+            run_time.replace(hour=0, minute=0, second=0, microsecond=0))
         params = {"project": ASANA_ONGOING_MON_GID, "modified_since": since,
                   "opt_fields": "gid,name", "limit": 100}
     while True:
