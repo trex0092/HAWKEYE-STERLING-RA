@@ -310,7 +310,7 @@ is [OBSERVED] against commit `8576ad61` unless marked otherwise.*
 *Estate re-verification · 1 October 2026 — Screening Morning Dispatch added: GitHub delivers this
 repository's scheduled events 4-6h late, so the daily screening reached Asana mid-afternoon (UAE).
 The new workflow fires in the UTC evening, waits on the runner until 00:05 UTC and dispatches
-Sanctions Screen and Daily Screening, so results land before 09:00 UAE; each screen's own cron
+Sanctions Screen and Daily Screening, so results land before 08:00 UAE; each screen's own cron
 stays the backstop. An accepted dispatch is never reported as delivery. Timing change only — no
 scored control changed.*
 

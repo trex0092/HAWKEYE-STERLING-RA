@@ -108,7 +108,7 @@ check('full results: required from the cutover day onward, never for history (no
     && /GUARD_DAY: \$\{\{ needs\.dispatch\.outputs\.guard_day \}\}/.test(guardJob));
   check('guard: may re-dispatch (actions: write) and outlives the 00:05→05:00 window',
     /actions: write/.test(guardJob) && Number((guardJob.match(/timeout-minutes: (\d+)/) || [])[1]) >= 320);
-  check('guard: alerts in Asana on failure', /if: failure\(\)[\s\S]*asana-alert\.mjs[\s\S]*09:00 UAE/.test(guardJob));
+  check('guard: alerts in Asana on failure', /if: failure\(\)[\s\S]*asana-alert\.mjs[\s\S]*08:00 UAE/.test(guardJob));
   // The guard's Sanctions Screen evidence is keyed on the delivery step's NAME:
   // renaming the step must fail here, not silently turn every day "not delivered".
   const { SANCTIONS_DELIVERY_STEP } = await import('../scripts/workflow-recovery.mjs');

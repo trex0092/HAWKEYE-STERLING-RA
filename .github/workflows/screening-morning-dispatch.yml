@@ -1,6 +1,6 @@
 name: Screening Morning Dispatch (on-time start)
 
-# Results of the daily screening must be in Asana before 09:00 UAE (05:00 UTC).
+# Results of the daily screening must be in Asana before 08:00 UAE (04:00 UTC).
 # GitHub starts this repo's SCHEDULED runs 4-6h late (sanctions-screen's 05:37
 # slot started 09:41-11:57 UTC over 19-30 Sep 2026) and drops most firings of
 # a frequent cron, but a workflow_dispatch starts at once. So this workflow is
@@ -11,9 +11,9 @@ name: Screening Morning Dispatch (on-time start)
 # Delivery Watchdog and freshness-check still judge delivery: an accepted
 # dispatch is never reported as delivery. The firing that dispatched then runs
 # the deadline guard (second job, fresh runner budget): it watches both screens
-# until 05:00 UTC, re-dispatches a screen whose run ended without delivery
+# until 04:00 UTC, re-dispatches a screen whose run ended without delivery
 # evidence (at most twice -- Control Retry's own cron starts hours too late for
-# 09:00 UAE), and fails red with an Asana alert if the deadline passes without
+# 08:00 UAE), and fails red with an Asana alert if the deadline passes without
 # full delivery. Logic + offline tests: scripts/workflow-recovery.mjs
 # (morningPlan / morningDecision / guardStep / guardVerdict, --self-test).
 on:
@@ -76,7 +76,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node scripts/asana-alert.mjs \
-            "MORNING SCREENING DISPATCH FAILED: today's screening may reach Asana after 09:00 UAE" \
+            "MORNING SCREENING DISPATCH FAILED: today's screening may reach Asana after 08:00 UAE" \
             "The on-time dispatch of Sanctions Screen / Daily Screening could not be confirmed. Each screen's own cron remains the backstop. Review the job summary. $RUN_URL"
 
   guard:
@@ -110,13 +110,13 @@ jobs:
           node-version: 22
       - name: Validate guard offline
         run: node scripts/workflow-recovery.mjs --self-test
-      - name: Guard delivery until 09:00 UAE (05:00 UTC)
+      - name: Guard delivery until 08:00 UAE (04:00 UTC)
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
           GUARD_DAY: ${{ needs.dispatch.outputs.guard_day }}
         run: node scripts/workflow-recovery.mjs --guard
-      - name: Alert when the screening missed the 09:00 UAE deadline
+      - name: Alert when the screening missed the 08:00 UAE deadline
         if: failure()
         env:
           ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
@@ -124,5 +124,5 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node scripts/asana-alert.mjs \
-            "DAILY SCREENING NOT FULLY DELIVERED BY 09:00 UAE ($GUARD_DAY)" \
-            "The deadline guard could not evidence full delivery of $GUARD_DAY's screening before 09:00 UAE (05:00 UTC): the Daily AML/CFT Screening Report with its full-results attachments, and a Sanctions Screen run whose Asana delivery step succeeded. It re-dispatched failed runs (at most twice each); the job summary names which screen is missing or late and why. Control Retry and the Delivery Watchdog continue to recover and verify later today. $RUN_URL"
+            "DAILY SCREENING NOT FULLY DELIVERED BY 08:00 UAE ($GUARD_DAY)" \
+            "The deadline guard could not evidence full delivery of $GUARD_DAY's screening before 08:00 UAE (04:00 UTC): the Daily AML/CFT Screening Report with its full-results attachments, and a Sanctions Screen run whose Asana delivery step succeeded. It re-dispatched failed runs (at most twice each); the job summary names which screen is missing or late and why. Control Retry and the Delivery Watchdog continue to recover and verify later today. $RUN_URL"

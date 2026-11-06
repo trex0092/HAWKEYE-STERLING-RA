@@ -88,14 +88,14 @@ RUN_MODE              = os.environ.get("RUN_MODE", "full_batch")  # full_batch |
 # has a successful run): sweep ONLY if the earlier run lost news/PEP coverage
 # to per-IP rate limits — a fresh runner VM means a fresh egress IP.
 AM_COVERAGE_RETRY     = os.environ.get("AM_COVERAGE_RETRY", "0") == "1"
-# Daily report delivery target: 09:00 UAE = 05:00 UTC. GitHub delivers this
+# Daily report delivery target: 08:00 UAE = 04:00 UTC. GitHub delivers this
 # repo's scheduled events 2-4h late (measured, hour-independent — see the
 # weekly-adverse-media.yml header), so the run cannot control its START; it
 # controls its FINISH: the enrichment phase budgets itself against the target
 # (enrichment_deadline_ts), trimmed subjects are disclosed as deadline-deferred
 # and recovered by the same-day make-up pass, and the report header states the
 # actual delivery time against the target. Empty DELIVERY_TARGET_UTC disables.
-DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "05:00")
+DELIVERY_TARGET_UTC   = os.environ.get("DELIVERY_TARGET_UTC", "04:00")
 DELIVERY_RESERVE_MIN  = int(os.environ.get("DELIVERY_RESERVE_MIN", "20"))
 
 ASANA_CUSTOMER_DB_GID = "1214107620220121"
@@ -6821,7 +6821,7 @@ def build_unified_narrative(possible_matches, clear, adverse_findings, pep_findi
                  else ("DEGRADED (news)" if am_errors_n else "OK"))
 
     # ── Formal header — professional register, one-line snapshots. The
-    #    delivery line states the actual time against the daily 09:00 UAE
+    #    delivery line states the actual time against the daily 08:00 UAE
     #    target: met or missed, always disclosed, never implied. ──
     A(f"DAILY AML/CFT SCREENING REPORT — {dt}")
     A("Prepared for the MLRO and Compliance function. Automated detection;")

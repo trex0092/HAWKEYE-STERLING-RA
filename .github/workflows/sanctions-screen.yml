@@ -40,8 +40,8 @@ on:
   # (New -> Under Review -> Cleared/Escalated) with a 5-day SLA and aging
   # alerts. Its own flat alert card + daily audit task stay SUPPRESSED so it
   # never duplicates the unified Daily Screening digest.
-  # 09:00 UAE DELIVERY (2026-10-01): results must be in Asana by 09:00 UAE
-  # (05:00 UTC). GitHub delivers this repo's scheduled events 4-6h late (the
+  # 08:00 UAE DELIVERY (2026-10-01): results must be in Asana by 08:00 UAE
+  # (04:00 UTC). GitHub delivers this repo's scheduled events 4-6h late (the
   # 05:37 slot started 09:41-11:57 UTC over 19-30 Sep) and drops most of a
   # frequent cron (control-retry's 36 daily slots produced 1-3 runs a day), so
   # no cron here can promise 09:00. The on-time trigger is

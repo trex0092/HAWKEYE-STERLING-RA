@@ -437,14 +437,14 @@ jobs:
           # Raise the bounded bulk-scan budget while keeping both values operator-tunable.
           GKG_WORKERS: ${{ vars.GKG_WORKERS || '12' }}
           GKG_DEADLINE_SEC: ${{ vars.GKG_DEADLINE_SEC || '2400' }}
-          # DAILY DELIVERY TARGET: 09:00 UAE (05:00 UTC). GitHub's 2-4h schedule
+          # DAILY DELIVERY TARGET: 08:00 UAE (04:00 UTC). GitHub's 2-4h schedule
           # delay means the run can't control its start, so it controls its
           # finish: news enrichment budgets itself against the target, trimmed
           # subjects are disclosed as deadline-deferred (never silent, never
           # counted clear) and the same-day make-up firings re-sweep them from
           # a fresh runner. A run starting after the target delivers ASAP with
           # FULL enrichment (no pointless trimming). Empty value disables.
-          DELIVERY_TARGET_UTC: ${{ vars.DELIVERY_TARGET_UTC || '05:00' }}
+          DELIVERY_TARGET_UTC: ${{ vars.DELIVERY_TARGET_UTC || '04:00' }}
           DELIVERY_RESERVE_MIN: ${{ vars.DELIVERY_RESERVE_MIN || '20' }}
           # Follow-Ups reminder attestation: after the report is DELIVERED the
           # engine comments proof on the externally-generated daily reminder
