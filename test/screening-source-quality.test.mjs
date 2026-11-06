@@ -25,8 +25,8 @@ const makeResults = () => ({
   enrichment: {
     skipped: 0, amErrors: 0, amPartial: 0,
     amLocalesPerSubject: 8, amMatrixTotal: LOCALES.length,
-    amBackbones: ['Google News RSS', 'GDELT global index', 'Bing News'],
-    amBackboneFailures: { googleNews: 0, gdelt: 0, bing: 0 },
+    amBackbones: ['Google News RSS', 'GDELT global index', 'Bing News', 'Yahoo News'],
+    amBackboneFailures: { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 },
     pepWorldwide: { active: true, count: pepCount, harvested, partial: false },
     pepLookupEnabled: true, pepErrors: 0,
   },
@@ -82,10 +82,26 @@ assert.equal(checked.operational, false, 'an under-floor fallback must be reject
 
 const partialNews = makeResults();
 partialNews.enrichment.amPartial = 1;
-partialNews.enrichment.amBackboneFailures.gdelt = 1;
+partialNews.enrichment.amBackboneFailures.yahoo = 1;
 checked = assess(partialNews);
 assert.equal(checked.operational, true, 'fallback news backbone can keep basic screening operational');
 assert.equal(checked.sourceQuality.assured, false, 'lost redundancy is not 100% news-source quality');
+
+// GDELT is best effort (no valid response reached GitHub runners in eight straight runs):
+// its failure is disclosed as a warning but does not by itself block source-quality assurance.
+const gdeltOnly = makeResults();
+gdeltOnly.enrichment.amBackboneFailures.gdelt = 991;
+gdeltOnly.enrichment.amBackbones = ['Google News RSS', 'Bing News', 'Yahoo News'];
+checked = assess(gdeltOnly);
+assert.equal(checked.sourceQuality.assured, true, 'a GDELT-only failure no longer blocks assurance');
+assert(checked.domains.adverseMedia.warnings.some(x => x.includes('GDELT unavailable')), 'GDELT failure stays disclosed');
+
+// The three evidenced backbones remain mandatory: Yahoo missing from the evidence blocks assurance.
+const noYahoo = makeResults();
+noYahoo.enrichment.amBackbones = ['Google News RSS', 'GDELT global index', 'Bing News'];
+checked = assess(noYahoo);
+assert.equal(checked.sourceQuality.assured, false, 'Yahoo News must be evidenced');
+assert(checked.sourceQuality.reasons.some(x => x.includes('Yahoo News')));
 
 const incompletePep = makePep();
 incompletePep.sourceUnscreenable = ['synthetic-unlabelled-QID'];

@@ -3,7 +3,7 @@
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
-  bingNewsUrl, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker, googleNewsRateState, GNEWS_PACING_CAP_MS,
+  bingNewsUrl, yahooNewsUrl, GDELT_REQUIRED, YAHOO_MIN_INTERVAL_MS, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker, googleNewsRateState, GNEWS_PACING_CAP_MS,
   RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS, ADVERSE_BACKBONE_MAX_ATTEMPTS, resetAdverseMediaRateGates,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
   gdeltFailureClass, gdeltCanFallbackToBase, gdeltResponseObservations,
@@ -564,8 +564,10 @@ resetGdeltBreaker();
 {
   const realFetch = globalThis.fetch;
   const realBing = process.env.BING_NEWS;
+  const realYahoo = process.env.YAHOO_NEWS;
   const realWarn = console.warn;
   process.env.BING_NEWS = '0';
+  process.env.YAHOO_NEWS = '0';
   console.warn = () => {};
   const subject = 'Acme Trading LLC';
   const baseUrl = gdeltUrl(subject, GDELT_RISK_TERMS);
@@ -635,6 +637,7 @@ resetGdeltBreaker();
     globalThis.fetch = realFetch;
     console.warn = realWarn;
     if (realBing === undefined) delete process.env.BING_NEWS; else process.env.BING_NEWS = realBing;
+    if (realYahoo === undefined) delete process.env.YAHOO_NEWS; else process.env.YAHOO_NEWS = realYahoo;
     resetGdeltBreaker();
   }
 }
@@ -643,8 +646,10 @@ resetGdeltBreaker();
 {
   const realFetch = globalThis.fetch;
   const realBing = process.env.BING_NEWS;
+  const realYahoo = process.env.YAHOO_NEWS;
   const realRetry = process.env.ADVERSE_BACKBONE_RETRY_MS;
   process.env.BING_NEWS = '1';
+  process.env.YAHOO_NEWS = '1';
   process.env.ADVERSE_BACKBONE_RETRY_MS = '1';
   resetGdeltBreaker();
   resetGnewsBreaker();
@@ -660,6 +665,9 @@ resetGdeltBreaker();
       if (bingCalls < 3) return { ok: false, status: 503, text: async () => 'try again' };
       return { ok: true, status: 200, text: async () => '<rss><channel><title>ok</title></channel></rss>' };
     }
+    if (u.includes('news.search.yahoo.com')) {
+      return { ok: false, status: 503, text: async () => 'yahoo down' };
+    }
     throw new Error('unexpected fetch in retry test: ' + u);
   };
   try {
@@ -668,15 +676,49 @@ resetGdeltBreaker();
       !r.errored && r.retryAttempted === true && r.retryRecovered === true
       && r.backbones.bing === true && bingCalls === 3
       && r.backboneStatus.bingAttempts === 3);
-    check('recovered subject remains partial when GDELT redundancy is unavailable, never falsely complete',
-      r.partial === true && r.sourcesFailed >= 1);
+    check('recovered subject remains partial when a REQUIRED backbone (Yahoo) is unavailable, never falsely complete',
+      r.partial === true && r.sourcesFailed >= 1 && r.backbones.yahoo === false);
   } finally {
     globalThis.fetch = realFetch;
     if (realBing === undefined) delete process.env.BING_NEWS; else process.env.BING_NEWS = realBing;
+    if (realYahoo === undefined) delete process.env.YAHOO_NEWS; else process.env.YAHOO_NEWS = realYahoo;
     if (realRetry === undefined) delete process.env.ADVERSE_BACKBONE_RETRY_MS; else process.env.ADVERSE_BACKBONE_RETRY_MS = realRetry;
     resetGdeltBreaker();
     resetGnewsBreaker();
     resetAdverseMediaRateGates();
+  }
+}
+
+/* ── Yahoo News RSS: third worldwide backbone (replaces GDELT as required) ─── */
+check('yahoo news url: free key-less RSS search with the exact-name phrase',
+  yahooNewsUrl('Acme Co').startsWith('https://news.search.yahoo.com/rss?p=')
+  && decodeURIComponent(yahooNewsUrl('Acme Co')).includes('"Acme Co"'));
+check('yahoo news pacing is polite by default and GDELT is best effort, not required',
+  YAHOO_MIN_INTERVAL_MS >= 1000 && GDELT_REQUIRED === false);
+{
+  const realFetch = globalThis.fetch;
+  const saved = { b: process.env.BING_NEWS, y: process.env.YAHOO_NEWS, r: process.env.ADVERSE_BACKBONE_RETRY_MS };
+  process.env.BING_NEWS = '1'; process.env.YAHOO_NEWS = '1'; process.env.ADVERSE_BACKBONE_RETRY_MS = '1';
+  resetGdeltBreaker(); resetGnewsBreaker(); resetAdverseMediaRateGates();
+  const rss = '<rss><channel><title>ok</title><item><title>Acme Co probe</title><link>https://example.org/a</link></item></channel></rss>';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('api.gdeltproject.org')) return { ok: false, status: 429, text: async () => 'Please limit requests' };
+    if (u.includes('www.bing.com') || u.includes('news.search.yahoo.com')) return { ok: true, status: 200, text: async () => rss };
+    throw new Error('unexpected fetch in yahoo test: ' + u);
+  };
+  try {
+    const r = await checkAdverseMedia('Acme Co', { timeoutMs: 2000, locales: [] });
+    check('yahoo answers: backbone recorded and its item is scanned',
+      r.backbones.yahoo === true && r.backbones.bing === true && r.itemsScanned >= 1);
+    check('GDELT failing alone does not narrow redundancy: subject is not partial',
+      r.backbones.gdelt === false && !r.errored && !r.partial);
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const [k, v] of [['BING_NEWS', saved.b], ['YAHOO_NEWS', saved.y], ['ADVERSE_BACKBONE_RETRY_MS', saved.r]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+    resetGdeltBreaker(); resetGnewsBreaker(); resetAdverseMediaRateGates();
   }
 }
 

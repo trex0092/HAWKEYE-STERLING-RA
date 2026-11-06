@@ -2105,7 +2105,7 @@ export async function screenLocally(subjects, cfg) {
   let amErrors = 0, amPartial = 0, amRetryAttempted = 0, amRetryRecovered = 0;
   const amSecondPassQueue = [];
   let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
-  const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0 };
+  const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 };
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
      bound the whole enrichment phase by a wall-clock budget: once it elapses the
@@ -2214,6 +2214,7 @@ export async function screenLocally(subjects, cfg) {
       if (!am.backbones?.googleNews) amBackboneFailures.googleNews++;
       if (!am.backbones?.gdelt) amBackboneFailures.gdelt++;
       if (!am.backbones?.bing) amBackboneFailures.bing++;
+      if (!am.backbones?.yahoo) amBackboneFailures.yahoo++;
       if (am.retryAttempted) amRetryAttempted++;
       if (am.retryRecovered) amRetryRecovered++;
       if (am.partial) amPartial++;   // narrowed redundancy — disclosed, never silent
@@ -2227,7 +2228,7 @@ export async function screenLocally(subjects, cfg) {
              pass. Without this, source-quality evidence still reports the
              original loss despite a verified response on that same subject.
              Never deduct a failure unless the provider actually answered. */
-          for (const id of ['googleNews', 'gdelt', 'bing']) {
+          for (const id of ['googleNews', 'gdelt', 'bing', 'yahoo']) {
             if (!am.backbones?.[id] && again.backbones?.[id]) amBackboneFailures[id]--;
           }
           // Replace the original per-subject observation rather than counting
@@ -2635,12 +2636,13 @@ async function main() {
          independent global backbones ran alongside every subject's sweep */
       amRotationCycleDays: cfg.adverseMedia ? rotationCycleDays() : 0,
       amMatrixTotal: LOCALES.length,
-      amBackboneFailures: screen.amBackboneFailures || { googleNews: 0, gdelt: 0, bing: 0 },
+      amBackboneFailures: screen.amBackboneFailures || { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 },
       amBackbones: cfg.adverseMedia
         ? [
             ...(screen.amBackboneFailures?.googleNews === 0 ? ['Google News RSS'] : []),
             ...(screen.amBackboneFailures?.gdelt === 0 ? ['GDELT global index'] : []),
             ...(screen.amBackboneFailures?.bing === 0 ? ['Bing News'] : []),
+            ...(screen.amBackboneFailures?.yahoo === 0 ? ['Yahoo News'] : []),
           ]
         : [] },
     /* Log-only challenger evidence (SCREEN_SHADOW_THRESHOLD) — kept OUT of

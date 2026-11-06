@@ -126,7 +126,7 @@ export function isHealthyCleanRun(results) {
   if ([h.amErrors, h.amPartial, h.pepErrors, h.skipped].some(
     value => !Number.isSafeInteger(value) || value !== 0)) return false;
   if (h.pepWorldwide && h.pepWorldwide.partial === true) return false;
-  if (!h.amBackboneFailures || ['googleNews', 'gdelt', 'bing'].some(
+  if (!h.amBackboneFailures || ['googleNews', 'bing', 'yahoo'].some(
     source => !Number.isSafeInteger(h.amBackboneFailures[source]) ||
       h.amBackboneFailures[source] !== 0)) return false;
   return true;

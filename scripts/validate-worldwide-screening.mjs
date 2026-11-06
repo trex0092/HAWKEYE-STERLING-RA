@@ -56,7 +56,8 @@ for (const source of domains.sanctions?.sources || []) {
 const adverseNeedles = [
   ["google-news-rss", "https://news.google.com/rss/search"],
   ["gdelt-doc-2", "https://api.gdeltproject.org/api/v2/doc/doc"],
-  ["bing-news-rss", "https://www.bing.com/news/search"]
+  ["bing-news-rss", "https://www.bing.com/news/search"],
+  ["yahoo-news-rss", "https://news.search.yahoo.com/rss"]
 ];
 for (const [id, needle] of adverseNeedles) {
   if (!adverse.includes(needle)) fail("adverse media: required worldwide backbone not wired: " + id);

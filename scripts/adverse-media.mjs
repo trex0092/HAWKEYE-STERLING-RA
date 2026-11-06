@@ -1041,6 +1041,7 @@ export function sourceTierFor(item) {
 export const GNEWS_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GNEWS_MIN_INTERVAL_MS) || 400);
 export const GDELT_MIN_INTERVAL_MS = Math.max(0, Number(process.env.GDELT_MIN_INTERVAL_MS) || 5000);
 export const BING_MIN_INTERVAL_MS = Math.max(0, Number(process.env.BING_MIN_INTERVAL_MS) || 1000);
+export const YAHOO_MIN_INTERVAL_MS = Math.max(0, Number(process.env.YAHOO_MIN_INTERVAL_MS) || 2000);
 export const ADVERSE_BACKBONE_MAX_ATTEMPTS = Math.max(1,
   Math.min(5, Number(process.env.ADVERSE_BACKBONE_MAX_ATTEMPTS) || 5));
 
@@ -1087,11 +1088,13 @@ export function googleNewsRateState() {
 }
 const _gdeltGate = new RequestCompletionGate(GDELT_MIN_INTERVAL_MS);
 const _bingGate = new RequestStartGate(BING_MIN_INTERVAL_MS);
+const _yahooGate = new RequestStartGate(YAHOO_MIN_INTERVAL_MS);
 
 export function resetAdverseMediaRateGates() {
   _gnewsGate.reset();
   _gdeltGate.reset();
   _bingGate.reset();
+  _yahooGate.reset();
 }
 
 /* Fetch one source with a run-global start gate. The screening engine processes
@@ -1214,6 +1217,21 @@ export function bingNewsUrl(name, terms = ADVERSE_TERMS) {
   return 'https://www.bing.com/news/search?q=' + encodeURIComponent(q) + '&format=rss';
 }
 
+/* Yahoo News RSS — independent worldwide news backbone on its OWN rate-limit
+   pool, free and key-less. Added 2026-11-06 in place of GDELT as the required
+   third backbone: GDELT returned zero valid responses to GitHub runners in
+   every one of the last eight daily screening runs (throttled or dropped), so
+   it never contributed coverage. GDELT is still asked (best effort) but its
+   failure no longer fails source-quality assurance.
+   Kill-switch: YAHOO_NEWS=0. */
+export function yahooNewsUrl(name, terms = ADVERSE_TERMS) {
+  const q = '"' + String(name).trim() + '" (' + terms.map(t => '"' + t + '"').join(' OR ') + ')';
+  return 'https://news.search.yahoo.com/rss?p=' + encodeURIComponent(q);
+}
+
+/* Whether a GDELT failure counts against source-quality (default: best effort). */
+export const GDELT_REQUIRED = process.env.GDELT_REQUIRED === '1';
+
 /* Run async `fn` over `items` with bounded concurrency, so a wide locale sweep
    does not fire dozens of simultaneous requests at one host (which Google News
    throttles). Preserves input order. */
@@ -1298,6 +1316,7 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const localeSet = locales || (explicitIds ? activeLocales() : budgetedLocales());
   const conc = Math.max(1, concurrency || Number(process.env.ADVERSE_MEDIA_CONCURRENCY) || 6);
   const bingOn = process.env.BING_NEWS !== '0';
+  const yahooOn = process.env.YAHOO_NEWS !== '0';
 
   // Independent providers start independently. GDELT queueing or a timeout
   // must not prevent Google News and Bing from being asked. Their own shared
@@ -1308,6 +1327,15 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
     const items = await fetchSource(bingNewsUrl(name), parseRss, xmlAccept, timeoutMs,
       (_ok, s) => { status = s; }, _bingGate);
     bingStatus = status;
+    return items;
+  };
+
+  let yahooStatus = 0;
+  const fetchYahoo = async () => {
+    let status = 0;
+    const items = await fetchSource(yahooNewsUrl(name), parseRss, xmlAccept, timeoutMs,
+      (_ok, s) => { status = s; }, _yahooGate);
+    yahooStatus = status;
     return items;
   };
 
@@ -1327,23 +1355,26 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
     const results = new Map([...first, ...regional].map(result => [result.id, result]));
     return localeSet.map(loc => results.get(loc.id));
   };
-  const [gd, initialBing, localeResults] = await Promise.all([
+  const [gd, initialBing, initialYahoo, localeResults] = await Promise.all([
     fetchGdelt(name, timeoutMs),
     bingOn ? fetchBing() : Promise.resolve(null),
+    yahooOn ? fetchYahoo() : Promise.resolve(null),
     googleSweep(),
   ]);
   let bgRaw = initialBing;
   let bingAttempts = bingOn ? 1 : 0;
+  let yhRaw = initialYahoo;
+  let yahooAttempts = yahooOn ? 1 : 0;
 
   let retryAttempted = false;
   let retryRecovered = false;
   const firstEnUs = localeResults.find(r => r.id === 'en-US');
-  const firstOk = !!((firstEnUs && firstEnUs.items !== null) || gd !== null || (bingOn && bgRaw !== null));
+  const firstOk = !!((firstEnUs && firstEnUs.items !== null) || gd !== null || (bingOn && bgRaw !== null) || (yahooOn && yhRaw !== null));
   const retryEnUs = (gnewsCanRequest('en-US') && (!firstEnUs || firstEnUs.items === null))
     ? localeSet.find(loc => loc.id === 'en-US')
     : null;
 
-  if (!firstOk && ((bingOn && bgRaw === null) || retryEnUs)) {
+  if (!firstOk && ((bingOn && bgRaw === null) || (yahooOn && yhRaw === null) || retryEnUs)) {
     retryAttempted = true;
     const retryDelayMs = Math.max(0, Number(process.env.ADVERSE_BACKBONE_RETRY_MS) || 3000);
 
@@ -1360,6 +1391,14 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
       bingAttempts++;
     }
 
+    /* Yahoo is the other independent pool: same bounded ladder, same gate. */
+    while (yahooOn && yhRaw === null && yahooAttempts < ADVERSE_BACKBONE_MAX_ATTEMPTS) {
+      const waitMs = retryDelayMs ? Math.min(30000, retryDelayMs * 2 ** Math.max(0, yahooAttempts - 1)) : 0;
+      if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+      yhRaw = await fetchYahoo();
+      yahooAttempts++;
+    }
+
     /* Google en-US gets one recovery probe only when its breaker admits it.
        Never bypass the breaker just to turn an assurance badge green. */
     if (retryEnUs) {
@@ -1371,6 +1410,7 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   }
 
   const bg = bgRaw === null ? null : bgRaw.map(it => ({ ...it, source: it.source || 'Bing News' }));
+  const yh = yhRaw === null ? null : yhRaw.map(it => ({ ...it, source: it.source || 'Yahoo News' }));
   const enUs = localeResults.find(r => r.id === 'en-US');
   const okLocales = localeResults.filter(r => r.items !== null);
   const backbones = {
@@ -1383,28 +1423,34 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
     gdelt: gd !== null,
     bingEnabled: bingOn,
     bing: bingOn && bg !== null,
+    yahooEnabled: yahooOn,
+    yahoo: yahooOn && yh !== null,
   };
-  const backboneOk = backbones.googleNewsEnUs || backbones.gdelt || backbones.bing;
+  const backboneOk = backbones.googleNewsEnUs || backbones.gdelt || backbones.bing || backbones.yahoo;
   retryRecovered = retryAttempted && backboneOk;
 
   if (!backboneOk) {
     return {
       errored: true,
       error: 'global adverse-media backbones unreachable after bounded gated retries (Google News en-US + GDELT'
-        + (bingOn ? ' + Bing News' : '') + ')',
+        + (bingOn ? ' + Bing News' : '') + (yahooOn ? ' + Yahoo News' : '') + ')',
       localesQueried: localeSet.length,
       backbones,
-      backboneStatus: { bing: bingStatus, bingAttempts },
+      backboneStatus: { bing: bingStatus, bingAttempts, yahoo: yahooStatus, yahooAttempts },
       retryAttempted,
       retryRecovered,
     };
   }
 
-  const items = dedupItems([...okLocales.flatMap(r => r.items), ...(gd || []), ...(bg || [])]);
+  const items = dedupItems([...okLocales.flatMap(r => r.items), ...(gd || []), ...(bg || []), ...(yh || [])]);
   const result = scoreAdverseMedia(name, items, ALL_TERMS);
-  const sourcesOk = okLocales.length + (gd !== null ? 1 : 0) + (bingOn && bg !== null ? 1 : 0);
-  const sourcesTotal = localeSet.length + 1 + (bingOn ? 1 : 0);
-  const failed = sourcesTotal - sourcesOk;
+  /* GDELT is best effort (see GDELT_REQUIRED): when it answers it adds coverage,
+     but its failure alone does not narrow a subject's redundancy. */
+  const requiredOk = okLocales.length + (bingOn && bg !== null ? 1 : 0) + (yahooOn && yh !== null ? 1 : 0)
+    + (GDELT_REQUIRED && gd !== null ? 1 : 0);
+  const requiredTotal = localeSet.length + (bingOn ? 1 : 0) + (yahooOn ? 1 : 0) + (GDELT_REQUIRED ? 1 : 0);
+  const sourcesOk = okLocales.length + (gd !== null ? 1 : 0) + (bingOn && bg !== null ? 1 : 0) + (yahooOn && yh !== null ? 1 : 0);
+  const failed = requiredTotal - requiredOk;
   const fullMatrix = localeSet.length >= LOCALES.length;
 
   const out = {
@@ -1415,7 +1461,7 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
     sourcesFailed: failed,
     itemsScanned: items.length,
     backbones,
-    backboneStatus: { bing: bingStatus, bingAttempts },
+    backboneStatus: { bing: bingStatus, bingAttempts, yahoo: yahooStatus, yahooAttempts },
     retryAttempted,
     retryRecovered,
   };
