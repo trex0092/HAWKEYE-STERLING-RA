@@ -560,12 +560,15 @@ if (pkg.private === true) {
   );
   check('old Click and MCP exceptions are retired only after patched versions',
     atLeast(version('click'), [8, 3, 3]) &&
-    atLeast(version('mcp'), [1, 28, 1]));
+    atLeast(version('mcp'), [1, 30, 0]) &&
+    atLeast(version('opentelemetry-api'), [1, 45, 1]));
   check('OSV does not silently ignore CI toolchain findings',
     !/^\s*\[\[IgnoredVulns\]\]/m.test(policy) &&
     !/^\s*id\s*=/m.test(policy) &&
     policy.includes('GHSA-84m7-p3x7-pcfv') &&
     policy.includes('GHSA-xcq7-p3pf-p88h'));
+  check('Semgrep lock is installed without re-resolving so the patched pins hold',
+    /--require-hashes --no-deps -r ci\/semgrep-requirements\.txt/.test(readFileSync('.github/workflows/semgrep.yml', 'utf8')));
 }
 
 /* The Scorecard result can be computed and signed successfully while
