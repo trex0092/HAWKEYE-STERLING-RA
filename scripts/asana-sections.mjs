@@ -19,19 +19,29 @@ export const SECTIONS = Object.freeze({
   media: Object.freeze({ gid: '1218979441933783', name: 'Screening Adverse Media & PEP\u2019s Update' })
   /* The "AI & Platform Governance" section (gid 1218985347982681) was removed
      from HAWKEYE STERLING APP on 2026-11-06 at the MLRO's request. Platform-health
-     alerts now go to "Regulatory Changes" (see alertSection). */
+     alerts are no longer filed in Asana at all (see alertSection). */
 });
 
 /* Where a platform alert (scripts/asana-alert.mjs) is filed, by its title.
    Document follow-ups, screening findings and law/list changes keep their own
-   sections; everything else is platform health and goes to "Regulatory Changes". */
+   sections. Everything else is platform health (site or function down, stale
+   control, production drift, code scan failed, workflow recovery blocked): it is
+   NOT filed in Asana since 2026-11-06 and alertSection returns null for it, so
+   it is reported in the workflow run instead (scripts/asana-alert.mjs). */
 export function alertSection(title) {
   const s = String(title || '').toLowerCase();
   if (/passport|emirates id|\beid\b|licen[cs]e|pending document|proof of address/.test(s)) return SECTIONS.documents.gid;
   if (/adverse media|\bpep\b/.test(s)) return SECTIONS.media.gid;
   if (/sanction|screening assurance/.test(s)) return SECTIONS.sanctions.gid;
+  /* Any other screening delivery/dispatch/integrity failure is a screening-obligation
+     alert, not platform health: it stays in Asana under the screening section. */
+  if (/screening/.test(s)) return SECTIONS.media.gid;
   if (/\beocn\b|regulat|fatf list|circular/.test(s)) return SECTIONS.regulatory.gid;
-  return SECTIONS.regulatory.gid;
+  return null;
+}
+
+export function isPlatformAlert(title) {
+  return alertSection(title) === null;
 }
 
 function normalizedName(value) {
