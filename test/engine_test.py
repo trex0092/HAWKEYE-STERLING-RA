@@ -7133,6 +7133,31 @@ for _f_to in sorted(_glob_to.glob(os.path.join(_root_to, "**", "*.py"), recursiv
 check("every requests call in the repository's Python files sets a timeout "
       + (f"(missing: {_no_timeout})" if _no_timeout else ""), not _no_timeout)
 
+# Dedup cut-offs must be real UTC instants. now_uae() is naive UAE wall time;
+# stamping it with a literal Z made the cut-off four hours late, so a report
+# posted between 00:00 and 04:00 UAE time was invisible to the dedup lookup.
+import datetime as _dt_ut
+class _UtResp:
+    status_code = 200
+    def __init__(self, body): self._b = body
+    def json(self): return self._b
+_ut_seen = []
+def _ut_stub(method, url, **kw):
+    _ut_seen.append(dict(kw.get("params") or {}))
+    return _UtResp({"data": [{"gid": "77", "name": "Daily AML/CFT Screening Report \u2014 06 Nov 2026"}],
+                    "next_page": None})
+_ut_orig = screen.asana_request
+try:
+    screen.asana_request = _ut_stub
+    _ut_gid = screen._existing_report_task("daily", _dt_ut.datetime(2026, 11, 6, 2, 0, 0))
+finally:
+    screen.asana_request = _ut_orig
+check("dedup lookup: daily cut-off is UAE midnight expressed as UTC (2026-11-05T20:00Z), "
+      "so a 01:00 UAE report is found",
+      _ut_seen and _ut_seen[0].get("modified_since") == "2026-11-05T20:00:00.000Z" and _ut_gid == "77")
+check("dedup lookup: onboarding window subtracts the UAE offset before labelling UTC",
+      screen._uae_to_asana_utc(_dt_ut.datetime(2026, 11, 6, 12, 0, 0)) == "2026-11-06T08:00:00.000Z")
+
 if _fail:
     print(f"FAILED: {len(_fail)} check(s): {_fail}")
     sys.exit(1)
