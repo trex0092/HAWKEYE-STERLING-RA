@@ -21,13 +21,11 @@
    here instead of rotting silently.
 
    Runs in GitHub Actions (.github/workflows/governance-report.yml).
-   Needs ASANA_ACCESS_TOKEN (secret) + the runner's GITHUB_TOKEN (actions:read). */
+   Needs the runner's GITHUB_TOKEN (actions:read). Asana delivery retired 2026-11-06:
+   the report is published in the workflow run's job summary. */
 
-/* Shared Asana client: bounded retry on 429/5xx so a transient blip never
-   drops the day's report (idempotency is by title-prefix check in main). */
-import { SECTIONS, requireApprovedSection } from './asana-sections.mjs';
+import { SECTIONS } from './asana-sections.mjs';
 import { readFileSync } from 'node:fs';
-import { asana } from './asana-notify.mjs';
 
 /* The "Ongoing Monitoring" project holds the daily evidence trail. */
 export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '1216203370612914';
@@ -39,7 +37,6 @@ export const REG_PROJECT_GID = process.env.ASANA_REG_PROJECT_GID || '12162033706
    time; while no live gid was registered (#701/#703) these reports were filed
    under "Regulatory Changes". */
 export const GOV_SECTION_NAME = SECTIONS.governance.name;
-const GOV_SECTION_GID = process.env.ASANA_GOV_SECTION_GID || '';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export function dateLabel(d) { return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
@@ -305,27 +302,6 @@ async function countAlerts(repo, token, kind) {
   } catch { return null; }
 }
 
-async function listTaskNames(projectGid) {
-  const names = [];
-  const base = '/projects/' + projectGid + '/tasks?limit=100&opt_fields=name';
-  let path = base;
-  while (path) {
-    const d = await asana(path);
-    for (const t of (d.data || [])) names.push(String(t.name || ''));
-    path = d.next_page ? base + '&offset=' + d.next_page.offset : null;
-  }
-  return names;
-}
-
-/* The governance section is pinned to an approved destination: never resolve
-   it by name and never create a section in the monitoring project. An
-   unapproved override is refused (the caller logs it; the task itself is still
-   created) instead of being honoured or recreated. */
-async function ensureSection(projectGid) {
-  const section = GOV_SECTION_GID || SECTIONS.governance.gid;
-  return requireApprovedSection(projectGid, section);
-}
-
 function runUrl() {
   const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
   return (GITHUB_SERVER_URL && GITHUB_REPOSITORY && GITHUB_RUN_ID)
@@ -334,7 +310,9 @@ function runUrl() {
 }
 
 async function main() {
-  if (!process.env.ASANA_ACCESS_TOKEN) throw new Error('ASANA_ACCESS_TOKEN secret is not configured in GitHub Actions');
+  /* Asana delivery retired 2026-11-06 at the MLRO's request: the "AI & Platform
+     Governance" section of HAWKEYE STERLING APP was removed, so the daily report
+     is published in the workflow run's job summary instead of as an Asana task. */
   const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   if (!ghToken) throw new Error('GITHUB_TOKEN is not available (needs actions:read)');
   const repo = process.env.GITHUB_REPOSITORY;
@@ -342,11 +320,6 @@ async function main() {
 
   const now = new Date();
   const label = dateLabel(now);
-
-  /* Idempotent: one report per calendar day. */
-  const names = await listTaskNames(REG_PROJECT_GID);
-  const already = names.find(n => n.startsWith('AI Governance & Platform Report — ' + label));
-  if (already) { console.log('report already exists: ' + already); return; }
 
   const latest = await fetchLatestRuns(repo, ghToken);
   const summary = summarise(latest, now.getTime());
@@ -365,17 +338,10 @@ async function main() {
   };
 
   const title = buildTaskName(label, summary);
-  const notes = buildReportNotes({ label, summary, alerts, runLink: runUrl(), prev: previousScore(names, label) });
-  const today = now.toISOString().slice(0, 10);
-  const made = await asana('/tasks', { method: 'POST', body: JSON.stringify({ data: { name: title, notes, projects: [REG_PROJECT_GID], due_on: today, assignee: 'me' } }) });
-  const gid = made.data && made.data.gid;
-  if (gid) {
-    try {
-      const sectionGid = await ensureSection(REG_PROJECT_GID);
-      if (sectionGid) await asana('/sections/' + sectionGid + '/addTask', { method: 'POST', body: JSON.stringify({ data: { task: gid } }) });
-    } catch (e) { console.warn('governance-report: could not file under section (' + (e && e.message || e) + ')'); }
-  }
-  console.log('governance report created (' + summary.verdict + '): ' + (made.data && made.data.permalink_url));
+  const notes = buildReportNotes({ label, summary, alerts, runLink: runUrl(), prev: previousScore([], label) });
+  const report = '## ' + title + '\n\n' + notes + '\n';
+  /* Printed to stdout; the workflow tees it into the job summary (no file write here). */
+  console.log(report);
 }
 
 if (process.argv[1] && process.argv[1].endsWith('governance-report.mjs')) {

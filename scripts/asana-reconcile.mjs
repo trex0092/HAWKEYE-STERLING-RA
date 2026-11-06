@@ -17,8 +17,8 @@
    printed — only references, tiers and scores.
 
    The diff itself is a pure function (reconcile) exported for unit tests. */
-import { writeFileSync } from 'node:fs';
-import { notifyAsana, esc, asanaEnabled, runUrl, isRetryable, retryDelayMs } from './asana-notify.mjs';
+import { writeFileSync, appendFileSync } from 'node:fs';
+import { isRetryable, retryDelayMs } from './asana-notify.mjs';
 
 const RISK_PROJECT_GID = process.env.ASANA_PROJECT_GID || '1216203370612914';
 const SHEET_OPEN = '===HS SHEET===';
@@ -162,16 +162,14 @@ async function main() {
   console.log(report);
   try { writeFileSync('asana-reconcile-report.md', report); } catch (e) { /* CI artifact only */ }
 
-  if (diff.total > 0 && asanaEnabled()) {
-    const link = runUrl();
-    const html = '<body><h2>Asana ↔ RA reconciliation — ' + diff.total + ' discrepancy(ies)</h2>'
-      + '<strong>' + esc(report.split('\n')[0]) + '</strong>'
-      + '<code>' + esc(report) + '</code>'  /* Asana html_notes has no <pre>; an unsupported tag 400s the card exactly when drift is found */
-      + (link ? '<a href="' + esc(link) + '">View the run</a>' : '') + '</body>';
-    await notifyAsana('RA ↔ Asana reconciliation — ' + diff.total + ' discrepancy(ies)', report, { html, section: '1218985347982681' /* AI & Platform Governance — a data-integrity check, not a law change */ });
+  /* Asana card delivery retired 2026-11-06 at the MLRO's request (the "AI & Platform
+     Governance" section was removed). A drift finding is now published in the
+     workflow run's job summary; the Asana reads above are unchanged. */
+  if (diff.total > 0 && process.env.GITHUB_STEP_SUMMARY) {
+    try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## RA <-> Asana reconciliation - ' + diff.total + ' discrepancy(ies)\n\n' + report + '\n'); } catch (e) { /* summary only */ }
   }
   /* Non-blocking: reconciliation is observational. The workflow inspects stdout /
-     the filed card; it exits 0 so a drift finding is not a red build. */
+     the run summary; it exits 0 so a drift finding is not a red build. */
 }
 
 /* Only run when invoked directly (so tests can import the pure helpers). */
