@@ -1,23 +1,23 @@
 [
  {
   "t": "Artificial intelligence",
-  "h": "https://www.oecd.org/en/topics/artificial-intelligence.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/topics/artificial-intelligence.html"
  },
  {
   "t": "Critical minerals",
-  "h": "https://www.oecd.org/en/topics/sustainable-mining-for-development.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/topics/sustainable-mining-for-development.html"
  },
  {
   "t": "Future of work",
-  "h": "https://www.oecd.org/en/topics/future-of-work.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/topics/future-of-work.html"
  },
  {
   "t": "Global value and supply chains",
-  "h": "https://www.oecd.org/en/topics/global-value-and-supply-chains.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/topics/global-value-and-supply-chains.html"
  },
  {
   "t": "Student performance (PISA)",
-  "h": "https://www.oecd.org/en/topics/student-performance-pisa.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/topics/student-performance-pisa.html"
  },
  {
   "t": "Agricultural policy monitoring",
@@ -84,10 +84,6 @@
   "h": "https://www.oecd.org/en/topics/climate-change.html"
  },
  {
-  "t": "Critical minerals",
-  "h": "https://www.oecd.org/en/topics/sustainable-mining-for-development.html"
- },
- {
   "t": "Development co-operation",
   "h": "https://www.oecd.org/en/topics/development-co-operation.html"
  },
@@ -126,10 +122,6 @@
  {
   "t": "Explore development",
   "h": "https://www.oecd.org/en/topics/development.html"
- },
- {
-  "t": "Artificial intelligence",
-  "h": "https://www.oecd.org/en/topics/artificial-intelligence.html"
  },
  {
   "t": "Communication infrastructure and services",
@@ -236,10 +228,6 @@
   "h": "https://www.oecd.org/en/topics/learning-environment.html"
  },
  {
-  "t": "Student performance (PISA)",
-  "h": "https://www.oecd.org/en/topics/student-performance-pisa.html"
- },
- {
   "t": "Teachers and educators",
   "h": "https://www.oecd.org/en/topics/teachers-and-educators.html"
  },
@@ -254,10 +242,6 @@
  {
   "t": "Employment services",
   "h": "https://www.oecd.org/en/topics/employment-services.html"
- },
- {
-  "t": "Future of work",
-  "h": "https://www.oecd.org/en/topics/future-of-work.html"
  },
  {
   "t": "Health and work",
@@ -402,10 +386,6 @@
  {
   "t": "Explore health",
   "h": "https://www.oecd.org/en/topics/health.html"
- },
- {
-  "t": "Global value and supply chains",
-  "h": "https://www.oecd.org/en/topics/global-value-and-supply-chains.html"
  },
  {
   "t": "Industrial policy",
@@ -693,111 +673,111 @@
  },
  {
   "t": "Latin America",
-  "h": "https://www.oecd.org/en/regions/latin-america-and-the-caribbean.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/regions/latin-america-and-the-caribbean.html"
  },
  {
   "t": "Middle East and North Africa",
-  "h": "https://www.oecd.org/en/regions/middle-east-and-north-africa.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/regions/middle-east-and-north-africa.html"
  },
  {
   "t": "Southeast Asia",
-  "h": "https://www.oecd.org/en/regions/southeast-asia.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/regions/southeast-asia.html"
  },
  {
   "t": "South East Europe",
-  "h": "https://www.oecd.org/en/regions/south-east-europe.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/regions/south-east-europe.html"
  },
  {
   "t": "Browse all countries & regions",
-  "h": "https://www.oecd.org/en/countries.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/countries.html"
  },
  {
   "t": "Browse all publications",
-  "h": "https://www.oecd.org/en/publications.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/publications.html"
  },
  {
   "t": "Reports and research papers",
-  "h": "https://www.oecd.org/en/publications/reports.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/publications/reports.html"
  },
  {
   "t": "Policy papers and briefs",
-  "h": "https://www.oecd.org/en/publications/briefs.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/publications/briefs.html"
+ },
+ {
+  "t": "The Value of School Principals in TALIS 2024",
+  "h": "https://www.oecd.org/en/publications/the-value-of-school-principals-in-talis-2024_a2cdb777-en.html"
  },
  {
   "t": "Ownership and Governance of State‑Owned Enterprises 2026",
-  "h": "https://www.oecd.org/en/publications/ownership-and-governance-of-state-owned-enterprises-2026_b72bf04c-en.html?wcmmode=json.html"
- },
- {
-  "t": "OECD Economic Outlook, Interim Report",
-  "h": "https://www.oecd.org/en/publications/oecd-economic-outlook-interim-report-september-2026_f751d02b-en.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/publications/ownership-and-governance-of-state-owned-enterprises-2026_b72bf04c-en.html"
  },
  {
   "t": "Browse all data",
-  "h": "https://www.oecd.org/en/data.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/data.html"
  },
  {
   "t": "Dashboards & tools",
-  "h": "https://www.oecd.org/en/data/dashboards-and-tools.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/data/dashboards-and-tools.html"
  },
  {
   "t": "OECD Data Explorer",
-  "h": "https://www.oecd.org/en/data/datasets/oecd-DE.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/data/datasets/oecd-DE.html"
  },
  {
   "t": "G20 GDP growth (Q2)",
-  "h": "https://www.oecd.org/en/data/insights/statistical-releases/2026/09/g20-gdp-growth-second-quarter-2026.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/data/insights/statistical-releases/2026/09/g20-gdp-growth-second-quarter-2026.html"
  },
  {
   "t": "Unemployment rates",
-  "h": "https://www.oecd.org/en/data/insights/statistical-releases/2026/09/unemployment-rates-updated-september-2026.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/data/insights/statistical-releases/2026/09/unemployment-rates-updated-september-2026.html"
  },
  {
   "t": "Explore news and events",
-  "h": "https://www.oecd.org/en/news-events.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/news-events.html"
  },
  {
   "t": "Blogs, videos & podcasts",
-  "h": "https://www.oecd.org/en/blogs.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/blogs.html"
  },
  {
   "t": "How much are people willing to pay to avoid chemicals-related health effects?",
-  "h": "https://www.oecd.org/en/events/2026/10/how-much-are-people-willing-to-pay-to-avoid-chemicals-related-health-effects.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/events/2026/10/how-much-are-people-willing-to-pay-to-avoid-chemicals-related-health-effects.html"
  },
  {
   "t": "Global Forum on Competition 2026",
-  "h": "https://www.oecd.org/en/events/2026/12/global-forum-on-competition-2026.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/events/2026/12/global-forum-on-competition-2026.html"
  },
  {
   "t": "About the organisation",
-  "h": "https://www.oecd.org/en/about.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about.html"
  },
  {
   "t": "OECD Secretary-General",
-  "h": "https://www.oecd.org/en/about/secretary-general.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/secretary-general.html"
  },
  {
   "t": "Organisational structure",
-  "h": "https://www.oecd.org/en/about/organisational-structure.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/organisational-structure.html"
  },
  {
   "t": "Members and partners",
-  "h": "https://www.oecd.org/en/about/members-partners.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/members-partners.html"
  },
  {
   "t": "OECD and G7, G20, APEC",
-  "h": "https://www.oecd.org/en/about/members-partners.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/members-partners.html"
  },
  {
   "t": "Ethics and Integrity",
-  "h": "https://www.oecd.org/en/about/ethics-and-integrity.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/ethics-and-integrity.html"
  },
  {
   "t": "Young associates",
-  "h": "https://www.oecd.org/en/about/careers/young-associates.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/careers/young-associates.html"
  },
  {
   "t": "Procurement at the OECD",
-  "h": "https://www.oecd.org/en/about/calls-for-tenders.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/calls-for-tenders.html"
  },
  {
   "t": "Login on your MyOECD account",
@@ -813,7 +793,7 @@
  },
  {
   "t": "Read more about due diligence",
-  "h": "https://www.oecd.org/en/topics/due-diligence-for-responsible-business-conduct.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/topics/due-diligence-for-responsible-business-conduct.html"
  },
  {
   "t": "Read the Recommendation",
@@ -821,7 +801,7 @@
  },
  {
   "t": "National Contact Points for Responsible Business Conduct",
-  "h": "https://www.oecd.org/en/networks/national-contact-points-for-responsible-business-conduct.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/networks/national-contact-points-for-responsible-business-conduct.html"
  },
  {
   "t": "Due diligence for responsible business conduct",
@@ -830,10 +810,6 @@
  {
   "t": "Global engagement on responsible business conduct",
   "h": "https://www.oecd.org/en/topics/global-engagement-on-responsible-business-conduct.html"
- },
- {
-  "t": "National Contact Points for Responsible Business Conduct",
-  "h": "https://www.oecd.org/en/networks/national-contact-points-for-responsible-business-conduct.html"
  },
  {
   "t": "Public policies for responsible business conduct",
@@ -885,7 +861,7 @@
  },
  {
   "t": "See all latest insights",
-  "h": "https://www.oecd.org/en/about.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about.html"
  },
  {
   "t": "OECD Responsible Business Outlook 2026",
@@ -925,7 +901,7 @@
  },
  {
   "t": "See all publications",
-  "h": "https://www.oecd.org/en/search/publications.html?facetTags=oecd-policy-issues:pi85,oecd-content-types:publications/reports,oecd-content-types:publications/policy-briefs,oecd-content-types:publications/policy-papers,oecd-content-types:publications/working-papers,oecd-content-types:publications/standards-and-guidelines,oecd-policy-subissues:psi277&path=/content/oecd/en/publications&wcmmode=json.html"
+  "h": "https://www.oecd.org/en/search/publications.html?facetTags=oecd-policy-issues:pi85,oecd-content-types:publications/reports,oecd-content-types:publications/policy-briefs,oecd-content-types:publications/policy-papers,oecd-content-types:publications/working-papers,oecd-content-types:publications/standards-and-guidelines,oecd-policy-subissues:psi277&path=/content/oecd/en/publications"
  },
  {
   "t": "Exploring the role of gold in geofinance, strategic autonomy and illicit trade",
@@ -1013,38 +989,38 @@
  },
  {
   "t": "All Countries",
-  "h": "https://www.oecd.org/en/countries.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/countries.html"
  },
  {
   "t": "Regional and global engagement",
-  "h": "https://www.oecd.org/en/regions.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/regions.html"
  },
  {
   "t": "Policy briefs",
-  "h": "https://www.oecd.org/en/publications/briefs.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/publications/briefs.html"
  },
  {
   "t": "Blogs & podcasts",
-  "h": "https://www.oecd.org/en/blogs.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/blogs.html"
  },
  {
   "t": "Accession to the OECD",
-  "h": "https://www.oecd.org/en/about/legal/oecd-accession-process.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/legal/oecd-accession-process.html"
  },
  {
   "t": "OECD legal framework",
-  "h": "https://www.oecd.org/en/about/legal.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/legal.html"
  },
  {
   "t": "Web accessibility",
-  "h": "https://www.oecd.org/en/about/web-accessibility.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/web-accessibility.html"
  },
  {
   "t": "Terms & Conditions",
-  "h": "https://www.oecd.org/en/about/terms-conditions.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/terms-conditions.html"
  },
  {
   "t": "Privacy Policy",
-  "h": "https://www.oecd.org/en/about/privacy.html?wcmmode=json.html"
+  "h": "https://www.oecd.org/en/about/privacy.html"
  }
 ]
