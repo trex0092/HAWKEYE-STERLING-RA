@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-09T01:55:19.085Z",
-  "githubRunId": "42547987925",
+  "generatedAt": "2026-11-09T14:09:03.167Z",
+  "githubRunId": "42631653358",
   "commit": "4dcc48d8c48ea8b4fd685ca99dcd5d1fda90bb3e",
   "screenedSubjects": 1006,
   "sourceProjects": {
@@ -23,9 +23,7 @@
   ],
   "operational": true,
   "reasons": [],
-  "warnings": [
-    "required sanctions source eu-fsf did not meet its full-source floor - screened via declared fallback fr-dgt (22920/9800 minimum names)"
-  ],
+  "warnings": [],
   "evidence": {
     "screenedSubjects": 1006,
     "loadedSources": [
@@ -33,6 +31,12 @@
         "id": "uk-ofsi",
         "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
         "count": 58644,
+        "partial": false
+      },
+      {
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3757,
         "partial": false
       },
       {
@@ -48,9 +52,9 @@
         "partial": false
       },
       {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3757,
+        "id": "eu-fsf",
+        "name": "EU — Consolidated financial sanctions list (CSV)",
+        "count": 31132,
         "partial": false
       },
       {
@@ -77,16 +81,7 @@
         "screenedSubjects": 20
       }
     },
-    "servedByFallback": [
-      {
-        "id": "eu-fsf",
-        "fallback": "fr-dgt",
-        "fallbackCount": 22920,
-        "fallbackMinNames": 9800
-      }
-    ],
-    "notes": [
-      "EU — Consolidated financial sanctions list (CSV) could not be loaded (HTTP 500) - fallback fr-dgt loaded successfully; coverage preserved"
-    ]
+    "servedByFallback": [],
+    "notes": []
   }
 }
