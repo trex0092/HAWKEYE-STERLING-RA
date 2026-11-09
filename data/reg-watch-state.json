@@ -7,9 +7,11 @@
       "checkedAt": "2026-11-09",
       "changedAt": "2026-11-03",
       "contentAsOf": "2026-11-09",
-      "status": 200,
+      "status": "error",
       "prevHash": "23e5d1fdef0e62fdcc7662d47732a3ce3194d9206f6c549f2c557997ea739a33",
-      "fp": 2
+      "fp": 2,
+      "error": "fetch failed (UND_ERR_CONNECT_TIMEOUT)",
+      "errorStreak": 1
     },
     "uae-fiu": {
       "hash": "7e067a5c918cf49ed2584aabd12bf981be702878d9826327b9087a962cc5c702",
@@ -21,7 +23,7 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 17
+      "errorStreak": 18
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
@@ -29,9 +31,11 @@
       "checkedAt": "2026-11-09",
       "changedAt": "2026-09-21",
       "contentAsOf": "2026-11-09",
-      "status": 200,
+      "status": 403,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261109015719"
+      "via": "web.archive.org save-page-now 20261109015719",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -61,13 +65,13 @@
       "fp": 2
     },
     "uae-jewellery": {
-      "hash": "e796dd3bfaf4b94c8451bb82ac953b5dacb0262fbf404d2470763c85cfbd6c06",
-      "bytes": 9925,
+      "hash": "6bf0f1c8723bc3b91fe2100c7be85098f93a0c48a54ac531f4cd189e8d236edd",
+      "bytes": 10170,
       "checkedAt": "2026-11-09",
       "changedAt": "2026-11-09",
       "contentAsOf": "2026-11-09",
       "status": 200,
-      "prevHash": "2f2d64d5249a87e624d3bdcfa6cc4aaa44596dab7993199409102a63c45f2abe",
+      "prevHash": "e796dd3bfaf4b94c8451bb82ac953b5dacb0262fbf404d2470763c85cfbd6c06",
       "fp": 2
     },
     "fatf-guidance": {
@@ -116,10 +120,12 @@
       "checkedAt": "2026-11-09",
       "changedAt": "2026-11-08",
       "contentAsOf": "2026-10-30",
-      "status": 200,
+      "status": 403,
       "prevHash": "6de47c792ad305275462005661517b67079e61a0bc2c0e1b15c12bfa13cd0962",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261030172210"
+      "via": "web.archive.org snapshot 20261030172210",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "ofac": {
       "hash": "f8d04ac00ed83117a20141ca482a1166f972a7808387fbff60f807e477124031",
@@ -201,13 +207,13 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "51da15300a547731fd55e091bd95e727050ba6dbb9bcde2d8bc92418c4e96540",
-      "bytes": 107691,
+      "hash": "e3f556df45c6febfa54f6792621507c72a6e6740631fc9f71db9c84397ab494e",
+      "bytes": 107729,
       "checkedAt": "2026-11-09",
-      "changedAt": "2026-11-07",
+      "changedAt": "2026-11-09",
       "contentAsOf": "2026-11-09",
       "status": 200,
-      "prevHash": "c8f286ca99d2089f5cd81faecaedee55d13e28d34ea7f94715e063f151daafa3",
+      "prevHash": "51da15300a547731fd55e091bd95e727050ba6dbb9bcde2d8bc92418c4e96540",
       "fp": 2
     },
     "eu-ai-act": {
