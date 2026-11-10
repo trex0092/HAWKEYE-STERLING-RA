@@ -3296,6 +3296,19 @@
       "chainHash": "07845b8c1a19651c376b93945314f5f8e83c3d82882e39fca6113b8b70ad8bb8",
       "latencyHours": 0,
       "resolutionHash": "ccd155a0d4935eada9778b9296178ad79637045eee0b9e8d4a13cc78d62c14af"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-10T00:05:41.698Z",
+      "prevCount": 20233,
+      "newCount": 20233,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "07845b8c1a19651c376b93945314f5f8e83c3d82882e39fca6113b8b70ad8bb8",
+      "chainHash": "dd969ee815871f04dfa431dc380b5942b1acad96d1bdc53f67c409a4ee599814"
     }
   ]
 }
