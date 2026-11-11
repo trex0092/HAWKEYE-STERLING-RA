@@ -357,6 +357,12 @@ async function suiteNewsFeeds() {
     ['bing, name + bare OR group', bingBase + enc('"' + engineName + '" (fraud OR corruption OR sanctions)'), engineHeaders],
     ['bing, name + bare OR, no parentheses', bingBase + enc('"' + engineName + '" fraud OR corruption OR sanctions'), engineHeaders],
     ['bing, name + two quoted terms OR', bingBase + enc('"' + engineName + '" ("fraud" OR "corruption")'), engineHeaders],
+    ['bing, ASCII name only', bingBase + enc('"Sam Bankman-Fried"'), engineHeaders],
+    ['bing, ASCII name, engine query', am.bingNewsUrl('Sam Bankman-Fried'), engineHeaders],
+    ['bing, ASCII name, three-term engine grammar', am.bingNewsUrl('Sam Bankman-Fried', shortTerms), engineHeaders],
+    ['bing, ASCII name + one bare term', bingBase + enc('"Sam Bankman-Fried" fraud'), engineHeaders],
+    ['bing, ASCII unquoted name + bare term', bingBase + enc('Sam Bankman-Fried fraud'), engineHeaders],
+    ['bing, ASCII name, engine query, browser user-agent', am.bingNewsUrl('Sam Bankman-Fried'), browserHeaders],
   ]) {
     const r = await shaped(url, headers);
     const parsed = am.parseRss(r.body);
