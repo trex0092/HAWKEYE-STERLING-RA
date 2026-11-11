@@ -9,8 +9,7 @@
       "contentAsOf": "2026-11-11",
       "status": 200,
       "prevHash": "23e5d1fdef0e62fdcc7662d47732a3ce3194d9206f6c549f2c557997ea739a33",
-      "fp": 2,
-      "via": "web.archive.org snapshot 20261111140111"
+      "fp": 2
     },
     "uae-fiu": {
       "hash": "7e067a5c918cf49ed2584aabd12bf981be702878d9826327b9087a962cc5c702",
@@ -22,7 +21,7 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 23
+      "errorStreak": 24
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
@@ -77,10 +76,12 @@
       "checkedAt": "2026-11-11",
       "changedAt": "2026-10-06",
       "contentAsOf": "2026-10-18",
-      "status": 200,
+      "status": 403,
       "prevHash": "f5359df5b816213005400e4196850dfc0d9ebdc8b09d6404f4dfc805a75a868a",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261018134107"
+      "via": "web.archive.org snapshot 20261018134107",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "wolfsberg": {
       "hash": "575ebdfe1028c70db1de23dfd4f5f5ec3d9b6ed11ef6646943945d298c284815",
@@ -88,10 +89,8 @@
       "checkedAt": "2026-11-11",
       "changedAt": "2026-07-16",
       "contentAsOf": "2026-11-11",
-      "status": "error",
-      "prevHash": "b95072ad7a3ca960e78d759cd74f46bfbab81c36bad3bb88538f5eff30dfe533",
-      "error": "This operation was aborted",
-      "errorStreak": 1
+      "status": 200,
+      "prevHash": "b95072ad7a3ca960e78d759cd74f46bfbab81c36bad3bb88538f5eff30dfe533"
     },
     "rmi": {
       "hash": "3e4046abe6797c8e3e6d91ab194e1fcf871872f943d5f8ed9eeb47b25922a57a",
@@ -124,7 +123,7 @@
       "fp": 2,
       "via": "web.archive.org snapshot 20261101052055",
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "ofac": {
       "hash": "3677c75cee2832e3f54fdda46665f31eef221b46c633b3d1344f972449181cc9",
