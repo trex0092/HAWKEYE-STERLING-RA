@@ -320,13 +320,14 @@ async function suiteNewsFeeds() {
      says nothing about what the engine receives, and the daily run records
      only a failure count for these two backbones, never the response. */
   const am = await import('./adverse-media.mjs');
-  const engineGet = async (url) => {
+  const ENGINE_UA = 'HawkeyeSterling-AdverseMedia/1.0';
+  const RSS_ACCEPT = 'application/rss+xml, application/xml, text/xml';
+  const shaped = async (url, headers) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 30000);
     const t0 = Date.now();
     try {
-      const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow',
-        headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: 'application/rss+xml, application/xml, text/xml' } });
+      const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers });
       const body = await res.text();
       return { status: res.status, type: res.headers.get('content-type') || '-', finalUrl: res.url, body, ms: Date.now() - t0 };
     } catch (e) {
@@ -335,21 +336,36 @@ async function suiteNewsFeeds() {
   };
   const engineName = 'Recep Tayyip Erdoğan';
   const shortTerms = ['fraud', 'corruption', 'sanctions'];
-  L.push('### Engine-shaped requests (engine user-agent, Accept and parser)', '');
-  for (const [label, url] of [
-    ['yahoo, engine query (full term set)', am.yahooNewsUrl(engineName)],
-    ['yahoo, three-term query', am.yahooNewsUrl(engineName, shortTerms)],
-    ['yahoo, name only', 'https://news.search.yahoo.com/rss?p=' + q],
-    ['bing, engine query (full term set)', am.bingNewsUrl(engineName)],
-    ['bing, three-term query', am.bingNewsUrl(engineName, shortTerms)],
+  const engineHeaders = { 'user-agent': ENGINE_UA, Accept: RSS_ACCEPT };
+  const browserHeaders = { 'user-agent': UA, Accept: RSS_ACCEPT, 'accept-language': 'en-US,en;q=0.9' };
+  const yahooBase = 'https://news.search.yahoo.com/rss?p=';
+  const bingBase = 'https://www.bing.com/news/search?format=rss&q=';
+  const enc = encodeURIComponent;
+  L.push('### Engine-shaped requests (engine URL builder and parser; headers as labelled)', '');
+  for (const [label, url, headers] of [
+    ['yahoo, engine query, engine headers', am.yahooNewsUrl(engineName), engineHeaders],
+    ['yahoo, name only, engine headers', yahooBase + q, engineHeaders],
+    ['yahoo, name only, engine user-agent, no Accept', yahooBase + q, { 'user-agent': ENGINE_UA }],
+    ['yahoo, name only, browser user-agent', yahooBase + q, browserHeaders],
+    ['yahoo, three-term query, browser user-agent', am.yahooNewsUrl(engineName, shortTerms), browserHeaders],
+    ['yahoo, engine query, browser user-agent', am.yahooNewsUrl(engineName), browserHeaders],
+    ['bing, engine query, engine headers', am.bingNewsUrl(engineName), engineHeaders],
+    ['bing, three-term engine grammar', am.bingNewsUrl(engineName, shortTerms), engineHeaders],
+    ['bing, name only', bingBase + q, engineHeaders],
+    ['bing, name + one bare term', bingBase + enc('"' + engineName + '" corruption'), engineHeaders],
+    ['bing, name + one quoted term', bingBase + enc('"' + engineName + '" "corruption"'), engineHeaders],
+    ['bing, name + bare OR group', bingBase + enc('"' + engineName + '" (fraud OR corruption OR sanctions)'), engineHeaders],
+    ['bing, name + bare OR, no parentheses', bingBase + enc('"' + engineName + '" fraud OR corruption OR sanctions'), engineHeaders],
+    ['bing, name + two quoted terms OR', bingBase + enc('"' + engineName + '" ("fraud" OR "corruption")'), engineHeaders],
   ]) {
-    const r = await engineGet(url);
+    const r = await shaped(url, headers);
     const parsed = am.parseRss(r.body);
     L.push('- **' + label + '**: HTTP ' + r.status + ' · ' + r.ms + ' ms · url length ' + url.length + ' · content-type ' + cell(r.type)
       + ' · ' + r.body.length + ' chars · engine parser: ' + (parsed === null ? 'REJECTED (counted as a backbone failure)' : parsed.length + ' item(s) accepted')
       + (r.error ? ' · error: ' + cell(r.error) : ''));
     if (r.finalUrl && r.finalUrl !== url) L.push('  - final url (after redirects): ' + cell(r.finalUrl).slice(0, 200));
-    L.push('  - body starts: ' + cell(r.body.slice(0, 200)));
+    if (parsed === null) L.push('  - body starts: ' + cell(r.body.slice(0, 200)));
+    else if (parsed.length) L.push('  - first titles: ' + cell(parsed.slice(0, 3).map(i => i.title).join(' || ')).slice(0, 300));
     await new Promise(res => setTimeout(res, 2000));
   }
   L.push('');
