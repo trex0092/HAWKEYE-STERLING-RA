@@ -315,6 +315,44 @@ async function suiteNewsFeeds() {
     L.push('- overlap with default edition — ' + label + ': ' + overlap + ' of ' + s.size + ' titles shared');
   }
   L.push('');
+  /* The screening engine's OWN Bing and Yahoo requests: same URL builder, same
+     user-agent and Accept header, same parser. A probe with browser headers
+     says nothing about what the engine receives, and the daily run records
+     only a failure count for these two backbones, never the response. */
+  const am = await import('./adverse-media.mjs');
+  const engineGet = async (url) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 30000);
+    const t0 = Date.now();
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow',
+        headers: { 'user-agent': 'HawkeyeSterling-AdverseMedia/1.0', Accept: 'application/rss+xml, application/xml, text/xml' } });
+      const body = await res.text();
+      return { status: res.status, type: res.headers.get('content-type') || '-', finalUrl: res.url, body, ms: Date.now() - t0 };
+    } catch (e) {
+      return { status: 'error', type: '-', finalUrl: '', body: '', ms: Date.now() - t0, error: String(e && e.message || e).slice(0, 160) };
+    } finally { clearTimeout(t); }
+  };
+  const engineName = 'Recep Tayyip Erdoğan';
+  const shortTerms = ['fraud', 'corruption', 'sanctions'];
+  L.push('### Engine-shaped requests (engine user-agent, Accept and parser)', '');
+  for (const [label, url] of [
+    ['yahoo, engine query (full term set)', am.yahooNewsUrl(engineName)],
+    ['yahoo, three-term query', am.yahooNewsUrl(engineName, shortTerms)],
+    ['yahoo, name only', 'https://news.search.yahoo.com/rss?p=' + q],
+    ['bing, engine query (full term set)', am.bingNewsUrl(engineName)],
+    ['bing, three-term query', am.bingNewsUrl(engineName, shortTerms)],
+  ]) {
+    const r = await engineGet(url);
+    const parsed = am.parseRss(r.body);
+    L.push('- **' + label + '**: HTTP ' + r.status + ' · ' + r.ms + ' ms · url length ' + url.length + ' · content-type ' + cell(r.type)
+      + ' · ' + r.body.length + ' chars · engine parser: ' + (parsed === null ? 'REJECTED (counted as a backbone failure)' : parsed.length + ' item(s) accepted')
+      + (r.error ? ' · error: ' + cell(r.error) : ''));
+    if (r.finalUrl && r.finalUrl !== url) L.push('  - final url (after redirects): ' + cell(r.finalUrl).slice(0, 200));
+    L.push('  - body starts: ' + cell(r.body.slice(0, 200)));
+    await new Promise(res => setTimeout(res, 2000));
+  }
+  L.push('');
   const gn = await get('https://news.google.com/rss/search?q=' + q + '&hl=tr&gl=TR&ceid=TR:tr', 30000);
   L.push('- google news TR:tr: HTTP ' + gn.status + ' · ' + gn.ms + ' ms · ' + (gn.buf.toString('utf8').match(/<item>/g) || []).length + ' items');
   for (let i = 1; i <= 3; i++) {
