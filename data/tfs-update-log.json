@@ -3324,10 +3324,16 @@
       "detectedAt": "2026-11-11T01:26:19.516Z",
       "prevCount": 58837,
       "newCount": 58837,
-      "rescreen": null,
-      "status": "pending-rescreen",
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 42942482901,
+        "startedAt": "2026-11-11T01:56:16Z"
+      },
+      "status": "complete",
       "chainPrev": "dd969ee815871f04dfa431dc380b5942b1acad96d1bdc53f67c409a4ee599814",
-      "chainHash": "f6123a97ded320885d9b88e8735e667221563d7b71692f491975e80337f0b453"
+      "chainHash": "f6123a97ded320885d9b88e8735e667221563d7b71692f491975e80337f0b453",
+      "latencyHours": 0.5,
+      "resolutionHash": "c7a3a95d50e4e35e8aa33c43ba24f36ab2e350663fee6d147b055ece536f5c5b"
     }
   ]
 }
