@@ -315,6 +315,66 @@ async function suiteNewsFeeds() {
     L.push('- overlap with default edition — ' + label + ': ' + overlap + ' of ' + s.size + ' titles shared');
   }
   L.push('');
+  /* The screening engine's OWN Bing and Yahoo requests: same URL builder, same
+     user-agent and Accept header, same parser. A probe with browser headers
+     says nothing about what the engine receives, and the daily run records
+     only a failure count for these two backbones, never the response. */
+  const am = await import('./adverse-media.mjs');
+  const ENGINE_UA = 'HawkeyeSterling-AdverseMedia/1.0';
+  const RSS_ACCEPT = 'application/rss+xml, application/xml, text/xml';
+  const shaped = async (url, headers) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 30000);
+    const t0 = Date.now();
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers });
+      const body = await res.text();
+      return { status: res.status, type: res.headers.get('content-type') || '-', finalUrl: res.url, body, ms: Date.now() - t0 };
+    } catch (e) {
+      return { status: 'error', type: '-', finalUrl: '', body: '', ms: Date.now() - t0, error: String(e && e.message || e).slice(0, 160) };
+    } finally { clearTimeout(t); }
+  };
+  const engineName = 'Recep Tayyip Erdoğan';
+  const shortTerms = ['fraud', 'corruption', 'sanctions'];
+  const engineHeaders = { 'user-agent': ENGINE_UA, Accept: RSS_ACCEPT };
+  const browserHeaders = { 'user-agent': UA, Accept: RSS_ACCEPT, 'accept-language': 'en-US,en;q=0.9' };
+  const yahooBase = 'https://news.search.yahoo.com/rss?p=';
+  const bingBase = 'https://www.bing.com/news/search?format=rss&q=';
+  const enc = encodeURIComponent;
+  L.push('### Engine-shaped requests (engine URL builder and parser; headers as labelled)', '');
+  for (const [label, url, headers] of [
+    ['yahoo, engine query, engine headers', am.yahooNewsUrl(engineName), engineHeaders],
+    ['yahoo, name only, engine headers', yahooBase + q, engineHeaders],
+    ['yahoo, name only, engine user-agent, no Accept', yahooBase + q, { 'user-agent': ENGINE_UA }],
+    ['yahoo, name only, browser user-agent', yahooBase + q, browserHeaders],
+    ['yahoo, three-term query, browser user-agent', am.yahooNewsUrl(engineName, shortTerms), browserHeaders],
+    ['yahoo, engine query, browser user-agent', am.yahooNewsUrl(engineName), browserHeaders],
+    ['bing, engine query, engine headers', am.bingNewsUrl(engineName), engineHeaders],
+    ['bing, three-term engine grammar', am.bingNewsUrl(engineName, shortTerms), engineHeaders],
+    ['bing, name only', bingBase + q, engineHeaders],
+    ['bing, name + one bare term', bingBase + enc('"' + engineName + '" corruption'), engineHeaders],
+    ['bing, name + one quoted term', bingBase + enc('"' + engineName + '" "corruption"'), engineHeaders],
+    ['bing, name + bare OR group', bingBase + enc('"' + engineName + '" (fraud OR corruption OR sanctions)'), engineHeaders],
+    ['bing, name + bare OR, no parentheses', bingBase + enc('"' + engineName + '" fraud OR corruption OR sanctions'), engineHeaders],
+    ['bing, name + two quoted terms OR', bingBase + enc('"' + engineName + '" ("fraud" OR "corruption")'), engineHeaders],
+    ['bing, ASCII name only', bingBase + enc('"Sam Bankman-Fried"'), engineHeaders],
+    ['bing, ASCII name, engine query', am.bingNewsUrl('Sam Bankman-Fried'), engineHeaders],
+    ['bing, ASCII name, three-term engine grammar', am.bingNewsUrl('Sam Bankman-Fried', shortTerms), engineHeaders],
+    ['bing, ASCII name + one bare term', bingBase + enc('"Sam Bankman-Fried" fraud'), engineHeaders],
+    ['bing, ASCII unquoted name + bare term', bingBase + enc('Sam Bankman-Fried fraud'), engineHeaders],
+    ['bing, ASCII name, engine query, browser user-agent', am.bingNewsUrl('Sam Bankman-Fried'), browserHeaders],
+  ]) {
+    const r = await shaped(url, headers);
+    const parsed = am.parseRss(r.body);
+    L.push('- **' + label + '**: HTTP ' + r.status + ' · ' + r.ms + ' ms · url length ' + url.length + ' · content-type ' + cell(r.type)
+      + ' · ' + r.body.length + ' chars · engine parser: ' + (parsed === null ? 'REJECTED (counted as a backbone failure)' : parsed.length + ' item(s) accepted')
+      + (r.error ? ' · error: ' + cell(r.error) : ''));
+    if (r.finalUrl && r.finalUrl !== url) L.push('  - final url (after redirects): ' + cell(r.finalUrl).slice(0, 200));
+    if (parsed === null) L.push('  - body starts: ' + cell(r.body.slice(0, 200)));
+    else if (parsed.length) L.push('  - first titles: ' + cell(parsed.slice(0, 3).map(i => i.title).join(' || ')).slice(0, 300));
+    await new Promise(res => setTimeout(res, 2000));
+  }
+  L.push('');
   const gn = await get('https://news.google.com/rss/search?q=' + q + '&hl=tr&gl=TR&ceid=TR:tr', 30000);
   L.push('- google news TR:tr: HTTP ' + gn.status + ' · ' + gn.ms + ' ms · ' + (gn.buf.toString('utf8').match(/<item>/g) || []).length + ' items');
   for (let i = 1; i <= 3; i++) {
