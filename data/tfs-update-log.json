@@ -3334,6 +3334,19 @@
       "chainHash": "f6123a97ded320885d9b88e8735e667221563d7b71692f491975e80337f0b453",
       "latencyHours": 0.5,
       "resolutionHash": "c7a3a95d50e4e35e8aa33c43ba24f36ab2e350663fee6d147b055ece536f5c5b"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-11-12",
+      "detectedAt": "2026-11-12T02:27:22.688Z",
+      "prevCount": 1007,
+      "newCount": 1007,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "f6123a97ded320885d9b88e8735e667221563d7b71692f491975e80337f0b453",
+      "chainHash": "701ada3918f49d3bd615254903389f6dda41c43d0dc5d8731b0bbaafbf0e1e6e"
     }
   ]
 }
