@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-12T02:28:51.733Z",
-  "githubRunId": "43141533917",
+  "generatedAt": "2026-11-12T13:55:05.082Z",
+  "githubRunId": "43231703284",
   "commit": "fee28b2b1abfa83f13ae865085bfd5f30fd2b016",
   "screenedSubjects": 1006,
   "sourceProjects": {
@@ -30,7 +30,7 @@
       {
         "id": "uk-ofsi",
         "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
-        "count": 58644,
+        "count": 58686,
         "partial": false
       },
       {
