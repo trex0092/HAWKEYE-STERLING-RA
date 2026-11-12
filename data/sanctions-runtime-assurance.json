@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-11T12:52:26.239Z",
-  "githubRunId": "43023916445",
+  "generatedAt": "2026-11-12T02:28:51.733Z",
+  "githubRunId": "43141533917",
   "commit": "fee28b2b1abfa83f13ae865085bfd5f30fd2b016",
   "screenedSubjects": 1006,
   "sourceProjects": {
@@ -48,7 +48,7 @@
       {
         "id": "un-consolidated",
         "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3757,
+        "count": 3758,
         "partial": false
       },
       {
