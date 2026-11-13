@@ -3362,10 +3362,29 @@
       "detectedAt": "2026-11-12T13:41:10.001Z",
       "prevCount": 58837,
       "newCount": 58879,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 43229656815,
+        "startedAt": "2026-11-12T13:41:14Z"
+      },
+      "status": "complete",
+      "chainPrev": "701ada3918f49d3bd615254903389f6dda41c43d0dc5d8731b0bbaafbf0e1e6e",
+      "chainHash": "f51a23385ffb82373526e5ab6b6b45ae46417ff337fe3342d890594356d6af4f",
+      "latencyHours": 0,
+      "resolutionHash": "5f2c7fc088b83acefef8aab6a5be88eed7e329e5e0e7bf495efe6fd1bf5cc6b4"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-13T02:31:16.075Z",
+      "prevCount": 58879,
+      "newCount": 58880,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "701ada3918f49d3bd615254903389f6dda41c43d0dc5d8731b0bbaafbf0e1e6e",
-      "chainHash": "f51a23385ffb82373526e5ab6b6b45ae46417ff337fe3342d890594356d6af4f"
+      "chainPrev": "f51a23385ffb82373526e5ab6b6b45ae46417ff337fe3342d890594356d6af4f",
+      "chainHash": "9099d24d42bf9155053e5a2728c6981ba3f2d8a550d1d3d1fbe205ec60c72ca0"
     }
   ]
 }
