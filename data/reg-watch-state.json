@@ -21,17 +21,17 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 29
+      "errorStreak": 30
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
       "bytes": 6329,
       "checkedAt": "2026-11-14",
       "changedAt": "2026-09-21",
-      "contentAsOf": "2026-11-13",
+      "contentAsOf": "2026-11-14",
       "status": 200,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261113144050"
+      "via": "web.archive.org snapshot 20261114133716"
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -122,7 +122,7 @@
       "fp": 2,
       "via": "web.archive.org snapshot 20261109035451",
       "error": "HTTP 403",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "ofac": {
       "hash": "da810b370ebe8e29636dfec55c222b4f8cf8c539825e154d34994459625227be",
