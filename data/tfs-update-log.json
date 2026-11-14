@@ -3391,6 +3391,58 @@
       "chainHash": "9099d24d42bf9155053e5a2728c6981ba3f2d8a550d1d3d1fbe205ec60c72ca0",
       "latencyHours": 0,
       "resolutionHash": "2287b72230f31379a59a6925444f2a47b94fccbed62e7b46dc849366907daf09"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-14T01:23:44.793Z",
+      "prevCount": 19564,
+      "newCount": 19566,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "9099d24d42bf9155053e5a2728c6981ba3f2d8a550d1d3d1fbe205ec60c72ca0",
+      "chainHash": "704f2071a3d5ed25ce41d12ca6d9d83b10764ff181ff8749f39533e3a4d6be98"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-14T01:23:44.793Z",
+      "prevCount": 20233,
+      "newCount": 20234,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "704f2071a3d5ed25ce41d12ca6d9d83b10764ff181ff8749f39533e3a4d6be98",
+      "chainHash": "96a1501d17857ef8b484128a66712f509b9d5d4e417c401a4b46ce80e7526bca"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-14T01:23:44.793Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "96a1501d17857ef8b484128a66712f509b9d5d4e417c401a4b46ce80e7526bca",
+      "chainHash": "9fe4683c30db6199ff7048cb1a9bc480e6c5a07af74a57026b2570feb9f5c361"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-11-14",
+      "detectedAt": "2026-11-14T01:23:44.793Z",
+      "prevCount": 1007,
+      "newCount": 1007,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "9fe4683c30db6199ff7048cb1a9bc480e6c5a07af74a57026b2570feb9f5c361",
+      "chainHash": "06ec5f77fa1cd118914e8e3c029cdc5116259dca9999c283f4fc1f7d3a204f43"
     }
   ]
 }
