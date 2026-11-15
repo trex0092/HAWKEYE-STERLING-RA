@@ -1,0 +1,12 @@
+# Regulatory update proposal — 2026-11-15
+
+> AI-drafted from monitored-source changes for **human review**. Nothing here is applied automatically. Verify against the primary source before editing `assets/super-data.js` or `index.html`.
+
+### Dubai Gold & Jewellery Group / DMCC (sector)
+_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.dmcc.ae/_
+
+### Responsible Minerals Initiative (RMI)
+_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.responsiblemineralsinitiative.org/news/_
+
+### OECD — Responsible Mineral Supply Chains (CAHRA)
+_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.oecd.org/en/topics/responsible-business-conduct.html_
