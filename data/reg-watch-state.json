@@ -21,7 +21,7 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 31
+      "errorStreak": 32
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
@@ -29,9 +29,11 @@
       "checkedAt": "2026-11-15",
       "changedAt": "2026-09-21",
       "contentAsOf": "2026-11-15",
-      "status": 200,
+      "status": 403,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261115023129"
+      "via": "web.archive.org save-page-now 20261115023129",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -76,10 +78,12 @@
       "checkedAt": "2026-11-15",
       "changedAt": "2026-11-14",
       "contentAsOf": "2026-11-11",
-      "status": 200,
+      "status": 403,
       "prevHash": "c3e93120079d97a3cdb527345cb66d5d82662c725ddb6fa5bd9ea8126d42b2b1",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261111041101"
+      "via": "web.archive.org snapshot 20261111041101",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "wolfsberg": {
       "hash": "953666f3803a6b5a8f259d8a7fe32c63e3d77d2d84f61375378ded9d7989a20a",
@@ -117,10 +121,12 @@
       "checkedAt": "2026-11-15",
       "changedAt": "2026-11-15",
       "contentAsOf": "2026-11-12",
-      "status": 200,
+      "status": 403,
       "prevHash": "9f997264c90c4902cda7651c2dd38daa10f7c09fe13b44971fa02dde6498d152",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261112073302"
+      "via": "web.archive.org snapshot 20261112073302",
+      "error": "HTTP 403",
+      "errorStreak": 1
     },
     "ofac": {
       "hash": "da810b370ebe8e29636dfec55c222b4f8cf8c539825e154d34994459625227be",
@@ -202,13 +208,13 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "c1c1fd999b0a000c3fc50dc34d69f8c63e5485280a4aa32a8d02b92e127532a7",
+      "hash": "ea3bfc9fe7aff97c7748a7e36016f50139364273cb353251bd030e9331531a9a",
       "bytes": 107937,
       "checkedAt": "2026-11-15",
-      "changedAt": "2026-11-14",
+      "changedAt": "2026-11-15",
       "contentAsOf": "2026-11-15",
       "status": 200,
-      "prevHash": "a7c9cf04a0bdadae2ad5475ed13198e9ca1b2d9f944c1dcb79bc48441f9fbb0a",
+      "prevHash": "c1c1fd999b0a000c3fc50dc34d69f8c63e5485280a4aa32a8d02b92e127532a7",
       "fp": 2
     },
     "eu-ai-act": {
