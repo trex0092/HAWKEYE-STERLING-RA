@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-15T12:53:09.138Z",
-  "githubRunId": "43716027754",
+  "generatedAt": "2026-11-16T13:52:59.221Z",
+  "githubRunId": "43879862847",
   "commit": "fee28b2b1abfa83f13ae865085bfd5f30fd2b016",
-  "screenedSubjects": 1043,
+  "screenedSubjects": 1123,
   "sourceProjects": {
     "customer": {
       "projectGid": "1214107620220121",
-      "screenedSubjects": 1023
+      "screenedSubjects": 1103
     },
     "employee": {
       "projectGid": "1216239131596624",
@@ -25,14 +25,8 @@
   "reasons": [],
   "warnings": [],
   "evidence": {
-    "screenedSubjects": 1043,
+    "screenedSubjects": 1123,
     "loadedSources": [
-      {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3758,
-        "partial": false
-      },
       {
         "id": "uk-ofsi",
         "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
@@ -52,6 +46,12 @@
         "partial": false
       },
       {
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3758,
+        "partial": false
+      },
+      {
         "id": "eu-fsf",
         "name": "EU — Consolidated financial sanctions list (CSV)",
         "count": 31132,
@@ -60,7 +60,7 @@
       {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
-        "count": 22920,
+        "count": 22921,
         "partial": false
       }
     ],
@@ -74,7 +74,7 @@
     "sourcePopulation": {
       "customer": {
         "projectGid": "1214107620220121",
-        "screenedSubjects": 1023
+        "screenedSubjects": 1103
       },
       "employee": {
         "projectGid": "1216239131596624",
