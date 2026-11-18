@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-18T04:42:10.834Z",
-  "githubRunId": "44239017338",
+  "generatedAt": "2026-11-18T14:24:11.280Z",
+  "githubRunId": "44323553563",
   "commit": "fee28b2b1abfa83f13ae865085bfd5f30fd2b016",
-  "screenedSubjects": 1284,
+  "screenedSubjects": 1285,
   "sourceProjects": {
     "customer": {
       "projectGid": "1214107620220121",
-      "screenedSubjects": 1264
+      "screenedSubjects": 1265
     },
     "employee": {
       "projectGid": "1216239131596624",
@@ -25,7 +25,7 @@
   "reasons": [],
   "warnings": [],
   "evidence": {
-    "screenedSubjects": 1284,
+    "screenedSubjects": 1285,
     "loadedSources": [
       {
         "id": "uk-ofsi",
@@ -34,15 +34,15 @@
         "partial": false
       },
       {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3758,
-        "partial": false
-      },
-      {
         "id": "ofac-consolidated",
         "name": "US OFAC — Consolidated (non-SDN) list (XML)",
         "count": 1674,
+        "partial": false
+      },
+      {
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3758,
         "partial": false
       },
       {
@@ -60,7 +60,7 @@
       {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
-        "count": 23160,
+        "count": 23289,
         "partial": false
       }
     ],
@@ -74,7 +74,7 @@
     "sourcePopulation": {
       "customer": {
         "projectGid": "1214107620220121",
-        "screenedSubjects": 1264
+        "screenedSubjects": 1265
       },
       "employee": {
         "projectGid": "1216239131596624",
