@@ -21,7 +21,7 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 37
+      "errorStreak": 38
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
@@ -29,11 +29,9 @@
       "checkedAt": "2026-11-18",
       "changedAt": "2026-09-21",
       "contentAsOf": "2026-11-17",
-      "status": 403,
+      "status": 200,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261117155125",
-      "error": "HTTP 403",
-      "errorStreak": 1
+      "via": "web.archive.org save-page-now 20261117155125"
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -63,13 +61,13 @@
       "fp": 2
     },
     "uae-jewellery": {
-      "hash": "d4e1ed6a8de16a492902ac6c16299072e690ee15b97f89bcb33f5a17cd001e30",
-      "bytes": 10177,
+      "hash": "fc306d6484490df2a8280a6105190016d2a54d6cc5db86dd0ec1db0b243299b3",
+      "bytes": 10250,
       "checkedAt": "2026-11-18",
       "changedAt": "2026-11-18",
       "contentAsOf": "2026-11-18",
       "status": 200,
-      "prevHash": "445bc94bd5fc043b08602628d9777a78ebe56bebab319b12c54db4fede77ea17",
+      "prevHash": "d4e1ed6a8de16a492902ac6c16299072e690ee15b97f89bcb33f5a17cd001e30",
       "fp": 2
     },
     "fatf-guidance": {
@@ -122,16 +120,16 @@
       "status": 200,
       "prevHash": "3c4d015952182908f24cc1e8eafdb3dc7045910ddf90c3db48dd6ac6df93ff18",
       "fp": 2,
-      "via": "web.archive.org snapshot 20261117085730"
+      "via": "web.archive.org snapshot 20261117142150"
     },
     "ofac": {
-      "hash": "da810b370ebe8e29636dfec55c222b4f8cf8c539825e154d34994459625227be",
-      "bytes": 4009,
+      "hash": "bc311a7a80af6f9937928e06199e19ef64a4910d6c49865820df65c8f3b7b2eb",
+      "bytes": 4043,
       "checkedAt": "2026-11-18",
-      "changedAt": "2026-11-14",
+      "changedAt": "2026-11-18",
       "contentAsOf": "2026-11-18",
       "status": 200,
-      "prevHash": "3677c75cee2832e3f54fdda46665f31eef221b46c633b3d1344f972449181cc9",
+      "prevHash": "da810b370ebe8e29636dfec55c222b4f8cf8c539825e154d34994459625227be",
       "fp": 2
     },
     "unsc": {
@@ -204,13 +202,13 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "0bb5235e6f71b134bbe4f37fd858e30f1e98f96741fb239c26a51c29e7821ccd",
+      "hash": "e6b8e24b53fd71be25235b9d54cc737cfd2cbd5e99029c77f3307b27a7b0aadc",
       "bytes": 108218,
       "checkedAt": "2026-11-18",
       "changedAt": "2026-11-18",
       "contentAsOf": "2026-11-18",
       "status": 200,
-      "prevHash": "32b72a1c66994eb9a2a3f679f3b29a7a691a7f7931aa252ea944629a6fba296a",
+      "prevHash": "0bb5235e6f71b134bbe4f37fd858e30f1e98f96741fb239c26a51c29e7821ccd",
       "fp": 2
     },
     "eu-ai-act": {

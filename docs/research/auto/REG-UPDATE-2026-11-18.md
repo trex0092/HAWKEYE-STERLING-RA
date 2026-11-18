@@ -5,5 +5,8 @@
 ### Dubai Gold & Jewellery Group / DMCC (sector)
 _AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.dmcc.ae/_
 
+### US OFAC — Recent Actions
+_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://ofac.treasury.gov/recent-actions_
+
 ### Responsible Jewellery Council (RJC)
 _AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.responsiblejewellery.com/_
