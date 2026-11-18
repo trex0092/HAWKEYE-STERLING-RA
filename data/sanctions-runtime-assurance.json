@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-17T14:45:20.545Z",
-  "githubRunId": "44106302082",
+  "generatedAt": "2026-11-18T04:42:10.834Z",
+  "githubRunId": "44239017338",
   "commit": "fee28b2b1abfa83f13ae865085bfd5f30fd2b016",
-  "screenedSubjects": 1258,
+  "screenedSubjects": 1284,
   "sourceProjects": {
     "customer": {
       "projectGid": "1214107620220121",
-      "screenedSubjects": 1238
+      "screenedSubjects": 1264
     },
     "employee": {
       "projectGid": "1216239131596624",
@@ -25,7 +25,7 @@
   "reasons": [],
   "warnings": [],
   "evidence": {
-    "screenedSubjects": 1258,
+    "screenedSubjects": 1284,
     "loadedSources": [
       {
         "id": "uk-ofsi",
@@ -60,7 +60,7 @@
       {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
-        "count": 22921,
+        "count": 23160,
         "partial": false
       }
     ],
@@ -74,7 +74,7 @@
     "sourcePopulation": {
       "customer": {
         "projectGid": "1214107620220121",
-        "screenedSubjects": 1238
+        "screenedSubjects": 1264
       },
       "employee": {
         "projectGid": "1216239131596624",
