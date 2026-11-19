@@ -128,12 +128,16 @@
   "h": "https://ofac.treasury.gov/contact-ofac"
  },
  {
-  "t": "Counter Narcotics and Counter Terrorism Designations",
-  "h": "https://ofac.treasury.gov/recent-actions/20261113"
+  "t": "Counter Terrorism Designations",
+  "h": "https://ofac.treasury.gov/recent-actions/20261118"
  },
  {
   "t": "Sanctions List Updates",
   "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
+ },
+ {
+  "t": "Counter Narcotics and Counter Terrorism Designations",
+  "h": "https://ofac.treasury.gov/recent-actions/20261113"
  },
  {
   "t": "Iran Designation Update",
@@ -178,10 +182,6 @@
  {
   "t": "Regulations and Guidance",
   "h": "https://ofac.treasury.gov/recent-actions/regulations-and-guidance"
- },
- {
-  "t": "Iran-related Designations; Belarus and North Korea Designations Removals; Issuance of Iran-related and Russia-related General Licenses and Amended Frequently Asked Questions",
-  "h": "https://ofac.treasury.gov/recent-actions/20261021"
  },
  {
   "t": "Current page 1",
