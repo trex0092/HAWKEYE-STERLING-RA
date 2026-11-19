@@ -128,12 +128,16 @@
   "h": "https://ofac.treasury.gov/contact-ofac"
  },
  {
-  "t": "Counter Terrorism Designations",
-  "h": "https://ofac.treasury.gov/recent-actions/20261118"
+  "t": "Counter Narcotics Designations; Cyber-related Designations; Issuance of Illicit Drugs General License; Issuance of Amended Russia-related General License and Frequently Asked Questions",
+  "h": "https://ofac.treasury.gov/recent-actions/20261119"
  },
  {
   "t": "Sanctions List Updates",
   "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
+ },
+ {
+  "t": "Counter Terrorism Designations",
+  "h": "https://ofac.treasury.gov/recent-actions/20261118"
  },
  {
   "t": "Counter Narcotics and Counter Terrorism Designations",
@@ -176,14 +180,6 @@
   "h": "https://ofac.treasury.gov/recent-actions/enforcement-actions"
  },
  {
-  "t": "Issuance of Amended Frequently Asked Questions Regarding Blocking and Rejecting Transactions and Filing Reports with OFAC",
-  "h": "https://ofac.treasury.gov/recent-actions/20261026"
- },
- {
-  "t": "Regulations and Guidance",
-  "h": "https://ofac.treasury.gov/recent-actions/regulations-and-guidance"
- },
- {
   "t": "Current page 1",
   "h": "https://ofac.treasury.gov/recent-actions?page=0"
  },
@@ -194,6 +190,10 @@
  {
   "t": "Miscellaneous",
   "h": "https://ofac.treasury.gov/recent-actions/miscellaneous"
+ },
+ {
+  "t": "Regulations and Guidance",
+  "h": "https://ofac.treasury.gov/recent-actions/regulations-and-guidance"
  },
  {
   "t": "Sign up for OFAC Recent Actions e-mail updates",
