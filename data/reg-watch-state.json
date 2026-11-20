@@ -2,15 +2,14 @@
   "updated": "2026-11-20",
   "sources": {
     "uae-moe": {
-      "hash": "1eea599b3a3a5beaec8545f17431955dd47318a2c314a0d3cf83ea96433f84d8",
-      "bytes": 10412,
+      "hash": "6b1ac21b64e74609558e7bc595f66908255d4bc4799dfa65b319776f9eb883c6",
+      "bytes": 10441,
       "checkedAt": "2026-11-20",
-      "changedAt": "2026-11-19",
+      "changedAt": "2026-11-20",
       "contentAsOf": "2026-11-20",
       "status": 200,
-      "prevHash": "bb49a48d8583f5d869b91976856a8c893aa37f9e3646baea250e3beef0606141",
-      "fp": 2,
-      "via": "web.archive.org snapshot 20261120035901"
+      "prevHash": "1eea599b3a3a5beaec8545f17431955dd47318a2c314a0d3cf83ea96433f84d8",
+      "fp": 2
     },
     "uae-fiu": {
       "hash": "7e067a5c918cf49ed2584aabd12bf981be702878d9826327b9087a962cc5c702",
@@ -22,7 +21,7 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 41
+      "errorStreak": 42
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
@@ -62,13 +61,13 @@
       "fp": 2
     },
     "uae-jewellery": {
-      "hash": "9fd2177aa2584392a73858017f0a4a4c4c6fc830ee9c884c1d27049f0e0a49eb",
-      "bytes": 10051,
+      "hash": "7233876ba6182e1b6338f76ab811d7102e6c4a2b2713f1c54e0d785b9b20c579",
+      "bytes": 10159,
       "checkedAt": "2026-11-20",
       "changedAt": "2026-11-20",
       "contentAsOf": "2026-11-20",
       "status": 200,
-      "prevHash": "d69bd3b8cee10e34c48e2281b870067ffc76e5258d246cb6cef8c9cc08b41b29",
+      "prevHash": "9fd2177aa2584392a73858017f0a4a4c4c6fc830ee9c884c1d27049f0e0a49eb",
       "fp": 2
     },
     "fatf-guidance": {
@@ -203,13 +202,13 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "04f1ea7e01221d34c46c8a9ff62567a8caf5e2af880d5c9ae8fb0aad5b8744fa",
-      "bytes": 108226,
+      "hash": "6d797f11840e4d9734ab445d079d15ae6dde22dd7cf876164d3af1cce42cc917",
+      "bytes": 108158,
       "checkedAt": "2026-11-20",
-      "changedAt": "2026-11-19",
+      "changedAt": "2026-11-20",
       "contentAsOf": "2026-11-20",
       "status": 200,
-      "prevHash": "b08c3c0fa33a32af74ed4279121f4269abe1c6612f8dd674b460ca13c577080c",
+      "prevHash": "04f1ea7e01221d34c46c8a9ff62567a8caf5e2af880d5c9ae8fb0aad5b8744fa",
       "fp": 2
     },
     "eu-ai-act": {
