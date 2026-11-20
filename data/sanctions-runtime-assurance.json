@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-20T03:57:38.969Z",
-  "githubRunId": "44671084906",
-  "commit": "fee28b2b1abfa83f13ae865085bfd5f30fd2b016",
+  "generatedAt": "2026-11-20T14:13:56.255Z",
+  "githubRunId": "44751167956",
+  "commit": "09cdfb8a36c05a010b4917bbeb161fb7c0819b22",
   "screenedSubjects": 1280,
   "sourceProjects": {
     "customer": {
@@ -23,9 +23,7 @@
   ],
   "operational": true,
   "reasons": [],
-  "warnings": [
-    "one or more supplementary sanctions sources were unavailable or partial"
-  ],
+  "warnings": [],
   "evidence": {
     "screenedSubjects": 1280,
     "loadedSources": [
@@ -42,21 +40,27 @@
         "partial": false
       },
       {
-        "id": "ofac-sdn",
-        "name": "US OFAC — SDN list (CSV)",
-        "count": 19576,
-        "partial": false
-      },
-      {
         "id": "un-consolidated",
         "name": "UN Security Council — Consolidated list (XML)",
         "count": 3758,
         "partial": false
       },
       {
+        "id": "ofac-sdn",
+        "name": "US OFAC — SDN list (CSV)",
+        "count": 19576,
+        "partial": false
+      },
+      {
         "id": "eu-fsf",
         "name": "EU — Consolidated financial sanctions list (CSV)",
         "count": 31132,
+        "partial": false
+      },
+      {
+        "id": "fr-dgt",
+        "name": "France — Registre national des gels (DGT)",
+        "count": 23294,
         "partial": false
       }
     ],
@@ -78,8 +82,6 @@
       }
     },
     "servedByFallback": [],
-    "notes": [
-      "France — Registre national des gels (DGT) could not be loaded (HTTP 503) - coverage degraded"
-    ]
+    "notes": []
   }
 }
