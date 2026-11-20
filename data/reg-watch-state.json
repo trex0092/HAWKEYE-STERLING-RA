@@ -21,7 +21,7 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 42
+      "errorStreak": 43
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
@@ -202,13 +202,13 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "6d797f11840e4d9734ab445d079d15ae6dde22dd7cf876164d3af1cce42cc917",
-      "bytes": 108158,
+      "hash": "8c941fe655ea47c73ae975666dcacaed8b8433f96be7a1cd62c00264f9816e48",
+      "bytes": 108203,
       "checkedAt": "2026-11-20",
       "changedAt": "2026-11-20",
       "contentAsOf": "2026-11-20",
       "status": 200,
-      "prevHash": "04f1ea7e01221d34c46c8a9ff62567a8caf5e2af880d5c9ae8fb0aad5b8744fa",
+      "prevHash": "6d797f11840e4d9734ab445d079d15ae6dde22dd7cf876164d3af1cce42cc917",
       "fp": 2
     },
     "eu-ai-act": {
