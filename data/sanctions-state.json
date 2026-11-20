@@ -50,13 +50,13 @@
       "errStreak": 0
     },
     "uk-ofsi": {
-      "hash": "0b3ec13fe6755b1681c1371bb7d148f67b7fbf797e1b9e8a36cfe5f9f4981f3f",
-      "bytes": 48276494,
+      "hash": "f97fc20fa8d591fa38340aee31d29fc9ab0bcd4d84afbb7d0d680651a9c477f4",
+      "bytes": 48276228,
       "checkedAt": "2026-11-20",
-      "changedAt": "2026-11-17",
+      "changedAt": "2026-11-20",
       "contentAsOf": "2026-11-20",
       "status": 200,
-      "prevHash": "877c1ea80bd487e32fa73fad47dff77f20b1c5d1d0d562c7c665e9e8d32d4bf1",
+      "prevHash": "0b3ec13fe6755b1681c1371bb7d148f67b7fbf797e1b9e8a36cfe5f9f4981f3f",
       "fp": 2,
       "count": 58895,
       "errStreak": 0
@@ -74,18 +74,16 @@
       "errStreak": 0
     },
     "fr-dgt": {
-      "hash": "cee4e2e63ffd2299356df18ad0eac46550d9612446cfb1084609a776bcdefc13",
-      "bytes": 579518,
+      "hash": "ff116a01e08edb3479634ec9b54383b5cf0e67fe4df88c0b555ac75c2694e4d2",
+      "bytes": 579613,
       "checkedAt": "2026-11-20",
-      "changedAt": "2026-11-19",
-      "contentAsOf": "2026-11-19",
-      "status": 503,
-      "prevHash": "7b3d3f07ccff9196db88078faf75a3a502cbe3f7289e4106399b5ebb69c35c4b",
+      "changedAt": "2026-11-20",
+      "contentAsOf": "2026-11-20",
+      "status": 200,
+      "prevHash": "cee4e2e63ffd2299356df18ad0eac46550d9612446cfb1084609a776bcdefc13",
       "fp": 2,
-      "count": 23287,
-      "errStreak": 1,
-      "error": "HTTP 503",
-      "errorStreak": 1
+      "count": 23291,
+      "errStreak": 0
     }
   }
 }
