@@ -1231,6 +1231,14 @@ export function yahooNewsUrl(name, terms = ADVERSE_TERMS) {
 /* Whether a GDELT failure counts against source-quality (default: best effort). */
 export const GDELT_REQUIRED = process.env.GDELT_REQUIRED === '1';
 
+/* Whether a Yahoo News failure counts against source-quality (default: best
+   effort). Evidence 2026-11-21: Yahoo's news RSS address answered all 549
+   subjects of a full run with a web page instead of a news feed, so it cannot
+   be a required evidence source. Google News and Bing stay required.
+   Its failures stay visible as a warning and in the evidence block;
+   YAHOO_REQUIRED=1 restores it as a hard requirement. */
+export const YAHOO_REQUIRED = process.env.YAHOO_REQUIRED === '1';
+
 /* Run async `fn` over `items` with bounded concurrency, so a wide locale sweep
    does not fire dozens of simultaneous requests at one host (which Google News
    throttles). Preserves input order. */
@@ -1445,9 +1453,9 @@ export async function checkAdverseMedia(name, { timeoutMs = 20000, concurrency, 
   const result = scoreAdverseMedia(name, items, ALL_TERMS);
   /* GDELT is best effort (see GDELT_REQUIRED): when it answers it adds coverage,
      but its failure alone does not narrow a subject's redundancy. */
-  const requiredOk = okLocales.length + (bingOn && bg !== null ? 1 : 0) + (yahooOn && yh !== null ? 1 : 0)
+  const requiredOk = okLocales.length + (bingOn && bg !== null ? 1 : 0) + (YAHOO_REQUIRED && yahooOn && yh !== null ? 1 : 0)
     + (GDELT_REQUIRED && gd !== null ? 1 : 0);
-  const requiredTotal = localeSet.length + (bingOn ? 1 : 0) + (yahooOn ? 1 : 0) + (GDELT_REQUIRED ? 1 : 0);
+  const requiredTotal = localeSet.length + (bingOn ? 1 : 0) + (YAHOO_REQUIRED && yahooOn ? 1 : 0) + (GDELT_REQUIRED ? 1 : 0);
   const sourcesOk = okLocales.length + (gd !== null ? 1 : 0) + (bingOn && bg !== null ? 1 : 0) + (yahooOn && yh !== null ? 1 : 0);
   const failed = requiredTotal - requiredOk;
   const fullMatrix = localeSet.length >= LOCALES.length;

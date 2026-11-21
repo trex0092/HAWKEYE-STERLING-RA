@@ -2176,6 +2176,7 @@ export async function screenLocally(subjects, cfg) {
   const degraded = loaded.degraded;
   let amErrors = 0, amPartial = 0, amRetryAttempted = 0, amRetryRecovered = 0;
   const amSecondPassQueue = [];
+  const gnewsRetryQueue = [];   // answered by other sources, but the en-US Google News backbone did not answer
   let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
   const pepErrorKinds = {};
   const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 };
@@ -2313,7 +2314,28 @@ export async function screenLocally(subjects, cfg) {
           if (at >= 0) results[at] = rebuilt;
           return true;
         } });
-      } else applyAm(am);
+      } else {
+        applyAm(am);
+        /* The subject WAS screened (another backbone answered), but Google News
+           is a required evidence source, so a transient refusal is re-asked once
+           after the sweep, slowly. Only a real answer clears the failure; a hit
+           found on the retry is added, never dropped. */
+        if (!am.backbones?.googleNews) {
+          gnewsRetryQueue.push({ key: s.key, retry: async () => {
+            const again = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+            if (again.errored || !again.backbones?.googleNews) return false;
+            for (const id of ['googleNews', 'gdelt', 'bing', 'yahoo']) {
+              if (!am.backbones?.[id] && again.backbones?.[id]) amBackboneFailures[id]--;
+            }
+            amPartial = reconcileAdversePartialCount(amPartial, am.partial, again.partial);
+            if (again.hit && !am.hit) applyAm(again);
+            const rebuilt = finalize();
+            const at = results.findIndex(r => r && r.key === rebuilt.key);
+            if (at >= 0) results[at] = rebuilt;
+            return true;
+          } });
+        }
+      }
     }
     if (cfg.pep && enrich) {
       if (pp.errored) {
@@ -2405,6 +2427,14 @@ export async function screenLocally(subjects, cfg) {
     deadlineMs: enrichDeadline + AM_SECOND_PASS_GRACE_MS,
     delayMs: Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0),
   });
+  const gnewsRetry = await runAmSecondPass(gnewsRetryQueue, {
+    deadlineMs: enrichDeadline + AM_SECOND_PASS_GRACE_MS,
+    delayMs: Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0),
+  });
+  if (gnewsRetryQueue.length) {
+    console.log('sanctions-screen: Google News retry - ' + gnewsRetryQueue.length + ' subject(s) without a Google News answer after the sweep; re-asked '
+      + gnewsRetry.attempted + ', answered ' + gnewsRetry.recovered + (gnewsRetry.skipped ? ' (' + gnewsRetry.skipped + ')' : ''));
+  }
   if (amSecondPassQueue.length) {
     console.log('sanctions-screen: adverse-media second pass — ' + amSecondPassQueue.length + ' zero-coverage subject(s) after the sweep; re-checked '
       + amSecondPass.attempted + ', recovered ' + amSecondPass.recovered + (amSecondPass.skipped ? ' (' + amSecondPass.skipped + ')' : ''));

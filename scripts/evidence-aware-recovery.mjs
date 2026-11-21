@@ -99,9 +99,11 @@ export function qualifyEvidence(receipt, producer, currentSha, {
   const zeroes = [quality?.adverseMediaPartialSubjects, quality?.pepUnscreenableSourceRecords,
     quality?.adverseMediaBackboneFailures?.googleNews,
     quality?.adverseMediaBackboneFailures?.bing,
-    quality?.adverseMediaBackboneFailures?.yahoo, am?.skippedSubjects, am?.partialSubjects,
+    am?.skippedSubjects, am?.partialSubjects,
     am?.backboneFailures?.googleNews, am?.backboneFailures?.bing,
-    am?.backboneFailures?.yahoo];
+    /* Yahoo is best effort unless YAHOO_REQUIRED=1 (see adverse-media.mjs). */
+    ...(process.env.YAHOO_REQUIRED === '1'
+      ? [quality?.adverseMediaBackboneFailures?.yahoo, am?.backboneFailures?.yahoo] : [])];
   const backbones = Array.isArray(am?.globalBackbones) ? am.globalBackbones : [];
   const floors = quality?.sanctionsFloors;
   const completeSources = Array.isArray(floors) && floors.length > 0 && floors.every(f =>
@@ -111,7 +113,7 @@ export function qualifyEvidence(receipt, producer, currentSha, {
     /* GDELT is best effort (see screening-assurance.mjs); the three evidenced
        backbones above must each be present with zero failures. */
     zeroes.every(n => n === 0) &&
-    ['Google News RSS', 'Bing News', 'Yahoo News'].every(name => backbones.includes(name)) &&
+    ['Google News RSS', 'Bing News', ...(process.env.YAHOO_REQUIRED === '1' ? ['Yahoo News'] : [])].every(name => backbones.includes(name)) &&
     Array.isArray(pep?.sourceUnscreenable) &&
     pep.sourceUnscreenable.length <= Math.max(25, Math.floor((Number(pep?.sourceExpected || pep?.expected || pep?.persons) || 0) * 0.001)) &&
     Array.isArray(receipt.sourceQuality?.reasons) && receipt.sourceQuality.reasons.length === 0;

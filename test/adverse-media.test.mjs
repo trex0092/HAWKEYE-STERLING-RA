@@ -3,7 +3,7 @@
 import { adverseMediaUrl, adverseMediaUrlAr, gdeltUrl, parseRss, parseGdelt, scoreAdverseMedia, ADVERSE_TERMS, ADVERSE_TERMS_AR,
   LANG_TERMS, ALL_TERMS, LOCALES, adverseMediaUrlFor, activeLocales, dedupItems, mapPool,
   canonicalLink, sourceTierFor, resolveLocaleBudget, budgetedLocales, rotationCycleDays, CORE_LOCALE_IDS,
-  bingNewsUrl, yahooNewsUrl, GDELT_REQUIRED, YAHOO_MIN_INTERVAL_MS, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker, googleNewsRateState, GNEWS_PACING_CAP_MS,
+  bingNewsUrl, yahooNewsUrl, GDELT_REQUIRED, YAHOO_REQUIRED, YAHOO_MIN_INTERVAL_MS, noteGnewsResult, gnewsBreakerOpen, resetGnewsBreaker, googleNewsRateState, GNEWS_PACING_CAP_MS,
   RequestStartGate, GNEWS_MIN_INTERVAL_MS, GDELT_MIN_INTERVAL_MS, BING_MIN_INTERVAL_MS, ADVERSE_BACKBONE_MAX_ATTEMPTS, resetAdverseMediaRateGates,
   GDELT_RISK_TERMS, GDELT_EXTRA_TERMS, gdeltTerms, gdeltQueryString, GDELT_QUERY_MAX,
   gdeltFailureClass, gdeltCanFallbackToBase, gdeltResponseObservations,
@@ -676,8 +676,8 @@ resetGdeltBreaker();
       !r.errored && r.retryAttempted === true && r.retryRecovered === true
       && r.backbones.bing === true && bingCalls === 3
       && r.backboneStatus.bingAttempts === 3);
-    check('recovered subject remains partial when a REQUIRED backbone (Yahoo) is unavailable, never falsely complete',
-      r.partial === true && r.sourcesFailed >= 1 && r.backbones.yahoo === false);
+    check('Yahoo is best effort: its failure alone does not narrow redundancy, and stays recorded as unavailable',
+      r.partial !== true && r.backbones.yahoo === false && r.backbones.bing === true);
   } finally {
     globalThis.fetch = realFetch;
     if (realBing === undefined) delete process.env.BING_NEWS; else process.env.BING_NEWS = realBing;
@@ -695,6 +695,7 @@ check('yahoo news url: free key-less RSS search with the exact-name phrase',
   && decodeURIComponent(yahooNewsUrl('Acme Co')).includes('"Acme Co"'));
 check('yahoo news pacing is polite by default and GDELT is best effort, not required',
   YAHOO_MIN_INTERVAL_MS >= 1000 && GDELT_REQUIRED === false);
+check('Yahoo is best effort by default, YAHOO_REQUIRED=1 restores it as a requirement', YAHOO_REQUIRED === false);
 {
   const realFetch = globalThis.fetch;
   const saved = { b: process.env.BING_NEWS, y: process.env.YAHOO_NEWS, r: process.env.ADVERSE_BACKBONE_RETRY_MS };

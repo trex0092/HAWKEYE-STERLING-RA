@@ -95,8 +95,14 @@ await test('83 skipped enrichments cannot pass through an assured boolean', () =
 await test('Google News failures cannot pass through an assured boolean', () => {
   const r = fixture(); r.sourceQuality.evidence.adverseMediaBackboneFailures.googleNews = 877; assert.equal(qualify(r).state, 'degraded');
 });
-await test('Yahoo News failures cannot pass through an assured boolean', () => {
-  const r = fixture(); r.domains.adverseMedia.evidence.backboneFailures.yahoo = 908; assert.equal(qualify(r).state, 'degraded');
+await test('a Yahoo-only failure is best effort and does not degrade verified evidence', () => {
+  const r = fixture(); r.domains.adverseMedia.evidence.backboneFailures.yahoo = 908; assert.equal(qualify(r).state, 'verified');
+});
+await test('YAHOO_REQUIRED=1 restores Yahoo News failures as degrading evidence', () => {
+  process.env.YAHOO_REQUIRED = '1';
+  try {
+    const r = fixture(); r.domains.adverseMedia.evidence.backboneFailures.yahoo = 908; assert.equal(qualify(r).state, 'degraded');
+  } finally { delete process.env.YAHOO_REQUIRED; }
 });
 await test('a GDELT-only failure is best effort and does not degrade verified evidence', () => {
   const r = fixture(); r.domains.adverseMedia.evidence.backboneFailures.gdelt = 908;
