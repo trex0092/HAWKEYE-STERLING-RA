@@ -291,7 +291,7 @@ export function assessRuntime({
   for (const [label, present] of [
     ['Google News RSS', backbones.has('Google News RSS')],
     ['Bing News', backbones.has('Bing News')],
-    ['Yahoo News', backbones.has('Yahoo News')],
+    ...(process.env.YAHOO_REQUIRED === '1' ? [['Yahoo News', backbones.has('Yahoo News')]] : []),
   ]) {
     if (!present) sourceQualityReasons.push('adverse-media backbone not evidenced: ' + label);
   }
@@ -299,8 +299,11 @@ export function assessRuntime({
      every one of the eight daily runs before 2026-11-06, so it cannot be a
      required evidence source. Its failures stay visible as a warning above and
      in the evidence block; GDELT_REQUIRED=1 restores it as a hard requirement. */
-  const requiredFailureNames = process.env.GDELT_REQUIRED === '1'
-    ? Object.keys(backboneFailures) : Object.keys(backboneFailures).filter(name => name !== 'gdelt');
+  /* Yahoo is best effort on the same footing (see YAHOO_REQUIRED in
+     adverse-media.mjs): Google News and Bing remain required with zero failures. */
+  const requiredFailureNames = Object.keys(backboneFailures).filter(name =>
+    (name !== 'gdelt' || process.env.GDELT_REQUIRED === '1')
+    && (name !== 'yahoo' || process.env.YAHOO_REQUIRED === '1'));
   for (const name of requiredFailureNames) {
     const failed = backboneFailures[name];
     if (num(failed) > 0) sourceQualityReasons.push('adverse-media backbone failures: ' + name + '=' + num(failed));

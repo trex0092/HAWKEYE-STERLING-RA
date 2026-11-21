@@ -2504,5 +2504,17 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   }
 }
 
+/* ── Google News is a required source: a subject answered by another source but not by Google News is re-asked once ── */
+{
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  check('google news retry: subjects without an en-US Google News answer are queued for one slow re-ask',
+    /gnewsRetryQueue\.push\(\{ key: s\.key/.test(src) && /!am\.backbones\?\.googleNews\)/.test(src));
+  check('google news retry: only a real answer clears the failure, and a retry hit is added, never dropped',
+    /!again\.backbones\?\.googleNews\) return false/.test(src)
+    && /if \(again\.hit && !am\.hit\) applyAm\(again\)/.test(src));
+  check('google news retry: runs through the bounded second-pass runner with the same deadline and cool-down',
+    /runAmSecondPass\(gnewsRetryQueue, \{[\s\S]{0,200}AM_SECOND_PASS_GRACE_MS/.test(src));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

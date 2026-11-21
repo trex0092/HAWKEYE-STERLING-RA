@@ -96,12 +96,35 @@ checked = assess(gdeltOnly);
 assert.equal(checked.sourceQuality.assured, true, 'a GDELT-only failure no longer blocks assurance');
 assert(checked.domains.adverseMedia.warnings.some(x => x.includes('GDELT unavailable')), 'GDELT failure stays disclosed');
 
-// The three evidenced backbones remain mandatory: Yahoo missing from the evidence blocks assurance.
+// Google News and Bing remain mandatory: either missing from the evidence blocks assurance.
+for (const [label, keep] of [['Google News RSS', ['GDELT global index', 'Bing News', 'Yahoo News']],
+  ['Bing News', ['Google News RSS', 'GDELT global index', 'Yahoo News']]]) {
+  const noOne = makeResults();
+  noOne.enrichment.amBackbones = keep;
+  checked = assess(noOne);
+  assert.equal(checked.sourceQuality.assured, false, label + ' must be evidenced');
+  assert(checked.sourceQuality.reasons.some(x => x.includes(label)));
+}
+
+// Yahoo is best effort (its news feed returned a web page for all 549 subjects on 2026-11-21):
+// its failure no longer blocks assurance but stays disclosed. YAHOO_REQUIRED=1 restores the hard requirement.
 const noYahoo = makeResults();
 noYahoo.enrichment.amBackbones = ['Google News RSS', 'GDELT global index', 'Bing News'];
+noYahoo.enrichment.amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0, yahoo: noYahoo.screened };
 checked = assess(noYahoo);
-assert.equal(checked.sourceQuality.assured, false, 'Yahoo News must be evidenced');
+assert.equal(checked.sourceQuality.assured, true, 'a Yahoo-only failure no longer blocks assurance');
+assert(checked.domains.adverseMedia.warnings.some(x => x.includes('Yahoo News unavailable')), 'Yahoo failure stays disclosed');
+process.env.YAHOO_REQUIRED = '1';
+checked = assess(noYahoo);
+assert.equal(checked.sourceQuality.assured, false, 'YAHOO_REQUIRED=1 restores Yahoo News as required');
 assert(checked.sourceQuality.reasons.some(x => x.includes('Yahoo News')));
+delete process.env.YAHOO_REQUIRED;
+
+// A single Google News failure blocks assurance (it is a required source).
+const gnewsOne = makeResults();
+gnewsOne.enrichment.amBackboneFailures = { googleNews: 1, gdelt: 0, bing: 0, yahoo: 0 };
+checked = assess(gnewsOne);
+assert.equal(checked.sourceQuality.assured, false, 'one Google News failure must block assurance');
 
 const incompletePep = makePep();
 incompletePep.sourceUnscreenable = ['synthetic-unlabelled-QID'];
