@@ -245,8 +245,7 @@ export const LANG_TERMS = {
   he: ['הונאה', 'הלבנת הון', 'סנקציות', 'טרור', 'מימון טרור', 'שוחד', 'שחיתות', 'מעילה',
     'נעצר', 'הורשע', 'הברחה',
     // Verified 2026-09-27 against IMPA (gov.il, Israel's Money Laundering and Terror Financing
-    // Prohibition Authority) and Bank of Israel (boi.org.il) - covers Israel, an active
-    // sanctions-extra.json source (il-nbctf, il-nbctf-orgs).
+    // Prohibition Authority) and Bank of Israel (boi.org.il) - covers Israel.
     'דיווח בלתי רגיל', 'עבירת מקור', 'הכר את הלקוח'],
   th: ['ฉ้อโกง', 'ฟอกเงิน', 'คว่ำบาตร', 'ก่อการร้าย', 'สนับสนุนการก่อการร้าย', 'สินบน',
     'ทุจริต', 'ยักยอก', 'ถูกจับ', 'ลักลอบ',

@@ -24,18 +24,6 @@
       "minNames": 200
     },
     {
-      "id": "il-nbctf-orgs",
-      "name": "Israel — NBCTF Terror Organization Designations (XLSX)",
-      "jurisdiction": "Israel",
-      "url": "https://nbctf.mod.gov.il/he/Announcements/Documents/NBCTFIsrael%20-%20Terror%20Organization%20Designation%20List_XL.xlsx",
-      "type": "xlsx",
-      "parser": "xlsx",
-      "enabled": true,
-      "browserHeaders": true,
-      "_note": "Israel NBCTF ORGANISATIONS designation list — sibling of the loaded il-nbctf individuals file. ENABLED 2026-08-05 on source-probe evidence (run 31030989375): the runner fetched the real 323KB workbook (http 200, openxml). Header layout matches the individuals file (Hebrew captions row 0, English header row 1: 'Organization Name - Hebrew' + '… - aka' columns), which the XLSX reader's header-row scan handles; empty a.k.a. columns carry an all-dash '----' placeholder now skipped by the parser (never indexed as a name).",
-      "minNames": 50
-    },
-    {
       "id": "az-fms",
       "name": "Azerbaijan — FMS Domestic Sanctions List (XML)",
       "jurisdiction": "Azerbaijan",
@@ -255,18 +243,6 @@
       "enabled": true,
       "_note": "RESOLVED 2026-09-21, but not the same way as every other source in this file: the live URL (sankcijas.fid.gov.lv/files/LV_national_v2.xml) is confirmed dead -- FID redesigned their site, the old flat XML path 302s to the homepage, and the new site serves this file only via a JavaScript-triggered download button with no href in the page source, so it cannot be fetched by a script the way every other source here is. This entry instead points at data/lv-fid-snapshot.xml, a byte-exact copy of the file the site's own download button produced, committed into this repo and fetched from here via raw.githubusercontent.com (added to the sanctions-screen.yml egress allowlist for this). Manually verified 2026-09-21: 3 entities, all North Korea-program designations, PublishDate 2018-03-29 in the file itself -- this is Latvia's small NATIONAL-only list (distinct from the much larger EU/UN lists already covered elsewhere in this registry) and genuinely appears not to have changed since 2018. This is a DATED SNAPSHOT, not a live feed: it will not pick up a future change on its own. Re-verify by repeating the manual download every few months (or sooner if FID Latvia designates someone new) and replacing data/lv-fid-snapshot.xml. Deliberately tiny floor unchanged -- a 0-name parse must still read as degraded, never as coverage.",
       "minNames": 2
-    },
-    {
-      "id": "il-nbctf",
-      "name": "Israel — NBCTF Terror Designations (individuals, XLSX)",
-      "jurisdiction": "Israel",
-      "url": "https://nbctf.mod.gov.il/he/Announcements/Documents/NBCTF%20Israel%20designation%20Individuals_XL.xlsx",
-      "type": "xlsx",
-      "parser": "xlsx",
-      "enabled": true,
-      "_note": "Israel NBCTF terror-designation individuals (stable un-dated XLSX). RE-ENABLED 2026-08-05 on probe evidence: the runner fetches the real 87KB workbook (http 200) — the earlier 0-parse was the HEADER LAYOUT (Hebrew captions on row 0, English header 'Name of Individual - English/Hebrew/Arabic' on row 1), which the XLSX reader's header-row scan now handles; name columns carry all three scripts into the transliteration nets. browserHeaders on for WAF safety.",
-      "minNames": 150,
-      "browserHeaders": true
     },
     {
       "id": "sa-pcct",
@@ -1109,7 +1085,7 @@
       "parser": "opensanctions",
       "enabled": true,
       "minNames": 190,
-      "_note": "ADDED 2026-10-08. Source-probe run 37772831908 (GitHub runner, 2026-10-08, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Isreali Ministry of Finance\" (official: true), 272 targets, last change 2025-11-28. Designations under Israel's law on preventing the distribution and financing of weapons of mass destruction; distinct from il-nbctf / il-nbctf-orgs (terror-financing lists). Last change 2025-11-28, so it is a slow-moving list. Runner-verified by source-probe run 37773821358 (GitHub runner, 2026-10-08, this branch): targets.simple.csv fetched and the registry parser read 547 names (names and aliases), minNames met. Hosted by OpenSanctions (CC-BY-NC, off under OPENSANCTIONS_DATA=0) because no keyless machine-readable official endpoint is configured. minNames is about 70% of the catalogue target count. The country's register status is unchanged: it was already screened through another national source."
+      "_note": "ADDED 2026-10-08. Source-probe run 37772831908 (GitHub runner, 2026-10-08, suite opensanctions-catalogue) read the OpenSanctions `sanctions` collection index (95 member datasets) and this dataset's own index.json: publisher \"Isreali Ministry of Finance\" (official: true), 272 targets, last change 2025-11-28. Designations under Israel's law on preventing the distribution and financing of weapons of mass destruction; distinct from the Israeli terror-financing lists, which are no longer loaded. Last change 2025-11-28, so it is a slow-moving list. Runner-verified by source-probe run 37773821358 (GitHub runner, 2026-10-08, this branch): targets.simple.csv fetched and the registry parser read 547 names (names and aliases), minNames met. Hosted by OpenSanctions (CC-BY-NC, off under OPENSANCTIONS_DATA=0) because no keyless machine-readable official endpoint is configured. minNames is about 70% of the catalogue target count. The country's register status is unchanged: it was already screened through another national source."
     },
     {
       "id": "cz-gov-210-2008",
