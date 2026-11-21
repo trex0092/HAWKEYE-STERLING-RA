@@ -3623,6 +3623,71 @@
       "status": "pending-rescreen",
       "chainPrev": "030914c49e6120972b0c08fd411ba1ec3207a8c07041e6e7e751c3b2c819e9b8",
       "chainHash": "1eb42bc35d4496a2d44d7f1c57834d1fc4e23abb981041dfe88d20aeb6ac7f4c"
+    },
+    {
+      "id": "ofac-sdn",
+      "list": "US OFAC — SDN list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-21T03:25:01.496Z",
+      "prevCount": 19596,
+      "newCount": 19600,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "1eb42bc35d4496a2d44d7f1c57834d1fc4e23abb981041dfe88d20aeb6ac7f4c",
+      "chainHash": "a6e83bc8a6abc47fd6628fe529e78ca76ee279a080be4330df53a17db66522e0"
+    },
+    {
+      "id": "ofac-sdn-alt",
+      "list": "US OFAC — SDN a.k.a. list (alt.csv)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-21T03:25:01.496Z",
+      "prevCount": 20251,
+      "newCount": 20252,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "a6e83bc8a6abc47fd6628fe529e78ca76ee279a080be4330df53a17db66522e0",
+      "chainHash": "7be6a2847cba2d74ace670fd787233b0ecade94bff3479ea81e1c1eb0404c343"
+    },
+    {
+      "id": "ofac-consolidated",
+      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-21T03:25:01.496Z",
+      "prevCount": 442,
+      "newCount": null,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "7be6a2847cba2d74ace670fd787233b0ecade94bff3479ea81e1c1eb0404c343",
+      "chainHash": "a3ad31cd0a3b013b9de10c5614d85b62c111bc0421e757f2437e494649a0a1a2"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-11-21",
+      "detectedAt": "2026-11-21T03:25:01.496Z",
+      "prevCount": 1007,
+      "newCount": 1007,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "a3ad31cd0a3b013b9de10c5614d85b62c111bc0421e757f2437e494649a0a1a2",
+      "chainHash": "a3ef2e2d01194ab7ef1a0481a3b0b995ca08dd3cf8518a39bf6b0b716bd4ebf5"
+    },
+    {
+      "id": "eu-fsf",
+      "list": "EU — Consolidated financial sanctions list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-21T03:25:01.496Z",
+      "prevCount": 44043,
+      "newCount": 44286,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "a3ef2e2d01194ab7ef1a0481a3b0b995ca08dd3cf8518a39bf6b0b716bd4ebf5",
+      "chainHash": "49769bd66224873c5204d147e89be8db1534b3e235197a88908f4b331702d432"
     }
   ]
 }

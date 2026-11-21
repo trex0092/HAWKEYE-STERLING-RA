@@ -1,0 +1,89 @@
+{
+  "updated": "2026-11-21",
+  "sources": {
+    "ofac-sdn": {
+      "hash": "6da1061e2f1ed8b6992b6c694ca56b9fbbe343744bf2cabe499307a136024897",
+      "bytes": 5656939,
+      "checkedAt": "2026-11-21",
+      "changedAt": "2026-11-21",
+      "contentAsOf": "2026-11-21",
+      "status": 200,
+      "prevHash": "6b467caccea5f253a72b16afd809dd6c89d94a8f76070d9c8a12fa3c48fe291c",
+      "fp": 2,
+      "count": 19600,
+      "errStreak": 0
+    },
+    "ofac-sdn-alt": {
+      "hash": "6f0dda6b88f3a9289357b9bb051944fffc121095d01b9bd248fc1eb2b5546c1d",
+      "bytes": 1025985,
+      "checkedAt": "2026-11-21",
+      "changedAt": "2026-11-21",
+      "contentAsOf": "2026-11-21",
+      "status": 200,
+      "prevHash": "4871f0bb7576b42d7c5f109f82d57e58f2c146e12bf668c50a1a2d757c5dcd99",
+      "fp": 2,
+      "count": 20252,
+      "errStreak": 0
+    },
+    "ofac-consolidated": {
+      "hash": "1d1ea81f80d046ee30a84255485b2b22adb245a38e68ad20d77058b392f29978",
+      "bytes": 355944,
+      "checkedAt": "2026-11-21",
+      "changedAt": "2026-11-21",
+      "contentAsOf": "2026-11-21",
+      "status": 200,
+      "prevHash": "334f80120448a65d4a739d4721cd78d2aa96d607b45d084ffa9c9d15f74e741f",
+      "fp": 2,
+      "count": 442,
+      "errStreak": 0
+    },
+    "un-consolidated": {
+      "hash": "8b546805eb4ebbac95e172aeab044efc406848e726bfd486772ae0004157a055",
+      "bytes": 611128,
+      "checkedAt": "2026-11-21",
+      "changedAt": "2026-11-21",
+      "contentAsOf": "2026-11-21",
+      "status": 200,
+      "prevHash": "8eab7b85bb1d9340e4399e007f8121696b5f4c0b1d9eaf2d86a922daf21024f4",
+      "fp": 2,
+      "count": 1007,
+      "errStreak": 0
+    },
+    "uk-ofsi": {
+      "hash": "f97fc20fa8d591fa38340aee31d29fc9ab0bcd4d84afbb7d0d680651a9c477f4",
+      "bytes": 48276228,
+      "checkedAt": "2026-11-21",
+      "changedAt": "2026-11-20",
+      "contentAsOf": "2026-11-21",
+      "status": 200,
+      "prevHash": "0b3ec13fe6755b1681c1371bb7d148f67b7fbf797e1b9e8a36cfe5f9f4981f3f",
+      "fp": 2,
+      "count": 58895,
+      "errStreak": 0
+    },
+    "eu-fsf": {
+      "hash": "936f23e330367c42952d0e41766d3ba42b806acfee86ce8ec383ae5dec03ca97",
+      "bytes": 21531742,
+      "checkedAt": "2026-11-21",
+      "changedAt": "2026-11-21",
+      "contentAsOf": "2026-11-21",
+      "status": 200,
+      "prevHash": "89e6cae0139ce5bba1fbc2f775149ebb8f96483388ebd255f792e94fcba86bb1",
+      "fp": 2,
+      "count": 44286,
+      "errStreak": 0
+    },
+    "fr-dgt": {
+      "hash": "ff116a01e08edb3479634ec9b54383b5cf0e67fe4df88c0b555ac75c2694e4d2",
+      "bytes": 579613,
+      "checkedAt": "2026-11-21",
+      "changedAt": "2026-11-20",
+      "contentAsOf": "2026-11-21",
+      "status": 200,
+      "prevHash": "cee4e2e63ffd2299356df18ad0eac46550d9612446cfb1084609a776bcdefc13",
+      "fp": 2,
+      "count": 23291,
+      "errStreak": 0
+    }
+  }
+}
