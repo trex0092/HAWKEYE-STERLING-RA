@@ -128,12 +128,16 @@
   "h": "https://ofac.treasury.gov/contact-ofac"
  },
  {
-  "t": "Counter Narcotics Designations; Cyber-related Designations; Issuance of Illicit Drugs General License; Issuance of Amended Russia-related General License and Frequently Asked Questions",
-  "h": "https://ofac.treasury.gov/recent-actions/20261119"
+  "t": "Iran Designations; Issuance of Cuba Frequently Asked Questions",
+  "h": "https://ofac.treasury.gov/recent-actions/20261120"
  },
  {
   "t": "Sanctions List Updates",
   "h": "https://ofac.treasury.gov/recent-actions/sanctions-list-updates"
+ },
+ {
+  "t": "Counter Narcotics Designations; Cyber-related Designations; Issuance of Illicit Drugs General License; Issuance of Amended Russia-related General License and Frequently Asked Questions",
+  "h": "https://ofac.treasury.gov/recent-actions/20261119"
  },
  {
   "t": "Counter Terrorism Designations",
@@ -172,20 +176,16 @@
   "h": "https://ofac.treasury.gov/recent-actions/20261028"
  },
  {
-  "t": "Settlement Agreement between the U.S. Department of the Treasury's Office of Foreign Assets Control and Extreme Networks, Inc.",
-  "h": "https://ofac.treasury.gov/recent-actions/20261027"
- },
- {
-  "t": "Enforcement Actions",
-  "h": "https://ofac.treasury.gov/recent-actions/enforcement-actions"
- },
- {
   "t": "Current page 1",
-  "h": "https://ofac.treasury.gov/recent-actions?param=b6675e06&page=0"
+  "h": "https://ofac.treasury.gov/recent-actions?pulse_nocache=1795231378058-3&page=0"
  },
  {
   "t": "All Recent Actions",
   "h": "https://ofac.treasury.gov/recent-actions"
+ },
+ {
+  "t": "Enforcement Actions",
+  "h": "https://ofac.treasury.gov/recent-actions/enforcement-actions"
  },
  {
   "t": "Miscellaneous",
