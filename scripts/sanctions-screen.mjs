@@ -2105,6 +2105,7 @@ export async function screenLocally(subjects, cfg) {
   let amErrors = 0, amPartial = 0, amRetryAttempted = 0, amRetryRecovered = 0;
   const amSecondPassQueue = [];
   let pepErrors = 0, interpolErrors = 0, fbiErrors = 0, enrichSkipped = 0;
+  const pepErrorKinds = {};
   const amBackboneFailures = { googleNews: 0, gdelt: 0, bing: 0, yahoo: 0 };
   /* The SANCTIONS match (local, instant) is ALWAYS run for every subject. The
      adverse-media / PEP / Interpol enrichment is best-effort and network-bound, so
@@ -2243,7 +2244,13 @@ export async function screenLocally(subjects, cfg) {
       } else applyAm(am);
     }
     if (cfg.pep && enrich) {
-      if (pp.errored) { pepErrors++; enrichmentIncomplete = true; }
+      if (pp.errored) {
+        pepErrors++; enrichmentIncomplete = true;
+        /* Cause only (an HTTP status or a generic class), never the error text:
+           a fetch error can carry the request URL, which holds the subject name. */
+        const kind = /^HTTP \d{3}$/.test(String(pp.error || '')) ? String(pp.error) : 'network or timeout';
+        pepErrorKinds[kind] = (pepErrorKinds[kind] || 0) + 1;
+      }
       else if (pp.hit) {
         lists.push({ list: 'PEP (Wikidata)', hitName: (pp.match && (pp.match.label + ' — ' + pp.match.description) || '').slice(0, 180), score: pp.score });
         band = strongerBand(band, pp.band); topScore = Math.max(topScore, pp.score);
@@ -2340,7 +2347,7 @@ export async function screenLocally(subjects, cfg) {
   if (amErrors) console.error('sanctions-screen: adverse-media lookup failed for ' + amErrors + ' subject(s)');
   if (amPartial) console.log('sanctions-screen: adverse-media redundancy was PARTIAL for ' + amPartial + ' subject(s) — at least one queried source did not answer (disclosed in the digest)');
   if (amRetryAttempted) console.log('sanctions-screen: last-resort adverse backbone retry attempted for ' + amRetryAttempted + ' subject(s); recovered ' + amRetryRecovered);
-  if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s)');
+  if (pepErrors) console.error('sanctions-screen: PEP lookup failed for ' + pepErrors + ' subject(s) (' + Object.entries(pepErrorKinds).map(([k, n]) => k + ': ' + n).join(', ') + ')');
   if (interpolErrors) console.error('sanctions-screen: Interpol lookup failed for ' + interpolErrors + ' subject(s)');
   if (fbiErrors) console.error('sanctions-screen: FBI Wanted lookup failed for ' + fbiErrors + ' subject(s)');
   if (enrichSkipped) console.log('sanctions-screen: enrichment time-budget reached — ' + enrichSkipped + ' subject(s) fully sanctions-screened but skipped adverse-media/PEP (best-effort, not degraded)');

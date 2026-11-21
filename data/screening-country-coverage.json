@@ -1559,8 +1559,7 @@
         "scope": "global-subject-screening",
         "nationalStatus": "screened",
         "nationalSources": [
-          "il-nbctf",
-          "il-nbctf-orgs"
+          "il-mof-wmd"
         ]
       },
       "adverseMedia": {

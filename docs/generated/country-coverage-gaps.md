@@ -100,7 +100,7 @@ This matrix separates global sanctions baseline and PEP/adverse-media scope from
 | Iran | yes | not-researched | — | yes | no | yes |
 | Iraq | yes | screened | iq-aml-freeze | yes | yes | yes |
 | Ireland | yes | assessed-not-loadable | — | yes | yes | yes |
-| Israel | yes | screened | il-nbctf, il-nbctf-orgs | yes | yes | yes |
+| Israel | yes | screened | il-mof-wmd | yes | yes | yes |
 | Italy | yes | assessed-not-loadable | — | yes | yes | yes |
 | Jamaica | yes | assessed-not-loadable | — | yes | no | yes |
 | Japan | yes | screened | jp-mof | yes | yes | yes |

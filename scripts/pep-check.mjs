@@ -70,13 +70,30 @@ export function scorePep(name, json) {
 const PEP_RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
 const _sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/* Spacing gate: the screen runs several subjects at once, so without a shared
+   gate every one of them hits Wikidata in the same instant and trips its rate
+   limit (HTTP 429). Each request claims the next free slot, at least
+   PEP_MIN_INTERVAL_MS after the previous one. This only paces requests; it never
+   changes a result, and a request that still fails is reported as errored. */
+const _envGap = process.env.PEP_MIN_INTERVAL_MS;
+const PEP_MIN_INTERVAL_MS = _envGap && Number(_envGap) >= 0 ? Number(_envGap) : 300;
+let _nextSlot = 0;
+async function _awaitSlot(minIntervalMs) {
+  if (!(minIntervalMs > 0)) return;
+  const now = Date.now();
+  const slot = Math.max(now, _nextSlot);
+  _nextSlot = slot + minIntervalMs;
+  if (slot > now) await _sleep(slot - now);
+}
+
 /* Network: look up one subject's PEP signal. Tolerant — on error returns
    { errored:true } so the caller flags degraded coverage, never a clean PEP.
    Retries transient rate-limit / 5xx responses with exponential backoff +
    jitter, honouring a Retry-After header when present. */
-export async function checkPep(name, { timeoutMs = 20000, retries = 2, backoffMs = 600 } = {}) {
+export async function checkPep(name, { timeoutMs = 20000, retries = 3, backoffMs = 600, minIntervalMs = PEP_MIN_INTERVAL_MS } = {}) {
   let lastErr = 'unreachable';
   for (let attempt = 0; attempt <= retries; attempt++) {
+    await _awaitSlot(minIntervalMs);
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {

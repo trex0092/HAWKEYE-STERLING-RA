@@ -752,12 +752,12 @@
       "country": "Israel",
       "status": "screened",
       "sources": [
-        "il-nbctf",
-        "il-nbctf-orgs"
+        "il-mof-wmd"
       ],
       "baseline": [
         "UN"
-      ]
+      ],
+      "note": "Israel NBCTF terror designation lists (individuals and organisations) removed from screening on 2026-11-21 at the MLRO's instruction; both returned HTTP 403 to the runner. The Ministry of Finance WMD proliferation-financing list remains loaded."
     },
     {
       "country": "Italy",
