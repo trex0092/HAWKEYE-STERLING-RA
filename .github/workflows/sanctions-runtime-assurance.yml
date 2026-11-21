@@ -65,6 +65,9 @@ jobs:
           # variable must never silently disable completed HR employee records.
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121' }}
           ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID || '1216239131596624' }}
+          # Customers are screened only with a completed description AND a risk assessment
+          # (the FG, FGB, NP and MD entity projects).
+          ASANA_RISK_ASSESSMENT_PROJECT_GIDS: ${{ vars.ASANA_RISK_ASSESSMENT_PROJECT_GIDS || '1216104524606792,1216105681208077,1216104445386019,1215653768729951' }}
           SCREEN_MATCH_THRESHOLD: ${{ vars.SCREEN_MATCH_THRESHOLD }}
           # Personal EU FSF crawler token (optional): the shared public token now
           # redirects to EU Login. Unset = public token, and the EU list fails loudly.

@@ -75,6 +75,21 @@ export const EMPLOYEE_PROJECT_GID =
     ? process.env.ASANA_EMPLOYEE_PROJECT_GID
     : EMPLOYEE_PROJECT;
 
+/* Customer eligibility (MLRO decision, 2026-11-21): only customers that have a
+   COMPLETED description (not blank, not "N/A") AND a risk assessment are
+   screened. A risk assessment is a task in one of the four risk assessment
+   projects below (entity codes FG, FGB, NP, MD), matched
+   to the customer by its entity code or, failing that, by its normalised name.
+   Set ASANA_RISK_ASSESSMENT_PROJECT_GIDS to an empty string to disable the
+   filter EXPLICITLY (every customer task is then screened, as before). The
+   rule is read from the live projects on every run; an unreadable or empty
+   risk assessment project stops the run unscreened, never screens a guess. */
+export const RISK_ASSESSMENT_PROJECT_GIDS =
+  (process.env.ASANA_RISK_ASSESSMENT_PROJECT_GIDS !== undefined
+    ? process.env.ASANA_RISK_ASSESSMENT_PROJECT_GIDS
+    : '1216104524606792,1216105681208077,1216104445386019,1215653768729951')
+    .split(',').map(g => g.trim()).filter(Boolean);
+
 /* Reject redirected screening sources and delivery destinations before any Asana read.
    Approval is tied to the project identity, not to a repository variable. */
 export function requireApprovedScreeningRoute() {
@@ -1370,10 +1385,67 @@ export function requireCompleteSourceTaskInventory(tasks, what = 'Asana screenin
   return tasks;
 }
 
-export async function fetchAsanaSubjects(projectGid, token) {
+/* A description counts as completed when it holds real text: not blank and not
+   the "N/A" placeholder used for banks and other records with no assessment. */
+export function hasCompletedDescription(notes) {
+  const t = String(notes == null ? '' : notes).trim();
+  return t !== '' && !/^n\s*\/?\s*a\.?$/i.test(t);
+}
+
+/* Risk assessment task names read "<ENTITY CODE> · <customer report name>",
+   e.g. "FG-YU-308 · YÜKSEL KIYMETLİ MADENLER TİCARET ANONİM ŞİRKETİ". */
+export function parseRiskAssessmentTaskName(name) {
+  const m = /^\s*([A-Z]{2,3}-[A-Z0-9]{2}-\d+)\s*·\s*(.+?)\s*$/u.exec(String(name || ''));
+  return m ? { code: m[1].toUpperCase(), name: m[2] } : null;
+}
+
+/* Pure rule: which customer tasks are eligible, and why the others are not.
+   Counts only, never names, so nothing identifying reaches the run log. */
+export function selectEligibleCustomerTasks(tasks, riskAssessmentTasks) {
+  const codes = new Set();
+  const names = new Set();
+  for (const ra of riskAssessmentTasks) {
+    const p = parseRiskAssessmentTaskName(ra && ra.name);
+    if (!p) continue;
+    codes.add(p.code);
+    const n = normalizeName(p.name);
+    if (n) names.add(n);
+  }
+  const eligible = [];
+  const stats = { total: tasks.length, noDescription: 0, noRiskAssessment: 0, eligible: 0 };
+  for (const t of tasks) {
+    if (!hasCompletedDescription(t.notes)) { stats.noDescription++; continue; }
+    const fieldCodes = (Array.isArray(t.custom_fields) ? t.custom_fields : [])
+      .map(f => String((f && (f.text_value ?? f.display_value)) || '').trim().toUpperCase())
+      .filter(Boolean);
+    const hasRa = fieldCodes.some(c => codes.has(c)) || names.has(normalizeName(t.name));
+    if (!hasRa) { stats.noRiskAssessment++; continue; }
+    eligible.push(t);
+  }
+  stats.eligible = eligible.length;
+  return { eligible, stats };
+}
+
+export async function fetchAsanaSubjects(projectGid, token, { riskAssessmentProjects = RISK_ASSESSMENT_PROJECT_GIDS } = {}) {
   const what = 'Asana customer source ' + projectGid;
-  return parseSubjects(requireCompleteSourceTaskInventory(
-    await asanaPaged(projectGid, '/tasks', 'gid,name,completed,notes', token, what), what));
+  const all = requireCompleteSourceTaskInventory(
+    await asanaPaged(projectGid, '/tasks', 'gid,name,completed,notes,custom_fields.gid,custom_fields.text_value', token, what), what);
+  if (!riskAssessmentProjects.length) return parseSubjects(all);
+  const ra = [];
+  for (const gid of riskAssessmentProjects) {
+    const raWhat = 'Asana risk assessment source ' + gid;
+    const rows = await asanaPaged(gid, '/tasks', 'gid,name', token, raWhat);
+    if (!rows.some(r => parseRiskAssessmentTaskName(r && r.name))) {
+      throw new Error(raWhat + ': no readable risk assessment task; refusing to decide customer eligibility from it');
+    }
+    ra.push(...rows);
+  }
+  const { eligible, stats } = selectEligibleCustomerTasks(all, ra);
+  if (!eligible.length) throw new Error(what + ': no customer has both a completed description and a risk assessment');
+  console.log('sanctions-screen: customer eligibility: ' + stats.total + ' customer task(s); '
+    + stats.noDescription + ' skipped (blank or N/A description); '
+    + stats.noRiskAssessment + ' skipped (no risk assessment); ' + stats.eligible + ' screened');
+  return parseSubjects(eligible);
 }
 
 /* HR – Employees: every task IS a natural person (the task name is the

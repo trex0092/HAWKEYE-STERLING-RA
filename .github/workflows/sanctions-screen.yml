@@ -24,6 +24,7 @@ name: Sanctions Screen
 #   ASANA_ACCESS_TOKEN  (secret)  read the Customer Database + post the alert
 #   ASANA_REG_PROJECT_GID         alert destination project (vars.ASANA_DELIVERY_PROJECT_GID -> HAWKEYE STERLING APP)
 #   ASANA_CUSTOMER_PROJECT_GID    screening subject project (default in script)
+#   ASANA_RISK_ASSESSMENT_PROJECT_GIDS  risk assessment projects a customer must appear in (default in script)
 #   ASANA_SANCTIONS_SECTION_GID   section to file alerts under
 #   SCREEN_MATCH_THRESHOLD        material-match score 0-1 (default 0.85)
 #   SCREEN_ADVERSE_MEDIA          '0' to disable Google News adverse-media (default on)
@@ -212,6 +213,9 @@ jobs:
           ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
           ASANA_CUSTOMER_PROJECT_GID: ${{ vars.ASANA_CUSTOMER_PROJECT_GID || '1214107620220121' }}
           ASANA_EMPLOYEE_PROJECT_GID: ${{ vars.ASANA_EMPLOYEE_PROJECT_GID || '1216239131596624' }}
+          # Customers are screened only with a completed description AND a risk assessment
+          # (the FG, FGB, NP and MD entity projects).
+          ASANA_RISK_ASSESSMENT_PROJECT_GIDS: ${{ vars.ASANA_RISK_ASSESSMENT_PROJECT_GIDS || '1216104524606792,1216105681208077,1216104445386019,1215653768729951' }}
           # "Sanctions updates" section, gid 1218451960830318. Repointed
           # 2026-09-16: same fix as sanctions-watch.yml -- this was reading
           # the generic, never-set ASANA_DELIVERY_SECTION_GID and silently

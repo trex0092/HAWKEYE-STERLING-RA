@@ -2210,7 +2210,7 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
     check('source inventory: ' + label + ' fails closed', !!error);
   }
   check('source fetches enforce complete inventories before both subject parsers',
-    /parseSubjects\(requireCompleteSourceTaskInventory\(/.test(readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8'))
+    /const all = requireCompleteSourceTaskInventory\(/.test(readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8'))
     && /parseEmployeeSubjects\(requireCompleteSourceTaskInventory\(/.test(readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8')));
 }
 
@@ -2459,6 +2459,49 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   const wf = readFileSync(join(ROOT, '.github/workflows/sanctions-screen.yml'), 'utf8');
   check('licence-free filter: Sanctions Screen passes the repository variable with no default',
     /OPENSANCTIONS_DATA: \$\{\{ vars\.OPENSANCTIONS_DATA \}\}\n/.test(wf));
+}
+
+/* ── customer eligibility: completed description AND a risk assessment ── */
+{
+  check('description: blank is not completed', !scr.hasCompletedDescription('') && !scr.hasCompletedDescription('   \n') && !scr.hasCompletedDescription(null));
+  check('description: N/A variants are not completed',
+    ['N/A', 'n/a', ' N / A ', 'NA', 'N/A.'].every(v => !scr.hasCompletedDescription(v)));
+  check('description: real text is completed', scr.hasCompletedDescription('Gold jewellery trader, Dubai') && scr.hasCompletedDescription('Banking, N/A for UBO'));
+  const p = scr.parseRiskAssessmentTaskName('FG-YU-308 \u00b7 EXAMPLE TRADING LLC');
+  check('risk assessment name: code and customer name are parsed', p && p.code === 'FG-YU-308' && p.name === 'EXAMPLE TRADING LLC');
+  check('risk assessment name: a task without a code is ignored', scr.parseRiskAssessmentTaskName('Template') === null);
+  const ra = [
+    { name: 'FG-AA-001 \u00b7 Alpha Trading LLC' },
+    { name: 'NP-BB-002 \u00b7 Beta Gold DMCC' },
+    { name: 'MD-CC-003 \u00b7 Gamma Bullion FZE' },
+    { name: 'FGB-DD-004 \u00b7 Delta Metals LLC' },
+  ];
+  const cf = v => [{ gid: 'f1', text_value: v }];
+  const tasks = [
+    { gid: '1', name: 'Alpha Trading LLC', notes: 'Trader', custom_fields: cf('FG-AA-001') },
+    { gid: '2', name: 'Beta Gold DMCC', notes: 'Trader', custom_fields: [{ gid: 'x', text_value: null }, { gid: 'f2', text_value: 'np-bb-002' }] },
+    { gid: '3', name: 'Shared Customer', notes: 'Trader', custom_fields: [{ text_value: 'MD-CC-003' }, { text_value: 'FGB-DD-004' }] },
+    { gid: '4', name: 'Some Bank', notes: 'N/A', custom_fields: cf('FG-ZZ-999') },
+    { gid: '5', name: 'No Assessment Co', notes: 'Trader', custom_fields: cf('FG-ZZ-999') },
+    { gid: '6', name: 'Blank Notes Co', notes: '', custom_fields: cf('FG-AA-001') },
+    { gid: '7', name: 'Delta Metals LLC', notes: 'Refiner', custom_fields: [] },
+  ];
+  const r = scr.selectEligibleCustomerTasks(tasks, ra);
+  check('eligibility: customers with description and an assessment are kept, each once',
+    r.eligible.map(t => t.gid).join() === '1,2,3,7');
+  check('eligibility: a customer shared by two assessment projects counts once', r.eligible.filter(t => t.gid === '3').length === 1);
+  check('eligibility: N/A and blank descriptions are skipped, no-assessment customers are skipped',
+    r.stats.noDescription === 2 && r.stats.noRiskAssessment === 1 && r.stats.eligible === 4 && r.stats.total === 7);
+  const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
+  check('eligibility: an unreadable or empty risk assessment project fails closed, never guesses',
+    /no readable risk assessment task; refusing to decide customer eligibility/.test(src)
+    && /no customer has both a completed description and a risk assessment/.test(src));
+  const gids = ['1216104524606792', '1216105681208077', '1216104445386019', '1215653768729951'];
+  check('eligibility: the four approved risk assessment projects are the default', gids.every(g => scr.RISK_ASSESSMENT_PROJECT_GIDS.includes(g)) && scr.RISK_ASSESSMENT_PROJECT_GIDS.length === 4);
+  for (const f of ['sanctions-screen.yml', 'sanctions-runtime-assurance.yml']) {
+    const w = readFileSync(join(ROOT, '.github/workflows', f), 'utf8');
+    check('eligibility: ' + f + ' passes the same risk assessment projects', gids.every(g => w.includes(g)) && /ASANA_RISK_ASSESSMENT_PROJECT_GIDS:/.test(w));
+  }
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
