@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-21T13:37:30.820Z",
-  "githubRunId": "44909739019",
-  "commit": "81bad2f88f8d1028ab3a63ef5b30749f955344c5",
+  "generatedAt": "2026-11-21T14:51:55.222Z",
+  "githubRunId": "44916072114",
+  "commit": "57cc7ecb81870c5c73346ee17f31a6df985e0a60",
   "screenedSubjects": 549,
   "sourceProjects": {
     "customer": {
