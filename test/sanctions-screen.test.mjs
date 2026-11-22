@@ -2513,10 +2513,13 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
 {
   const src = readFileSync(join(ROOT, 'scripts/sanctions-screen.mjs'), 'utf8');
   check('google news retry: subjects without an en-US Google News answer are queued for one slow re-ask',
-    /gnewsRetryQueue\.push\(\{ key: s\.key/.test(src) && /!am\.backbones\?\.googleNews\)/.test(src));
+    /gnewsRetryQueue\.push\(\{ key: s\.key/.test(src) && /!am\.backbones\?\.googleNews \|\| !am\.backbones\?\.bing\)/.test(src));
   check('google news retry: only a real answer clears the failure, and a retry hit is added, never dropped',
-    /!again\.backbones\?\.googleNews\) return false/.test(src)
+    /missingRequired\.some\(id => again\.backbones\?\.\[id\]\)\) return false/.test(src)
     && /if \(again\.hit && !am\.hit\) applyAm\(again\)/.test(src));
+  check('required news retry: Bing News is retried like Google News, and only a source that answers clears its failure',
+    /\['googleNews', 'bing'\]\.filter\(id => !am\.backbones\?\.\[id\]\)/.test(src)
+    && /amBackboneFailures\[id\]--/.test(src));
   check('google news retry: runs through the bounded second-pass runner with the same deadline and cool-down',
     /runAmSecondPass\(gnewsRetryQueue, \{[\s\S]{0,200}AM_SECOND_PASS_GRACE_MS/.test(src));
 }
