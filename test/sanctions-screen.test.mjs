@@ -2520,6 +2520,8 @@ check('rotateByDay: rotates by the day offset, preserves every element, and vari
   check('required news retry: Bing News is retried like Google News, and only a source that answers clears its failure',
     /\['googleNews', 'bing'\]\.filter\(id => !am\.backbones\?\.\[id\]\)/.test(src)
     && /amBackboneFailures\[id\]--/.test(src));
+  check('required news retry: a subject still unanswered gets one further attempt after the cool-down',
+    /for \(let attempt = 0; attempt < 2; attempt\+\+\)/.test(src) && /setTimeout\(r, coolDownMs\)/.test(src));
   check('google news retry: runs through the bounded second-pass runner with the same deadline and cool-down',
     /runAmSecondPass\(gnewsRetryQueue, \{[\s\S]{0,200}AM_SECOND_PASS_GRACE_MS/.test(src));
 }
