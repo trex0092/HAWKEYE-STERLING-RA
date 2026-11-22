@@ -2317,13 +2317,17 @@ export async function screenLocally(subjects, cfg) {
       } else {
         applyAm(am);
         /* The subject WAS screened (another backbone answered), but Google News
-           is a required evidence source, so a transient refusal is re-asked once
+           and Bing News are required evidence sources, so a transient refusal is re-asked once
            after the sweep, slowly. Only a real answer clears the failure; a hit
            found on the retry is added, never dropped. */
-        if (!am.backbones?.googleNews) {
+        if (!am.backbones?.googleNews || !am.backbones?.bing) {
           gnewsRetryQueue.push({ key: s.key, retry: async () => {
             const again = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
-            if (again.errored || !again.backbones?.googleNews) return false;
+            /* Bing News is required alongside Google News (screening-assurance),
+               so a refusal from either is re-asked once. Only a source that
+               really answers on the retry clears its failure. */
+            const missingRequired = ['googleNews', 'bing'].filter(id => !am.backbones?.[id]);
+            if (again.errored || !missingRequired.some(id => again.backbones?.[id])) return false;
             for (const id of ['googleNews', 'gdelt', 'bing', 'yahoo']) {
               if (!am.backbones?.[id] && again.backbones?.[id]) amBackboneFailures[id]--;
             }
@@ -2432,7 +2436,7 @@ export async function screenLocally(subjects, cfg) {
     delayMs: Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0),
   });
   if (gnewsRetryQueue.length) {
-    console.log('sanctions-screen: Google News retry - ' + gnewsRetryQueue.length + ' subject(s) without a Google News answer after the sweep; re-asked '
+    console.log('sanctions-screen: required news source retry (Google News, Bing) - ' + gnewsRetryQueue.length + ' subject(s) without a required news answer after the sweep; re-asked '
       + gnewsRetry.attempted + ', answered ' + gnewsRetry.recovered + (gnewsRetry.skipped ? ' (' + gnewsRetry.skipped + ')' : ''));
   }
   if (amSecondPassQueue.length) {
