@@ -2322,11 +2322,20 @@ export async function screenLocally(subjects, cfg) {
            found on the retry is added, never dropped. */
         if (!am.backbones?.googleNews || !am.backbones?.bing) {
           gnewsRetryQueue.push({ key: s.key, retry: async () => {
-            const again = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
             /* Bing News is required alongside Google News (screening-assurance),
-               so a refusal from either is re-asked once. Only a source that
-               really answers on the retry clears its failure. */
+               so a refusal from either is re-asked. A single refusal on the
+               first re-ask is common while the providers throttle, so the
+               subject gets one further attempt after the same cool-down used
+               between subjects. Only a source that really answers clears its
+               failure. */
             const missingRequired = ['googleNews', 'bing'].filter(id => !am.backbones?.[id]);
+            const coolDownMs = Math.max(0, Number(process.env.ADVERSE_SECOND_PASS_DELAY_MS ?? 60000) || 0);
+            let again = null;
+            for (let attempt = 0; attempt < 2; attempt++) {
+              if (attempt > 0 && coolDownMs) await new Promise(r => setTimeout(r, coolDownMs));
+              again = await checkAdverseMedia(s.name, { timeoutMs: cfg.checkTimeoutMs });
+              if (!again.errored && missingRequired.some(id => again.backbones?.[id])) break;
+            }
             if (again.errored || !missingRequired.some(id => again.backbones?.[id])) return false;
             for (const id of ['googleNews', 'gdelt', 'bing', 'yahoo']) {
               if (!am.backbones?.[id] && again.backbones?.[id]) amBackboneFailures[id]--;
