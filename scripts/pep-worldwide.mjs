@@ -393,9 +393,9 @@ export function labelsUrl(qids) {
    For unresolved QIDs only, redirects plus Wikipedia sitelink titles can recover
    merged/deleted IDs and items whose labels are blank while still preserving a
    human-readable, screenable name. */
-export function fallbackLabelsUrl(qids) {
-  return WD_API + '?action=wbgetentities&format=json&props=labels%7Caliases%7Csitelinks%7Cclaims&redirects=yes&maxlag=5&ids='
-    + qids.join('%7C');
+export function fallbackLabelsUrl(qids, { maxlag = true } = {}) {
+  return WD_API + '?action=wbgetentities&format=json&props=labels%7Caliases%7Csitelinks%7Cclaims&redirects=yes'
+    + (maxlag ? '&maxlag=5' : '') + '&ids=' + qids.join('%7C');
 }
 
 /* SPARQL JSON results → rows of { var: plainValue } (entity URIs reduced to
@@ -1297,7 +1297,14 @@ async function harvest(outfile) {
     console.log(`pep-worldwide: attempting redirect/sitelink fallback for ${fallbackPending.length} unresolved person label(s)`);
     for (let i = 0; i < fallbackPending.length; i += LABEL_CHUNK) {
       const batch = fallbackPending.slice(i, i + LABEL_CHUNK);
-      const data = await fetchJsonSafe(fallbackLabelsUrl(batch));
+      let data = await fetchJsonSafe(fallbackLabelsUrl(batch));
+      /* maxlag is a politeness hint, not a correctness control: Wikidata
+         refuses every request while its replicas lag, however small the
+         request. The unresolved tail is a handful of QIDs (never a sweep), so
+         when the polite attempt exhausts its retries, ask ONCE more without the
+         hint rather than leaving the list short of those people forever. A
+         failure here still leaves them pending and the harvest red. */
+      if (!data) data = await fetchJsonSafe(fallbackLabelsUrl(batch, { maxlag: false }));
       bankLabelNames(names, data, batch);
       const verifiedHistorical = bankCorroboratedPepNames(names, data, batch);
       if (verifiedHistorical) console.log('pep-worldwide: source-corroborated historical identities recovered: ' + verifiedHistorical);
