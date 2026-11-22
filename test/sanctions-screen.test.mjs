@@ -1188,6 +1188,11 @@ check('PEP harvest: targeted fallback URL follows merged QIDs and requests sitel
   pep.fallbackLabelsUrl(['Q10']).includes('props=labels%7Caliases%7Csitelinks%7Cclaims')
   && pep.fallbackLabelsUrl(['Q10']).includes('redirects=yes')
   && pep.fallbackLabelsUrl(['Q10']).endsWith('Q10'));
+check('pep fallback URL: maxlag hint can be dropped for the unresolved tail, redirects and fields kept',
+  pep.fallbackLabelsUrl(['Q10']).includes('maxlag=5')
+  && !pep.fallbackLabelsUrl(['Q10'], { maxlag: false }).includes('maxlag')
+  && pep.fallbackLabelsUrl(['Q10', 'Q11'], { maxlag: false }).includes('redirects=yes')
+  && pep.fallbackLabelsUrl(['Q10', 'Q11'], { maxlag: false }).endsWith('Q10%7CQ11'));
 const _claimNameEnt = pep.namesFromEntity({
   labels: {}, aliases: {}, sitelinks: {},
   claims: {
