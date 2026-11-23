@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-23T01:31:26.626Z",
-  "githubRunId": "45094959931",
+  "generatedAt": "2026-11-23T16:16:44.384Z",
+  "githubRunId": "45214543979",
   "commit": "dc66cb2c8d43404968e30241529b727617b76332",
   "screenedSubjects": 549,
   "sourceProjects": {
@@ -28,15 +28,15 @@
     "screenedSubjects": 549,
     "loadedSources": [
       {
-        "id": "uk-ofsi",
-        "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
-        "count": 58702,
-        "partial": false
-      },
-      {
         "id": "un-consolidated",
         "name": "UN Security Council — Consolidated list (XML)",
         "count": 3758,
+        "partial": false
+      },
+      {
+        "id": "uk-ofsi",
+        "name": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+        "count": 58702,
         "partial": false
       },
       {
@@ -60,7 +60,7 @@
       {
         "id": "fr-dgt",
         "name": "France — Registre national des gels (DGT)",
-        "count": 23294,
+        "count": 23296,
         "partial": false
       }
     ],
