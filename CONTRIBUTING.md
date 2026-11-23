@@ -50,16 +50,21 @@ This is developer-only tooling. It is not a runtime, build or CI dependency,
 and no app, engine or MCP-server file imports it.
 
 ```bash
-uv tool install graphifyy     # or: pipx install graphifyy
-graphify install --project    # adds a /graphify skill under .claude/skills/
+uv tool install 'graphifyy[mcp]'   # or: pipx install 'graphifyy[mcp]'
+graphify install --project         # adds a /graphify skill under .claude/skills/
+export GRAPHIFY_BACKEND=none       # code-only build, no LLM calls
+graphify update .                  # builds graphify-out/graph.json (about 10 s)
+graphify query "where is the screening matcher"
 ```
 
-Then run `/graphify` in your assistant. Rules for this repository:
+The `[mcp]` extra is required: without it, `graphify query` fails with
+`ModuleNotFoundError: No module named 'anyio'`. You can also run `/graphify`
+in your assistant. Rules for this repository:
 
-- Set `GRAPHIFY_BACKEND=none` before building the graph. The code pass is local
-  either way, but the semantic pass for docs and PDFs sends content to the
-  configured LLM backend, and this tree holds compliance material. If you need
-  semantic extraction, use `GRAPHIFY_BACKEND=ollama` so it stays on your machine.
+- Keep `GRAPHIFY_BACKEND=none`. The code pass is local either way, but the
+  semantic pass for docs and PDFs sends content to the configured LLM backend,
+  and this tree holds compliance material. If you need semantic extraction,
+  use `GRAPHIFY_BACKEND=ollama` so it stays on your machine.
 - Do not connect to Graphify's hosted MCP service for this repository.
 - Output goes to `graphify-out/`, which is git-ignored. Do not commit it.
 - Each `graphify query`, `path` and `explain` call is logged to
