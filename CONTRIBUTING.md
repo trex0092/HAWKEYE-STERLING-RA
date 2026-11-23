@@ -42,6 +42,29 @@ python3 -m http.server 8000
 Node is only needed to run the test/automation scripts (Node 22, pinned in
 `.nvmrc` — same version CI uses).
 
+## Optional: codebase knowledge graph (Graphify)
+
+Developers who use an AI coding assistant can build a local knowledge graph of
+this repository with Graphify (PyPI package `graphifyy`, double-y; Apache-2.0).
+This is developer-only tooling. It is not a runtime, build or CI dependency,
+and no app, engine or MCP-server file imports it.
+
+```bash
+uv tool install graphifyy     # or: pipx install graphifyy
+graphify install --project    # adds a /graphify skill under .claude/skills/
+```
+
+Then run `/graphify` in your assistant. Rules for this repository:
+
+- Set `GRAPHIFY_BACKEND=none` before building the graph. The code pass is local
+  either way, but the semantic pass for docs and PDFs sends content to the
+  configured LLM backend, and this tree holds compliance material. If you need
+  semantic extraction, use `GRAPHIFY_BACKEND=ollama` so it stays on your machine.
+- Do not connect to Graphify's hosted MCP service for this repository.
+- Output goes to `graphify-out/`, which is git-ignored. Do not commit it.
+- Each `graphify query`, `path` and `explain` call is logged to
+  `~/.cache/graphify-queries.log`. Set `GRAPHIFY_QUERY_LOG_DISABLE=1` to opt out.
+
 ## GitHub CLI in Codespaces
 
 This repository provisions the official GitHub CLI in GitHub Codespaces and

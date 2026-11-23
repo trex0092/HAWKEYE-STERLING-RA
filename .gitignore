@@ -29,6 +29,8 @@ link-check-report.md
 playwright-report/
 test-results/
 .lighthouseci/
+# Graphify knowledge graph (developer-local, see CONTRIBUTING.md)
+graphify-out/
 
 # Python build artifacts
 __pycache__/
