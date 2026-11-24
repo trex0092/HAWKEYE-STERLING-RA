@@ -71,9 +71,9 @@
       "prevHash": "89e6cae0139ce5bba1fbc2f775149ebb8f96483388ebd255f792e94fcba86bb1",
       "fp": 2,
       "count": 44286,
-      "errStreak": 1,
+      "errStreak": 2,
       "error": "HTTP 500",
-      "errorStreak": 1
+      "errorStreak": 2
     },
     "fr-dgt": {
       "hash": "f4778d47fa6f77f0d6a4c1daa4b5d1c67e9350ab997771c4d6a2807445abe826",
