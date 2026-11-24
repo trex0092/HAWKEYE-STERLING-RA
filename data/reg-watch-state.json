@@ -7,9 +7,11 @@
       "checkedAt": "2026-11-24",
       "changedAt": "2026-11-20",
       "contentAsOf": "2026-11-24",
-      "status": 200,
+      "status": "error",
       "prevHash": "1eea599b3a3a5beaec8545f17431955dd47318a2c314a0d3cf83ea96433f84d8",
-      "fp": 2
+      "fp": 2,
+      "error": "fetch failed (UND_ERR_CONNECT_TIMEOUT)",
+      "errorStreak": 1
     },
     "uae-fiu": {
       "hash": "7e067a5c918cf49ed2584aabd12bf981be702878d9826327b9087a962cc5c702",
@@ -21,17 +23,17 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 54
+      "errorStreak": 55
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
       "bytes": 6329,
       "checkedAt": "2026-11-24",
       "changedAt": "2026-09-21",
-      "contentAsOf": "2026-11-23",
+      "contentAsOf": "2026-11-24",
       "status": 200,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261123175450"
+      "via": "web.archive.org save-page-now 20261124063312"
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -202,13 +204,13 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "3843ac34213b35922e1d42151c86a65ef6157c3aa8f0aac0d6f8e4fdfd3f6cdf",
+      "hash": "70b694d9383806f78d6151e1b8dd4713a75ad9386c26fa7ce812684dbd372db8",
       "bytes": 108178,
       "checkedAt": "2026-11-24",
       "changedAt": "2026-11-24",
       "contentAsOf": "2026-11-24",
       "status": 200,
-      "prevHash": "e135c091820e6d50d4df3195c2af3a896a38871da210fa2c55fac67d371cc370",
+      "prevHash": "3843ac34213b35922e1d42151c86a65ef6157c3aa8f0aac0d6f8e4fdfd3f6cdf",
       "fp": 2
     },
     "eu-ai-act": {
