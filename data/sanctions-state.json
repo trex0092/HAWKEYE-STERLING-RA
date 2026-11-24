@@ -50,15 +50,15 @@
       "errStreak": 0
     },
     "uk-ofsi": {
-      "hash": "4fe4b5cd2202b467d32ed910a13b16917807fc14c77db2fcfffcb189532df159",
-      "bytes": 48288757,
+      "hash": "bb1a636c71bce57de3d4dd4d003c8b941fe85d8f46cd5e1d99698292353f6155",
+      "bytes": 48301029,
       "checkedAt": "2026-11-24",
-      "changedAt": "2026-11-23",
+      "changedAt": "2026-11-24",
       "contentAsOf": "2026-11-24",
       "status": 200,
-      "prevHash": "6e052fc7afe6e0deedb6aa969f106472885e71619bd63ff2f7e79000ff865444",
+      "prevHash": "4fe4b5cd2202b467d32ed910a13b16917807fc14c77db2fcfffcb189532df159",
       "fp": 2,
-      "count": 58907,
+      "count": 58919,
       "errStreak": 0
     },
     "eu-fsf": {
@@ -66,25 +66,23 @@
       "bytes": 21531742,
       "checkedAt": "2026-11-24",
       "changedAt": "2026-11-21",
-      "contentAsOf": "2026-11-23",
-      "status": 500,
+      "contentAsOf": "2026-11-24",
+      "status": 200,
       "prevHash": "89e6cae0139ce5bba1fbc2f775149ebb8f96483388ebd255f792e94fcba86bb1",
       "fp": 2,
       "count": 44286,
-      "errStreak": 2,
-      "error": "HTTP 500",
-      "errorStreak": 2
+      "errStreak": 0
     },
     "fr-dgt": {
-      "hash": "f4778d47fa6f77f0d6a4c1daa4b5d1c67e9350ab997771c4d6a2807445abe826",
-      "bytes": 579449,
+      "hash": "9d841d10a3df1d94f0f53132cd7eed4580b77bc40b968a224ee158634affabe7",
+      "bytes": 579489,
       "checkedAt": "2026-11-24",
-      "changedAt": "2026-11-23",
+      "changedAt": "2026-11-24",
       "contentAsOf": "2026-11-24",
       "status": 200,
-      "prevHash": "ff116a01e08edb3479634ec9b54383b5cf0e67fe4df88c0b555ac75c2694e4d2",
+      "prevHash": "f4778d47fa6f77f0d6a4c1daa4b5d1c67e9350ab997771c4d6a2807445abe826",
       "fp": 2,
-      "count": 23293,
+      "count": 23297,
       "errStreak": 0
     }
   }

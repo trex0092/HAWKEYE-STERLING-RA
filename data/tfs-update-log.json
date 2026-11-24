@@ -2,44 +2,6 @@
   "_README": "TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). A first snapshot of a newly tracked source is recorded with status \"baseline\" (monitoring began; not a designation update, so no re-screen obligation or latency). Entries are tamper-evident: chainPrev/chainHash link each detection to its predecessor and resolutionHash seals the terminal outcome; `node scripts/sanctions-watch.mjs verify-log` proves the log unedited and the watch workflow runs that check daily. Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest 200.",
   "entries": [
     {
-      "id": "ofac-sdn",
-      "list": "US OFAC — SDN list (CSV)",
-      "change": "list changed",
-      "publicationDate": null,
-      "detectedAt": "2026-07-21T07:39:53.870Z",
-      "prevCount": 19170,
-      "newCount": 19170,
-      "rescreen": {
-        "workflow": "sanctions-screen.yml",
-        "runId": 29811288227,
-        "startedAt": "2026-07-21T07:39:58Z"
-      },
-      "status": "complete",
-      "chainPrev": "7324e0b1c6e4d86aa6c2e5b6d5bae337c158916472170d06fedf832f8ef10c10",
-      "chainHash": "6cb376144d05df6da834054f1bf8f6d12e1f0d734adf1f21ef9047b5e701ae8d",
-      "latencyHours": 0,
-      "resolutionHash": "8522b865fbe41d9930ebcdb76fd72708230d834a8e9663a8614f980a635ac215"
-    },
-    {
-      "id": "ofac-sdn",
-      "list": "US OFAC — SDN list (CSV)",
-      "change": "list changed",
-      "publicationDate": null,
-      "detectedAt": "2026-07-24T07:39:16.735Z",
-      "prevCount": 19170,
-      "newCount": 19242,
-      "rescreen": {
-        "workflow": "sanctions-screen.yml",
-        "runId": 30076180913,
-        "startedAt": "2026-07-24T07:39:20Z"
-      },
-      "status": "complete",
-      "chainPrev": "6cb376144d05df6da834054f1bf8f6d12e1f0d734adf1f21ef9047b5e701ae8d",
-      "chainHash": "27c2db1772f3358d1bb4cdd1f053dcf868f3dd116e503747ea72a682e2873123",
-      "latencyHours": 0,
-      "resolutionHash": "762dc9af3055a6b827f1e5dff9d9daef9a74894aadc6edd2f1ccc8c1b750776b"
-    },
-    {
       "id": "ofac-consolidated",
       "list": "US OFAC — Consolidated (non-SDN) list (XML)",
       "change": "list changed",
@@ -3790,6 +3752,32 @@
       "chainHash": "0a2a4e48bd12bfa9b254b08f2fcc703e775d21d68e9e52486b37cb42758593ec",
       "latencyHours": 0,
       "resolutionHash": "e83437cf4e7d4867f3a65cf234bb24882da8198234720d7132871db77b15ba87"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-24T15:43:56.171Z",
+      "prevCount": 58907,
+      "newCount": 58919,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "0a2a4e48bd12bfa9b254b08f2fcc703e775d21d68e9e52486b37cb42758593ec",
+      "chainHash": "f4118cf46c70a7d00e1449fcef6bf14b29b864c9ce43836692bdeb998df2c788"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-24T15:43:56.171Z",
+      "prevCount": 23293,
+      "newCount": 23297,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "f4118cf46c70a7d00e1449fcef6bf14b29b864c9ce43836692bdeb998df2c788",
+      "chainHash": "6baa30d4c899da96f3528d477b7a289c1c634e41a477539106e70fb17927c36d"
     }
   ]
 }
