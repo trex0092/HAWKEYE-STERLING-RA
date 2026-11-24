@@ -661,7 +661,11 @@ check('a sectionless mirror still joins the project',
 {
   const ROOT2 = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const mirrorRe = /ASANA_MIRROR_PROJECT_GID:\s*\$\{\{/;
-  for (const wf of ['regulatory-watch.yml', 'sanctions-watch.yml', 'sanctions-screen.yml']) {
+  /* sanctions-watch.yml left this list on 2026-11-24: its Asana delivery was
+     retired at the MLRO's request (the change report is published in the run's
+     job summary), so it no longer has a mirror or an Asana destination to wire.
+     The retirement itself is pinned below. */
+  for (const wf of ['regulatory-watch.yml', 'sanctions-screen.yml']) {
     const y = readFileSync(join(ROOT2, '.github/workflows', wf), 'utf8');
     /* Match the ASSIGNMENT, not the bare identifier: the explanatory comment
        above it says "Clear ASANA_MIRROR_PROJECT_GID to disable", so an
@@ -670,6 +674,13 @@ check('a sectionless mirror still joins the project',
     check(`${wf} still wires ASANA_MIRROR_PROJECT_GID through to Asana (opt-in; no live default since #518)`, mirrorRe.test(y));
     check(`${wf} still delivers to the #305 destination as well (additive)`,
       y.includes('1216203370612914'));
+  }
+  {
+    const sw = readFileSync(join(ROOT2, '.github/workflows', 'sanctions-watch.yml'), 'utf8');
+    check('sanctions-watch.yml no longer posts to Asana (retired 2026-11-24 at the MLRO\'s request)',
+      !sw.includes('watch-notify.mjs') && !/ASANA_ACCESS_TOKEN:\s*\$\{\{/.test(sw));
+    check('sanctions-watch.yml still publishes its change report in the run summary',
+      sw.includes('sanctions-watch-report.md') && sw.includes('GITHUB_STEP_SUMMARY'));
   }
   /* STEP-SCOPED: the env must be assigned on the step that CONSUMES it. The
      regression this closes: sanctions-screen.yml assigned the mirror env only

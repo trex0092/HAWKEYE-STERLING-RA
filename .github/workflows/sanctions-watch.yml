@@ -2,12 +2,11 @@ name: Sanctions Watch
 
 # Daily check of the major consolidated designation lists (OFAC SDN + non-SDN,
 # UN Security Council, UK OFSI, EU FSF) defined in data/sanctions-sources.json.
-# On any change it creates a task in the "Ongoing Monitoring"
-# Asana project, commits the refreshed fingerprint state to main, and falls back
-# to a labelled GitHub issue if Asana delivery fails. Country black/grey list
-# moves are handled by the FATF Watchdog.
+# On any change it publishes the change report in the run's job summary (Asana
+# delivery retired 2026-11-24: the MLRO's own daily sanctions tasks now report
+# list changes in Asana) and commits the refreshed fingerprint state. Country
+# black/grey list moves are handled by the FATF Watchdog.
 #
-# Needs the ASANA_ACCESS_TOKEN repository secret to route alerts to Asana.
 # First run: dispatch with mode = seed to record the baseline quietly.
 
 on:
@@ -138,36 +137,22 @@ jobs:
             });
             core.notice('Dispatched sanctions-screen.yml: immediate re-screen after a designation-list content change.');
 
-      - name: Notify Asana — Ongoing Monitoring project
-        id: asana
-        continue-on-error: true
+      # Asana delivery retired 2026-11-24 at the MLRO's request: sanctions list
+      # monitoring and customer comparison are now delivered to Asana by the
+      # MLRO's own daily tasks, and this repository keeps adverse media and PEP
+      # screening only. The watch still runs on its schedule, keeps its state and
+      # TFS evidence log, and still dispatches the immediate re-screen above; the
+      # change report is published in the run's job summary instead.
+      - name: Publish the change report in the run summary
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
         env:
-          ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
-          ASANA_REG_PROJECT_GID: ${{ vars.ASANA_DELIVERY_PROJECT_GID || '1216203370612914' }}
-          # "Sanctions updates" section, gid 1218451960830318. Repointed
-          # 2026-09-16: this was reading the generic, never-set
-          # ASANA_DELIVERY_SECTION_GID and silently falling through to a
-          # DIFFERENT section ("Assessment Report", 1216203370612916).
-          # ASANA_SANCTIONS_SECTION_GID existed as a repo variable but held a
-          # STALE value from an earlier Asana reorganization (1216203873114462,
-          # which no longer exists) -- corrected in the same pass, both here
-          # and in the repo variable itself. Both this literal and the
-          # variable were verified against the live Asana API.
-          ASANA_SECTION_GID: ${{ vars.ASANA_SANCTIONS_SECTION_GID || '1218451960830318' }}
-          # MIRROR (RETIRED 2026-09-15): the separate "Sanctions/Media/PEP -
-          # Monitoring" project (1213914392047129, section 1213914392047131) was
-          # merged into HAWKEYE STERLING APP, so mirroring here would just re-add
-          # the SAME project the alert above already targets. Both vars below
-          # default to empty (disabled) via the original "Clear
-          # ASANA_MIRROR_PROJECT_GID to disable" escape hatch, until/unless a
-          # genuinely separate MLRO queue exists again.
-          ASANA_MIRROR_PROJECT_GID: ${{ vars.ASANA_ALERT_MIRROR_PROJECT_GID }}
-          ASANA_MIRROR_SECTION_GID: ${{ vars.ASANA_ALERT_MIRROR_SECTION_GID }}
-          # Step output crosses into the shell via env (never inline ${{ }} in run:),
-          # so a hostile character in a generated title can never become shell syntax.
           PR_TITLE: ${{ steps.watch.outputs.pr_title }}
-        run: node scripts/watch-notify.mjs "$PR_TITLE" sanctions-watch-report.md sanctions-watch-changes.json
+        run: |
+          {
+            echo "## ${PR_TITLE:-Sanctions Watch}"
+            echo
+            if [ -f sanctions-watch-report.md ]; then cat sanctions-watch-report.md; else echo "No report file was produced."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Retain dated snapshot + integrity manifest
         if: steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed'
@@ -193,25 +178,3 @@ jobs:
             echo "state unchanged"
           fi
 
-      - name: Fallback to a GitHub issue if Asana delivery failed
-        if: (steps.watch.outputs.has_changes == 'true' || inputs.mode == 'seed') && steps.asana.outcome == 'failure'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          PR_TITLE: ${{ steps.watch.outputs.pr_title }}
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('sanctions-watch-report.md', 'utf8');
-            const { owner, repo } = context.repo;
-            const body = report + [
-              '', '---',
-              '> This change could not be delivered to the Asana "Ongoing Monitoring" project',
-              '> (no `ASANA_ACCESS_TOKEN` repository secret, or the Asana API call failed), so this issue was opened instead.',
-              '> Set the `ASANA_ACCESS_TOKEN` secret to route future changes to Asana automatically.',
-            ].join('\n');
-            await github.rest.issues.create({
-              owner, repo,
-              title: process.env.PR_TITLE || 'Sanctions Watch - changes detected',
-              body,
-              labels: ['sanctions-watch'],
-            });
