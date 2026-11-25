@@ -2,25 +2,6 @@
   "_README": "TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). A first snapshot of a newly tracked source is recorded with status \"baseline\" (monitoring began; not a designation update, so no re-screen obligation or latency). Entries are tamper-evident: chainPrev/chainHash link each detection to its predecessor and resolutionHash seals the terminal outcome; `node scripts/sanctions-watch.mjs verify-log` proves the log unedited and the watch workflow runs that check daily. Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest 200.",
   "entries": [
     {
-      "id": "ofac-consolidated",
-      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
-      "change": "list changed",
-      "publicationDate": null,
-      "detectedAt": "2026-07-24T07:39:16.735Z",
-      "prevCount": 442,
-      "newCount": null,
-      "rescreen": {
-        "workflow": "sanctions-screen.yml",
-        "runId": 30076180913,
-        "startedAt": "2026-07-24T07:39:20Z"
-      },
-      "status": "complete",
-      "chainPrev": "27c2db1772f3358d1bb4cdd1f053dcf868f3dd116e503747ea72a682e2873123",
-      "chainHash": "a68b5b600b67a7236094ee1b3de685e3ca96600c3bcd9d8d3e2f9784c51ef897",
-      "latencyHours": 0,
-      "resolutionHash": "622003a0926666d9f12d8caaa9c0c39092b142e34f38a812d31f7b106a5b5771"
-    },
-    {
       "id": "un-consolidated",
       "list": "UN Security Council — Consolidated list (XML)",
       "change": "list changed",
@@ -3790,6 +3771,19 @@
       "chainHash": "6baa30d4c899da96f3528d477b7a289c1c634e41a477539106e70fb17927c36d",
       "latencyHours": 0,
       "resolutionHash": "24a023adc3eb9556f5441cb248f94da53f78cebbae0ce16c0b8525726e370fc4"
+    },
+    {
+      "id": "un-consolidated",
+      "list": "UN Security Council — Consolidated list (XML)",
+      "change": "list changed",
+      "publicationDate": "2026-11-25",
+      "detectedAt": "2026-11-25T17:02:56.047Z",
+      "prevCount": 1007,
+      "newCount": 1008,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "6baa30d4c899da96f3528d477b7a289c1c634e41a477539106e70fb17927c36d",
+      "chainHash": "7596fca324dd018702a1825dca85ca1e6bcdf8efb1afe77e1c528b5e74507fba"
     }
   ]
 }
