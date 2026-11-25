@@ -85,5 +85,41 @@ if (broken.length) {
   if (broken.length > 40) console.log('        …and ' + (broken.length - 40) + ' more');
 }
 
+/* Completeness of the documentation map (docs/README.md). The map called
+   itself "the way in" while it missed two packs (runbooks/, generated/) and a
+   standalone document, and its hand-written counts ("12 packs plus 9
+   standalone", "~195 documents") were all wrong against 14 folders, 12
+   standalone documents and 205 files. A link that resolves says nothing about
+   a file nobody linked, so this pins the other direction: every immediate
+   subfolder of docs/ and every top-level docs/*.md must be a link target on
+   the map, and a pack that has its own README is linked through that README. */
+console.log('\n— Documentation map completeness (docs/README.md) —\n');
+{
+  const map = readFileSync(join(ROOT, 'docs', 'README.md'), 'utf8');
+  const targets = new Set();
+  for (const m of map.matchAll(LINK)) {
+    if (NOT_A_PATH.test(m[1])) continue;
+    targets.add(m[1].split('#')[0].split('?')[0]);
+  }
+  const entries = readdirSync(join(ROOT, 'docs')).sort();
+  const folders = entries.filter(e => statSync(join(ROOT, 'docs', e)).isDirectory());
+  const standalone = entries.filter(e => e.endsWith('.md') && e !== 'README.md');
+  check('docs/ has packs and standalone documents to map (' + folders.length + ' + ' + standalone.length + ')',
+    folders.length > 5 && standalone.length > 5);
+
+  const unlistedFolders = folders.filter(f => ![...targets].some(t => t.startsWith(f + '/')));
+  check('every docs/ subfolder is linked from the map (' + folders.length + ' folders)', unlistedFolders.length === 0);
+  for (const f of unlistedFolders) console.log('        not on the map: docs/' + f + '/');
+
+  const unlistedDocs = standalone.filter(f => !targets.has(f));
+  check('every top-level docs/*.md is linked from the map (' + standalone.length + ' documents)', unlistedDocs.length === 0);
+  for (const f of unlistedDocs) console.log('        not on the map: docs/' + f);
+
+  const withIndex = folders.filter(f => existsSync(join(ROOT, 'docs', f, 'README.md')));
+  const bypassed = withIndex.filter(f => !targets.has(f + '/README.md'));
+  check('a pack with its own README is linked through it (' + withIndex.length + ' packs)', bypassed.length === 0);
+  for (const f of bypassed) console.log('        map does not link docs/' + f + '/README.md');
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
