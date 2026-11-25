@@ -1,109 +1,162 @@
-# Product Presentation: Summary (6 Aug 2026)
+# Hawkeye Sterling: Sponsor Presentation
 
-Summary of the Hawkeye Sterling product presentation ("HAWKEYE STERLING: AI-Enabled AML and CFT Compliance Intelligence", 66 pages), reviewed against `main` of this repository.
+AI-enabled AML and CFT compliance intelligence for Dealers in Precious Metals and Stones (DPMS).
 
-This is a product and business summary. It is not an audit, a certification, a regulatory approval or legal advice. Figures and commercial terms must be reconfirmed before any external use (see the checklist at the end).
+Product presentation, 6 August 2026. Reviewed against the `main` branch of this repository.
 
-## Positioning
+---
 
-Hawkeye Sterling is a self-hosted AML/CFT customer risk-assessment and screening platform for a UAE Dealer in Precious Metals and Stones (DPMS), adaptable to other reporting entities.
+## 1. Overview
 
-- **Users:** MLROs, compliance analysts, reviewers and senior management.
-- **Screens:** Entity Risk Assessment (`index.html`), AI Operations Console (`console.html`), Hawkeye Sterling Advisor (`advisor.html`).
-- **Role of AI:** risk-rating support, adverse-media triage, relationship signals and drafting. Outputs are labelled and always reviewed.
-- **Decisions:** every onboarding, escalation, freeze or filing decision is made by an authorised human. The platform does not onboard, freeze, decline or file on its own.
+Hawkeye Sterling brings customer risk assessment, sanctions and PEP screening, adverse-media monitoring, case handling and compliance documentation into one workspace.
 
-## Capability chain
+- **Built for:** a UAE DPMS, and adaptable to other reporting entities with similar obligations.
+- **Used by:** MLROs, compliance analysts, reviewers and senior management.
+- **Deployment:** self-hosted, with a lightweight architecture. No backend framework is required in the browser.
+- **Price:** AED 1,500 per month for integrated access to the confirmed modules. Other commercial terms are subject to agreement.
 
-Onboarding, risk assessment, sanctions and PEP screening, adverse media, ownership and UBO analysis, monitoring, advisory support, case preparation and STR/SAR draft, documentation and audit trail.
+## 2. The problem
 
-## Entity risk assessment
+Manual, fragmented compliance work accumulates risk quietly.
 
-- **Factors:** seven scored categories (jurisdiction, business activity, onboarding channel, operational history, ownership and control, recycled and mined supply chain).
-- **Bands:** score 0-19 CDD (12-month review), 20-22 SDD (6-month review), 23+ EDD (3-month review).
-- **Hard outcomes** override the band. Sanctions exposure of the entity or its principals, terrorist financing and proliferation financing lead to PROHIBITED. Mandatory EDD applies to PEP exposure, FATF call-for-action jurisdictions and ASM mined sources in high-risk jurisdictions.
-- **Analyst override:** raise-only, with a mandatory printed justification. It never applies to PROHIBITED relationships.
-- **Risk data:** a versioned firm baseline (`RISK_DATA_VERSION`). Local overrides are dated, reasoned and visible.
-- **Reference format:** `RA-YYYYMMDD-NNN`.
-- **Sign-off:** two-line segregation of duties. The analyst assesses; the MLRO reviews and approves.
+- Screening runs ad hoc rather than on a fixed daily cadence.
+- Evidence is spread across spreadsheets and email.
+- Review dates are tracked by hand and slip.
+- Analyst judgement varies between people and over time.
+- Documentation is rebuilt at examination time rather than maintained as work happens.
 
-## Automated screening
+## 3. The solution
 
-- **Daily unified run** on GitHub Actions (`screen.py`, `RUN_MODE=unified`), with the report delivered by 09:00 UAE. No paid data feed and no API key are required. An LLM is optional and opt-in.
-- **Sanctions lists:** OFAC SDN and Consolidated, UN, EU FSF, UK OFSI and UAE EOCN as core lists. Canada SEMA, France DGT and Switzerland SECO as supplementary lists.
-- **Matching:** fuzzy and transliteration-aware, with 89 shared groups (267 members) for Arabic and Turkish spelling variants. Material-match threshold 85/100. Phonetic-only matches are WEAK, never confirmed. Very short or non-Latin-only names go to MANUAL REVIEW.
-- **PEP and RCA:** auto-detected through Wikidata, with the OpenSanctions PEP mirror as fallback. Documented as a best-effort signal, not screening-grade.
-- **Adverse media:** Google News RSS, GDELT, Bing News RSS and the OpenSanctions crime watchlist. Every item links to its source.
-- **Ownership:** a designated owner or UBO flags the company at 50% or more control linkage, even when the company name is clear.
-- **Delta engine:** each report leads with what is new. Standing items are marked, never dropped. Repeat signals (3 or more stories in 90 days) are tracked.
-- **Cadence:** 60 scheduled or CI workflows (see `data/board-figures.json`). Daily sanctions screen, 6-hourly onboarding screen, weekly adverse-media sweep, monthly FATF watchdog.
-- **Cases:** a new match becomes an assigned, SLA-tracked case. Dispositions are set by the MLRO under four-eyes review.
+One connected chain from onboarding to filing:
 
-## Failure handling
+1. Onboarding and identification
+2. Risk assessment
+3. Sanctions and PEP screening
+4. Adverse-media monitoring
+5. Ownership and UBO analysis
+6. Ongoing monitoring
+7. Advisory support
+8. Case preparation and STR/SAR drafting
+9. Documentation and audit trail
 
-- **Refuse-to-clear:** if a required list cannot load, the run stops rather than reporting an all-clear.
-- **Degrade loudly:** a source that fails or parses zero names is shown in the report.
-- **Freshness alarm:** `freshness-check` flags a mandatory daily control that did not run.
-- **Red run:** a run that cannot screen fails red and opens a GitHub issue automatically.
+Humans decide at every step that matters. The platform assesses, screens, monitors, prioritises, summarises and drafts. Authorised reviewers alone make onboarding, escalation, freezing and filing decisions.
 
-## Measured accuracy (as stated in the deck)
+## 4. Why Hawkeye Sterling
 
-| Measure | Figure | Source |
+| Area | Typical approach | Hawkeye Sterling |
 |---|---|---|
-| Sanctions recall (CI-enforced floor 95%) | 97.5% (118/121); 100% on the listed cases | `docs/governance/screening-accuracy-benchmark.md`, dated 28 Jul 2026 |
-| Hard-negative clear | Python; 96.5% JS | Same benchmark |
-| Frozen pre-hardening baseline | 57.0% recall | Same benchmark |
+| Risk assessment | Spreadsheet or standalone module | Built-in 0-30 scoring engine with CDD, SDD or EDD verdict |
+| Sanctions screening | Often the only function of a point solution | One module of nine, screening core lists daily |
+| PEP identification | Paid third-party lookup | Auto-detected via Wikidata, with relatives and close associates |
+| Adverse media | Single news feed | Four independent, overlapping feeds, delta-led |
+| Ownership analysis | Manual, file by file | Portfolio-level related-party and 50%-control detection |
+| Ongoing monitoring | Periodic re-checks | 60 scheduled or CI workflows on fixed cadences |
+| Case support | Tracked outside the tool | Cases opened, SLA-tracked and dispositioned in the workspace |
+| Audit evidence | Rebuilt at examination time | Captured continuously and carried in the printed report |
 
-These are repository-reported and CI-enforced. Reconfirm after any material code change.
+## 5. Who it is for
 
-## AI governance
+- **MLRO:** owns the methodology, approves every assessment, and decides on escalation, freezing and filing.
+- **Compliance analyst:** prepares assessments, reviews screening alerts and drafts narratives for MLRO sign-off.
+- **Senior management and the Board:** receive governance and KPI reporting to oversee the compliance programme.
+- **Regulators and auditors:** can be shown the control-to-evidence mapping and per-feature documentation on request.
 
-- **Model inventory:** six model cards. Four are deterministic (entity risk scoring, sanctions name matcher, adverse-media classifier, PEP identifier). Two are LLM-backed (AI triage and the Advisor).
-- **Labels:** AI output is marked `[AI]`, deterministic output `[Auto]`. Both appear beside the raw evidence.
-- **No hallucinations (hard rule):** filed reports contain only real, sourced data. Generative prose is off by default. LLM triage classifies supplied headlines only.
-- **Prompt injection:** fetched web text is stripped, wrapped and screened. Detected injections are never sent to the model. A CI red-team suite runs on every build.
-- **Advisor:** cited-answer Q&A. It never asserts a named entity's sanctions or adverse-media status as fact. Output is withheld where it could tip off a subject.
-- **Standards:** ISO/IEC 42001 (self-assessed, first management review pending), NIST AI RMF (mapped), EU AI Act (outside territorial scope), UAE PDPL (DPIA on file). These are self-assessments, not certifications.
+## 6. Entity risk assessment
 
-## Data architecture and security
+- **Identification first:** legal identity, location and contact, principals (beneficial owners, controllers, directors). Captured before any score.
+- **Seven scored factors:** jurisdiction, business activity, onboarding channel, operational history, ownership and control, and two supply-chain factors (recycled and mined sources).
+- **Risk bands:**
+  - 0-19: CDD, reviewed every 12 months
+  - 20-22: SDD, reviewed every 6 months
+  - 23 and above: EDD, reviewed every 3 months
+- **Hard outcomes override the band:** sanctions exposure, terrorist financing or proliferation financing leads to PROHIBITED. PEP exposure, FATF call-for-action jurisdictions and artisanal mining in high-risk jurisdictions force EDD.
+- **Analyst override:** can only raise the outcome, and always needs a printed justification.
+- **Sign-off:** the analyst assesses and the MLRO approves, with a formal attestation.
+- **Reports:** a print-ready letterhead report with evidence trail, filed to a controlled workspace by risk band.
 
-- **Browser:** deterministic scoring. Encrypted local storage (AES-256-GCM, PBKDF2, idle auto-lock). Hash-chained activity log (SHA-256).
-- **Edge and serverless:** Netlify CDN with security headers. `brain-soul.js` holds `ANTHROPIC_API_KEY`.
-- **Automation:** GitHub Actions holds the API key and Asana token.
-- **Egress:** with no Anthropic key configured, no assessment or customer data leaves the device or the runner. Provisioning the key is a separate, authorised decision assessed under PDPL.
-- **Controls:** pure-self CSP, CodeQL, Semgrep, Gitleaks, CycloneDX SBOM, Sigstore build provenance, branch protection and least-privilege tokens.
+## 7. Automated screening
 
-## Top residual risks (management attention)
+- **Daily run:** one unified screen covers every company and every recorded owner, director or UBO. The report is ready for the MLRO by 09:00 UAE.
+- **No paid feed required:** the screening runs on GitHub Actions with no API key for core operation. An AI layer is optional and opt-in.
+- **Sanctions lists:** OFAC (SDN and Consolidated), UN, EU, UK OFSI and UAE EOCN as core lists, with Canada SEMA, France DGT and Switzerland SECO as supplementary lists.
+- **Matching:** fuzzy and transliteration-aware, with groups covering Arabic and Turkish spelling variants. Phonetic-only matches are marked weak, never confirmed. Very short or non-Latin names go to manual review.
+- **Adverse media:** Google News, GDELT, Bing News and the OpenSanctions crime watchlist. Every item links to its real source.
+- **Delta engine:** each report leads with what is new. Standing items are marked and never dropped.
+- **Safe failure:** if a list cannot be loaded, the run stops rather than reporting an all-clear. A failed source is shown in the report.
 
-| ID | Risk | Residual |
-|---|---|---|
-| R-13 | Transaction-monitoring blind spot (FATF R.16 engine built, inactive pending a data feed) | Medium (12) |
-| R-17 | Key-person dependency (single operator; BCP drill and second trained operator) | Medium (12) |
-| R-03 | Residual false-negative risk (inherent to screening) | Medium (10) |
-| R-16 | Regulatory drift | Medium (8) |
-| R-20 | AI incident-response documented but not yet drilled | Medium (8) |
+## 8. Measured screening recall
 
-## Current status
+- **Sanctions recall:** 97.5% (118 of 121 labelled cases), against a 95% floor enforced in continuous integration.
+- **Hard negatives cleared:** 100% in Python and 96.5% in JavaScript.
+- **Improvement:** up from 57.0% recall on the frozen pre-hardening baseline (28 July 2026).
 
-- **Active:** entity risk assessment, screening, monitoring, Advisor (when the key is set), case support and compliance docs.
-- **Pending activation:** transaction monitoring. It needs a firm-provided data feed.
-- **Optional and gated:** LLM-backed features. They ship off by default and need the firm's own service arrangements, including a signed Anthropic DPA.
+These figures come from the repository's screening benchmark and are re-tested on every build.
 
-## Commercial terms (as stated in the presentation)
+## 9. AI in the platform
 
-AED 1,500 per month for integrated access to the confirmed modules. Other commercial terms are subject to agreement.
+Every AI output is decision support. It is never the decision.
 
-## Pre-publication verification checklist
+- **Where AI helps:** risk-rating suggestions, adverse-media triage, plain-language alert summaries, STR/SAR narrative drafts and related-party signals.
+- **Always labelled:** AI output is tagged [AI] and deterministic output is tagged [Auto]. Both appear beside the raw evidence.
+- **Grounded:** AI classifies only real, supplied headlines and list entries. It does not generate facts.
+- **Fallback:** if a model fails, the platform falls back to deterministic logic and says so.
+- **Advisor:** a cited-answer AML Q&A with verdict, legal basis and recommended steps. It is always advisory.
+- **Opt-in:** AI features are off by default and need the firm's own service arrangements.
 
-Confirm each item before external use:
+## 10. Architecture and data
 
-- [ ] AED 1,500/month price and implied commercial scope: confirm current terms.
-- [ ] 97.5% sanctions-recall and related figures: confirm no material code change since 6 Aug 2026.
-- [ ] Anthropic DPA status (shown as pending at review): confirm current status.
-- [ ] Transaction-monitoring "inactive" status: confirm whether a feed has since been connected.
-- [ ] `board-figures.json` counts (60 workflows, 183 docs): reconfirm as current.
-- [ ] "Independent readiness score: 3.9/5" is the firm's own self-assessment, not a third-party audit result.
-- [ ] ISO/IEC 42001, NIST AI RMF and EU AI Act positioning are self-assessments, not certifications.
-- [ ] KPI dashboard monthly log is unpopulated ("tbc") at the reviewed date.
+- **Browser:** the risk engine runs on the device. Data is encrypted in local storage and never leaves the device unless the firm enables an AI feature.
+- **Activity log:** a tamper-evident log records completions, overrides, exports and unlocks.
+- **Edge and serverless:** a CDN with strict security headers, and a relay for the optional Advisor.
+- **Automation:** scheduled screening runs on GitHub Actions.
+- **Security:** static analysis on every push, software bill of materials, and build provenance on every release.
 
-Any figure not explicitly sourced should be treated as not independently verified.
+## 11. Business value
+
+- **Consistent assessments:** the same methodology applied to every entity, every time.
+- **Faster access to information:** screening evidence and case history in one place.
+- **Better alert focus:** delta detection and AI triage highlight what is new.
+- **Stronger documentation:** evidence is assembled as work happens.
+- **Clearer rationale:** narrative templates and evidence citations support analyst reasoning.
+- **Management visibility:** KPI and governance reporting for senior management and the Board.
+
+No financial saving or return-on-investment figure is asserted.
+
+## 12. Implementation journey
+
+1. **Configure:** subscription activation, user and role setup, policy and methodology alignment.
+2. **Connect:** risk-data configuration, screening-source configuration, and AI-service configuration (optional).
+3. **Launch:** user training and a controlled operational launch.
+4. **Govern:** performance monitoring and ongoing governance.
+
+No implementation durations are asserted.
+
+## 13. Current status
+
+- **Live today:** entity risk assessment, automated screening, monitoring, case support and compliance documentation.
+- **Pending activation:** transaction monitoring, which is built and tested against FATF Recommendation 16 and needs a firm-provided data feed.
+- **Optional:** LLM-backed features, which ship gated off and need a signed data-processing agreement with the AI provider.
+
+## 14. Subscription
+
+**AED 1,500 per month**
+
+- Risk assessment
+- Sanctions screening
+- PEP screening
+- Adverse media
+- AI compliance advisor
+- Monitoring
+- Case support
+- Compliance documentation
+
+Terms beyond the monthly price are subject to agreement.
+
+## 15. Next step
+
+- **See it in your workflow:** a product demonstration covering an entity assessment, a screening alert, a monitoring event and a governed AI-assisted review.
+- **Discuss deployment and configuration** for your firm.
+
+---
+
+*Figures and commercial terms are stated as at 6 August 2026. Confirm current figures and terms before external use.*
