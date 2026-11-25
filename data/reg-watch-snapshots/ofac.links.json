@@ -177,7 +177,7 @@
  },
  {
   "t": "Current page 1",
-  "h": "https://ofac.treasury.gov/recent-actions?page=0"
+  "h": "https://ofac.treasury.gov/recent-actions?pulse_nocache=1795570204033-0&page=0"
  },
  {
   "t": "All Recent Actions",
@@ -230,6 +230,10 @@
  {
   "t": "Dealing with an \"OFAC Alert\"",
   "h": "https://ofac.treasury.gov/faqs/71"
+ },
+ {
+  "t": "List of Country-related Sanctions",
+  "h": "https://ofac.treasury.gov/sanctions-programs-and-country-information/where-is-ofacs-country-list-what-countries-do-i-need-to-worry-about-in-terms-of-us-sanctions"
  },
  {
   "t": "Appeal an OFAC designation or other listing",
