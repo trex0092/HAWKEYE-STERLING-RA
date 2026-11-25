@@ -113,6 +113,12 @@ await test('missing provider cannot be silently substituted', () => {
 });
 await test('a few nameless PEP records stay disclosed warnings, a large share still degrades', () => {
   const r = fixture(); r.domains.pep.evidence.sourceUnscreenable = ['fixture-item']; assert.equal(qualify(r).state, 'verified', 'a handful of nameless records is a disclosed warning');
+  // Regression: the producer's own count (pepUnscreenableSourceRecords) is
+  // reported in sourceQuality.evidence and must not be a zero-count gate when
+  // the bounded sourceUnscreenable tolerance is satisfied.
+  const counted = fixture(); counted.sourceQuality.evidence.pepUnscreenableSourceRecords = 5;
+  counted.domains.pep.evidence.sourceUnscreenable = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5'];
+  assert.equal(qualify(counted).state, 'verified', 'a bounded count of nameless PEP records must not degrade verified evidence');
   const big = fixture(); big.domains.pep.evidence.sourceUnscreenable = Array.from({ length: 5000 }, (_, i) => 'Q' + i); big.domains.pep.evidence.persons = 50000; assert.equal(qualify(big).state, 'degraded');
 });
 await test('sanctions list below its floor cannot pass', () => {
