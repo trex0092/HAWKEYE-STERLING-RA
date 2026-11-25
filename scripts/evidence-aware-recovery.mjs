@@ -96,7 +96,10 @@ export function qualifyEvidence(receipt, producer, currentSha, {
   const am = receipt.domains?.adverseMedia?.evidence;
   const pep = receipt.domains?.pep?.evidence;
   const quality = receipt.sourceQuality?.evidence;
-  const zeroes = [quality?.adverseMediaPartialSubjects, quality?.pepUnscreenableSourceRecords,
+  /* PEP source records without a screenable identity are bounded by the
+     tolerance check below (pep.sourceUnscreenable vs max(25, 0.1%)), the same
+     limit screening-assurance.mjs applies. They are not a zero-count gate. */
+  const zeroes = [quality?.adverseMediaPartialSubjects,
     quality?.adverseMediaBackboneFailures?.googleNews,
     quality?.adverseMediaBackboneFailures?.bing,
     am?.skippedSubjects, am?.partialSubjects,
