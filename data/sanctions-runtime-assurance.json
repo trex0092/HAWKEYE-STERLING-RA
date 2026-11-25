@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-24T16:04:26.432Z",
-  "githubRunId": "45432636436",
+  "generatedAt": "2026-11-25T01:33:27.911Z",
+  "githubRunId": "45526500147",
   "commit": "0d2e5b98417525844d70a2d434a587dfc9cebcbe",
   "screenedSubjects": 552,
   "sourceProjects": {
@@ -34,9 +34,9 @@
         "partial": false
       },
       {
-        "id": "un-consolidated",
-        "name": "UN Security Council — Consolidated list (XML)",
-        "count": 3758,
+        "id": "ofac-consolidated",
+        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
+        "count": 1674,
         "partial": false
       },
       {
@@ -46,9 +46,9 @@
         "partial": false
       },
       {
-        "id": "ofac-consolidated",
-        "name": "US OFAC — Consolidated (non-SDN) list (XML)",
-        "count": 1674,
+        "id": "un-consolidated",
+        "name": "UN Security Council — Consolidated list (XML)",
+        "count": 3758,
         "partial": false
       },
       {
