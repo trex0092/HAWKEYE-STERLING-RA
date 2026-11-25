@@ -21,7 +21,7 @@
       "prevHash": "d7aff2aa17f33c4a2c2d7cb0a928b1d5517d5a8ed9f6ab7e0fa8a71af4c9b3f2",
       "fp": 2,
       "error": "HTTP 403",
-      "errorStreak": 58
+      "errorStreak": 59
     },
     "uae-namlcftc": {
       "hash": "974234e337221e78a0a19a718f70910d559f55213a571374ff5ce8acb2bd4f7f",
@@ -31,7 +31,7 @@
       "contentAsOf": "2026-11-25",
       "status": 200,
       "prevHash": "8a9d28812faae18ecb74b740b1afe3cb99c776671d030838563cc80e7fcaced0",
-      "via": "web.archive.org save-page-now 20261125013357"
+      "via": "web.archive.org save-page-now 20261125170336"
     },
     "uae-eocn": {
       "hash": "3fb4feea5d90986bf8dbf3cef45a931c1fabfc5e85c50eb87e79b972f41d4ade",
@@ -61,13 +61,13 @@
       "fp": 2
     },
     "uae-jewellery": {
-      "hash": "942b755a0d91f2a9bea0e484bfc8eef196e748173b6d7302f43ad6756ba22a3c",
-      "bytes": 10244,
+      "hash": "5577a2fa92d0cbfb30a264908724dcf5eb4a997e31b38210341cbf56154708d5",
+      "bytes": 10264,
       "checkedAt": "2026-11-25",
       "changedAt": "2026-11-25",
       "contentAsOf": "2026-11-25",
       "status": 200,
-      "prevHash": "ad203c73e35a3c9619ff4b26041fd13a2560ac86369a3445644833e57b64d6d5",
+      "prevHash": "942b755a0d91f2a9bea0e484bfc8eef196e748173b6d7302f43ad6756ba22a3c",
       "fp": 2
     },
     "fatf-guidance": {
@@ -202,23 +202,23 @@
       "fp": 2
     },
     "rjc": {
-      "hash": "780573f9bc641e9da8bf6cb34bca005d1f3d56b6173801ecded624225deb8bef",
-      "bytes": 108361,
+      "hash": "9c3105a26bd320ea9e1a7ce718b613ec319982657423fa7a3b62fef4dcaa736a",
+      "bytes": 108334,
       "checkedAt": "2026-11-25",
-      "changedAt": "2026-11-24",
+      "changedAt": "2026-11-25",
       "contentAsOf": "2026-11-25",
       "status": 200,
-      "prevHash": "70b694d9383806f78d6151e1b8dd4713a75ad9386c26fa7ce812684dbd372db8",
+      "prevHash": "780573f9bc641e9da8bf6cb34bca005d1f3d56b6173801ecded624225deb8bef",
       "fp": 2
     },
     "eu-ai-act": {
-      "hash": "eb2fa66b630befbfd5faa0ffe8b5f64537ba68cdbb433715e14cac09a4faf056",
-      "bytes": 18128,
+      "hash": "1662145f236962602ef6d1dde563808e8c8f012887015027475c6b20496fe33e",
+      "bytes": 18264,
       "checkedAt": "2026-11-25",
-      "changedAt": "2026-11-24",
+      "changedAt": "2026-11-25",
       "contentAsOf": "2026-11-25",
       "status": 200,
-      "prevHash": "60f65f0954a888074feece26193d9191f55cf4a8dfc081c680331d698987ed20",
+      "prevHash": "eb2fa66b630befbfd5faa0ffe8b5f64537ba68cdbb433715e14cac09a4faf056",
       "fp": 2
     }
   }
