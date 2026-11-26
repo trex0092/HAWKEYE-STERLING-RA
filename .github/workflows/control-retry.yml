@@ -141,9 +141,14 @@ jobs:
           }
           const code = readFileSync('scripts/evidence-aware-recovery.mjs', 'utf8');
           assert.ok(code.includes('console.log(report);'));
-          assert.ok(code.includes('appendFileSync(process.env.GITHUB_STEP_SUMMARY, recoveryStepSummary(evidence, rows));'));
+          assert.ok(code.includes('appendFileSync(process.env.GITHUB_STEP_SUMMARY, recoveryStepSummary(evidence, rows, { producerPending }));'));
+          const pendingText = recoveryStepSummary({ state: 'degraded' }, [row('dispatched')], { producerPending: true });
+          assert.match(pendingText, /RECOVERY IN PROGRESS, NOT VERIFIED/);
+          assert.ok(!pendingText.includes(payload) && pendingText !== fixed && pendingText !== blocked);
+          assert.equal(recoveryStepSummary({ state: 'degraded' }, [row('blocked')], { producerPending: true }), blocked);
+          assert.equal(recoveryStepSummary({ state: 'unknown' }, [row('dispatched')], { producerPending: true }), blocked);
           assert.ok(!code.includes('appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);'));
-          checks += 3;
+          checks += 7;
           console.log(`${checks} offline summary-security checks passed. No live evidence was created or changed.`);
           NODE
 
@@ -187,4 +192,4 @@ jobs:
         run: |
           node scripts/asana-alert.mjs \
             "WORKFLOW RECOVERY BLOCKED: a registered control needs intervention" \
-            "Recovery encountered an unverifiable status, disabled workflow, or exhausted retry budget. Review the job log for per-control decisions and the summary for status. No operational pass is inferred from an accepted dispatch. $RUN_URL"
+            "Recovery encountered an unverifiable status, disabled workflow, exhausted retry budget, or a producer attempt that completed without verified evidence. Review the job log for per-control decisions and the summary for status. No operational pass is inferred from an accepted dispatch. $RUN_URL"

@@ -340,7 +340,9 @@ check('sharded refresh dispatches only when the merge job actually published (no
     siteWorkflow.includes('workflow_dispatch:') &&
     !/curl\s+-X\s+POST|npm\s+publish|netlify\s+deploy/m.test(siteWorkflow));
   check('screening assurance still controls the overall recovery status and cannot be bypassed',
-    recovery.includes("if (evidence.state !== 'verified' || rows.some(") &&
+    recovery.includes("if (outcome !== 'verified' && outcome !== 'recovering') process.exitCode = 1;") &&
+    recovery.includes("if (evidence?.state === 'degraded' && producerPending === true) return 'recovering';") &&
+    recovery.includes("return !current.some(r => r.status === 'completed' && time(r) >= midnight(nowMs));") &&
     recovery.includes("screeningDecision(runs, evidence,") &&
     recovery.includes("throw new Error('screening evidence changed; re-evaluation required')"));
 }
