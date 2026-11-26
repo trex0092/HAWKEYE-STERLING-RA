@@ -2,25 +2,6 @@
   "_README": "TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). A first snapshot of a newly tracked source is recorded with status \"baseline\" (monitoring began; not a designation update, so no re-screen obligation or latency). Entries are tamper-evident: chainPrev/chainHash link each detection to its predecessor and resolutionHash seals the terminal outcome; `node scripts/sanctions-watch.mjs verify-log` proves the log unedited and the watch workflow runs that check daily. Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest 200.",
   "entries": [
     {
-      "id": "un-consolidated",
-      "list": "UN Security Council — Consolidated list (XML)",
-      "change": "list changed",
-      "publicationDate": "2026-07-23",
-      "detectedAt": "2026-07-24T07:39:16.735Z",
-      "prevCount": 1010,
-      "newCount": 1011,
-      "rescreen": {
-        "workflow": "sanctions-screen.yml",
-        "runId": 30076180913,
-        "startedAt": "2026-07-24T07:39:20Z"
-      },
-      "status": "complete",
-      "chainPrev": "a68b5b600b67a7236094ee1b3de685e3ca96600c3bcd9d8d3e2f9784c51ef897",
-      "chainHash": "a6d057e602ddbcc3ba27c3f25df4fea76621bc9fb879d14909dc63d1b91d9a6f",
-      "latencyHours": 0,
-      "resolutionHash": "7b8116ac5d06c580142026af53f82bc7e4ca5e111addd9e427b7551698a9e160"
-    },
-    {
       "id": "ofac-sdn",
       "list": "US OFAC — SDN list (CSV)",
       "change": "list changed",
@@ -3790,6 +3771,19 @@
       "chainHash": "7596fca324dd018702a1825dca85ca1e6bcdf8efb1afe77e1c528b5e74507fba",
       "latencyHours": 0,
       "resolutionHash": "be8dbc122811f7f07887d7c256cf99d88ff91460984c5ccb789e0113afb11a87"
+    },
+    {
+      "id": "fr-dgt",
+      "list": "France — Registre national des gels (DGT)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-26T11:09:26.111Z",
+      "prevCount": 23297,
+      "newCount": 23300,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "7596fca324dd018702a1825dca85ca1e6bcdf8efb1afe77e1c528b5e74507fba",
+      "chainHash": "93e425c79530b2626ade05ec095550ed8d48ea81a811c8c3257e8d93106d73e5"
     }
   ]
 }

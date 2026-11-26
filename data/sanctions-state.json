@@ -74,15 +74,15 @@
       "errStreak": 0
     },
     "fr-dgt": {
-      "hash": "9d841d10a3df1d94f0f53132cd7eed4580b77bc40b968a224ee158634affabe7",
-      "bytes": 579489,
+      "hash": "9b132968262895aea253135d52a26d9cf951ef31606e4746a31a142b1565cee2",
+      "bytes": 579511,
       "checkedAt": "2026-11-26",
-      "changedAt": "2026-11-24",
+      "changedAt": "2026-11-26",
       "contentAsOf": "2026-11-26",
       "status": 200,
-      "prevHash": "f4778d47fa6f77f0d6a4c1daa4b5d1c67e9350ab997771c4d6a2807445abe826",
+      "prevHash": "9d841d10a3df1d94f0f53132cd7eed4580b77bc40b968a224ee158634affabe7",
       "fp": 2,
-      "count": 23297,
+      "count": 23300,
       "errStreak": 0
     }
   }
