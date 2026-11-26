@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { screeningDecision, qualifyEvidence, independentReady,
-  makeEvidenceReader, readPinnedEvidence, competingScreenStateWriter } from './evidence-aware-recovery.mjs';
+  makeEvidenceReader, readPinnedEvidence, competingScreenStateWriter,
+  producerRecoveryPending, recoveryOutcome, recoveryStepSummary } from './evidence-aware-recovery.mjs';
 
 const sha = 'a'.repeat(40), oldSha = 'b'.repeat(40), stateSha = 'c'.repeat(40), blobSha = 'd'.repeat(40);
 const nowMs = Date.parse('2026-10-22T16:00:00Z');
@@ -219,5 +220,85 @@ await test('top-level recovery failure logs its cause instead of discarding it',
   assert.ok(text.includes("'Recovery failed; no operational pass is established. Cause: ' + cause"));
   assert.ok(!text.includes("main().catch(() =>"));
 });
+
+/* Regression for Control Retry run 45731952677 (26 Nov 2026, 00:53 UTC): the
+   pinned receipt was generated 25 Nov 22:19 UTC, the producer was dispatched
+   in the same pass, no control was blocked, and the job still failed and
+   raised "WORKFLOW RECOVERY BLOCKED". Pending is narrow and is never a pass. */
+{
+  const midnightNow = Date.parse('2026-10-22T00:53:00Z');
+  const yesterdayRun = { ...baseRun, created_at: '2026-10-21T21:19:00Z' };
+  const yesterday = () => { const r = fixture(); r.generatedAt = '2026-10-21T22:19:00Z'; return r; };
+  const stale = qualifyEvidence(yesterday(), yesterdayRun, sha, { ...validators, nowMs: midnightNow });
+  const pending = (runs, evidence, action, options = {}) =>
+    producerRecoveryPending(runs, evidence, { action }, { nowMs: midnightNow, currentSha: sha, ...options });
+  const rows = action => [{ id: 'sanctions-screen.yml', action, reason: 'fixture' }];
+  const outcome = (evidence, action, flag) => recoveryOutcome(evidence, rows(action), { producerPending: flag });
+  await test('yesterday receipt after UTC midnight is degraded and routes to one bounded dispatch', () => {
+    assert.equal(stale.state, 'degraded');
+    assert.equal(screeningDecision([yesterdayRun], stale, { nowMs: midnightNow, currentSha: sha }).action, 'dispatch');
+  });
+  await test('first producer attempt of the day is pending, not blocked and not verified', () => {
+    assert.equal(pending([yesterdayRun], stale, 'dispatched'), true);
+    assert.equal(outcome(stale, 'dispatched', true), 'recovering');
+    assert.notEqual(outcome(stale, 'dispatched', true), 'verified');
+  });
+  await test('a main move is pending until the first current-code attempt completes', () => {
+    const oldRun = { ...baseRun, head_sha: oldSha, created_at: '2026-10-22T00:10:00Z' };
+    const moved = { state: 'degraded', currentSha: sha, runId: '111', generatedAt: '2026-10-22T00:40:00Z' };
+    assert.equal(pending([oldRun], moved, 'dispatched'), true);
+    assert.equal(pending([oldRun, { ...baseRun, id: 112, status: 'in_progress', conclusion: null,
+      created_at: '2026-10-22T00:45:00Z' }], moved, 'wait'), true);
+  });
+  await test('a completed current-code attempt today ends pending: still-degraded evidence is blocked', () => {
+    for (const conclusion of ['success', 'failure', 'cancelled', 'skipped']) {
+      const done = { ...baseRun, id: 113, conclusion, created_at: '2026-10-22T00:20:00Z' };
+      assert.equal(pending([yesterdayRun, done], stale, 'cooldown'), false);
+      assert.equal(pending([yesterdayRun, done], stale, 'dispatched'), false);
+    }
+    assert.equal(outcome(stale, 'cooldown', false), 'blocked');
+  });
+  await test('pending never covers unknown evidence, an exhausted budget or an unverified row', () => {
+    assert.equal(pending([yesterdayRun], { state: 'unknown', currentSha: sha }, 'dispatched'), false);
+    assert.equal(pending([yesterdayRun], { ...stale, state: 'verified' }, 'dispatched'), false);
+    for (const action of ['blocked', 'unknown', 'healthy', 'dispatch', undefined]) {
+      assert.equal(pending([yesterdayRun], stale, action), false);
+    }
+    assert.equal(outcome({ state: 'unknown' }, 'dispatched', true), 'blocked');
+    assert.equal(outcome(stale, 'blocked', true), 'blocked');
+    assert.equal(outcome(stale, 'unknown', true), 'blocked');
+    assert.equal(recoveryOutcome(stale, [], { producerPending: true }), 'blocked');
+    assert.equal(recoveryOutcome(stale, null, { producerPending: true }), 'blocked');
+    assert.equal(outcome(stale, 'dispatched', 'true'), 'blocked');
+    assert.equal(outcome(stale, 'dispatched'), 'blocked');
+  });
+  await test('pending fails closed on a wrong commit, an old or future receipt and malformed history', () => {
+    assert.equal(pending([yesterdayRun], { ...stale, currentSha: oldSha }, 'dispatched'), false);
+    assert.equal(pending([yesterdayRun], stale, 'dispatched', { currentSha: '' }), false);
+    assert.equal(pending([yesterdayRun], { ...stale, generatedAt: '2026-10-20T12:52:00Z' }, 'dispatched'), false);
+    assert.equal(pending([yesterdayRun], { ...stale, generatedAt: '2026-10-20T12:54:00Z' }, 'dispatched'), true);
+    assert.equal(pending([yesterdayRun], { ...stale, generatedAt: '2026-10-23T00:00:00Z' }, 'dispatched'), false);
+    assert.equal(pending([yesterdayRun], { ...stale, generatedAt: undefined }, 'dispatched'), false);
+    assert.equal(pending(null, stale, 'dispatched'), false);
+    assert.equal(pending([null], stale, 'dispatched'), false);
+    assert.equal(pending([{ ...baseRun, created_at: 'invalid' }], stale, 'dispatched'), false);
+    assert.equal(pending([yesterdayRun], stale, 'dispatched', { nowMs: NaN }), false);
+  });
+  await test('verified evidence is unchanged and the pending summary never reads as a pass', () => {
+    assert.equal(outcome(good, 'healthy', false), 'verified');
+    assert.equal(outcome(good, 'healthy', true), 'verified');
+    const text = recoveryStepSummary(stale, rows('dispatched'), { producerPending: true });
+    assert.match(text, /RECOVERY IN PROGRESS, NOT VERIFIED/);
+    assert.match(text, /No operational pass is established/);
+    assert.match(recoveryStepSummary(stale, rows('dispatched')), /BLOCKED OR UNVERIFIED/);
+    assert.match(recoveryStepSummary(stale, rows('blocked'), { producerPending: true }), /BLOCKED OR UNVERIFIED/);
+  });
+  await test('only a blocked outcome fails the job, and the producer decision feeds the pending check', () => {
+    const text = readFileSync('scripts/evidence-aware-recovery.mjs', 'utf8');
+    assert.ok(text.includes("if (outcome !== 'verified' && outcome !== 'recovering') process.exitCode = 1;"));
+    assert.ok(text.includes('producerPending = producerRecoveryPending(runs, evidence, decision, { nowMs: Date.now(), currentSha });'));
+    assert.ok(!text.includes("if (evidence.state !== 'verified' ||"));
+  });
+}
 
 console.log(`${passed} offline software checks passed. No live screening, provider, security-scan or deployment claim.`);

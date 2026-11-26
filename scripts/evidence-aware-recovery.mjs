@@ -130,6 +130,45 @@ export function qualifyEvidence(receipt, producer, currentSha, {
     reason: verified ? 'receipt and producer validated' : 'fresh current-code, population or source-quality evidence is incomplete' };
 }
 
+/* A degraded receipt is not always a blocked control. Two routine events
+ * leave the pinned receipt degraded while recovery is still doing its job:
+ * the UTC day rolls over (yesterday's receipt cannot satisfy today) and main
+ * moves (a receipt for the previous commit cannot satisfy the new one). In
+ * both, the first bounded producer attempt for today's current code has not
+ * finished yet, so nothing has failed and nobody can intervene usefully.
+ * This is "pending", never a pass. It ends the moment any current-code
+ * producer run completes today: from then on only a verified receipt is
+ * accepted, and a still-degraded one is reported as blocked. A receipt older
+ * than PENDING_MAX_AGE is never pending, so a producer that does not start
+ * cannot stay quiet beyond that age. */
+const PENDING_MAX_AGE = 36 * HOUR;
+const PENDING_ACTIONS = new Set(['dispatched', 'wait', 'cooldown', 'skip']);
+export function producerRecoveryPending(runs, evidence, decision, {
+  nowMs = Date.now(), currentSha = '', branch = 'main',
+} = {}) {
+  if (!Array.isArray(runs) || !Number.isFinite(nowMs) || !SHA.test(currentSha) ||
+      !object(evidence) || evidence.state !== 'degraded' || evidence.currentSha !== currentSha ||
+      !object(decision) || !PENDING_ACTIONS.has(decision.action)) return false;
+  const generated = Date.parse(evidence.generatedAt || '');
+  if (!Number.isFinite(generated) || generated > nowMs + 300000 || nowMs - generated > PENDING_MAX_AGE) return false;
+  if (runs.some(r => !object(r) || typeof r.head_branch !== 'string' || typeof r.event !== 'string')) return false;
+  const current = runs.filter(r => r.head_branch === branch && EVENTS.has(r.event) && r.head_sha === currentSha);
+  if (current.some(r => !Number.isFinite(time(r)))) return false;
+  return !current.some(r => r.status === 'completed' && time(r) >= midnight(nowMs));
+}
+
+const SAFE_ROW_ACTIONS = ['healthy', 'wait', 'cooldown', 'skip', 'dispatched'];
+/* The single status decision for the run: 'verified', 'recovering' or
+ * 'blocked'. Only 'blocked' fails the job and raises the intervention alert. */
+export function recoveryOutcome(evidence, rows, { producerPending = false } = {}) {
+  const rowsKnown = Array.isArray(rows) && rows.length > 0 &&
+    rows.every(r => object(r) && SAFE_ROW_ACTIONS.includes(r.action));
+  if (!rowsKnown) return 'blocked';
+  if (evidence?.state === 'verified') return 'verified';
+  if (evidence?.state === 'degraded' && producerPending === true) return 'recovering';
+  return 'blocked';
+}
+
 export function makeEvidenceReader({ repo, token, fetchImpl = fetch }) {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo || '') || !token) {
     throw new Error('repository and GitHub token are required');
@@ -190,10 +229,10 @@ export function independentReady(runs, evidence, currentSha) {
 // The summary file accepts locally authored status text only. API-derived
 // receipt identifiers and per-control details remain in the job log, never in
 // a local file that another workflow step could mistake for trusted input.
-export function recoveryStepSummary(evidence, rows) {
-  const known = evidence?.state === 'verified' && Array.isArray(rows) && rows.length > 0 &&
-    rows.every(r => object(r) && ['healthy', 'wait', 'cooldown', 'skip', 'dispatched'].includes(r.action));
-  if (!known) return '# Evidence-aware control recovery\n\nBLOCKED OR UNVERIFIED. Review the job log for pinned receipt metadata and per-control decisions. No operational pass is established.\n';
+export function recoveryStepSummary(evidence, rows, options = {}) {
+  const outcome = recoveryOutcome(evidence, rows, options);
+  if (outcome === 'recovering') return '# Evidence-aware control recovery\n\nRECOVERY IN PROGRESS, NOT VERIFIED. The pinned screening receipt does not yet cover today and the current code; the first bounded producer attempt is pending. No operational pass is established. Review the job log for per-control decisions.\n';
+  if (outcome !== 'verified') return '# Evidence-aware control recovery\n\nBLOCKED OR UNVERIFIED. Review the job log for pinned receipt metadata and per-control decisions. No operational pass is established.\n';
   return '# Evidence-aware control recovery\n\nRecovery routing decisions recorded. Review the job log for pinned receipt metadata and per-control decisions. Routing or dispatch is not independent screening, AI, security or deployment assurance.\n';
 }
 
@@ -217,6 +256,7 @@ export async function main() {
   const rows = [];
   const screenStateDispatched = new Set();
   let dispatched = false;
+  let producerPending = false;
   for (const control of controls) {
     try {
       const path = '/actions/workflows/' + encodeURIComponent(control.id);
@@ -268,6 +308,9 @@ export async function main() {
           if (SHARED_SCREEN_STATE_WRITERS.has(control.id)) screenStateDispatched.add(control.id);
         }
       }
+      if (control.id === PRODUCER) {
+        producerPending = producerRecoveryPending(runs, evidence, decision, { nowMs: Date.now(), currentSha });
+      }
       rows.push({ id: control.id, ...decision });
     } catch {
       rows.push({ id: control.id, action: 'unknown', reason: 'control history, evidence or dispatch is unverified; no blind retry' });
@@ -280,15 +323,18 @@ export async function main() {
       branch: 'main', nowMs: Date.now(), quietMs: 30 * 60000,
     }) });
   }
+  const outcome = recoveryOutcome(evidence, rows, { producerPending });
   const cell = value => String(value).replaceAll('|', '/').replace(/[\r\n]/g, ' ');
   const report = ['# Evidence-aware control recovery', '',
     'Recovery routing is not screening, AI, security or deployment assurance. A dispatch is not a pass.',
-    'Pinned receipt: ' + (evidence.stateSha || 'unverified') + ' / blob ' + (evidence.blobSha || 'unverified'), '',
+    'Pinned receipt: ' + (evidence.stateSha || 'unverified') + ' / blob ' + (evidence.blobSha || 'unverified'),
+    'Screening evidence: ' + (['verified', 'degraded'].includes(evidence.state) ? evidence.state : 'unknown') +
+      ' / overall: ' + outcome, '',
     '| Control | Recovery state | Evidence / action |', '| --- | --- | --- |',
     ...rows.map(r => `| ${cell(r.id)} | ${cell(r.action)} | ${cell(r.reason)} |`), ''].join('\n');
   console.log(report);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, recoveryStepSummary(evidence, rows));
-  if (evidence.state !== 'verified' || rows.some(r => ['unknown', 'blocked'].includes(r.action))) process.exitCode = 1;
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, recoveryStepSummary(evidence, rows, { producerPending }));
+  if (outcome !== 'verified' && outcome !== 'recovering') process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
