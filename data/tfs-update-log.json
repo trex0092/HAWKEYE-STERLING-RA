@@ -2,44 +2,6 @@
   "_README": "TFS list-update timeline: one entry per detected designation-list change, recording publicationDate (machine-readable when the feed carries one, else null; the MLRO completes it from the official notice), detectedAt (ingestion into monitoring), and rescreen (the first successful full-base screening run after detection, with latency in hours). A first snapshot of a newly tracked source is recorded with status \"baseline\" (monitoring began; not a designation update, so no re-screen obligation or latency). Entries are tamper-evident: chainPrev/chainHash link each detection to its predecessor and resolutionHash seals the terminal outcome; `node scripts/sanctions-watch.mjs verify-log` proves the log unedited and the watch workflow runs that check daily. Maintained by scripts/sanctions-watch.mjs on the sanctions-watch-state branch; entries are append-only, capped at the newest 200.",
   "entries": [
     {
-      "id": "ofac-sdn",
-      "list": "US OFAC — SDN list (CSV)",
-      "change": "list changed",
-      "publicationDate": null,
-      "detectedAt": "2026-07-25T07:25:05.772Z",
-      "prevCount": 19242,
-      "newCount": 19255,
-      "rescreen": {
-        "workflow": "sanctions-screen.yml",
-        "runId": 30149266798,
-        "startedAt": "2026-07-25T07:25:09Z"
-      },
-      "status": "complete",
-      "chainPrev": "a6d057e602ddbcc3ba27c3f25df4fea76621bc9fb879d14909dc63d1b91d9a6f",
-      "chainHash": "194ca2d0eadeb1eca869cbcd0718ae0c56497837adceb8f71a70307cff1bb506",
-      "latencyHours": 0,
-      "resolutionHash": "6efc244e4b13d07455ce6cb3e5b6cfc57fe1f07a48d4a80f25be2e1bb54b408f"
-    },
-    {
-      "id": "ofac-consolidated",
-      "list": "US OFAC — Consolidated (non-SDN) list (XML)",
-      "change": "list changed",
-      "publicationDate": null,
-      "detectedAt": "2026-07-25T07:25:05.772Z",
-      "prevCount": 442,
-      "newCount": null,
-      "rescreen": {
-        "workflow": "sanctions-screen.yml",
-        "runId": 30149266798,
-        "startedAt": "2026-07-25T07:25:09Z"
-      },
-      "status": "complete",
-      "chainPrev": "194ca2d0eadeb1eca869cbcd0718ae0c56497837adceb8f71a70307cff1bb506",
-      "chainHash": "c6ffb3b51f9d0a7c7066ac6c1c5f06f2e7c835bbbd41cd9f07c84f3b8ec580d7",
-      "latencyHours": 0,
-      "resolutionHash": "cfeb11ae73bddc5979a08c2e0cdb2b159760b1e5c57634782797587f524806bf"
-    },
-    {
       "id": "ofac-sdn-alt",
       "list": "US OFAC — SDN a.k.a. list (alt.csv)",
       "change": "first snapshot",
@@ -3780,10 +3742,42 @@
       "detectedAt": "2026-11-26T11:09:26.111Z",
       "prevCount": 23297,
       "newCount": 23300,
+      "rescreen": {
+        "workflow": "sanctions-screen.yml",
+        "runId": 45807988009,
+        "startedAt": "2026-11-26T11:09:29Z"
+      },
+      "status": "complete",
+      "chainPrev": "7596fca324dd018702a1825dca85ca1e6bcdf8efb1afe77e1c528b5e74507fba",
+      "chainHash": "93e425c79530b2626ade05ec095550ed8d48ea81a811c8c3257e8d93106d73e5",
+      "latencyHours": 0,
+      "resolutionHash": "f02632d9d359d11a94184038fea57da7858c74a3ce0966c65334f4c91dfdf74e"
+    },
+    {
+      "id": "uk-ofsi",
+      "list": "UK Sanctions List — FCDO/OFSI consolidated targets (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-26T14:59:55.765Z",
+      "prevCount": 58919,
+      "newCount": 58922,
       "rescreen": null,
       "status": "pending-rescreen",
-      "chainPrev": "7596fca324dd018702a1825dca85ca1e6bcdf8efb1afe77e1c528b5e74507fba",
-      "chainHash": "93e425c79530b2626ade05ec095550ed8d48ea81a811c8c3257e8d93106d73e5"
+      "chainPrev": "93e425c79530b2626ade05ec095550ed8d48ea81a811c8c3257e8d93106d73e5",
+      "chainHash": "16e6b55cd4db374b7cafe30b31680a951a0f49cf7dcacbe74bc4f15aadffbe52"
+    },
+    {
+      "id": "eu-fsf",
+      "list": "EU — Consolidated financial sanctions list (CSV)",
+      "change": "list changed",
+      "publicationDate": null,
+      "detectedAt": "2026-11-26T14:59:55.765Z",
+      "prevCount": 44286,
+      "newCount": 44288,
+      "rescreen": null,
+      "status": "pending-rescreen",
+      "chainPrev": "16e6b55cd4db374b7cafe30b31680a951a0f49cf7dcacbe74bc4f15aadffbe52",
+      "chainHash": "b55557b19b90e06da3324248c0883aa14528068a1cffa84997a8625c40ee9088"
     }
   ]
 }
