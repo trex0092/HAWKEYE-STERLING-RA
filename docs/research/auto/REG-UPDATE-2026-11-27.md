@@ -4,3 +4,12 @@
 
 ### Dubai Gold & Jewellery Group / DMCC (sector)
 _AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.dmcc.ae/_
+
+### Egmont Group of FIUs
+_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://egmontgroup.org/news/_
+
+### Responsible Jewellery Council (RJC)
+_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://www.responsiblejewellery.com/_
+
+### European Commission — EU AI Act regulatory framework (incl. Digital Omnibus amendments)
+_AI analysis skipped (API USD budget evidence unavailable). MLRO must inspect the primary source manually: https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai_
